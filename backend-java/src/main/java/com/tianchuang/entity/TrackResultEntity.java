@@ -1,0 +1,36 @@
+package com.tianchuang.entity;
+
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Lob;
+import jakarta.persistence.Table;
+
+import java.time.LocalDateTime;
+
+/** 双轨推演结果 */
+@Entity
+@Table(name = "track_result")
+public class TrackResultEntity {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    public Long id;
+
+    public LocalDateTime ts = LocalDateTime.now();
+    public String track1Level;
+    public int track1Sfi;
+    @Lob
+    public String track1Reason;      // 主要要素原因摘要
+    public String track2Level;
+    public double track2Confidence;
+    public String track2Source;      // deepseek | fallback
+    @Lob
+    public String track2Factors;
+    @Lob
+    public String track2Advice;
+    public String fusedLevel;
+    public String agreement;         // CONSISTENT | WEIGHTED | SAFETY_FIRST
+    public int fusedSfi;
+}

@@ -1,0 +1,8 @@
+spring:
+  application:
+    name: tianchuang
+  config:
+    # 外部共享配置：工程根目录 config/application.yml（start.bat 保证工作目录为工程根）
+    import: "optional:file:./config/application.yml"
+  jackson:
+    default-property-inclusion: non_null

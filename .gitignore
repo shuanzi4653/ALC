@@ -1,0 +1,41 @@
+# IDE and OS files
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Java / Maven build output
+backend-java/target/
+*.class
+*.jar
+*.war
+
+# Frontend dependencies and build output
+frontend/node_modules/
+frontend/dist/
+backend-java/src/main/resources/static/
+*.tsbuildinfo
+
+# Python virtual environments and caches
+backend-python/.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# Runtime data and logs
+data/*.db
+data/*.trace.db
+*.log
+
+# Local audit and temporary artifacts
+.audit/
+*.tmp
+*.temp
+
+# Local secrets and machine-specific configuration
+config/application.yml
+config/qweather/*.pem
+*.key
+*.secret
