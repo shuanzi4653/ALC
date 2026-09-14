@@ -4,17 +4,28 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.ViewControllerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import org.springframework.beans.factory.annotation.Value;
 
 /**
- * 静态资源：托管 frontend/dist 大屏构建产物（免重新打包 JAR，改前端后刷新即生效）
+ * 发布默认只托管 JAR 内构建产物；开发环境可显式配置 frontend.external-path 覆盖。
  */
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
+    private final String externalPath;
+
+    public WebConfig(@Value("${frontend.external-path:}") String externalPath) {
+        this.externalPath = externalPath == null ? "" : externalPath.trim();
+    }
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        registry.addResourceHandler("/**")
-                .addResourceLocations("file:./frontend/dist/", "classpath:/static/");
+        var handler = registry.addResourceHandler("/**");
+        if (!externalPath.isBlank()) {
+            String normalized = externalPath.replace('\\', '/');
+            if (!normalized.endsWith("/")) normalized += "/";
+            handler.addResourceLocations("file:" + normalized);
+        }
+        handler.addResourceLocations("classpath:/static/");
     }
 
     @Override

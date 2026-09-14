@@ -1,0 +1,112 @@
+{
+  "$comment": "规则边界用例（配置驱动）。用于 Java SfiEngineTest 与 Python test_rules.py 的跨语言 golden cases。期望值按 config/rules-v1.json 的阈值计算，threshold 字段标注所验证的比较边界。",
+  "ruleVersion": "v1",
+  "cases": [
+    {
+      "id": "wind-below-warn",
+      "snapshot": { "windSpeed": 7.9, "windGust": 5, "precipMmh": 0, "visibilityM": 20000, "thunderProb": 0, "tempC": 20 },
+      "expect": { "rawSfi": 100, "sfi": 100, "level": "FIT", "hardBan": false, "penalty": 0 },
+      "threshold": "windSpeed 警戒线 8 之下"
+    },
+    {
+      "id": "wind-equals-warn",
+      "snapshot": { "windSpeed": 8, "windGust": 5, "precipMmh": 0, "visibilityM": 20000, "thunderProb": 0, "tempC": 20 },
+      "expect": { "rawSfi": 78, "sfi": 78, "level": "CAUTION", "hardBan": false, "penalty": 22 },
+      "threshold": "windSpeed == 8（>= 命中，警戒）"
+    },
+    {
+      "id": "wind-equals-ban",
+      "snapshot": { "windSpeed": 12, "windGust": 5, "precipMmh": 0, "visibilityM": 20000, "thunderProb": 0, "tempC": 20 },
+      "expect": { "rawSfi": 60, "sfi": 39, "level": "BAN", "hardBan": true, "penalty": 40 },
+      "threshold": "windSpeed == 12（>= 命中，硬禁飞，sfi 截断为 39）"
+    },
+    {
+      "id": "gust-equals-ban",
+      "snapshot": { "windSpeed": 5, "windGust": 18, "precipMmh": 0, "visibilityM": 20000, "thunderProb": 0, "tempC": 20 },
+      "expect": { "rawSfi": 70, "sfi": 39, "level": "BAN", "hardBan": true, "penalty": 30 },
+      "threshold": "windGust == 18"
+    },
+    {
+      "id": "precip-equals-ban",
+      "snapshot": { "windSpeed": 5, "windGust": 5, "precipMmh": 5, "visibilityM": 20000, "thunderProb": 0, "tempC": 20 },
+      "expect": { "rawSfi": 65, "sfi": 39, "level": "BAN", "hardBan": true, "penalty": 35 },
+      "threshold": "precipMmh == 5（禁飞阈值；不得出现 CAUTION）"
+    },
+    {
+      "id": "visibility-equals-ban",
+      "snapshot": { "windSpeed": 5, "windGust": 5, "precipMmh": 0, "visibilityM": 1000, "thunderProb": 0, "tempC": 20 },
+      "expect": { "rawSfi": 70, "sfi": 39, "level": "BAN", "hardBan": true, "penalty": 30 },
+      "threshold": "visibilityM == 1000（<= 命中；低向阈值）"
+    },
+    {
+      "id": "visibility-just-above-ban",
+      "snapshot": { "windSpeed": 5, "windGust": 5, "precipMmh": 0, "visibilityM": 1001, "thunderProb": 0, "tempC": 20 },
+      "expect": { "rawSfi": 88, "sfi": 88, "level": "FIT", "hardBan": false, "penalty": 12 },
+      "threshold": "visibilityM == 1001（脱离禁飞，落入警戒）"
+    },
+    {
+      "id": "thunder-equals-ban",
+      "snapshot": { "windSpeed": 5, "windGust": 5, "precipMmh": 0, "visibilityM": 20000, "thunderProb": 0.6, "tempC": 20 },
+      "expect": { "rawSfi": 65, "sfi": 39, "level": "BAN", "hardBan": true, "penalty": 35 },
+      "threshold": "thunderProb == 0.6"
+    },
+    {
+      "id": "temp-warn-low-edge",
+      "snapshot": { "windSpeed": 5, "windGust": 5, "precipMmh": 0, "visibilityM": 20000, "thunderProb": 0, "tempC": -10.1 },
+      "expect": { "rawSfi": 90, "sfi": 90, "level": "FIT", "hardBan": false, "penalty": 10 },
+      "threshold": "温度 < -10 警戒（严格比较）"
+    },
+    {
+      "id": "temp-ban-high-edge",
+      "snapshot": { "windSpeed": 5, "windGust": 5, "precipMmh": 0, "visibilityM": 20000, "thunderProb": 0, "tempC": 45.1 },
+      "expect": { "rawSfi": 70, "sfi": 39, "level": "BAN", "hardBan": true, "penalty": 30 },
+      "threshold": "温度 > 45 禁飞（严格比较）"
+    },
+    {
+      "id": "temp-equals-warn-high",
+      "snapshot": { "windSpeed": 5, "windGust": 5, "precipMmh": 0, "visibilityM": 20000, "thunderProb": 0, "tempC": 40 },
+      "expect": { "rawSfi": 100, "sfi": 100, "level": "FIT", "hardBan": false, "penalty": 0 },
+      "threshold": "温度 == 40 不在警戒内（区间闭合）"
+    },
+    {
+      "id": "multi-factors-accumulate",
+      "snapshot": { "windSpeed": 9, "windGust": 13, "precipMmh": 2, "visibilityM": 4000, "thunderProb": 0.3, "tempC": 35 },
+      "expect": { "penalty": 77, "rawSfi": 23, "level": "BAN", "hardBan": false },
+      "threshold": "多要素警戒叠加但无单项禁飞：22+16+15+12+12=77，rawSfi 低至禁飞区间，hardBan 应为 false"
+    },
+    {
+      "id": "level-boundary-80",
+      "snapshot": { "windSpeed": 5, "windGust": 5, "precipMmh": 0, "visibilityM": 20000, "thunderProb": 0, "tempC": 20 },
+      "expect": { "rawSfi": 100, "level": "FIT" },
+      "threshold": "等级边界 80：sfi>=80 → FIT"
+    },
+    {
+      "id": "level-boundary-60",
+      "snapshot": { "windSpeed": 8, "windGust": 5, "precipMmh": 0, "visibilityM": 20000, "thunderProb": 0, "tempC": 20 },
+      "expect": { "rawSfi": 78, "level": "CAUTION" },
+      "threshold": "等级边界 60：60<=sfi<80 → CAUTION"
+    }
+  ],
+  "invalidCases": [
+    {
+      "id": "missing-required-wind",
+      "snapshot": { "windSpeed": null, "windGust": 5, "precipMmh": 0, "visibilityM": 20000, "thunderProb": 0, "tempC": 20 },
+      "expectError": "必需字段缺失（null）不得默认判定适飞"
+    },
+    {
+      "id": "negative-wind",
+      "snapshot": { "windSpeed": -1, "windGust": 5, "precipMmh": 0, "visibilityM": 20000, "thunderProb": 0, "tempC": 20 },
+      "expectError": "风速不接受负值"
+    },
+    {
+      "id": "thunder-prob-out-of-range",
+      "snapshot": { "windSpeed": 5, "windGust": 5, "precipMmh": 0, "visibilityM": 20000, "thunderProb": 1.5, "tempC": 20 },
+      "expectError": "概率限定 0-1"
+    },
+    {
+      "id": "nan-value",
+      "snapshot": { "windSpeed": "NaN", "windGust": 5, "precipMmh": 0, "visibilityM": 20000, "thunderProb": 0, "tempC": 20 },
+      "expectError": "NaN / 无穷不接受"
+    }
+  ]
+}

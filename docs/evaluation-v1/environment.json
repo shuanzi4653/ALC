@@ -1,0 +1,10 @@
+{
+  "caseSha256": "8b422d68e54979e580e6b302d0500b24ec8b3d9816111f35ac136daabf38ec23",
+  "python": "3.13.14 (main, Jun 11 2026, 04:04:46) [MSC v.1944 64 bit (AMD64)]",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "caseCount": 120,
+  "checkStepSeconds": 10,
+  "source": "SIMULATION",
+  "deadlineSeconds": 2,
+  "note": "No measured flight outcomes or calibrated probabilities"
+}

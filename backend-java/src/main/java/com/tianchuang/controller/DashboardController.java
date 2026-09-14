@@ -1,10 +1,7 @@
 package com.tianchuang.controller;
 
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
 
 import com.tianchuang.config.QweatherProperties;
 import com.tianchuang.entity.AgentChatEntity;
@@ -63,20 +60,23 @@ public class DashboardController {
     /** 切换模拟剧本（clear/wind/rain/storm）并立即触发一轮 */
     @PostMapping("/sim/switch")
     public ResponseEntity<Map<String, Object>> switchScenario(@RequestParam String scenario) throws Exception {
-        monitor.switchScenario(scenario);
-        return ResponseEntity.ok(monitor.buildDashboard());
+        return ResponseEntity.ok(monitor.switchScenario(scenario));
     }
 
     /** 配置状态（供大屏顶部状态灯） */
     @GetMapping("/config/status")
     public Map<String, Object> configStatus() {
         boolean qweatherReady = qw.jwtReady();
+        Map<String, Object> dashboard = monitor.buildDashboard();
         return Map.of(
                 "qweatherReady", qweatherReady,
-                "qweatherHost", qweatherReady ? qw.apiHost() : "(未配置)",
-                "mode", qweatherReady ? "live/sim 可切换" : "sim",
-                "note", qweatherReady ? "和风 JWT 配置完整"
-                        : "缺少和风配置，仅支持模拟数据模式");
+                "configuredMode", dashboard.get("configuredMode"),
+                "effectiveSource", String.valueOf(dashboard.getOrDefault("effectiveSource", "-")),
+                "dataStatus", dashboard.get("dataStatus"),
+                "lastSuccessAt", String.valueOf(dashboard.getOrDefault("lastRunAt", "")),
+                "degraded", Boolean.TRUE.equals(dashboard.get("degraded")),
+                "note", qweatherReady ? "和风凭据配置项完整，实际可用性以最近成功观测为准"
+                        : "和风凭据未完整配置");
     }
 
     /** 智能体问答（大屏右栏交互窗口） */
@@ -111,57 +111,6 @@ public class DashboardController {
     @GetMapping("/push/logs")
     public List<?> pushLogs() {
         return pushLogRepo.findTop50ByOrderByTsDesc();
-    }
-
-    /** 结束系统：先停 Python 服务（8600），再延迟退出 Java 自身（8085） */
-    @PostMapping("/system/shutdown")
-    public ResponseEntity<Map<String, Object>> shutdown() {
-        String killMsg;
-        try {
-            killMsg = killPort(8600);
-        } catch (Exception e) {
-            log.warn("停止 Python 服务时出错: {}", e.getMessage());
-            killMsg = "停止 Python 服务异常: " + e.getMessage();
-        }
-        String msg = killMsg + "；Java 后端将于 1 秒后退出，端口 8085 随之释放";
-        log.info("收到结束系统指令: {}", killMsg);
-        Thread exitThread = new Thread(() -> {
-            try {
-                Thread.sleep(800);
-            } catch (InterruptedException ignored) {
-                Thread.currentThread().interrupt();
-            }
-            System.exit(0);
-        }, "shutdown-exit");
-        exitThread.setDaemon(true);
-        exitThread.start();
-        return ResponseEntity.ok(Map.of("message", msg));
-    }
-
-    /** 通过 netstat 定位监听指定端口的进程并 taskkill 结束 */
-    private String killPort(int port) throws Exception {
-        Process probe = Runtime.getRuntime().exec(new String[]{
-                "cmd", "/c", "netstat -ano | findstr :" + port + " | findstr LISTENING"});
-        String out = new String(probe.getInputStream().readAllBytes(), java.nio.charset.Charset.forName("GBK"));
-        probe.waitFor(5, TimeUnit.SECONDS);
-        Set<String> pids = new LinkedHashSet<>();
-        for (String line : out.split("\\R")) {
-            String[] parts = line.trim().split("\\s+");
-            if (parts.length >= 5 && parts[parts.length - 1].matches("\\d+")) {
-                pids.add(parts[parts.length - 1]);
-            }
-        }
-        if (pids.isEmpty()) {
-            return "端口 " + port + " 无监听进程";
-        }
-        StringBuilder sb = new StringBuilder();
-        for (String pid : pids) {
-            Process killer = Runtime.getRuntime().exec(
-                    new String[]{"cmd", "/c", "taskkill /F /T /PID " + pid});
-            killer.waitFor(5, TimeUnit.SECONDS);
-            sb.append("已停止 PID ").append(pid).append("；");
-        }
-        return sb.toString();
     }
 
     private String buildContext(Map<String, Object> dash) {

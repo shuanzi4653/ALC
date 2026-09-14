@@ -1,0 +1,73 @@
+server:
+  address: 127.0.0.1
+  port: 8085
+
+spring:
+  datasource:
+    url: jdbc:h2:file:./data/tianchuang;MODE=MySQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+  h2:
+    console:
+      enabled: false
+
+qweather:
+  api-host: ""
+  kid: ""
+  iss: ""
+  sub: ""
+  private-key-path: "${QWEATHER_PRIVATE_KEY_PATH:}"
+  lat: 43.90
+  lon: 125.32
+  region-name: "东北三省低空运行区"
+  task-type: "区域低空巡检"
+
+deepseek:
+  api-key: "${DEEPSEEK_API_KEY:}"
+  base-url: https://api.deepseek.com
+  model: deepseek-chat
+
+monitor:
+  mode: sim
+  scenario: clear
+  initial-delay-ms: 6000
+  fixed-delay-ms: 600000
+  allow-sim-fallback: false
+
+rules:
+  version: v1
+  hard-ban-enabled: true
+
+push:
+  dingtalk-webhook: "${DINGTALK_WEBHOOK:}"
+  feishu-webhook: "${FEISHU_WEBHOOK:}"
+  wecom-webhook: "${WECOM_WEBHOOK:}"
+  mail:
+    enabled: false
+    host: ""
+    port: 465
+    username: ""
+    password: "${SMTP_PASSWORD:}"
+    to: ""
+
+python-service:
+  base-url: http://127.0.0.1:8600
+
+security:
+  enabled: false
+  allow-demo-user: true
+  viewer-user: "${TIANCHUANG_VIEWER_USER:}"
+  viewer-password: "${TIANCHUANG_VIEWER_PASSWORD:}"
+  operator-user: "${TIANCHUANG_OPERATOR_USER:}"
+  operator-password: "${TIANCHUANG_OPERATOR_PASSWORD:}"
+  admin-user: "${TIANCHUANG_ADMIN_USER:}"
+  admin-password: "${TIANCHUANG_ADMIN_PASSWORD:}"
+
+# 仅前端开发联调时设置；正式发布保持为空，使用 JAR 内静态资源。
+frontend:
+  external-path: ""

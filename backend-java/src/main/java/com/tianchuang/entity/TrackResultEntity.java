@@ -19,6 +19,9 @@ public class TrackResultEntity {
     public Long id;
 
     public LocalDateTime ts = LocalDateTime.now();
+    public String runId;
+    public int revision = 1;
+    public String status = "COMPLETE";
     public String track1Level;
     public int track1Sfi;
     @Lob

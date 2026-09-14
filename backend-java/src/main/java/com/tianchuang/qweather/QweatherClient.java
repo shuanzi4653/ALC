@@ -53,23 +53,22 @@ public class QweatherClient {
         JsonNode gust = root.path("windGust");
         JsonNode precip = root.path("precipitation").path("intensity");
         JsonNode vis = root.path("visibility");
-        String time = root.path("metadata").path("obsTime").asText(null);
-        if (time == null || time.isBlank()) {
-            time = java.time.OffsetDateTime.now().toString();
-        }
-        double thunder = estimateThunder(c.path("code").asText("100"), root.path("cloudCover").asDouble(0));
+        String time = requiredText(root.path("metadata").path("obsTime"), "metadata.obsTime");
+        double cloudCover = requiredDouble(root.path("cloudCover"), "cloudCover");
+        double humidity = normalizeFraction(requiredDouble(root.path("humidity"), "humidity"), "humidity");
+        double thunder = estimateThunder(c.path("code").asText(""), cloudCover);
         return new WeatherSnapshot(
                 time, "live", props.lat(), props.lon(),
-                c.path("text").asText("未知"),
-                root.path("temperature").path("value").asDouble(0),
-                root.path("humidity").asDouble(0),
-                wind.path("value").asDouble(0),
-                gust.path("value").asDouble(0),
-                root.path("wind").path("direction").path("degree").asInt(0),
-                precip.path("value").asDouble(0),
-                vis.path("value").asDouble(20000),
-                root.path("pressure").path("value").asDouble(1010),
-                root.path("cloudCover").asDouble(0),
+                requiredText(c.path("text"), "condition.text"),
+                requiredDouble(root.path("temperature").path("value"), "temperature.value"),
+                humidity,
+                requiredDouble(wind.path("value"), "wind.speed.value"),
+                requiredDouble(gust.path("value"), "windGust.value"),
+                optionalDegree(root.path("wind").path("direction").path("degree")),
+                requiredDouble(precip.path("value"), "precipitation.intensity.value"),
+                requiredDouble(vis.path("value"), "visibility.value"),
+                requiredDouble(root.path("pressure").path("value"), "pressure.value"),
+                cloudCover,
                 thunder);
     }
 
@@ -81,13 +80,15 @@ public class QweatherClient {
         List<ForecastHour> list = new ArrayList<>();
         for (JsonNode h : root.path("hours")) {
             list.add(new ForecastHour(
-                    h.path("forecastTime").asText(""),
-                    h.path("temperature").path("value").asDouble(0),
-                    h.path("wind").path("speed").path("value").asDouble(0),
-                    h.path("windGust").path("value").asDouble(0),
-                    h.path("precipitation").path("intensity").path("value").asDouble(0),
-                    h.path("visibility").path("value").asDouble(20000),
-                    thunderFromPrecipProb(h.path("precipitation").path("probability").asDouble(0))));
+                    requiredText(h.path("forecastTime"), "hours.forecastTime"),
+                    requiredDouble(h.path("temperature").path("value"), "hours.temperature.value"),
+                    requiredDouble(h.path("wind").path("speed").path("value"), "hours.wind.speed.value"),
+                    requiredDouble(h.path("windGust").path("value"), "hours.windGust.value"),
+                    requiredDouble(h.path("precipitation").path("intensity").path("value"), "hours.precipitation.intensity.value"),
+                    requiredDouble(h.path("visibility").path("value"), "hours.visibility.value"),
+                    thunderFromPrecipProb(normalizeFraction(requiredDouble(
+                            h.path("precipitation").path("probability"), "hours.precipitation.probability"),
+                            "hours.precipitation.probability"))));
         }
         return list;
     }
@@ -102,6 +103,38 @@ public class QweatherClient {
 
     private double thunderFromPrecipProb(double prob) {
         return Math.max(0, Math.min(0.9, prob * 0.6));
+    }
+
+    private String requiredText(JsonNode node, String field) {
+        if (node == null || node.isMissingNode() || node.isNull() || node.asText().isBlank()) {
+            throw new IllegalArgumentException("和风字段缺失: " + field);
+        }
+        return node.asText();
+    }
+
+    private double requiredDouble(JsonNode node, String field) {
+        if (node == null || node.isMissingNode() || node.isNull() || !node.isNumber()) {
+            throw new IllegalArgumentException("和风数值字段缺失或格式错误: " + field);
+        }
+        double value = node.asDouble();
+        if (!Double.isFinite(value)) throw new IllegalArgumentException("和风数值字段非有限值: " + field);
+        return value;
+    }
+
+    private double normalizeFraction(double value, String field) {
+        double normalized = value > 1 && value <= 100 ? value / 100.0 : value;
+        if (normalized < 0 || normalized > 1) {
+            throw new IllegalArgumentException("和风比例字段超出范围: " + field);
+        }
+        return normalized;
+    }
+
+    private Integer optionalDegree(JsonNode node) {
+        if (node == null || node.isMissingNode() || node.isNull()) return null;
+        if (!node.canConvertToInt()) throw new IllegalArgumentException("和风风向字段格式错误");
+        int value = node.asInt();
+        if (value < 0 || value > 359) throw new IllegalArgumentException("和风风向字段超出范围");
+        return value;
     }
 
     private JsonNode getJson(String url) throws Exception {

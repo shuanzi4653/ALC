@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, onUnmounted, nextTick, ref, watch } from 'vue'
-import * as echarts from 'echarts'
+import echarts from '../echarts.js'
 import { store } from '../api.js'
 import { levelColor, levelLabel } from '../utils.js'
 
@@ -33,18 +33,18 @@ function draw() {
     yAxis: {
       type: 'value', min: 0, max: 100,
       axisLabel: { color: '#6f95c4', fontSize: 9 },
-      splitLine: { lineStyle: { color: 'rgba(42,74,115,.35)' } },
-      markLine: { silent: true, symbol: 'none', label: { show: false }, data: [
-        { yAxis: 80, lineStyle: { color: 'rgba(46,139,87,.5)', type: 'dashed' } },
-        { yAxis: 60, lineStyle: { color: 'rgba(217,138,43,.5)', type: 'dashed' } },
-        { yAxis: 40, lineStyle: { color: 'rgba(192,57,43,.5)', type: 'dashed' } }
-      ] }
+      splitLine: { lineStyle: { color: 'rgba(42,74,115,.35)' } }
     },
     series: [
       {
         name: 'SFI 实测', type: 'line', data: [...histY, ...nulls(fcY.length - 1)],
         smooth: true, symbol: 'none', connectNulls: false,
         lineStyle: { color: '#3fa7ff', width: 2 },
+        markLine: { silent: true, symbol: 'none', label: { show: false }, data: [
+          { yAxis: 80, lineStyle: { color: 'rgba(46,139,87,.5)', type: 'dashed' } },
+          { yAxis: 60, lineStyle: { color: 'rgba(217,138,43,.5)', type: 'dashed' } },
+          { yAxis: 40, lineStyle: { color: 'rgba(192,57,43,.5)', type: 'dashed' } }
+        ] },
         areaStyle: {
           color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
             { offset: 0, color: 'rgba(63,167,255,.35)' },

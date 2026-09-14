@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { store } from '../api.js'
+import { requestJson, store } from '../api.js'
 import { fmtDateTime } from '../utils.js'
 
 const logs = ref([])
@@ -20,19 +20,18 @@ const channelState = computed(() => {
   for (const c of CHANNELS) {
     const recent = logs.value.find(l => l.channel === c.key)
     map[c.key] = !recent || recent.status === 'SKIPPED' ? 'idle'
-      : recent.status === 'SENT' ? 'ok' : 'fail'
+      : ['SENT', 'DISPLAYED'].includes(recent.status) ? 'ok' : 'fail'
   }
   return map
 })
-const STATE_LABEL = { ok: '已连通', idle: '未配置', fail: '异常' }
+const STATE_LABEL = { ok: '曾送达', idle: '无有效送达记录', fail: '最近失败' }
 
 // 明细列表：右栏空间充足，一次展示 14 条（后端 top50 内可滚动回看）
 const shown = computed(() => logs.value.slice(0, 14))
 
 async function load() {
   try {
-    const r = await fetch((import.meta.env.DEV ? 'http://127.0.0.1:8085' : '') + '/api/push/logs')
-    if (r.ok) logs.value = await r.json()
+    logs.value = await requestJson('/api/push/logs', { timeoutMs: 8000 })
   } catch (e) { /* 后端未就绪时静默 */ }
 }
 
@@ -67,12 +66,12 @@ const wsOk = computed(() => store.wsConnected)
         <span class="pi-time">{{ fmtDateTime(l.ts) }}</span>
         <span class="pi-ch">{{ CHANNELS.find(c => c.key === l.channel)?.name || l.channel }}</span>
         <span class="pi-status" :class="l.status.toLowerCase()">
-          <i></i>{{ l.status === 'SENT' ? '送达' : l.status === 'SKIPPED' ? '跳过' : '失败' }}
+          <i></i>{{ l.status === 'SENT' ? '已发送' : l.status === 'DISPLAYED' ? '已展示' : l.status === 'SKIPPED' ? '跳过' : '失败' }}
         </span>
         <span class="pi-detail">{{ l.detail }}</span>
       </div>
     </div>
-    <div class="push-empty" v-else>暂无推送记录 · 触发预警后此处显示各渠道送达情况</div>
+    <div class="push-empty" v-else>暂无推送记录 · 触发预警后此处显示各渠道发送状态</div>
 
     <!-- 底部实时链路状态 -->
     <div class="push-ws">
@@ -116,7 +115,7 @@ const wsOk = computed(() => store.wsConnected)
 .pi-ch { color: #dce9f7; flex: none; width: 40px; }
 .pi-status { flex: none; width: 44px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; }
 .pi-status i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-.pi-status.ok, .pi-status.sent { color: #2e8b57; }
+.pi-status.ok, .pi-status.sent, .pi-status.displayed { color: #2e8b57; }
 .pi-status.skipped { color: #51719e; }
 .pi-status.failed { color: #c0392b; }
 .pi-detail { color: #7ba0cc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }

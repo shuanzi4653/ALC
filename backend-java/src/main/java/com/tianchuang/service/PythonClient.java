@@ -54,15 +54,17 @@ public class PythonClient {
 
     /** 轨2 大模型研判 */
     @SuppressWarnings("unchecked")
-    public Map<String, Object> track2(WeatherSnapshot snap, List<ForecastHour> forecast,
-                                      String region, String taskType) throws Exception {
+    public Map<String, Object> track2(String runId, long deadlineEpochMs, WeatherSnapshot snap,
+                                      List<ForecastHour> forecast, String region, String taskType) throws Exception {
         Map<String, Object> body = Map.of(
+                "run_id", runId,
+                "deadline_epoch_ms", deadlineEpochMs,
                 "snapshot", mapper.convertValue(snap, Map.class),
                 "forecast", forecast.stream().map(f -> mapper.convertValue(f, Map.class)).toList(),
                 "region", region,
                 "task_type", taskType);
         HttpRequest req = HttpRequest.newBuilder(URI.create(pyProps.baseUrl() + "/track2"))
-                .timeout(Duration.ofSeconds(90))
+                .timeout(Duration.ofSeconds(22))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body)))
                 .build();
@@ -87,6 +89,34 @@ public class PythonClient {
             throw new IllegalStateException("问答服务 HTTP " + resp.statusCode());
         }
         return mapper.readValue(resp.body(), Map.class);
+    }
+
+    public org.springframework.http.ResponseEntity<?> decisionRequest(String path, Map<String, Object> body) throws Exception {
+        HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(pyProps.baseUrl() + path))
+                .timeout(Duration.ofSeconds(30)).header("Content-Type", "application/json");
+        if (body == null) builder.GET();
+        else builder.POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body)));
+        HttpResponse<String> response = http.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() >= 400) {
+            String message = "决策请求被拒绝，请检查输入、时次或记录是否存在";
+            if (path.equals("/traffic/command") && response.statusCode() == 409) {
+                var detail = mapper.readTree(response.body()).path("detail");
+                if (detail.isTextual() && detail.asText().length() <= 160) message = detail.asText();
+            }
+            return org.springframework.http.ResponseEntity.status(response.statusCode()).body(
+                    Map.of("code", "DECISION_REQUEST_FAILED", "message", message, "retryable", false));
+        }
+        return org.springframework.http.ResponseEntity.ok(mapper.readValue(response.body(), Object.class));
+    }
+
+    public java.util.List<com.tianchuang.dto.LayerDto> weatherLayers(Map<String, Object> dashboard) throws Exception {
+        HttpRequest request = HttpRequest.newBuilder(URI.create(pyProps.baseUrl() + "/weather/layers"))
+                .timeout(Duration.ofSeconds(8)).header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(dashboard))).build();
+        HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 200) throw new IllegalStateException("天气计算服务不可用");
+        return mapper.readValue(response.body(), mapper.getTypeFactory().constructCollectionType(
+                java.util.List.class, com.tianchuang.dto.LayerDto.class));
     }
 
     private String abbreviate(String s) {

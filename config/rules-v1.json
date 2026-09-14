@@ -1,0 +1,95 @@
+{
+  "version": "v1",
+  "description": "天窗智巡适飞规则 v1。阈值、比较方向、扣分与等级边界均由本文件驱动；Java 与 Python 需读取同一文件以保持一致。修改阈值必须同时更新 version 字段。",
+  "hardBanEnabled": true,
+  "hardBanSfiCap": 39,
+  "levels": {
+    "fit": 80,
+    "caution": 60,
+    "danger": 40
+  },
+  "factors": [
+    {
+      "key": "windSpeed",
+      "label": "平均风速",
+      "unit": "m/s",
+      "direction": "high",
+      "warnValue": 8,
+      "banValue": 12,
+      "penaltyWarn": 22,
+      "penaltyBan": 40,
+      "noteOk": "正常",
+      "noteWarn": "超适飞阈值",
+      "noteBan": "达禁飞阈值"
+    },
+    {
+      "key": "windGust",
+      "label": "阵风风速",
+      "unit": "m/s",
+      "direction": "high",
+      "warnValue": 12,
+      "banValue": 18,
+      "penaltyWarn": 16,
+      "penaltyBan": 30,
+      "noteOk": "正常",
+      "noteWarn": "超适飞阈值",
+      "noteBan": "达禁飞阈值"
+    },
+    {
+      "key": "precipMmh",
+      "label": "降水强度",
+      "unit": "mm/h",
+      "direction": "high",
+      "warnValue": 1,
+      "banValue": 5,
+      "penaltyWarn": 15,
+      "penaltyBan": 35,
+      "noteOk": "无降水",
+      "noteWarn": "出现降水",
+      "noteBan": "达禁飞阈值"
+    },
+    {
+      "key": "visibilityM",
+      "label": "能见度",
+      "unit": "km",
+      "direction": "low",
+      "warnValue": 5000,
+      "banValue": 1000,
+      "penaltyWarn": 12,
+      "penaltyBan": 30,
+      "displayDivisor": 1000,
+      "noteOk": "良好",
+      "noteWarn": "偏低",
+      "noteBan": "低于禁飞阈值"
+    },
+    {
+      "key": "thunderProb",
+      "label": "雷暴概率",
+      "unit": "%",
+      "direction": "high",
+      "warnValue": 0.2,
+      "banValue": 0.6,
+      "penaltyWarn": 12,
+      "penaltyBan": 35,
+      "displayMultiplier": 100,
+      "noteOk": "低",
+      "noteWarn": "存在风险",
+      "noteBan": "过高"
+    },
+    {
+      "key": "tempC",
+      "label": "温度",
+      "unit": "℃",
+      "direction": "range",
+      "warnLow": -10,
+      "warnHigh": 40,
+      "banLow": -20,
+      "banHigh": 45,
+      "penaltyWarn": 10,
+      "penaltyBan": 30,
+      "noteOk": "正常",
+      "noteWarn": "接近边界",
+      "noteBan": "超出安全范围"
+    }
+  ]
+}

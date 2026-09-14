@@ -10,7 +10,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class FusionService {
 
-    public enum Agreement { CONSISTENT, WEIGHTED, SAFETY_FIRST }
+    public enum Agreement { CONSISTENT, WEIGHTED, SAFETY_FIRST, TRACK1_ONLY }
 
     public record FusionResult(FlightLevel fused, Agreement agreement, double fusedProb) {
     }
@@ -22,6 +22,9 @@ public class FusionService {
      * @param confidence 轨2 置信度 0-1
      */
     public FusionResult fuse(int sfi, FlightLevel track1, FlightLevel track2, double confidence) {
+        if (track2 == null) {
+            return new FusionResult(track1, Agreement.TRACK1_ONLY, track1.riskProb());
+        }
         // 1. 两轨一致：置信度提升，直接采用
         if (track1 == track2) {
             return new FusionResult(track1, Agreement.CONSISTENT, track1.riskProb());

@@ -19,17 +19,35 @@ public class SfiRecordEntity {
     public Long id;
 
     public LocalDateTime ts = LocalDateTime.now();
+    public String runId;
+    public String regionId;
+    public String configuredMode;
+    public String effectiveSource;
+    public boolean degraded;
+    public String degradeReason;
+    public String obsTime;
+    public LocalDateTime ingestedAt;
+    public LocalDateTime evaluatedAt;
     public String source;        // live | sim
     public String scenario;      // 模拟剧本（sim 模式）
     public int sfi;
+    public int rawSfi;
     public String level;         // FIT/CAUTION/DANGER/BAN
+    public boolean hardBan;
+    public String ruleVersion;
+    public Double lat;
+    public Double lon;
+    public String conditionText;
     public double windSpeed;
     public double windGust;
+    public Integer windDeg;
     public double precipMmh;
     public double visibilityM;
     public double thunderProb;
     public double tempC;
     public double humidity;      // 相对湿度 0-1
+    public double pressureHpa;
+    public double cloudCover;
     @Lob
     public String checksJson;    // 轨1 逐要素明细 JSON
 }

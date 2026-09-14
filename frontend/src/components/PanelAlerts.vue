@@ -21,7 +21,7 @@ const triggerLabel = { LEVEL_REACH: '等级触发', SFI_DROP: '指数骤降' }
       <div class="al-text" :title="a.text">{{ a.text }}</div>
     </div>
   </div>
-  <div v-else style="color:#6f95c4;padding:14px 4px;font-size:12px">暂无预警记录，运行状态平稳</div>
+  <div v-else style="color:#6f95c4;padding:14px 4px;font-size:12px">当前筛选范围暂无预警记录；不代表已确认安全。</div>
 </template>
 
 <style scoped>

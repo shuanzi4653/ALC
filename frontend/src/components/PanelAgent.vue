@@ -29,7 +29,7 @@ async function scrollBottom() {
   if (listEl.value) listEl.value.scrollTop = listEl.value.scrollHeight
 }
 
-const SRC_LABEL = { deepseek: 'DeepSeek', rule: '规则降级', ask: '知识问答', error: '异常' }
+const SRC_LABEL = { deepseek: 'DeepSeek', rule: '规则降级', fallback: '规则降级', ask: '知识问答', error: '异常' }
 </script>
 
 <template>
@@ -55,16 +55,16 @@ const SRC_LABEL = { deepseek: 'DeepSeek', rule: '规则降级', ask: '知识问�
 <style scoped>
 .ag-wrap { display: flex; flex-direction: column; height: 100%; width: 100%; }
 .ag-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; padding: 2px 2px; }
-.ag-hint { font-size: 11px; color: #51719e; line-height: 1.6; }
+.ag-hint { font-size: 12px; color: #51719e; line-height: 1.6; }
 .ag-msg { display: flex; flex-direction: column; }
 .ag-msg.user { align-items: flex-end; }
-.ag-bubble { max-width: 92%; padding: 4px 9px; border-radius: 6px; font-size: 11px; line-height: 1.5; }
+.ag-bubble { max-width: 92%; padding: 7px 10px; border-radius: 6px; font-size: 12px; line-height: 1.55; }
 .ag-msg.user .ag-bubble { background: rgba(61,139,255,.3); color: #e6f1fb; border-bottom-right-radius: 2px; }
 .ag-msg.agent .ag-bubble { background: rgba(20,40,70,.7); color: #a9c4e4; border-bottom-left-radius: 2px; }
 .ag-bubble.thinking { color: #6f95c4; }
 .ag-src { font-size: 9px; color: #51719e; margin-top: 2px; }
 .ag-input { display: flex; gap: 6px; padding-top: 6px; border-top: 1px solid rgba(64,140,230,.25); flex: none; }
 .ag-input input { flex: 1; background: rgba(10,25,48,.8); border: 1px solid rgba(64,140,230,.35); border-radius: 4px;
-  color: #dce9f7; font-size: 11px; padding: 6px 8px; outline: none; }
+  color: #dce9f7; font-size: 12px; padding: 8px 9px; outline: none; }
 .ag-input input:focus { border-color: #3fa7ff; box-shadow: 0 0 8px rgba(61,139,255,.3); }
 </style>

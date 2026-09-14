@@ -1,5 +1,9 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const configDir = path.dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig({
   plugins: [vue()],
@@ -11,6 +15,10 @@ export default defineConfig({
     }
   },
   build: {
+    outDir: process.env.TIANCHUANG_FRONTEND_OUT
+      ? path.resolve(configDir, process.env.TIANCHUANG_FRONTEND_OUT)
+      : 'dist',
+    emptyOutDir: true,
     chunkSizeWarningLimit: 1600
   }
 })

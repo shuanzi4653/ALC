@@ -8,8 +8,8 @@ body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; color: #cfe3ff
 .stage {
   width: 1920px; height: 1080px; flex: none;
   display: grid; gap: 10px; padding: 10px;
-  grid-template-rows: 64px 1fr 195px;
-  grid-template-columns: 370px 1fr 440px;
+  grid-template-rows: 64px 1fr 286px;
+  grid-template-columns: 440px 1fr 470px;
   background:
     radial-gradient(1300px 560px at 50% -12%, rgba(38, 108, 205, 0.20), transparent 62%),
     radial-gradient(900px 420px at 88% 108%, rgba(24, 84, 168, 0.12), transparent 60%),
@@ -71,21 +71,27 @@ body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; color: #cfe3ff
 .status-item { font-size: 12px; color: #8fb4de; }
 
 /* ---------- 三栏 ---------- */
-.left-col { display: grid; grid-template-rows: 0.82fr 1.22fr 1.3fr; gap: 10px; min-height: 0; }
+.left-col { display: grid; grid-template-rows: 1.25fr .75fr; gap: 10px; min-height: 0; }
 .center-col { min-height: 0; display: flex; flex-direction: column; }
-.right-col { display: grid; grid-template-rows: 1.12fr 1fr; gap: 10px; min-height: 0; }
-.bottom { grid-column: 1 / 4; display: grid; grid-template-columns: 1.35fr 1fr; gap: 10px; min-height: 0; }
+.right-col { min-height: 0; display: flex; }
+.right-col > .panel { flex: 1; }
+.bottom { grid-column: 1 / 4; display: grid; grid-template-columns: 1.3fr 1fr; gap: 10px; min-height: 0; }
+.decision-body { display: grid; grid-template-rows: minmax(0, 1.15fr) auto minmax(0, .85fr); gap: 9px; overflow: hidden; }
+.decision-tracks, .decision-alerts { min-height: 0; overflow: hidden; }
+.decision-subhead { color: #8dbce8; font-size: 12px; font-weight: 700; letter-spacing: 1px;
+  padding: 7px 2px 4px; border-top: 1px solid rgba(64,140,230,.24); }
 
 /* ---------- 气象要素网格 ---------- */
-.wx-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.wx-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; height: 100%; }
 .wx-item {
   background: linear-gradient(160deg, rgba(28, 58, 104, 0.5), rgba(16, 36, 68, 0.4));
   border: 1px solid rgba(64, 140, 230, 0.20);
-  border-radius: 8px; padding: 8px 10px;
+  border-radius: 8px; padding: 8px 9px; min-width: 0; min-height: 0; overflow: hidden;
 }
-.wx-item .lab { font-size: 11px; color: #7ba0cc; }
-.wx-item .val { font-size: 20px; font-weight: 700; color: #eaf5ff; margin-top: 2px; text-shadow: 0 0 10px rgba(120, 180, 255, 0.25); }
-.wx-item .val small { font-size: 11px; color: #7ba0cc; font-weight: 400; margin-left: 2px; }
+.wx-item .lab { font-size: 11px; color: #87afd9; white-space: nowrap; }
+.wx-item .val { max-width: 100%; font-size: 18px; line-height: 1.35; font-weight: 700; color: #eaf5ff; margin-top: 3px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; text-shadow: 0 0 10px rgba(120, 180, 255, 0.25); }
+.wx-item .val small { font-size: 9px; color: #7ba0cc; font-weight: 400; margin-left: 2px; }
 .wx-item.warn { border-color: rgba(217, 138, 43, 0.55); background: linear-gradient(160deg, rgba(96, 62, 16, 0.35), rgba(16, 36, 68, 0.4)); }
 .wx-item.ban { border-color: rgba(192, 57, 43, 0.65); background: linear-gradient(160deg, rgba(96, 26, 22, 0.4), rgba(16, 36, 68, 0.4)); }
 
@@ -146,17 +152,13 @@ body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; color: #cfe3ff
 
 /* ---------- 剧本切换 ---------- */
 .scenario-bar { display: flex; gap: 8px; align-items: center; }
+.action-error { margin-left: 8px; color: #ff9a8a; font-size: 10px; max-width: 220px;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .scenario-bar .btn.active {
   background: linear-gradient(180deg, #3d84e0, #2b5fa8); border-color: #5aa4ff; color: #fff;
   box-shadow: 0 0 12px rgba(61, 139, 255, 0.55);
 }
 
-/* ---------- 底部信息流 ---------- */
-.feed-list { overflow: auto; }
-.feed-row { display: flex; gap: 10px; padding: 5px 8px; border-bottom: 1px dashed rgba(64, 140, 230, 0.15);
-  font-size: 12px; align-items: baseline; }
-.feed-row .t { color: #6f95c4; flex: none; font-variant-numeric: tabular-nums; }
-.feed-row .x { color: #cfe3ff; }
 .push-status { display: flex; flex-wrap: wrap; gap: 6px; align-content: flex-start; }
 .push-chip { font-size: 11.5px; padding: 3px 9px; border-radius: 12px; border: 1px solid; }
 .push-SENT { color: #7ee2a8; border-color: rgba(46, 139, 87, 0.5); }

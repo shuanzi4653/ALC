@@ -6,85 +6,97 @@ import java.util.List;
 import java.util.Map;
 
 import com.tianchuang.model.FlightLevel;
+import com.tianchuang.model.RuleSpec;
 import com.tianchuang.model.WeatherSnapshot;
+import com.tianchuang.config.RuleProperties;
 
 import org.springframework.stereotype.Service;
 
 /**
  * 轨1：数据驱动规则基线（L1，必做层）
- * 依据计划书 5.2 节适飞指数阈值体系，输出 SFI（0-100）与四级窗口等级。
+ * 阈值、比较方向、扣分与等级边界全部来自 {@link RuleProperties}（config/rules-v1.json），
+ * 代码不硬编码数值，保证规则可审计、可版本化。
  * 特点：全程可解释（逐要素扣分明细），永不失灵。
  */
 @Service
 public class SfiEngine {
+
+    private final ObservationValidator validator;
+    private final RuleProperties rules;
+
+    public SfiEngine(ObservationValidator validator, RuleProperties rules) {
+        this.validator = validator;
+        this.rules = rules;
+    }
 
     /** 要素检查结果 */
     public record Check(String factor, double value, String unit, boolean banned,
                         boolean warn, int penalty, String note) {
     }
 
-    public record SfiResult(int sfi, FlightLevel level, List<Check> checks) {
+    public record SfiResult(int sfi, int rawSfi, FlightLevel level, boolean hardBan,
+                            String ruleVersion, List<Check> checks) {
     }
 
     public SfiResult evaluate(WeatherSnapshot s) {
+        validator.validate(s);
         List<Check> checks = new ArrayList<>();
         int penalty = 0;
 
-        // 平均风速：≤8 适飞 / ≥12 禁飞
-        double w = s.windSpeed();
-        checks.add(new Check("平均风速", w, "m/s", w >= 12, w >= 8,
-                w >= 12 ? 40 : w >= 8 ? 22 : 0,
-                w >= 12 ? "达禁飞阈值" : w >= 8 ? "超适飞阈值" : "正常"));
-        penalty += checks.get(checks.size() - 1).penalty();
+        for (RuleSpec.FactorRule f : rules.factors()) {
+            Double raw = rawValue(f.key(), s);
+            if (raw == null) {
+                // 该要素缺失：不计分也不臆断，由校验层决定本轮是否可信
+                continue;
+            }
+            double v = raw;
+            boolean banned = f.banned(v);
+            boolean warn = !banned && f.warn(v);
+            int p = banned ? f.penaltyBan() : warn ? f.penaltyWarn() : 0;
+            String note = banned ? f.noteBan() : warn ? f.noteWarn() : f.noteOk();
+            checks.add(new Check(f.label(), f.display(v), f.unit(), banned, warn, p, note));
+            penalty += p;
+        }
 
-        // 阵风：≤12 适飞 / ≥18 禁飞
-        double g = s.windGust();
-        checks.add(new Check("阵风风速", g, "m/s", g >= 18, g >= 12,
-                g >= 18 ? 30 : g >= 12 ? 16 : 0,
-                g >= 18 ? "达禁飞阈值" : g >= 12 ? "超适飞阈值" : "正常"));
-        penalty += checks.get(checks.size() - 1).penalty();
+        int rawSfi = Math.max(0, Math.min(100, 100 - penalty));
+        boolean hardBan = rules.hardBanEnabled() && checks.stream().anyMatch(Check::banned);
+        int sfi = hardBan ? Math.min(rawSfi, rules.hardBanSfiCap()) : rawSfi;
+        FlightLevel level = hardBan ? FlightLevel.BAN : levelFromSfi(sfi);
+        return new SfiResult(sfi, rawSfi, level, hardBan, rules.version(), checks);
+    }
 
-        // 降水：0 适飞 / ≥5 禁飞
-        double p = s.precipMmh();
-        checks.add(new Check("降水强度", p, "mm/h", p >= 5, p >= 1,
-                p >= 5 ? 35 : p >= 1 ? 15 : 0,
-                p >= 5 ? "达禁飞阈值" : p >= 1 ? "出现降水" : "无降水"));
-        penalty += checks.get(checks.size() - 1).penalty();
+    /** 按配置的等级边界判定（不再使用硬编码 80/60/40）。 */
+    private FlightLevel levelFromSfi(int sfi) {
+        RuleSpec.LevelBounds b = rules.levels();
+        if (sfi >= b.fit()) return FlightLevel.FIT;
+        if (sfi >= b.caution()) return FlightLevel.CAUTION;
+        if (sfi >= b.danger()) return FlightLevel.DANGER;
+        return FlightLevel.BAN;
+    }
 
-        // 能见度：≥5km 适飞 / ≤1km 禁飞
-        double v = s.visibilityM();
-        checks.add(new Check("能见度", v / 1000, "km", v <= 1000, v <= 5000,
-                v <= 1000 ? 30 : v <= 5000 ? 12 : 0,
-                v <= 1000 ? "低于禁飞阈值" : v <= 5000 ? "偏低" : "良好"));
-        penalty += checks.get(checks.size() - 1).penalty();
-
-        // 雷暴概率：≤20% 适飞 / ≥60% 禁飞
-        double t = s.thunderProb();
-        checks.add(new Check("雷暴概率", t * 100, "%", t >= 0.6, t >= 0.2,
-                t >= 0.6 ? 35 : t >= 0.2 ? 12 : 0,
-                t >= 0.6 ? "过高" : t >= 0.2 ? "存在风险" : "低"));
-        penalty += checks.get(checks.size() - 1).penalty();
-
-        // 温度：-10~40 适飞 / <-20 或 >45 禁飞
-        double tc = s.tempC();
-        boolean tempBan = tc < -20 || tc > 45;
-        boolean tempWarn = tc < -10 || tc > 40;
-        checks.add(new Check("温度", tc, "℃", tempBan, tempWarn,
-                tempBan ? 30 : tempWarn ? 10 : 0,
-                tempBan ? "超出安全范围" : tempWarn ? "接近边界" : "正常"));
-        penalty += checks.get(checks.size() - 1).penalty();
-
-        int sfi = Math.max(0, Math.min(100, 100 - penalty));
-        return new SfiResult(sfi, FlightLevel.fromSfi(sfi), checks);
+    /** 从观测快照提取规则要素原始值；未知返回 null（不补零、不视为安全）。 */
+    private Double rawValue(String key, WeatherSnapshot s) {
+        return switch (key) {
+            case "windSpeed" -> s.windSpeed();
+            case "windGust" -> s.windGust();
+            case "precipMmh" -> s.precipMmh();
+            case "visibilityM" -> s.visibilityM();
+            case "thunderProb" -> s.thunderProb();
+            case "tempC" -> s.tempC();
+            default -> null;
+        };
     }
 
     /** 转为可序列化 Map（供前端/存储） */
     public Map<String, Object> toMap(SfiResult r) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("sfi", r.sfi());
+        m.put("rawSfi", r.rawSfi());
         m.put("level", r.level().name());
         m.put("levelLabel", r.level().label);
         m.put("color", r.level().color);
+        m.put("hardBan", r.hardBan());
+        m.put("ruleVersion", r.ruleVersion());
         m.put("checks", r.checks().stream().map(c -> {
             Map<String, Object> cm = new LinkedHashMap<>();
             cm.put("factor", c.factor());

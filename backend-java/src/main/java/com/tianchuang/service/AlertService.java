@@ -18,6 +18,7 @@ import com.tianchuang.ws.DashboardWebSocketHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 预警服务：生成预警文本（模板）+ 多渠道推送（对应计划书 6.1/6.2 节）
@@ -32,9 +33,6 @@ public class AlertService {
     private final AlertRepo alertRepo;
     private final PushService pushService;
     private final DashboardWebSocketHandler ws;
-    private final ObjectMapper mapper = new ObjectMapper()
-            .registerModule(new JavaTimeModule())
-            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
     public AlertService(QweatherProperties qw, AlertRepo alertRepo,
                         PushService pushService, DashboardWebSocketHandler ws) {
@@ -44,48 +42,61 @@ public class AlertService {
         this.ws = ws;
     }
 
+    @Transactional
     public AlertEntity createAlert(FlightLevel fused, String triggerType,
                                    SfiRecordEntity rec, SfiEngine.SfiResult sfi,
                                    Map<String, Object> track2,
                                    FusionService.FusionResult fr,
-                                   FlightLevel t1, FlightLevel t2) {
-        String factors = joinFactors(track2, sfi);
-        String advice = String.valueOf(track2.get("advice"));
-        if (advice == null || advice.isBlank() || "null".equals(advice)) {
-            advice = fused == FlightLevel.BAN ? "立即停止作业，设备撤收或就近降落"
-                    : "不建议飞行，已起飞的应立即返航";
-        }
+                                   FlightLevel t1, FlightLevel t2,
+                                   AlertStateService.Decision decision) {
+        boolean resolved = decision.action() == AlertStateService.Action.RESOLVE;
+        String factors = resolved ? "风险条件已连续两轮解除" : joinFactors(track2, sfi);
+        String advice = resolved ? "可按当前最新气象与作业规程重新评估飞行窗口" : switch (fused) {
+            case BAN -> "立即停止作业，设备撤收或就近降落";
+            case DANGER -> "不建议飞行，已起飞的应立即返航";
+            case CAUTION -> "缩短作业窗口并持续监测气象变化";
+            case FIT -> "适飞指数出现骤降，请复核趋势后再继续作业";
+        };
 
         AlertEntity a = new AlertEntity();
+        a.runId = rec.runId;
+        a.episodeId = decision.episodeId();
+        a.transitionVersion = decision.transitionVersion();
         a.level = fused.name();
         a.triggerType = triggerType;
         a.region = qw.regionName();
         a.factors = factors;
         a.advice = advice;
-        a.status = "PUBLISHED";
-        a.text = buildText(fused, triggerType, rec, factors, advice);
+        a.status = resolved ? "WITHDRAWN" : "PUBLISHED";
+        a.text = resolved ? buildResolvedText(fused, rec, advice)
+                : buildText(fused, triggerType, rec, factors, advice);
         a = alertRepo.save(a);
 
         log.warn("触发预警 [{}] {} {}：{}", triggerType, fused.label, a.region,
                 a.text.replace("\n", " | "));
 
-        // 多渠道推送 + 大屏弹窗广播
-        pushService.pushAll(a);
-        try {
-            ws.broadcast(mapper.writeValueAsString(Map.of(
-                    "type", "alert", "alert", Map.of(
-                            "id", a.id, "ts", a.ts.toString(), "level", a.level,
-                            "levelLabel", fused.label, "text", a.text))));
-        } catch (Exception e) {
-            log.warn("预警弹窗广播失败: {}", e.getMessage());
-        }
+        // 外部渠道通过事务 outbox 异步发送；SCREEN 只有实际在线会话收到才记 SENT。
+        pushService.enqueueExternal(a);
+        int delivered = ws.broadcastAlert(rec.runId, Map.of(
+                "id", a.id, "eventId", a.id, "ts", a.ts.toString(), "level", a.level,
+                "levelLabel", fused.label, "text", a.text));
+        pushService.recordScreen(a, delivered);
         return a;
+    }
+
+    private String buildResolvedText(FlightLevel previous, SfiRecordEntity rec, String advice) {
+        return "【低空飞行气象预警解除】\n"
+                + "时间：" + LocalDateTime.now().toLocalTime().withNano(0) + "\n"
+                + "区域：" + qw.regionName() + "\n"
+                + "原风险等级：" + previous.label + "\n"
+                + "当前 SFI：" + rec.sfi + "\n"
+                + "建议措施：" + advice;
     }
 
     private String buildText(FlightLevel fused, String trigger, SfiRecordEntity rec,
                              String factors, String advice) {
         String head = trigger.equals("SFI_DROP")
-                ? "适飞指数骤降（60 分钟内下降超 30 分，当前 " + rec.sfi + "）"
+                ? "适飞指数骤降（60 分钟内下降至少 30 分，当前 " + rec.sfi + "）"
                 : "综合研判风险等级达「" + fused.label + "」（SFI " + rec.sfi + "）";
         return "【低空飞行气象预警】\n"
                 + "时间：" + LocalDateTime.now().toLocalTime().withNano(0) + "\n"

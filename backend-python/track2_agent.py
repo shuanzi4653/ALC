@@ -19,8 +19,11 @@
 
 import json
 import logging
+import math
 
 import httpx
+
+import rules  # 与 Java 共用 config/rules-v1.json（C02）
 
 log = logging.getLogger("tianchuang.track2")
 
@@ -102,76 +105,65 @@ def _clamp(v, lo, hi):
     return max(lo, min(hi, v))
 
 
-def _fallback(snapshot, hours, region, task_type):
-    """本地规则降级研判：与 Java 侧 SFI 阈值逻辑一致的简化版。
-    读取扁平字段（与 WeatherSnapshot 对齐），兼容旧嵌套结构。"""
+def _flatten_snapshot(snapshot):
+    """统一快照字段：扁平结构优先（Java 侧传入），嵌套结构兜底（和风原始 JSON）。
+    缺失或非有限值一律返回 None，由规则模块判定为「缺失」，不补零、不假设安全。"""
 
-    def _num(d, *keys, default=0.0):
+    def _num(d, *keys):
         cur = d
         for k in keys:
             if not isinstance(cur, dict):
-                return default
-            cur = cur.get(k, default)
+                return None
+            cur = cur.get(k)
+        if cur is None:
+            return None
         try:
-            return float(cur)
+            value = float(cur)
         except (TypeError, ValueError):
-            return default
+            return None
+        return value if math.isfinite(value) else None
 
-    # 扁平结构优先（Java 侧传入），嵌套结构兜底（和风原始 JSON）
-    wind = _num(snapshot, "windSpeed", default=-1)
-    if wind < 0:
-        wind = _num(snapshot, "wind", "speed", "value")
-    gust = _num(snapshot, "windGust", default=-1)
-    if gust < 0:
-        gust = _num(snapshot, "windGust", "value")
-    precip = _num(snapshot, "precipMmh", default=-1)
-    if precip < 0:
-        precip = _num(snapshot, "precipitation", "intensity", "value")
-    vis_m = _num(snapshot, "visibilityM", default=-1)
-    if vis_m < 0:
-        vis_m = _num(snapshot, "visibility", "value", default=20000)
-    thunder = _num(snapshot, "thunderProb")
-    if thunder == 0:
-        thunder = _num(snapshot, "thunderProbability")
+    def _pick(flat_key, *nested_keys):
+        value = _num(snapshot, flat_key)
+        if value is None and nested_keys:
+            value = _num(snapshot, *nested_keys)
+        return value
 
-    score = 0
-    reasons = []
-    if wind >= 12:
-        score += 40; reasons.append("平均风速 %.1f m/s 达禁飞阈值" % wind)
-    elif wind >= 8:
-        score += 22; reasons.append("平均风速 %.1f m/s 超适飞阈值" % wind)
-    if gust >= 18:
-        score += 30; reasons.append("阵风 %.1f m/s 达禁飞阈值" % gust)
-    elif gust >= 12:
-        score += 16; reasons.append("阵风 %.1f m/s 超适飞阈值" % gust)
-    if precip >= 5:
-        score += 35; reasons.append("降水强度 %.1f mm/h 达禁飞阈值" % precip)
-    elif precip >= 1:
-        score += 15; reasons.append("出现降水 %.1f mm/h" % precip)
-    if vis_m <= 1000:
-        score += 30; reasons.append("能见度 %.1f km 过低" % (vis_m / 1000))
-    elif vis_m <= 5000:
-        score += 12; reasons.append("能见度 %.1f km 偏低" % (vis_m / 1000))
-    if thunder >= 0.6:
-        score += 35; reasons.append("雷暴概率 %.0f%% 过高" % (thunder * 100))
-    elif thunder >= 0.2:
-        score += 12; reasons.append("存在雷暴风险 %.0f%%" % (thunder * 100))
+    return {
+        "windSpeed": _pick("windSpeed", "wind", "speed", "value"),
+        "windGust": _pick("windGust", "windGust", "value"),
+        "precipMmh": _pick("precipMmh", "precipitation", "intensity", "value"),
+        "visibilityM": _pick("visibilityM", "visibility", "value"),
+        "thunderProb": _pick("thunderProb", "thunderProbability"),
+        "tempC": _pick("tempC"),
+    }
 
-    if score >= 70:
-        level, conf = "禁飞", 0.8
-        advice = "立即停止作业，设备撤收或就近降落"
-    elif score >= 40:
-        level, conf = "危险", 0.72
-        advice = "不建议飞行，已起飞的应立即返航"
-    elif score >= 15:
-        level, conf = "谨慎", 0.7
-        advice = "可短暂作业，需持续关注气象变化"
+
+def _fallback(snapshot, hours, region, task_type):
+    """本地规则降级研判（C02）。
+
+    读取与 Java 侧**同一份** config/rules-v1.json（见 rules.py），阈值、比较方向、
+    扣分与等级边界完全一致；缺失字段抛 ValueError，不得默认判定适飞。
+    source 标记为 fallback，不伪装成模型结果。
+    """
+    flat = _flatten_snapshot(snapshot)
+    result = rules.evaluate(flat)
+
+    sfi = result["sfi"]
+    raw_sfi = result["raw_sfi"]
+    hard_ban = result["hard_ban"]
+    level = result["level_label"]
+    reasons = result["reasons"]
+
+    if hard_ban or sfi < 40:
+        conf, advice = 0.8, "立即停止作业，设备撤收或就近降落"
+    elif sfi < 60:
+        conf, advice = 0.72, "不建议飞行，已起飞的应立即返航"
+    elif sfi < 80:
+        conf, advice = 0.7, "可短暂作业，需持续关注气象变化"
     else:
-        level, conf = "适飞", 0.75
-        advice = "气象条件适宜飞行，可按计划作业"
+        conf, advice = 0.75, "气象条件适宜飞行，可按计划作业"
 
-    if not reasons:
-        reasons = ["各要素均在适飞阈值内"]
     alert_text = "【低空飞行气象通报】%s %s任务：%s。主要影响：%s。%s" % (
         region, task_type, level, "；".join(reasons[:3]), advice)
     return {
@@ -180,10 +172,14 @@ def _fallback(snapshot, hours, region, task_type):
         "key_factors": reasons[:4],
         "advice": advice,
         "alert_text": alert_text[:200],
+        "raw_sfi": raw_sfi,
+        "sfi": sfi,
+        "hard_ban": hard_ban,
+        "rule_version": result["rule_version"],
     }
 
 
-def analyze(snapshot, forecast, region, task_type, cfg):
+def analyze(snapshot, forecast, region, task_type, cfg, run_id="", deadline_epoch_ms=0):
     """
     轨2 研判主入口。
     cfg 为 DeepSeek 配置 dict：{api_key, base_url, model}；api_key 为空时直接走降级。
@@ -207,16 +203,24 @@ def analyze(snapshot, forecast, region, task_type, cfg):
     messages = [{"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_text}]
     last_err = None
-    for attempt in range(3):
+    for attempt in range(2):
         try:
-            text = _chat(messages, cfg)
+            remaining = ((deadline_epoch_ms / 1000.0) - time.time()) if deadline_epoch_ms else 8.0
+            if remaining <= 0.5:
+                raise TimeoutError("track2 deadline exhausted")
+            text = _chat(messages, cfg, timeout=max(1.0, min(8.0, remaining - 0.2)))
             result = _parse_five(text)
+            # 规则版本由本地受控规则文件写入，不能信任或要求模型生成。
+            # Java 侧以此校验轨2结论与当前运行规则是否一致。
+            result["rule_version"] = rules.load_spec().version
             result["source"] = "deepseek"
             result["latency_ms"] = int((time.time() - t0) * 1000)
             return result
         except Exception as e:  # noqa: BLE001 网络异常/格式漂移统一重试
             last_err = e
             log.warning("track2 attempt %d failed: %s", attempt + 1, e)
+            if deadline_epoch_ms and time.time() * 1000 >= deadline_epoch_ms:
+                break
 
     # 三次尝试全部失败 → 规则降级，主流程零阻塞
     log.error("track2 degraded to fallback: %s", last_err)

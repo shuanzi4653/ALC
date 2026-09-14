@@ -172,7 +172,7 @@ def _gen_point(scenario, progress, dt_local, lat, lon, rng):
 
 
 def generate(scenario_key: str, hours: int = 6, lat: float = 38.91, lon: float = 121.61,
-             seed: int = None):
+             seed: int = None, now: datetime = None):
     """
     生成模拟数据。
     返回: {"scenario": {...}, "snapshot": {...当前观测...}, "hourly": [...未来逐时预报...]}
@@ -185,7 +185,9 @@ def generate(scenario_key: str, hours: int = 6, lat: float = 38.91, lon: float =
 
     # 当前观测从过程中段开始（切换剧本立即体现天气强度），预报沿过程继续演化
     START_PROGRESS = 0.45
-    now = datetime.now(timezone(timedelta(hours=8)))
+    now = now or datetime.now(timezone(timedelta(hours=8)))
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone(timedelta(hours=8)))
     total_steps = hours * 6  # 10 分钟粒度
     points = []
     for i in range(total_steps + 1):

@@ -1,0 +1,156 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://tianchuang/contracts/dashboard-v1.schema.json",
+  "title": "天窗智巡 Dashboard v1",
+  "description": "REST /api/dashboard 与 WebSocket payload 共用的同一 DTO。字段与后端 buildDashboard() 实际输出对齐。",
+  "type": "object",
+  "required": ["version", "runId", "runSequence", "revision", "status", "configuredMode",
+               "effectiveSource", "degraded", "appliedScenario", "dataStatus"],
+  "properties": {
+    "version": { "type": "integer", "const": 1, "description": "契约版本；前端拒绝未知版本" },
+    "serverTime": { "type": "string", "description": "服务端当前时间（无时区后缀）" },
+    "configuredMode": { "enum": ["sim", "live"], "description": "配置的运行模式" },
+    "mode": { "type": "string", "description": "兼容旧字段，等于 configuredMode" },
+    "regionId": { "type": ["string", "null"], "description": "区域标识" },
+    "region": { "type": ["string", "null"], "description": "区域展示名" },
+    "taskType": { "type": ["string", "null"], "description": "任务类型（巡检/测绘等）" },
+    "runId": { "type": ["string", "null"], "description": "当前运行 UUID；冷启动为 null" },
+    "runSequence": { "type": "integer", "minimum": 0, "description": "按区域单调递增的运行序号，重启不归零" },
+    "revision": { "type": "integer", "minimum": 0, "description": "同轮轨2异步补全时递增" },
+    "status": {
+      "enum": ["WAITING", "RUNNING", "RULE_READY", "COMPLETE", "FAILED"],
+      "description": "运行状态；RULE_READY 表示规则已发布、轨2仍在异步研判"
+    },
+    "effectiveSource": { "enum": ["sim", "live", "unavailable"], "description": "实际生效数据来源" },
+    "degraded": { "type": "boolean", "description": "是否发生降级（如 live 失败回落 sim）" },
+    "degradeReason": { "type": ["string", "null"] },
+    "scenario": { "type": ["string", "null"], "description": "兼容旧字段，等于 appliedScenario" },
+    "appliedScenario": { "enum": ["clear", "wind", "rain", "storm", "live", null], "description": "已成功提交的剧本" },
+    "obsTime": { "type": ["string", "null"], "description": "观测时间（ISO-8601 带时区）" },
+    "updatedAt": { "type": ["string", "null"], "description": "本轮更新时间" },
+    "ingestedAt": { "type": ["string", "null"], "description": "接入时间" },
+    "evaluatedAt": { "type": ["string", "null"], "description": "研判时间" },
+    "lastRunAt": { "type": ["string", "null"], "description": "兼容旧字段" },
+    "lat": { "type": ["number", "null"] },
+    "lon": { "type": ["number", "null"] },
+    "dataStatus": {
+      "enum": ["FRESH", "STALE", "NO_DATA", "UNAVAILABLE", "UNKNOWN"],
+      "description": "数据新鲜度，由 obsTime 与数据源 TTL 决定"
+    },
+    "current": { "$ref": "#/definitions/current" },
+    "forecast": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["time"],
+        "properties": {
+          "time": { "type": "string" },
+          "tempC": { "type": ["number", "null"] },
+          "windSpeed": { "type": ["number", "null"] },
+          "windGust": { "type": ["number", "null"] },
+          "precipMmh": { "type": ["number", "null"] },
+          "visibilityM": { "type": ["number", "null"] },
+          "thunderProb": { "type": ["number", "null"] }
+        }
+      }
+    },
+    "forecastSfi": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["time", "sfi", "level"],
+        "properties": {
+          "time": { "type": "string" },
+          "sfi": { "type": "integer" },
+          "level": { "$ref": "#/definitions/level" },
+          "levelLabel": { "type": "string" }
+        }
+      }
+    },
+    "sfiHistory": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "ts": { "type": "string" },
+          "sfi": { "type": "integer" },
+          "level": { "type": "string" }
+        }
+      }
+    },
+    "tracks": { "type": "array", "items": { "type": "object" } },
+    "tracksHistory": { "type": "array", "items": { "type": "object" } },
+    "alerts": { "type": "array", "items": { "type": "object" } },
+    "lastError": { "type": ["string", "null"] },
+    "lastAttempt": {
+      "type": "object",
+      "description": "最近一次失败尝试，不污染成功快照归属",
+      "properties": {
+        "runId": { "type": ["string", "null"] },
+        "status": { "type": ["string", "null"] },
+        "errorCode": { "type": ["string", "null"] },
+        "message": { "type": ["string", "null"] },
+        "updatedAt": { "type": ["string", "null"] }
+      }
+    }
+  },
+  "definitions": {
+    "level": { "enum": ["FIT", "CAUTION", "DANGER", "BAN"] },
+    "current": {
+      "type": ["object", "null"],
+      "required": ["sfi", "level"],
+      "properties": {
+        "runId": { "type": ["string", "null"] },
+        "sfi": { "type": "integer", "minimum": 0, "maximum": 100, "description": "对外有效 SFI；硬禁飞时 = min(rawSfi,39)" },
+        "rawSfi": { "type": "integer", "description": "扣分明细原始分，不被硬约束改写" },
+        "level": { "$ref": "#/definitions/level" },
+        "hardBan": { "type": "boolean", "description": "是否由阈值硬约束直接判定禁飞" },
+        "ruleVersion": { "type": ["string", "null"] },
+        "source": { "enum": ["sim", "live"] },
+        "scenario": { "type": ["string", "null"] },
+        "ts": { "type": "string" },
+        "obsTime": { "type": ["string", "null"] },
+        "degraded": { "type": "boolean" },
+        "snapshot": { "$ref": "#/definitions/snapshot" },
+        "checks": {
+          "type": "array",
+          "description": "轨1逐要素明细",
+          "items": {
+            "type": "object",
+            "required": ["factor", "value", "unit"],
+            "properties": {
+              "factor": { "type": "string" },
+              "value": { "type": "number" },
+              "unit": { "type": "string" },
+              "banned": { "type": "boolean" },
+              "warn": { "type": "boolean" },
+              "penalty": { "type": "number" },
+              "note": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "snapshot": {
+      "type": "object",
+      "description": "完整标准化观测；未知值用 null，禁止补零或默认安全值",
+      "properties": {
+        "time": { "type": "string", "description": "观测时间 ISO-8601 带时区" },
+        "source": { "enum": ["sim", "live"] },
+        "lat": { "type": ["number", "null"] },
+        "lon": { "type": ["number", "null"] },
+        "conditionText": { "type": ["string", "null"], "description": "天气现象描述；null 表示未知" },
+        "tempC": { "type": ["number", "null"] },
+        "humidity": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "windSpeed": { "type": ["number", "null"], "minimum": 0 },
+        "windGust": { "type": ["number", "null"], "minimum": 0 },
+        "windDeg": { "type": ["integer", "null"], "minimum": 0, "maximum": 360, "description": "风向（气象来向）；null 表示未知，0 是有效北风" },
+        "precipMmh": { "type": ["number", "null"], "minimum": 0 },
+        "visibilityM": { "type": ["number", "null"], "minimum": 0 },
+        "pressureHpa": { "type": ["number", "null"] },
+        "cloudCover": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "thunderProb": { "type": ["number", "null"], "minimum": 0, "maximum": 1, "description": "雷暴概率，非实际闪电事件" }
+      }
+    }
+  }
+}

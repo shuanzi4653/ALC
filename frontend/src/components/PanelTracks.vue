@@ -23,7 +23,7 @@ const agreeLabel = computed(() => AGREEMENT_LABELS[t.value?.agreement] || t.valu
         <div class="tr-tag">轨2 · LLM 智能体 <em>{{ t.track2Source }}</em></div>
         <div class="tr-lv" :style="{ color: levelColor(t.track2Level) }">
           {{ levelLabel(t.track2Level) }}
-          <small>置信 {{ Math.round((t.track2Confidence ?? 0) * 100) }}%</small>
+          <small>模型自报 {{ Math.round((t.track2Confidence ?? 0) * 100) }}%（未校准）</small>
         </div>
         <div class="tr-reason" :title="t.track2Factors">{{ t.track2Factors }}</div>
       </div>

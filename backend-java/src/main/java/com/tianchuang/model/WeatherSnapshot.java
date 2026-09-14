@@ -6,17 +6,17 @@ package com.tianchuang.model;
 public record WeatherSnapshot(
         String time,           // ISO-8601 观测时间
         String source,         // live | sim
-        double lat,
-        double lon,
+        Double lat,
+        Double lon,
         String conditionText,
-        double tempC,
-        double humidity,       // 0-1
-        double windSpeed,      // m/s 平均风速
-        double windGust,       // m/s 阵风
-        int windDeg,           // 风向角度
-        double precipMmh,      // 降水强度 mm/h
-        double visibilityM,    // 能见度（米）
-        double pressureHpa,    // 海平面气压
-        double cloudCover,     // 云量 0-1
-        double thunderProb) {  // 雷暴概率 0-1
+        Double tempC,
+        Double humidity,       // 0-1
+        Double windSpeed,      // m/s 平均风速
+        Double windGust,       // m/s 阵风
+        Integer windDeg,       // 风向角度；null 表示未知，0 是有效北风
+        Double precipMmh,      // 降水强度 mm/h
+        Double visibilityM,    // 能见度（米）
+        Double pressureHpa,    // 海平面气压
+        Double cloudCover,     // 云量 0-1
+        Double thunderProb) {  // 雷暴概率 0-1
 }

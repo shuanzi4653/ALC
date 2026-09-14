@@ -1,0 +1,150 @@
+{
+  "sourceUrl": "https://www.ncei.noaa.gov/data/global-hourly/access/2025/50953099999.csv",
+  "retrievedAt": "2026-09-13T04:16:43.806948+00:00",
+  "rawSha256": "0529a00955c8ab625dce5a9dba50821196ae3db7d6d3685166ca1be7f32a6118",
+  "stations": [
+    {
+      "stationId": "50953099999",
+      "name": "HARBIN",
+      "coord": [
+        126.567,
+        45.933
+      ],
+      "regionId": "heilongjiang",
+      "begin": "19560820",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    }
+  ],
+  "samples": [
+    {
+      "observedAt": "2025-07-01T00:00:00Z",
+      "windSpeedMps": 2.0,
+      "windDirectionDeg": 120.0,
+      "temperatureC": 23.3,
+      "visibilityM": 18000.0,
+      "precipitationAccumulationMm": 0.1,
+      "precipitationPeriodHours": 6.0,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "120,1,N,0020,1",
+        "TMP": "+0233,1",
+        "VIS": "018000,1,9,9",
+        "AA1": "06,0001,3,1"
+      }
+    },
+    {
+      "observedAt": "2025-07-01T03:00:00Z",
+      "windSpeedMps": 3.0,
+      "windDirectionDeg": 100.0,
+      "temperatureC": 25.8,
+      "visibilityM": 30000.0,
+      "precipitationAccumulationMm": 0.1,
+      "precipitationPeriodHours": 6.0,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "100,1,N,0030,1",
+        "TMP": "+0258,1",
+        "VIS": "030000,1,9,9",
+        "AA1": "06,0001,3,1"
+      }
+    },
+    {
+      "observedAt": "2025-07-01T06:00:00Z",
+      "windSpeedMps": 2.0,
+      "windDirectionDeg": 90.0,
+      "temperatureC": 26.8,
+      "visibilityM": 30000.0,
+      "precipitationAccumulationMm": 0.1,
+      "precipitationPeriodHours": 6.0,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "090,1,N,0020,1",
+        "TMP": "+0268,1",
+        "VIS": "030000,1,9,9",
+        "AA1": "06,0001,3,1"
+      }
+    },
+    {
+      "observedAt": "2025-07-01T09:00:00Z",
+      "windSpeedMps": 1.0,
+      "windDirectionDeg": 60.0,
+      "temperatureC": 24.8,
+      "visibilityM": 12000.0,
+      "precipitationAccumulationMm": 3.0,
+      "precipitationPeriodHours": 6.0,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "060,1,N,0010,1",
+        "TMP": "+0248,1",
+        "VIS": "012000,1,9,9",
+        "AA1": "06,0030,3,1"
+      }
+    },
+    {
+      "observedAt": "2025-07-01T12:00:00Z",
+      "windSpeedMps": 2.0,
+      "windDirectionDeg": 160.0,
+      "temperatureC": 25.0,
+      "visibilityM": 6000.0,
+      "precipitationAccumulationMm": 3.0,
+      "precipitationPeriodHours": 6.0,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "160,1,N,0020,1",
+        "TMP": "+0250,1",
+        "VIS": "006000,1,9,9",
+        "AA1": "06,0030,3,1"
+      }
+    },
+    {
+      "observedAt": "2025-07-01T15:00:00Z",
+      "windSpeedMps": 2.0,
+      "windDirectionDeg": 160.0,
+      "temperatureC": 25.6,
+      "visibilityM": 11000.0,
+      "precipitationAccumulationMm": 0.0,
+      "precipitationPeriodHours": 6.0,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "160,1,N,0020,1",
+        "TMP": "+0256,1",
+        "VIS": "011000,1,9,9",
+        "AA1": "06,0000,9,1"
+      }
+    },
+    {
+      "observedAt": "2025-07-01T18:00:00Z",
+      "windSpeedMps": 3.0,
+      "windDirectionDeg": 180.0,
+      "temperatureC": 22.4,
+      "visibilityM": 30000.0,
+      "precipitationAccumulationMm": 4.0,
+      "precipitationPeriodHours": 6.0,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "180,1,N,0030,1",
+        "TMP": "+0224,1",
+        "VIS": "030000,1,9,9",
+        "AA1": "06,0040,3,1"
+      }
+    },
+    {
+      "observedAt": "2025-07-01T21:00:00Z",
+      "windSpeedMps": 4.0,
+      "windDirectionDeg": 210.0,
+      "temperatureC": 24.3,
+      "visibilityM": 12000.0,
+      "precipitationAccumulationMm": 4.0,
+      "precipitationPeriodHours": 6.0,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "210,1,N,0040,1",
+        "TMP": "+0243,1",
+        "VIS": "012000,1,9,9",
+        "AA1": "06,0040,3,1"
+      }
+    }
+  ]
+}

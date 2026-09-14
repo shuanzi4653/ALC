@@ -1,0 +1,2762 @@
+[
+  {
+    "family": 0,
+    "id": "case-000",
+    "scenario": "clear",
+    "seed": 42,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        122.9,
+        42.02
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "liaoning",
+      "speedKmh": 90,
+      "to": [
+        123.6,
+        42.02
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 0,
+    "id": "case-001",
+    "scenario": "clear",
+    "seed": 43,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        124.85,
+        44.05
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "jilin",
+      "speedKmh": 90,
+      "to": [
+        125.55,
+        44.05
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 0,
+    "id": "case-002",
+    "scenario": "clear",
+    "seed": 44,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        126.05,
+        46.1
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "heilongjiang",
+      "speedKmh": 90,
+      "to": [
+        126.75,
+        46.1
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 0,
+    "id": "case-003",
+    "scenario": "clear",
+    "seed": 45,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        122.9,
+        42.02
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "liaoning",
+      "speedKmh": 90,
+      "to": [
+        123.6,
+        42.02
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 0,
+    "id": "case-004",
+    "scenario": "clear",
+    "seed": 46,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        124.85,
+        44.05
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "jilin",
+      "speedKmh": 90,
+      "to": [
+        125.55,
+        44.05
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 0,
+    "id": "case-005",
+    "scenario": "clear",
+    "seed": 47,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        126.05,
+        46.1
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "heilongjiang",
+      "speedKmh": 90,
+      "to": [
+        126.75,
+        46.1
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 0,
+    "id": "case-006",
+    "scenario": "clear",
+    "seed": 48,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        122.9,
+        42.02
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "liaoning",
+      "speedKmh": 90,
+      "to": [
+        123.6,
+        42.02
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 0,
+    "id": "case-007",
+    "scenario": "clear",
+    "seed": 49,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        124.85,
+        44.05
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "jilin",
+      "speedKmh": 90,
+      "to": [
+        125.55,
+        44.05
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 0,
+    "id": "case-008",
+    "scenario": "clear",
+    "seed": 50,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        126.05,
+        46.1
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "heilongjiang",
+      "speedKmh": 90,
+      "to": [
+        126.75,
+        46.1
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 0,
+    "id": "case-009",
+    "scenario": "clear",
+    "seed": 51,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        122.9,
+        42.02
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "liaoning",
+      "speedKmh": 90,
+      "to": [
+        123.6,
+        42.02
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 1,
+    "id": "case-010",
+    "scenario": "calm",
+    "seed": 42,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        124.85,
+        44.05
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "jilin",
+      "speedKmh": 90,
+      "to": [
+        125.55,
+        44.05
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 1,
+    "id": "case-011",
+    "scenario": "calm",
+    "seed": 43,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        126.05,
+        46.1
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "heilongjiang",
+      "speedKmh": 90,
+      "to": [
+        126.75,
+        46.1
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 1,
+    "id": "case-012",
+    "scenario": "calm",
+    "seed": 44,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        122.9,
+        42.02
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "liaoning",
+      "speedKmh": 90,
+      "to": [
+        123.6,
+        42.02
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 1,
+    "id": "case-013",
+    "scenario": "calm",
+    "seed": 45,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        124.85,
+        44.05
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "jilin",
+      "speedKmh": 90,
+      "to": [
+        125.55,
+        44.05
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 1,
+    "id": "case-014",
+    "scenario": "calm",
+    "seed": 46,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        126.05,
+        46.1
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "heilongjiang",
+      "speedKmh": 90,
+      "to": [
+        126.75,
+        46.1
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 1,
+    "id": "case-015",
+    "scenario": "calm",
+    "seed": 47,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        122.9,
+        42.02
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "liaoning",
+      "speedKmh": 90,
+      "to": [
+        123.6,
+        42.02
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 1,
+    "id": "case-016",
+    "scenario": "calm",
+    "seed": 48,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        124.85,
+        44.05
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "jilin",
+      "speedKmh": 90,
+      "to": [
+        125.55,
+        44.05
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 1,
+    "id": "case-017",
+    "scenario": "calm",
+    "seed": 49,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        126.05,
+        46.1
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "heilongjiang",
+      "speedKmh": 90,
+      "to": [
+        126.75,
+        46.1
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 1,
+    "id": "case-018",
+    "scenario": "calm",
+    "seed": 50,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        122.9,
+        42.02
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "liaoning",
+      "speedKmh": 90,
+      "to": [
+        123.6,
+        42.02
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 1,
+    "id": "case-019",
+    "scenario": "calm",
+    "seed": 51,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        124.85,
+        44.05
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "jilin",
+      "speedKmh": 90,
+      "to": [
+        125.55,
+        44.05
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 2,
+    "id": "case-020",
+    "scenario": "wind",
+    "seed": 42,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        126.05,
+        46.1
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "heilongjiang",
+      "speedKmh": 90,
+      "to": [
+        126.75,
+        46.1
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 2,
+    "id": "case-021",
+    "scenario": "wind",
+    "seed": 43,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        122.9,
+        42.02
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "liaoning",
+      "speedKmh": 90,
+      "to": [
+        123.6,
+        42.02
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 2,
+    "id": "case-022",
+    "scenario": "wind",
+    "seed": 44,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        124.85,
+        44.05
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "jilin",
+      "speedKmh": 90,
+      "to": [
+        125.55,
+        44.05
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 2,
+    "id": "case-023",
+    "scenario": "wind",
+    "seed": 45,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        126.05,
+        46.1
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "heilongjiang",
+      "speedKmh": 90,
+      "to": [
+        126.75,
+        46.1
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 2,
+    "id": "case-024",
+    "scenario": "wind",
+    "seed": 46,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        122.9,
+        42.02
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "liaoning",
+      "speedKmh": 90,
+      "to": [
+        123.6,
+        42.02
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 2,
+    "id": "case-025",
+    "scenario": "wind",
+    "seed": 47,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        124.85,
+        44.05
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "jilin",
+      "speedKmh": 90,
+      "to": [
+        125.55,
+        44.05
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 2,
+    "id": "case-026",
+    "scenario": "wind",
+    "seed": 48,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        126.05,
+        46.1
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "heilongjiang",
+      "speedKmh": 90,
+      "to": [
+        126.75,
+        46.1
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 2,
+    "id": "case-027",
+    "scenario": "wind",
+    "seed": 49,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        122.9,
+        42.02
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "liaoning",
+      "speedKmh": 90,
+      "to": [
+        123.6,
+        42.02
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 2,
+    "id": "case-028",
+    "scenario": "wind",
+    "seed": 50,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        124.85,
+        44.05
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "jilin",
+      "speedKmh": 90,
+      "to": [
+        125.55,
+        44.05
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 2,
+    "id": "case-029",
+    "scenario": "wind",
+    "seed": 51,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        126.05,
+        46.1
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "heilongjiang",
+      "speedKmh": 90,
+      "to": [
+        126.75,
+        46.1
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 3,
+    "id": "case-030",
+    "scenario": "rain",
+    "seed": 42,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        122.9,
+        42.02
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "liaoning",
+      "speedKmh": 90,
+      "to": [
+        123.6,
+        42.02
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 3,
+    "id": "case-031",
+    "scenario": "rain",
+    "seed": 43,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        124.85,
+        44.05
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "jilin",
+      "speedKmh": 90,
+      "to": [
+        125.55,
+        44.05
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 3,
+    "id": "case-032",
+    "scenario": "rain",
+    "seed": 44,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        126.05,
+        46.1
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "heilongjiang",
+      "speedKmh": 90,
+      "to": [
+        126.75,
+        46.1
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 3,
+    "id": "case-033",
+    "scenario": "rain",
+    "seed": 45,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        122.9,
+        42.02
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "liaoning",
+      "speedKmh": 90,
+      "to": [
+        123.6,
+        42.02
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 3,
+    "id": "case-034",
+    "scenario": "rain",
+    "seed": 46,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        124.85,
+        44.05
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "jilin",
+      "speedKmh": 90,
+      "to": [
+        125.55,
+        44.05
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 3,
+    "id": "case-035",
+    "scenario": "rain",
+    "seed": 47,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        126.05,
+        46.1
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "heilongjiang",
+      "speedKmh": 90,
+      "to": [
+        126.75,
+        46.1
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 3,
+    "id": "case-036",
+    "scenario": "rain",
+    "seed": 48,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        122.9,
+        42.02
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "liaoning",
+      "speedKmh": 90,
+      "to": [
+        123.6,
+        42.02
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 3,
+    "id": "case-037",
+    "scenario": "rain",
+    "seed": 49,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        124.85,
+        44.05
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "jilin",
+      "speedKmh": 90,
+      "to": [
+        125.55,
+        44.05
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 3,
+    "id": "case-038",
+    "scenario": "rain",
+    "seed": 50,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        126.05,
+        46.1
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "heilongjiang",
+      "speedKmh": 90,
+      "to": [
+        126.75,
+        46.1
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 3,
+    "id": "case-039",
+    "scenario": "rain",
+    "seed": 51,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        122.9,
+        42.02
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "liaoning",
+      "speedKmh": 90,
+      "to": [
+        123.6,
+        42.02
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 4,
+    "id": "case-040",
+    "scenario": "crossing",
+    "seed": 42,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        124.85,
+        44.05
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "jilin",
+      "speedKmh": 90,
+      "to": [
+        125.55,
+        44.05
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 4,
+    "id": "case-041",
+    "scenario": "crossing",
+    "seed": 43,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        126.05,
+        46.1
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "heilongjiang",
+      "speedKmh": 90,
+      "to": [
+        126.75,
+        46.1
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 4,
+    "id": "case-042",
+    "scenario": "crossing",
+    "seed": 44,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        122.9,
+        42.02
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "liaoning",
+      "speedKmh": 90,
+      "to": [
+        123.6,
+        42.02
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 4,
+    "id": "case-043",
+    "scenario": "crossing",
+    "seed": 45,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        124.85,
+        44.05
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "jilin",
+      "speedKmh": 90,
+      "to": [
+        125.55,
+        44.05
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 4,
+    "id": "case-044",
+    "scenario": "crossing",
+    "seed": 46,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        126.05,
+        46.1
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "heilongjiang",
+      "speedKmh": 90,
+      "to": [
+        126.75,
+        46.1
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 4,
+    "id": "case-045",
+    "scenario": "crossing",
+    "seed": 47,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        122.9,
+        42.02
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "liaoning",
+      "speedKmh": 90,
+      "to": [
+        123.6,
+        42.02
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 4,
+    "id": "case-046",
+    "scenario": "crossing",
+    "seed": 48,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        124.85,
+        44.05
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "jilin",
+      "speedKmh": 90,
+      "to": [
+        125.55,
+        44.05
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 4,
+    "id": "case-047",
+    "scenario": "crossing",
+    "seed": 49,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        126.05,
+        46.1
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "heilongjiang",
+      "speedKmh": 90,
+      "to": [
+        126.75,
+        46.1
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 4,
+    "id": "case-048",
+    "scenario": "crossing",
+    "seed": 50,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        122.9,
+        42.02
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "liaoning",
+      "speedKmh": 90,
+      "to": [
+        123.6,
+        42.02
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 4,
+    "id": "case-049",
+    "scenario": "crossing",
+    "seed": 51,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        124.85,
+        44.05
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "jilin",
+      "speedKmh": 90,
+      "to": [
+        125.55,
+        44.05
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 5,
+    "id": "case-050",
+    "scenario": "multi",
+    "seed": 42,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        126.05,
+        46.1
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "heilongjiang",
+      "speedKmh": 90,
+      "to": [
+        126.75,
+        46.1
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 5,
+    "id": "case-051",
+    "scenario": "multi",
+    "seed": 43,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        122.9,
+        42.02
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "liaoning",
+      "speedKmh": 90,
+      "to": [
+        123.6,
+        42.02
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 5,
+    "id": "case-052",
+    "scenario": "multi",
+    "seed": 44,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        124.85,
+        44.05
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "jilin",
+      "speedKmh": 90,
+      "to": [
+        125.55,
+        44.05
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 5,
+    "id": "case-053",
+    "scenario": "multi",
+    "seed": 45,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        126.05,
+        46.1
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "heilongjiang",
+      "speedKmh": 90,
+      "to": [
+        126.75,
+        46.1
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 5,
+    "id": "case-054",
+    "scenario": "multi",
+    "seed": 46,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        122.9,
+        42.02
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "liaoning",
+      "speedKmh": 90,
+      "to": [
+        123.6,
+        42.02
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 5,
+    "id": "case-055",
+    "scenario": "multi",
+    "seed": 47,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        124.85,
+        44.05
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "jilin",
+      "speedKmh": 90,
+      "to": [
+        125.55,
+        44.05
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 5,
+    "id": "case-056",
+    "scenario": "multi",
+    "seed": 48,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        126.05,
+        46.1
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "heilongjiang",
+      "speedKmh": 90,
+      "to": [
+        126.75,
+        46.1
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 5,
+    "id": "case-057",
+    "scenario": "multi",
+    "seed": 49,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        122.9,
+        42.02
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "liaoning",
+      "speedKmh": 90,
+      "to": [
+        123.6,
+        42.02
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 5,
+    "id": "case-058",
+    "scenario": "multi",
+    "seed": 50,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        124.85,
+        44.05
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "jilin",
+      "speedKmh": 90,
+      "to": [
+        125.55,
+        44.05
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 5,
+    "id": "case-059",
+    "scenario": "multi",
+    "seed": 51,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        126.05,
+        46.1
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "heilongjiang",
+      "speedKmh": 90,
+      "to": [
+        126.75,
+        46.1
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 6,
+    "id": "case-060",
+    "scenario": "unknown",
+    "seed": 42,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        122.9,
+        42.02
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "liaoning",
+      "speedKmh": 90,
+      "to": [
+        123.6,
+        42.02
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 6,
+    "id": "case-061",
+    "scenario": "unknown",
+    "seed": 43,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        124.85,
+        44.05
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "jilin",
+      "speedKmh": 90,
+      "to": [
+        125.55,
+        44.05
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 6,
+    "id": "case-062",
+    "scenario": "unknown",
+    "seed": 44,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        126.05,
+        46.1
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "heilongjiang",
+      "speedKmh": 90,
+      "to": [
+        126.75,
+        46.1
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 6,
+    "id": "case-063",
+    "scenario": "unknown",
+    "seed": 45,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        122.9,
+        42.02
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "liaoning",
+      "speedKmh": 90,
+      "to": [
+        123.6,
+        42.02
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 6,
+    "id": "case-064",
+    "scenario": "unknown",
+    "seed": 46,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        124.85,
+        44.05
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "jilin",
+      "speedKmh": 90,
+      "to": [
+        125.55,
+        44.05
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 6,
+    "id": "case-065",
+    "scenario": "unknown",
+    "seed": 47,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        126.05,
+        46.1
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "heilongjiang",
+      "speedKmh": 90,
+      "to": [
+        126.75,
+        46.1
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 6,
+    "id": "case-066",
+    "scenario": "unknown",
+    "seed": 48,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        122.9,
+        42.02
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "liaoning",
+      "speedKmh": 90,
+      "to": [
+        123.6,
+        42.02
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 6,
+    "id": "case-067",
+    "scenario": "unknown",
+    "seed": 49,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        124.85,
+        44.05
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "jilin",
+      "speedKmh": 90,
+      "to": [
+        125.55,
+        44.05
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 6,
+    "id": "case-068",
+    "scenario": "unknown",
+    "seed": 50,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        126.05,
+        46.1
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "heilongjiang",
+      "speedKmh": 90,
+      "to": [
+        126.75,
+        46.1
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 6,
+    "id": "case-069",
+    "scenario": "unknown",
+    "seed": 51,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        122.9,
+        42.02
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "liaoning",
+      "speedKmh": 90,
+      "to": [
+        123.6,
+        42.02
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 7,
+    "id": "case-070",
+    "scenario": "crossing",
+    "seed": 42,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 95,
+      "enduranceMinutes": 100,
+      "from": [
+        124.85,
+        44.05
+      ],
+      "latestArrivalMinute": 270,
+      "regionId": "jilin",
+      "speedKmh": 90,
+      "to": [
+        125.55,
+        44.05
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 7,
+    "id": "case-071",
+    "scenario": "crossing",
+    "seed": 43,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 96,
+      "enduranceMinutes": 100,
+      "from": [
+        126.05,
+        46.1
+      ],
+      "latestArrivalMinute": 270,
+      "regionId": "heilongjiang",
+      "speedKmh": 90,
+      "to": [
+        126.75,
+        46.1
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 7,
+    "id": "case-072",
+    "scenario": "crossing",
+    "seed": 44,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 97,
+      "enduranceMinutes": 100,
+      "from": [
+        122.9,
+        42.02
+      ],
+      "latestArrivalMinute": 270,
+      "regionId": "liaoning",
+      "speedKmh": 90,
+      "to": [
+        123.6,
+        42.02
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 7,
+    "id": "case-073",
+    "scenario": "crossing",
+    "seed": 45,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 98,
+      "enduranceMinutes": 100,
+      "from": [
+        124.85,
+        44.05
+      ],
+      "latestArrivalMinute": 270,
+      "regionId": "jilin",
+      "speedKmh": 90,
+      "to": [
+        125.55,
+        44.05
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 7,
+    "id": "case-074",
+    "scenario": "crossing",
+    "seed": 46,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 99,
+      "enduranceMinutes": 100,
+      "from": [
+        126.05,
+        46.1
+      ],
+      "latestArrivalMinute": 270,
+      "regionId": "heilongjiang",
+      "speedKmh": 90,
+      "to": [
+        126.75,
+        46.1
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 7,
+    "id": "case-075",
+    "scenario": "crossing",
+    "seed": 47,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 100,
+      "enduranceMinutes": 100,
+      "from": [
+        122.9,
+        42.02
+      ],
+      "latestArrivalMinute": 270,
+      "regionId": "liaoning",
+      "speedKmh": 90,
+      "to": [
+        123.6,
+        42.02
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 7,
+    "id": "case-076",
+    "scenario": "crossing",
+    "seed": 48,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 101,
+      "enduranceMinutes": 100,
+      "from": [
+        124.85,
+        44.05
+      ],
+      "latestArrivalMinute": 270,
+      "regionId": "jilin",
+      "speedKmh": 90,
+      "to": [
+        125.55,
+        44.05
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 7,
+    "id": "case-077",
+    "scenario": "crossing",
+    "seed": 49,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 102,
+      "enduranceMinutes": 100,
+      "from": [
+        126.05,
+        46.1
+      ],
+      "latestArrivalMinute": 270,
+      "regionId": "heilongjiang",
+      "speedKmh": 90,
+      "to": [
+        126.75,
+        46.1
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 7,
+    "id": "case-078",
+    "scenario": "crossing",
+    "seed": 50,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 103,
+      "enduranceMinutes": 100,
+      "from": [
+        122.9,
+        42.02
+      ],
+      "latestArrivalMinute": 270,
+      "regionId": "liaoning",
+      "speedKmh": 90,
+      "to": [
+        123.6,
+        42.02
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 7,
+    "id": "case-079",
+    "scenario": "crossing",
+    "seed": 51,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 104,
+      "enduranceMinutes": 100,
+      "from": [
+        124.85,
+        44.05
+      ],
+      "latestArrivalMinute": 270,
+      "regionId": "jilin",
+      "speedKmh": 90,
+      "to": [
+        125.55,
+        44.05
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 8,
+    "id": "case-080",
+    "scenario": "rain",
+    "seed": 42,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 20,
+      "from": [
+        126.05,
+        46.1
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "heilongjiang",
+      "speedKmh": 90,
+      "to": [
+        126.75,
+        46.1
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 8,
+    "id": "case-081",
+    "scenario": "rain",
+    "seed": 43,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 20,
+      "from": [
+        122.9,
+        42.02
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "liaoning",
+      "speedKmh": 90,
+      "to": [
+        123.6,
+        42.02
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 8,
+    "id": "case-082",
+    "scenario": "rain",
+    "seed": 44,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 20,
+      "from": [
+        124.85,
+        44.05
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "jilin",
+      "speedKmh": 90,
+      "to": [
+        125.55,
+        44.05
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 8,
+    "id": "case-083",
+    "scenario": "rain",
+    "seed": 45,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 20,
+      "from": [
+        126.05,
+        46.1
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "heilongjiang",
+      "speedKmh": 90,
+      "to": [
+        126.75,
+        46.1
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 8,
+    "id": "case-084",
+    "scenario": "rain",
+    "seed": 46,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 20,
+      "from": [
+        122.9,
+        42.02
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "liaoning",
+      "speedKmh": 90,
+      "to": [
+        123.6,
+        42.02
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 8,
+    "id": "case-085",
+    "scenario": "rain",
+    "seed": 47,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 20,
+      "from": [
+        124.85,
+        44.05
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "jilin",
+      "speedKmh": 90,
+      "to": [
+        125.55,
+        44.05
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 8,
+    "id": "case-086",
+    "scenario": "rain",
+    "seed": 48,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 20,
+      "from": [
+        126.05,
+        46.1
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "heilongjiang",
+      "speedKmh": 90,
+      "to": [
+        126.75,
+        46.1
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 8,
+    "id": "case-087",
+    "scenario": "rain",
+    "seed": 49,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 20,
+      "from": [
+        122.9,
+        42.02
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "liaoning",
+      "speedKmh": 90,
+      "to": [
+        123.6,
+        42.02
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 8,
+    "id": "case-088",
+    "scenario": "rain",
+    "seed": 50,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 20,
+      "from": [
+        124.85,
+        44.05
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "jilin",
+      "speedKmh": 90,
+      "to": [
+        125.55,
+        44.05
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 8,
+    "id": "case-089",
+    "scenario": "rain",
+    "seed": 51,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 20,
+      "from": [
+        126.05,
+        46.1
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "heilongjiang",
+      "speedKmh": 90,
+      "to": [
+        126.75,
+        46.1
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 9,
+    "id": "case-090",
+    "scenario": "multi",
+    "seed": 42,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        122.9,
+        42.02
+      ],
+      "latestArrivalMinute": 25,
+      "regionId": "liaoning",
+      "speedKmh": 90,
+      "to": [
+        123.6,
+        42.02
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 9,
+    "id": "case-091",
+    "scenario": "multi",
+    "seed": 43,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        124.85,
+        44.05
+      ],
+      "latestArrivalMinute": 25,
+      "regionId": "jilin",
+      "speedKmh": 90,
+      "to": [
+        125.55,
+        44.05
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 9,
+    "id": "case-092",
+    "scenario": "multi",
+    "seed": 44,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        126.05,
+        46.1
+      ],
+      "latestArrivalMinute": 25,
+      "regionId": "heilongjiang",
+      "speedKmh": 90,
+      "to": [
+        126.75,
+        46.1
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 9,
+    "id": "case-093",
+    "scenario": "multi",
+    "seed": 45,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        122.9,
+        42.02
+      ],
+      "latestArrivalMinute": 25,
+      "regionId": "liaoning",
+      "speedKmh": 90,
+      "to": [
+        123.6,
+        42.02
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 9,
+    "id": "case-094",
+    "scenario": "multi",
+    "seed": 46,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        124.85,
+        44.05
+      ],
+      "latestArrivalMinute": 25,
+      "regionId": "jilin",
+      "speedKmh": 90,
+      "to": [
+        125.55,
+        44.05
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 9,
+    "id": "case-095",
+    "scenario": "multi",
+    "seed": 47,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        126.05,
+        46.1
+      ],
+      "latestArrivalMinute": 25,
+      "regionId": "heilongjiang",
+      "speedKmh": 90,
+      "to": [
+        126.75,
+        46.1
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 9,
+    "id": "case-096",
+    "scenario": "multi",
+    "seed": 48,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        122.9,
+        42.02
+      ],
+      "latestArrivalMinute": 25,
+      "regionId": "liaoning",
+      "speedKmh": 90,
+      "to": [
+        123.6,
+        42.02
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 9,
+    "id": "case-097",
+    "scenario": "multi",
+    "seed": 49,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        124.85,
+        44.05
+      ],
+      "latestArrivalMinute": 25,
+      "regionId": "jilin",
+      "speedKmh": 90,
+      "to": [
+        125.55,
+        44.05
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 9,
+    "id": "case-098",
+    "scenario": "multi",
+    "seed": 50,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        126.05,
+        46.1
+      ],
+      "latestArrivalMinute": 25,
+      "regionId": "heilongjiang",
+      "speedKmh": 90,
+      "to": [
+        126.75,
+        46.1
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 9,
+    "id": "case-099",
+    "scenario": "multi",
+    "seed": 51,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        122.9,
+        42.02
+      ],
+      "latestArrivalMinute": 25,
+      "regionId": "liaoning",
+      "speedKmh": 90,
+      "to": [
+        123.6,
+        42.02
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 10,
+    "id": "case-100",
+    "scenario": "wind",
+    "seed": 42,
+    "task": {
+      "bufferM": 3000,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        124.85,
+        44.05
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "jilin",
+      "speedKmh": 90,
+      "to": [
+        125.55,
+        44.05
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 10,
+    "id": "case-101",
+    "scenario": "wind",
+    "seed": 43,
+    "task": {
+      "bufferM": 3000,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        126.05,
+        46.1
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "heilongjiang",
+      "speedKmh": 90,
+      "to": [
+        126.75,
+        46.1
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 10,
+    "id": "case-102",
+    "scenario": "wind",
+    "seed": 44,
+    "task": {
+      "bufferM": 3000,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        122.9,
+        42.02
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "liaoning",
+      "speedKmh": 90,
+      "to": [
+        123.6,
+        42.02
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 10,
+    "id": "case-103",
+    "scenario": "wind",
+    "seed": 45,
+    "task": {
+      "bufferM": 3000,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        124.85,
+        44.05
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "jilin",
+      "speedKmh": 90,
+      "to": [
+        125.55,
+        44.05
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 10,
+    "id": "case-104",
+    "scenario": "wind",
+    "seed": 46,
+    "task": {
+      "bufferM": 3000,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        126.05,
+        46.1
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "heilongjiang",
+      "speedKmh": 90,
+      "to": [
+        126.75,
+        46.1
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 10,
+    "id": "case-105",
+    "scenario": "wind",
+    "seed": 47,
+    "task": {
+      "bufferM": 3000,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        122.9,
+        42.02
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "liaoning",
+      "speedKmh": 90,
+      "to": [
+        123.6,
+        42.02
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 10,
+    "id": "case-106",
+    "scenario": "wind",
+    "seed": 48,
+    "task": {
+      "bufferM": 3000,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        124.85,
+        44.05
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "jilin",
+      "speedKmh": 90,
+      "to": [
+        125.55,
+        44.05
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 10,
+    "id": "case-107",
+    "scenario": "wind",
+    "seed": 49,
+    "task": {
+      "bufferM": 3000,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        126.05,
+        46.1
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "heilongjiang",
+      "speedKmh": 90,
+      "to": [
+        126.75,
+        46.1
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 10,
+    "id": "case-108",
+    "scenario": "wind",
+    "seed": 50,
+    "task": {
+      "bufferM": 3000,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        122.9,
+        42.02
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "liaoning",
+      "speedKmh": 90,
+      "to": [
+        123.6,
+        42.02
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 10,
+    "id": "case-109",
+    "scenario": "wind",
+    "seed": 51,
+    "task": {
+      "bufferM": 3000,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        124.85,
+        44.05
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "jilin",
+      "speedKmh": 90,
+      "to": [
+        125.55,
+        44.05
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 11,
+    "id": "case-110",
+    "scenario": "clear",
+    "seed": 42,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        126.05,
+        46.1
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "heilongjiang",
+      "speedKmh": 90,
+      "to": [
+        116.4,
+        39.9
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 11,
+    "id": "case-111",
+    "scenario": "clear",
+    "seed": 43,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        122.9,
+        42.02
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "liaoning",
+      "speedKmh": 90,
+      "to": [
+        116.4,
+        39.9
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 11,
+    "id": "case-112",
+    "scenario": "clear",
+    "seed": 44,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        124.85,
+        44.05
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "jilin",
+      "speedKmh": 90,
+      "to": [
+        116.4,
+        39.9
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 11,
+    "id": "case-113",
+    "scenario": "clear",
+    "seed": 45,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        126.05,
+        46.1
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "heilongjiang",
+      "speedKmh": 90,
+      "to": [
+        116.4,
+        39.9
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 11,
+    "id": "case-114",
+    "scenario": "clear",
+    "seed": 46,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        122.9,
+        42.02
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "liaoning",
+      "speedKmh": 90,
+      "to": [
+        116.4,
+        39.9
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 11,
+    "id": "case-115",
+    "scenario": "clear",
+    "seed": 47,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        124.85,
+        44.05
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "jilin",
+      "speedKmh": 90,
+      "to": [
+        116.4,
+        39.9
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 11,
+    "id": "case-116",
+    "scenario": "clear",
+    "seed": 48,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        126.05,
+        46.1
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "heilongjiang",
+      "speedKmh": 90,
+      "to": [
+        116.4,
+        39.9
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 11,
+    "id": "case-117",
+    "scenario": "clear",
+    "seed": 49,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        122.9,
+        42.02
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "liaoning",
+      "speedKmh": 90,
+      "to": [
+        116.4,
+        39.9
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 11,
+    "id": "case-118",
+    "scenario": "clear",
+    "seed": 50,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        124.85,
+        44.05
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "jilin",
+      "speedKmh": 90,
+      "to": [
+        116.4,
+        39.9
+      ],
+      "workMinutes": 5
+    }
+  },
+  {
+    "family": 11,
+    "id": "case-119",
+    "scenario": "clear",
+    "seed": 51,
+    "task": {
+      "bufferM": 500,
+      "departureMinute": 0,
+      "enduranceMinutes": 100,
+      "from": [
+        126.05,
+        46.1
+      ],
+      "latestArrivalMinute": 180,
+      "regionId": "heilongjiang",
+      "speedKmh": 90,
+      "to": [
+        116.4,
+        39.9
+      ],
+      "workMinutes": 5
+    }
+  }
+]

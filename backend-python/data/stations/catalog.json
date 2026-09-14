@@ -1,0 +1,1125 @@
+{
+  "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv",
+  "retrievedAt": "2026-09-13T04:16:40.452074+00:00",
+  "sha256": "1994747ab4af1b97e63adb434b4d0d022f2daee76f0c144ea9ab46be2d906604",
+  "stations": [
+    {
+      "stationId": "50136099999",
+      "name": "MOHE",
+      "coord": [
+        122.533,
+        52.967
+      ],
+      "regionId": "heilongjiang",
+      "begin": "19730101",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "50246099999",
+      "name": "TA-HE",
+      "coord": [
+        124.8,
+        52.333
+      ],
+      "regionId": "heilongjiang",
+      "begin": "19730101",
+      "end": "20070727",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "50353099999",
+      "name": "HUMA",
+      "coord": [
+        126.633,
+        51.733
+      ],
+      "regionId": "heilongjiang",
+      "begin": "19560820",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "50468099999",
+      "name": "AIHUI",
+      "coord": [
+        127.45,
+        50.25
+      ],
+      "regionId": "heilongjiang",
+      "begin": "19610801",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "50557099999",
+      "name": "NENJIANG",
+      "coord": [
+        125.233,
+        49.167
+      ],
+      "regionId": "heilongjiang",
+      "begin": "19560820",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "50564099999",
+      "name": "SUNWU",
+      "coord": [
+        127.35,
+        49.433
+      ],
+      "regionId": "heilongjiang",
+      "begin": "19560820",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "50646099999",
+      "name": "BORDO",
+      "coord": [
+        124.85,
+        48.483
+      ],
+      "regionId": "heilongjiang",
+      "begin": "19570601",
+      "end": "19590831",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "50656099999",
+      "name": "LONG-ZHEN",
+      "coord": [
+        126.667,
+        48.65
+      ],
+      "regionId": "heilongjiang",
+      "begin": "19610801",
+      "end": "19971021",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "50658099999",
+      "name": "KESHAN",
+      "coord": [
+        125.883,
+        48.05
+      ],
+      "regionId": "heilongjiang",
+      "begin": "19570601",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "50741099999",
+      "name": "NORTHEAST",
+      "coord": [
+        133.5,
+        47.9
+      ],
+      "regionId": "heilongjiang",
+      "begin": "19570601",
+      "end": "19590831",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "50742099999",
+      "name": "SAN-CHEN-FANG",
+      "coord": [
+        124.167,
+        47.783
+      ],
+      "regionId": "heilongjiang",
+      "begin": "19570601",
+      "end": "19970703",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "50745099999",
+      "name": "SANJIAZI",
+      "coord": [
+        123.918,
+        47.24
+      ],
+      "regionId": "heilongjiang",
+      "begin": "19560820",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "50756099999",
+      "name": "HAILUN",
+      "coord": [
+        126.867,
+        47.45
+      ],
+      "regionId": "heilongjiang",
+      "begin": "19560820",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "50758099999",
+      "name": "MING-SHUI",
+      "coord": [
+        125.883,
+        47.25
+      ],
+      "regionId": "heilongjiang",
+      "begin": "19570601",
+      "end": "19971211",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "50774099999",
+      "name": "YICHUN",
+      "coord": [
+        128.833,
+        47.7
+      ],
+      "regionId": "heilongjiang",
+      "begin": "19570601",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "50775099999",
+      "name": "HE-GANG",
+      "coord": [
+        130.2,
+        47.35
+      ],
+      "regionId": "heilongjiang",
+      "begin": "19570602",
+      "end": "19970225",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "50788099999",
+      "name": "FUJIN",
+      "coord": [
+        131.983,
+        47.233
+      ],
+      "regionId": "heilongjiang",
+      "begin": "19560820",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "50844099999",
+      "name": "TAILAI",
+      "coord": [
+        123.45,
+        46.4
+      ],
+      "regionId": "heilongjiang",
+      "begin": "19610801",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "50853099999",
+      "name": "WANG-KUI",
+      "coord": [
+        126.483,
+        46.833
+      ],
+      "regionId": "heilongjiang",
+      "begin": "19570601",
+      "end": "20020513",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "50854099999",
+      "name": "ANDA",
+      "coord": [
+        125.317,
+        46.383
+      ],
+      "regionId": "heilongjiang",
+      "begin": "19560820",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "50862099999",
+      "name": "TIE-LI",
+      "coord": [
+        128.033,
+        47.067
+      ],
+      "regionId": "heilongjiang",
+      "begin": "19571215",
+      "end": "20070727",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "50873099999",
+      "name": "CHIA-MU-SSU /CHIAMUEZE",
+      "coord": [
+        130.333,
+        46.817
+      ],
+      "regionId": "heilongjiang",
+      "begin": "19560820",
+      "end": "19611031",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "50877099999",
+      "name": "YI-LAN",
+      "coord": [
+        129.55,
+        46.3
+      ],
+      "regionId": "heilongjiang",
+      "begin": "19610801",
+      "end": "20020513",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "50888099999",
+      "name": "BAOQING",
+      "coord": [
+        132.183,
+        46.317
+      ],
+      "regionId": "heilongjiang",
+      "begin": "19570602",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "50936099999",
+      "name": "BAICHENG NORTHEAST",
+      "coord": [
+        122.85,
+        45.633
+      ],
+      "regionId": "jilin",
+      "begin": "19560820",
+      "end": "19611031",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "50949099999",
+      "name": "QIAN GORLOS",
+      "coord": [
+        124.867,
+        45.083
+      ],
+      "regionId": "jilin",
+      "begin": "19560820",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "50953099999",
+      "name": "HARBIN",
+      "coord": [
+        126.567,
+        45.933
+      ],
+      "regionId": "heilongjiang",
+      "begin": "19560820",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "50963099999",
+      "name": "TONGHE",
+      "coord": [
+        128.733,
+        45.967
+      ],
+      "regionId": "heilongjiang",
+      "begin": "19560820",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "50968099999",
+      "name": "SHANGZHI",
+      "coord": [
+        127.967,
+        45.217
+      ],
+      "regionId": "heilongjiang",
+      "begin": "19560820",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "50978099999",
+      "name": "JIXI",
+      "coord": [
+        130.917,
+        45.3
+      ],
+      "regionId": "heilongjiang",
+      "begin": "19560820",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "50983099999",
+      "name": "HULIN",
+      "coord": [
+        132.967,
+        45.767
+      ],
+      "regionId": "heilongjiang",
+      "begin": "19730101",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54041099999",
+      "name": "KAITONG/TONGYU",
+      "coord": [
+        123.083,
+        44.8
+      ],
+      "regionId": "jilin",
+      "begin": "19570601",
+      "end": "20070727",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54049099999",
+      "name": "CHANGLING",
+      "coord": [
+        123.967,
+        44.25
+      ],
+      "regionId": "jilin",
+      "begin": "19560820",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54063099999",
+      "name": "WU-CHAI-CHAN",
+      "coord": [
+        125.683,
+        44.967
+      ],
+      "regionId": "jilin",
+      "begin": "19570601",
+      "end": "20070727",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54080099999",
+      "name": "SHAHEZI SE",
+      "coord": [
+        127.6,
+        44.483
+      ],
+      "regionId": "heilongjiang",
+      "begin": "19571201",
+      "end": "19590831",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54094099999",
+      "name": "MUDANJIANG",
+      "coord": [
+        129.667,
+        44.5
+      ],
+      "regionId": "heilongjiang",
+      "begin": "19560820",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54096099999",
+      "name": "SUIFENHE",
+      "coord": [
+        131.15,
+        44.383
+      ],
+      "regionId": "heilongjiang",
+      "begin": "19560820",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54097099999",
+      "name": "MUDANJIANG NORTH",
+      "coord": [
+        129.217,
+        44.133
+      ],
+      "regionId": "heilongjiang",
+      "begin": "19570601",
+      "end": "19590831",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54142099999",
+      "name": "WO-HU-TUN",
+      "coord": [
+        123.6,
+        43.7
+      ],
+      "regionId": "jilin",
+      "begin": "19570601",
+      "end": "19971231",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54145099999",
+      "name": "CHENG-CHIZ-T'UN",
+      "coord": [
+        123.5,
+        43.5
+      ],
+      "regionId": "jilin",
+      "begin": "19800402",
+      "end": "20011114",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54157099999",
+      "name": "SIPING",
+      "coord": [
+        124.333,
+        43.183
+      ],
+      "regionId": "jilin",
+      "begin": "19560820",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54161099999",
+      "name": "LONGJIA",
+      "coord": [
+        125.681,
+        43.996
+      ],
+      "regionId": "jilin",
+      "begin": "19560820",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54161199999",
+      "name": "TAIPING",
+      "coord": [
+        126.25,
+        45.623
+      ],
+      "regionId": "heilongjiang",
+      "begin": "20040713",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54172099999",
+      "name": "JILIN",
+      "coord": [
+        126.55,
+        43.85
+      ],
+      "regionId": "jilin",
+      "begin": "19570601",
+      "end": "19971228",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54181099999",
+      "name": "JIAOHE SOUTH",
+      "coord": [
+        127.15,
+        43.717
+      ],
+      "regionId": "jilin",
+      "begin": "19560820",
+      "end": "19611031",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54186099999",
+      "name": "DUNHUA",
+      "coord": [
+        128.2,
+        43.367
+      ],
+      "regionId": "jilin",
+      "begin": "19570601",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54192099999",
+      "name": "LUO-ZI-GOU",
+      "coord": [
+        130.317,
+        43.717
+      ],
+      "regionId": "jilin",
+      "begin": "19571201",
+      "end": "20011225",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54195099999",
+      "name": "WANG-CH'ING",
+      "coord": [
+        129.75,
+        43.317
+      ],
+      "regionId": "jilin",
+      "begin": "19890101",
+      "end": "20070727",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54235099999",
+      "name": "HA-ERH-T'AO",
+      "coord": [
+        122.133,
+        42.5
+      ],
+      "regionId": "liaoning",
+      "begin": "19731006",
+      "end": "20021121",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54236099999",
+      "name": "ZHANGWU",
+      "coord": [
+        122.533,
+        42.417
+      ],
+      "regionId": "liaoning",
+      "begin": "19560820",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54237099999",
+      "name": "FUXIN",
+      "coord": [
+        121.633,
+        42.0
+      ],
+      "regionId": "liaoning",
+      "begin": "19570601",
+      "end": "19971231",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54259099999",
+      "name": "QINGYUAN",
+      "coord": [
+        124.867,
+        42.067
+      ],
+      "regionId": "liaoning",
+      "begin": "19570601",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54266099999",
+      "name": "MEIHEKOU WEST",
+      "coord": [
+        125.633,
+        42.517
+      ],
+      "regionId": "jilin",
+      "begin": "19560820",
+      "end": "19611031",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54273099999",
+      "name": "HUADIAN",
+      "coord": [
+        126.75,
+        42.983
+      ],
+      "regionId": "jilin",
+      "begin": "19570601",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54284099999",
+      "name": "FUSONG",
+      "coord": [
+        127.283,
+        42.333
+      ],
+      "regionId": "jilin",
+      "begin": "19610801",
+      "end": "19971231",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54285099999",
+      "name": "LUSHUIHE",
+      "coord": [
+        127.8,
+        42.517
+      ],
+      "regionId": "jilin",
+      "begin": "19580101",
+      "end": "20070727",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54287099999",
+      "name": "SONGJIANGHE",
+      "coord": [
+        127.5,
+        42.167
+      ],
+      "regionId": "jilin",
+      "begin": "19610801",
+      "end": "19971022",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54292099999",
+      "name": "YANJI",
+      "coord": [
+        129.5,
+        42.883
+      ],
+      "regionId": "jilin",
+      "begin": "19560820",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54324099999",
+      "name": "CHAOYANG",
+      "coord": [
+        120.45,
+        41.55
+      ],
+      "regionId": "liaoning",
+      "begin": "19570302",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54326099999",
+      "name": "CHAOYANG AIRFIELD",
+      "coord": [
+        120.433,
+        41.583
+      ],
+      "regionId": "liaoning",
+      "begin": "19570601",
+      "end": "20020603",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54335099999",
+      "name": "GOUBANGZI",
+      "coord": [
+        121.8,
+        41.383
+      ],
+      "regionId": "liaoning",
+      "begin": "19570601",
+      "end": "19971231",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54337099999",
+      "name": "JINZHOU",
+      "coord": [
+        121.117,
+        41.133
+      ],
+      "regionId": "liaoning",
+      "begin": "19560820",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54339099999",
+      "name": "ANSHAN",
+      "coord": [
+        122.983,
+        41.133
+      ],
+      "regionId": "liaoning",
+      "begin": "19570601",
+      "end": "19971231",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54342099999",
+      "name": "SHENYANG",
+      "coord": [
+        123.517,
+        41.733
+      ],
+      "regionId": "liaoning",
+      "begin": "19560820",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54342499999",
+      "name": "TAOXIAN",
+      "coord": [
+        123.483,
+        41.64
+      ],
+      "regionId": "liaoning",
+      "begin": "19920701",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54346099999",
+      "name": "BENXI",
+      "coord": [
+        123.783,
+        41.317
+      ],
+      "regionId": "liaoning",
+      "begin": "19570601",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54351099999",
+      "name": "DA-HUO-FANG",
+      "coord": [
+        124.083,
+        41.883
+      ],
+      "regionId": "liaoning",
+      "begin": "19610801",
+      "end": "19971231",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54363099999",
+      "name": "TONGHUA",
+      "coord": [
+        125.917,
+        41.717
+      ],
+      "regionId": "jilin",
+      "begin": "19570601",
+      "end": "19971231",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54365099999",
+      "name": "HUANREN",
+      "coord": [
+        125.367,
+        41.267
+      ],
+      "regionId": "liaoning",
+      "begin": "19570601",
+      "end": "19971231",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54377099999",
+      "name": "JI'AN",
+      "coord": [
+        126.217,
+        41.15
+      ],
+      "regionId": "jilin",
+      "begin": "19560820",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54386099999",
+      "name": "CHANGBAI",
+      "coord": [
+        128.183,
+        41.417
+      ],
+      "regionId": "jilin",
+      "begin": "19570601",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54454099999",
+      "name": "SUIZHONG",
+      "coord": [
+        120.35,
+        40.35
+      ],
+      "regionId": "liaoning",
+      "begin": "19730101",
+      "end": "19971231",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54455099999",
+      "name": "SHAHOUSUO",
+      "coord": [
+        120.567,
+        40.484
+      ],
+      "regionId": "liaoning",
+      "begin": "19570601",
+      "end": "19631231",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54471099999",
+      "name": "YINGKOU",
+      "coord": [
+        122.2,
+        40.667
+      ],
+      "regionId": "liaoning",
+      "begin": "19560820",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54476099999",
+      "name": "BAIYANGGOU NW",
+      "coord": [
+        122.75,
+        40.35
+      ],
+      "regionId": "liaoning",
+      "begin": "19570601",
+      "end": "19590831",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54477099999",
+      "name": "XIONG-YUE-CHENG",
+      "coord": [
+        122.133,
+        40.167
+      ],
+      "regionId": "liaoning",
+      "begin": "19740503",
+      "end": "20020717",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54483099999",
+      "name": "CAOHEKOU",
+      "coord": [
+        123.9,
+        40.883
+      ],
+      "regionId": "liaoning",
+      "begin": "19560820",
+      "end": "19900414",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54486099999",
+      "name": "SITAIZI",
+      "coord": [
+        123.967,
+        40.467
+      ],
+      "regionId": "liaoning",
+      "begin": "19570601",
+      "end": "19590831",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54493099999",
+      "name": "KUANDIAN",
+      "coord": [
+        124.783,
+        40.717
+      ],
+      "regionId": "liaoning",
+      "begin": "19560820",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54497099999",
+      "name": "DANDONG",
+      "coord": [
+        124.333,
+        40.05
+      ],
+      "regionId": "liaoning",
+      "begin": "19560820",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54498099999",
+      "name": "APPROXIMATE LOCALE",
+      "coord": [
+        124.333,
+        40.117
+      ],
+      "regionId": "liaoning",
+      "begin": "19731115",
+      "end": "20020605",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54563099999",
+      "name": "FUXIAN/WAFANGDIAN",
+      "coord": [
+        121.983,
+        39.633
+      ],
+      "regionId": "liaoning",
+      "begin": "19570601",
+      "end": "19971231",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54575099999",
+      "name": "CHENGZITAN",
+      "coord": [
+        122.5,
+        39.5
+      ],
+      "regionId": "liaoning",
+      "begin": "19570601",
+      "end": "19590831",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54577099999",
+      "name": "LU-DA/ZHENG-SHA-HE",
+      "coord": [
+        122.083,
+        39.267
+      ],
+      "regionId": "liaoning",
+      "begin": "19800403",
+      "end": "20191211",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54584099999",
+      "name": "SHISHAN NORTHEAST",
+      "coord": [
+        123.067,
+        39.717
+      ],
+      "regionId": "liaoning",
+      "begin": "19560820",
+      "end": "19611031",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    },
+    {
+      "stationId": "54662099999",
+      "name": "ZHOUSHUIZI",
+      "coord": [
+        121.539,
+        38.966
+      ],
+      "regionId": "liaoning",
+      "begin": "19560820",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    }
+  ]
+}

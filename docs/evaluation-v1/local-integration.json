@@ -1,0 +1,166 @@
+{
+  "transitions": [
+    {
+      "index": 0,
+      "region": "liaoning",
+      "scenario": "clear",
+      "status": "DIRECT",
+      "replay": true,
+      "latencyMs": 267
+    },
+    {
+      "index": 1,
+      "region": "jilin",
+      "scenario": "crossing",
+      "status": "DETOUR",
+      "replay": true,
+      "latencyMs": 670
+    },
+    {
+      "index": 2,
+      "region": "heilongjiang",
+      "scenario": "rain",
+      "status": "DETOUR",
+      "replay": true,
+      "latencyMs": 690
+    },
+    {
+      "index": 3,
+      "region": "liaoning",
+      "scenario": "multi",
+      "status": "DETOUR",
+      "replay": true,
+      "latencyMs": 2177
+    },
+    {
+      "index": 4,
+      "region": "jilin",
+      "scenario": "unknown",
+      "status": "UNEVALUATED",
+      "replay": true,
+      "latencyMs": 114
+    },
+    {
+      "index": 5,
+      "region": "heilongjiang",
+      "scenario": "clear",
+      "status": "DIRECT",
+      "replay": true,
+      "latencyMs": 169
+    },
+    {
+      "index": 6,
+      "region": "liaoning",
+      "scenario": "crossing",
+      "status": "DETOUR",
+      "replay": true,
+      "latencyMs": 506
+    },
+    {
+      "index": 7,
+      "region": "jilin",
+      "scenario": "rain",
+      "status": "DETOUR",
+      "replay": true,
+      "latencyMs": 672
+    },
+    {
+      "index": 8,
+      "region": "heilongjiang",
+      "scenario": "multi",
+      "status": "DETOUR",
+      "replay": true,
+      "latencyMs": 1480
+    },
+    {
+      "index": 9,
+      "region": "liaoning",
+      "scenario": "unknown",
+      "status": "UNEVALUATED",
+      "replay": true,
+      "latencyMs": 131
+    },
+    {
+      "index": 10,
+      "region": "jilin",
+      "scenario": "clear",
+      "status": "DIRECT",
+      "replay": true,
+      "latencyMs": 141
+    },
+    {
+      "index": 11,
+      "region": "heilongjiang",
+      "scenario": "crossing",
+      "status": "DETOUR",
+      "replay": true,
+      "latencyMs": 384
+    },
+    {
+      "index": 12,
+      "region": "liaoning",
+      "scenario": "rain",
+      "status": "DETOUR",
+      "replay": true,
+      "latencyMs": 482
+    },
+    {
+      "index": 13,
+      "region": "jilin",
+      "scenario": "multi",
+      "status": "DETOUR",
+      "replay": true,
+      "latencyMs": 1338
+    },
+    {
+      "index": 14,
+      "region": "heilongjiang",
+      "scenario": "unknown",
+      "status": "UNEVALUATED",
+      "replay": true,
+      "latencyMs": 141
+    },
+    {
+      "index": 15,
+      "region": "liaoning",
+      "scenario": "clear",
+      "status": "DIRECT",
+      "replay": true,
+      "latencyMs": 115
+    },
+    {
+      "index": 16,
+      "region": "jilin",
+      "scenario": "crossing",
+      "status": "DETOUR",
+      "replay": true,
+      "latencyMs": 526
+    },
+    {
+      "index": 17,
+      "region": "heilongjiang",
+      "scenario": "rain",
+      "status": "DETOUR",
+      "replay": true,
+      "latencyMs": 364
+    },
+    {
+      "index": 18,
+      "region": "liaoning",
+      "scenario": "multi",
+      "status": "DETOUR",
+      "replay": true,
+      "latencyMs": 1009
+    },
+    {
+      "index": 19,
+      "region": "jilin",
+      "scenario": "unknown",
+      "status": "UNEVALUATED",
+      "replay": true,
+      "latencyMs": 112
+    }
+  ],
+  "observations": "3 historical regions",
+  "note": "Short integration run, not a two-hour soak test"
+}

@@ -1,0 +1,534 @@
+{
+  "sourceUrl": "https://www.ncei.noaa.gov/data/global-hourly/access/2025/54161099999.csv",
+  "retrievedAt": "2026-09-13T04:16:42.746774+00:00",
+  "rawSha256": "c711eff13086136094c45a00c4d7665b892cdda25ac3baa2cdfaed5bf19cb408",
+  "stations": [
+    {
+      "stationId": "54161099999",
+      "name": "LONGJIA",
+      "coord": [
+        125.681,
+        43.996
+      ],
+      "regionId": "jilin",
+      "begin": "19560820",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    }
+  ],
+  "samples": [
+    {
+      "observedAt": "2025-07-01T00:00:00Z",
+      "windSpeedMps": 2.4,
+      "windDirectionDeg": 231.0,
+      "temperatureC": 24.5,
+      "visibilityM": 8100.0,
+      "precipitationAccumulationMm": 26.3,
+      "precipitationPeriodHours": 24.0,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "231,1,N,0024,1",
+        "TMP": "+0245,1",
+        "VIS": "008100,1,9,9",
+        "AA1": "24,0263,3,1"
+      }
+    },
+    {
+      "observedAt": "2025-07-01T00:00:00Z",
+      "windSpeedMps": 5.0,
+      "windDirectionDeg": 250.0,
+      "temperatureC": 25.0,
+      "visibilityM": 8000.0,
+      "precipitationAccumulationMm": null,
+      "precipitationPeriodHours": null,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "250,1,N,0050,1",
+        "TMP": "+0250,1",
+        "VIS": "008000,1,9,9",
+        "AA1": ""
+      }
+    },
+    {
+      "observedAt": "2025-07-01T01:00:00Z",
+      "windSpeedMps": 5.0,
+      "windDirectionDeg": 240.0,
+      "temperatureC": 26.0,
+      "visibilityM": 8000.0,
+      "precipitationAccumulationMm": null,
+      "precipitationPeriodHours": null,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "240,1,N,0050,1",
+        "TMP": "+0260,1",
+        "VIS": "008000,1,9,9",
+        "AA1": ""
+      }
+    },
+    {
+      "observedAt": "2025-07-01T02:00:00Z",
+      "windSpeedMps": 4.0,
+      "windDirectionDeg": 220.0,
+      "temperatureC": 27.0,
+      "visibilityM": 9999.0,
+      "precipitationAccumulationMm": null,
+      "precipitationPeriodHours": null,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "220,1,V,0040,1",
+        "TMP": "+0270,1",
+        "VIS": "009999,1,9,9",
+        "AA1": ""
+      }
+    },
+    {
+      "observedAt": "2025-07-01T03:00:00Z",
+      "windSpeedMps": 2.5,
+      "windDirectionDeg": 247.0,
+      "temperatureC": 26.5,
+      "visibilityM": 13200.0,
+      "precipitationAccumulationMm": 22.1,
+      "precipitationPeriodHours": 24.0,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "247,1,N,0025,1",
+        "TMP": "+0265,1",
+        "VIS": "013200,1,9,9",
+        "AA1": "24,0221,3,1"
+      }
+    },
+    {
+      "observedAt": "2025-07-01T03:00:00Z",
+      "windSpeedMps": 6.0,
+      "windDirectionDeg": 220.0,
+      "temperatureC": 28.0,
+      "visibilityM": 9999.0,
+      "precipitationAccumulationMm": null,
+      "precipitationPeriodHours": null,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "220,1,N,0060,1",
+        "TMP": "+0280,1",
+        "VIS": "009999,1,9,9",
+        "AA1": ""
+      }
+    },
+    {
+      "observedAt": "2025-07-01T04:00:00Z",
+      "windSpeedMps": 6.0,
+      "windDirectionDeg": 210.0,
+      "temperatureC": 28.0,
+      "visibilityM": 9999.0,
+      "precipitationAccumulationMm": null,
+      "precipitationPeriodHours": null,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "210,1,N,0060,1",
+        "TMP": "+0280,1",
+        "VIS": "009999,1,9,9",
+        "AA1": ""
+      }
+    },
+    {
+      "observedAt": "2025-07-01T05:00:00Z",
+      "windSpeedMps": 7.0,
+      "windDirectionDeg": 220.0,
+      "temperatureC": 28.0,
+      "visibilityM": 9999.0,
+      "precipitationAccumulationMm": null,
+      "precipitationPeriodHours": null,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "220,1,V,0070,1",
+        "TMP": "+0280,1",
+        "VIS": "009999,1,9,9",
+        "AA1": ""
+      }
+    },
+    {
+      "observedAt": "2025-07-01T06:00:00Z",
+      "windSpeedMps": 2.8,
+      "windDirectionDeg": 209.0,
+      "temperatureC": 27.7,
+      "visibilityM": 17400.0,
+      "precipitationAccumulationMm": 0.3,
+      "precipitationPeriodHours": 24.0,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "209,1,N,0028,1",
+        "TMP": "+0277,1",
+        "VIS": "017400,1,9,9",
+        "AA1": "24,0003,3,1"
+      }
+    },
+    {
+      "observedAt": "2025-07-01T06:00:00Z",
+      "windSpeedMps": 6.0,
+      "windDirectionDeg": 240.0,
+      "temperatureC": 28.0,
+      "visibilityM": 9999.0,
+      "precipitationAccumulationMm": null,
+      "precipitationPeriodHours": null,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "240,1,N,0060,1",
+        "TMP": "+0280,1",
+        "VIS": "009999,1,9,9",
+        "AA1": ""
+      }
+    },
+    {
+      "observedAt": "2025-07-01T07:00:00Z",
+      "windSpeedMps": 4.0,
+      "windDirectionDeg": 230.0,
+      "temperatureC": 28.0,
+      "visibilityM": 9999.0,
+      "precipitationAccumulationMm": null,
+      "precipitationPeriodHours": null,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "230,1,V,0040,1",
+        "TMP": "+0280,1",
+        "VIS": "009999,1,9,9",
+        "AA1": ""
+      }
+    },
+    {
+      "observedAt": "2025-07-01T08:00:00Z",
+      "windSpeedMps": 5.0,
+      "windDirectionDeg": 210.0,
+      "temperatureC": 28.0,
+      "visibilityM": 9999.0,
+      "precipitationAccumulationMm": null,
+      "precipitationPeriodHours": null,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "210,1,N,0050,1",
+        "TMP": "+0280,1",
+        "VIS": "009999,1,9,9",
+        "AA1": ""
+      }
+    },
+    {
+      "observedAt": "2025-07-01T09:00:00Z",
+      "windSpeedMps": 2.8,
+      "windDirectionDeg": 208.0,
+      "temperatureC": 27.2,
+      "visibilityM": 14700.0,
+      "precipitationAccumulationMm": 3.5,
+      "precipitationPeriodHours": 24.0,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "208,1,N,0028,1",
+        "TMP": "+0272,1",
+        "VIS": "014700,1,9,9",
+        "AA1": "24,0035,3,1"
+      }
+    },
+    {
+      "observedAt": "2025-07-01T09:00:00Z",
+      "windSpeedMps": 5.0,
+      "windDirectionDeg": 220.0,
+      "temperatureC": 29.0,
+      "visibilityM": 9999.0,
+      "precipitationAccumulationMm": null,
+      "precipitationPeriodHours": null,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "220,1,N,0050,1",
+        "TMP": "+0290,1",
+        "VIS": "009999,1,9,9",
+        "AA1": ""
+      }
+    },
+    {
+      "observedAt": "2025-07-01T10:00:00Z",
+      "windSpeedMps": 5.0,
+      "windDirectionDeg": 220.0,
+      "temperatureC": 27.0,
+      "visibilityM": 9999.0,
+      "precipitationAccumulationMm": null,
+      "precipitationPeriodHours": null,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "220,1,N,0050,1",
+        "TMP": "+0270,1",
+        "VIS": "009999,1,9,9",
+        "AA1": ""
+      }
+    },
+    {
+      "observedAt": "2025-07-01T11:00:00Z",
+      "windSpeedMps": 5.0,
+      "windDirectionDeg": 200.0,
+      "temperatureC": 27.0,
+      "visibilityM": 9999.0,
+      "precipitationAccumulationMm": null,
+      "precipitationPeriodHours": null,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "200,1,N,0050,1",
+        "TMP": "+0270,1",
+        "VIS": "009999,1,9,9",
+        "AA1": ""
+      }
+    },
+    {
+      "observedAt": "2025-07-01T12:00:00Z",
+      "windSpeedMps": 2.3,
+      "windDirectionDeg": 156.0,
+      "temperatureC": 26.7,
+      "visibilityM": 16600.0,
+      "precipitationAccumulationMm": 3.4,
+      "precipitationPeriodHours": 24.0,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "156,1,N,0023,1",
+        "TMP": "+0267,1",
+        "VIS": "016600,1,9,9",
+        "AA1": "24,0034,3,1"
+      }
+    },
+    {
+      "observedAt": "2025-07-01T12:00:00Z",
+      "windSpeedMps": 4.0,
+      "windDirectionDeg": 190.0,
+      "temperatureC": 26.0,
+      "visibilityM": 9999.0,
+      "precipitationAccumulationMm": null,
+      "precipitationPeriodHours": null,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "190,1,N,0040,1",
+        "TMP": "+0260,1",
+        "VIS": "009999,1,9,9",
+        "AA1": ""
+      }
+    },
+    {
+      "observedAt": "2025-07-01T13:00:00Z",
+      "windSpeedMps": 4.0,
+      "windDirectionDeg": 190.0,
+      "temperatureC": 26.0,
+      "visibilityM": 9999.0,
+      "precipitationAccumulationMm": null,
+      "precipitationPeriodHours": null,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "190,1,N,0040,1",
+        "TMP": "+0260,1",
+        "VIS": "009999,1,9,9",
+        "AA1": ""
+      }
+    },
+    {
+      "observedAt": "2025-07-01T14:00:00Z",
+      "windSpeedMps": 4.0,
+      "windDirectionDeg": 200.0,
+      "temperatureC": 26.0,
+      "visibilityM": 9999.0,
+      "precipitationAccumulationMm": null,
+      "precipitationPeriodHours": null,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "200,1,N,0040,1",
+        "TMP": "+0260,1",
+        "VIS": "009999,1,9,9",
+        "AA1": ""
+      }
+    },
+    {
+      "observedAt": "2025-07-01T15:00:00Z",
+      "windSpeedMps": 2.1,
+      "windDirectionDeg": 215.0,
+      "temperatureC": 24.0,
+      "visibilityM": 6400.0,
+      "precipitationAccumulationMm": 7.2,
+      "precipitationPeriodHours": 24.0,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "215,1,N,0021,1",
+        "TMP": "+0240,1",
+        "VIS": "006400,1,9,9",
+        "AA1": "24,0072,3,1"
+      }
+    },
+    {
+      "observedAt": "2025-07-01T15:00:00Z",
+      "windSpeedMps": 5.0,
+      "windDirectionDeg": 220.0,
+      "temperatureC": 26.0,
+      "visibilityM": 9999.0,
+      "precipitationAccumulationMm": null,
+      "precipitationPeriodHours": null,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "220,1,N,0050,1",
+        "TMP": "+0260,1",
+        "VIS": "009999,1,9,9",
+        "AA1": ""
+      }
+    },
+    {
+      "observedAt": "2025-07-01T16:00:00Z",
+      "windSpeedMps": 4.0,
+      "windDirectionDeg": 210.0,
+      "temperatureC": 25.0,
+      "visibilityM": 7000.0,
+      "precipitationAccumulationMm": null,
+      "precipitationPeriodHours": null,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "210,1,N,0040,1",
+        "TMP": "+0250,1",
+        "VIS": "007000,1,9,9",
+        "AA1": ""
+      }
+    },
+    {
+      "observedAt": "2025-07-01T17:00:00Z",
+      "windSpeedMps": 4.0,
+      "windDirectionDeg": 220.0,
+      "temperatureC": 24.0,
+      "visibilityM": 9999.0,
+      "precipitationAccumulationMm": null,
+      "precipitationPeriodHours": null,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "220,1,N,0040,1",
+        "TMP": "+0240,1",
+        "VIS": "009999,1,9,9",
+        "AA1": ""
+      }
+    },
+    {
+      "observedAt": "2025-07-01T18:00:00Z",
+      "windSpeedMps": 4.7,
+      "windDirectionDeg": 232.0,
+      "temperatureC": 24.5,
+      "visibilityM": 9100.0,
+      "precipitationAccumulationMm": 7.1,
+      "precipitationPeriodHours": 24.0,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "232,1,N,0047,1",
+        "TMP": "+0245,1",
+        "VIS": "009100,1,9,9",
+        "AA1": "24,0071,3,1"
+      }
+    },
+    {
+      "observedAt": "2025-07-01T18:00:00Z",
+      "windSpeedMps": 3.0,
+      "windDirectionDeg": 230.0,
+      "temperatureC": 24.0,
+      "visibilityM": 9999.0,
+      "precipitationAccumulationMm": null,
+      "precipitationPeriodHours": null,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "230,1,N,0030,1",
+        "TMP": "+0240,1",
+        "VIS": "009999,1,9,9",
+        "AA1": ""
+      }
+    },
+    {
+      "observedAt": "2025-07-01T19:00:00Z",
+      "windSpeedMps": 5.0,
+      "windDirectionDeg": 230.0,
+      "temperatureC": 24.0,
+      "visibilityM": 9999.0,
+      "precipitationAccumulationMm": null,
+      "precipitationPeriodHours": null,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "230,1,N,0050,1",
+        "TMP": "+0240,1",
+        "VIS": "009999,1,9,9",
+        "AA1": ""
+      }
+    },
+    {
+      "observedAt": "2025-07-01T20:00:00Z",
+      "windSpeedMps": 7.0,
+      "windDirectionDeg": 240.0,
+      "temperatureC": 24.0,
+      "visibilityM": 7000.0,
+      "precipitationAccumulationMm": null,
+      "precipitationPeriodHours": null,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "240,1,N,0070,1",
+        "TMP": "+0240,1",
+        "VIS": "007000,1,9,9",
+        "AA1": ""
+      }
+    },
+    {
+      "observedAt": "2025-07-01T21:00:00Z",
+      "windSpeedMps": 5.7,
+      "windDirectionDeg": 239.0,
+      "temperatureC": 23.7,
+      "visibilityM": 12400.0,
+      "precipitationAccumulationMm": 7.1,
+      "precipitationPeriodHours": 24.0,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "239,1,N,0057,1",
+        "TMP": "+0237,1",
+        "VIS": "012400,1,9,9",
+        "AA1": "24,0071,3,1"
+      }
+    },
+    {
+      "observedAt": "2025-07-01T21:00:00Z",
+      "windSpeedMps": 8.0,
+      "windDirectionDeg": 240.0,
+      "temperatureC": 24.0,
+      "visibilityM": 2500.0,
+      "precipitationAccumulationMm": null,
+      "precipitationPeriodHours": null,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "240,1,N,0080,1",
+        "TMP": "+0240,1",
+        "VIS": "002500,1,9,9",
+        "AA1": ""
+      }
+    },
+    {
+      "observedAt": "2025-07-01T22:00:00Z",
+      "windSpeedMps": 7.0,
+      "windDirectionDeg": 240.0,
+      "temperatureC": 25.0,
+      "visibilityM": 7000.0,
+      "precipitationAccumulationMm": null,
+      "precipitationPeriodHours": null,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "240,1,N,0070,1",
+        "TMP": "+0250,1",
+        "VIS": "007000,1,9,9",
+        "AA1": ""
+      }
+    },
+    {
+      "observedAt": "2025-07-01T23:00:00Z",
+      "windSpeedMps": 6.0,
+      "windDirectionDeg": 240.0,
+      "temperatureC": 25.0,
+      "visibilityM": 9999.0,
+      "precipitationAccumulationMm": null,
+      "precipitationPeriodHours": null,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "240,1,N,0060,1",
+        "TMP": "+0250,1",
+        "VIS": "009999,1,9,9",
+        "AA1": ""
+      }
+    }
+  ]
+}

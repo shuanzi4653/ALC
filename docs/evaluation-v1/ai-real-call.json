@@ -1,0 +1,10 @@
+{
+  "source": "deepseek",
+  "errorCode": null,
+  "decisionId": "54caa3b9773254126392958328d2a6963a4c41bbe8f3e4c6c29b55533f780061",
+  "explanationId": "97e189c2373ec765ef667bc5d26309152b321c282ea6fb94f374e6b9937a12d3",
+  "latencyMs": 1769,
+  "toolCount": 5,
+  "citationCount": 6,
+  "citationsValid": true
+}

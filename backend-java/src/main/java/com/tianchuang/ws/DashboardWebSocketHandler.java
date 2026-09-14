@@ -2,6 +2,7 @@ package com.tianchuang.ws;
 
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.Map;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
+import com.tianchuang.service.PushService;
 
 /**
  * 大屏 WebSocket 推送（/ws/dashboard）
@@ -22,7 +24,26 @@ public class DashboardWebSocketHandler extends TextWebSocketHandler {
     private static final Logger log = LoggerFactory.getLogger(DashboardWebSocketHandler.class);
 
     private final List<WebSocketSession> sessions = new CopyOnWriteArrayList<>();
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper;
+    private final PushService pushService;
+
+    public DashboardWebSocketHandler(ObjectMapper mapper, PushService pushService) {
+        this.mapper = mapper;
+        this.pushService = pushService;
+    }
+
+    @Override
+    protected void handleTextMessage(WebSocketSession session, TextMessage message) {
+        try {
+            var root = mapper.readTree(message.getPayload());
+            if (root.path("version").asInt() == 1 && "alert_ack".equals(root.path("type").asText())) {
+                long eventId = root.path("payload").path("eventId").asLong(-1);
+                if (eventId > 0) pushService.recordScreenAck(eventId, session.getId());
+            }
+        } catch (Exception e) {
+            log.debug("忽略无法识别的 WS 客户端消息 session={}", session.getId());
+        }
+    }
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
@@ -37,21 +58,43 @@ public class DashboardWebSocketHandler extends TextWebSocketHandler {
     }
 
     /** 向全部在线大屏广播 JSON 消息 */
-    public void broadcast(String json) {
+    public int broadcast(String json) {
+        int delivered = 0;
         for (WebSocketSession s : sessions) {
             try {
                 if (s.isOpen()) {
                     synchronized (s) {
                         s.sendMessage(new TextMessage(json));
+                        delivered++;
                     }
                 }
             } catch (Exception e) {
                 log.warn("WS 推送失败 {}: {}", s.getId(), e.getMessage());
             }
         }
+        return delivered;
     }
 
     public int clientCount() {
         return sessions.size();
+    }
+
+    public void broadcastDashboard(String runId, Map<String, Object> dashboard) {
+        try {
+            broadcast(mapper.writeValueAsString(Map.of(
+                    "type", "dashboard", "version", 1, "runId", runId, "payload", dashboard)));
+        } catch (Exception e) {
+            log.warn("Dashboard WS 序列化失败: {}", e.getMessage());
+        }
+    }
+
+    public int broadcastAlert(String runId, Map<String, Object> alert) {
+        try {
+            return broadcast(mapper.writeValueAsString(Map.of(
+                    "type", "alert", "version", 1, "runId", runId, "payload", alert)));
+        } catch (Exception e) {
+            log.warn("Alert WS 序列化失败: {}", e.getMessage());
+            return 0;
+        }
     }
 }

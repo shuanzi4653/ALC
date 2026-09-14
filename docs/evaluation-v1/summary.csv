@@ -1,0 +1,5 @@
+﻿method,cases,opened,conflicts,safeOpened,closed,unevaluated,timeout,p95Ms
+B0_STRAIGHT,120,120,93,27,0,0,0,0.012
+B1_STATIC,120,80,49,31,30,10,0,11.704
+B2_DYNAMIC,120,80,0,80,30,10,0,1264.462
+B3_BUFFERED,120,80,0,80,30,10,0,1108.156

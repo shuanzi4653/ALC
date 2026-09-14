@@ -27,15 +27,23 @@ __pycache__/
 # Runtime data and logs
 data/*.db
 data/*.trace.db
+data/*.mv.db
 *.log
+
+# Local backups (never distribute)
+backup/
+backups/
+data_backup_*/
 
 # Local audit and temporary artifacts
 .audit/
+.run/
 *.tmp
 *.temp
 
 # Local secrets and machine-specific configuration
 config/application.yml
+backend-java/src/main/resources/application.yml
 config/qweather/*.pem
 *.key
 *.secret

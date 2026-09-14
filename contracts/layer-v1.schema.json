@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://tianchuang/contracts/layer-v1.schema.json",
+  "title": "天窗智巡 空间图层 v1",
+  "description": "GET /api/layers 返回的图层数组；每层必须自报来源、时间、单位与状态，模拟图层强制 isSimulated=true。",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["id", "kind", "regionId", "runId", "revision", "source", "isSimulated", "validTime", "crs", "units", "status"],
+    "properties": {
+      "id": { "type": "string" },
+      "kind": {
+        "enum": ["WIND", "PRECIPITATION", "THUNDER_PROBABILITY", "LIGHTNING", "RISK_AREA", "ROUTE"],
+        "description": "图层类型。THUNDER_PROBABILITY 为预报概率，与 LIGHTNING 实际事件严格区分"
+      },
+      "regionId": { "type": "string" },
+      "runId": { "type": "string", "description": "所属运行；与当前 dashboard 不一致时应拒收" },
+      "revision": { "type": "integer", "minimum": 1, "description": "所属运行修订；与当前 dashboard 不一致时应拒收" },
+      "source": { "enum": ["sim", "live"] },
+      "isSimulated": { "type": "boolean", "description": "true 表示演示数据，界面必须标注" },
+      "validTime": { "type": "string", "description": "有效时间 ISO-8601" },
+      "expiresAt": { "type": "string", "description": "过期时间；过期后前端须降透明度并标注陈旧" },
+      "crs": { "type": "string", "const": "EPSG:4326", "description": "WGS84 经纬度坐标，lon/lat 顺序" },
+      "units": { "type": "string", "description": "如 m/s、mm/h、%" },
+      "bbox": {
+        "type": ["array", "null"],
+        "items": { "type": "number" },
+        "minItems": 4,
+        "maxItems": 4,
+        "description": "[minLon,minLat,maxLon,maxLat]"
+      },
+      "geometry": {
+        "type": ["object", "null"],
+        "description": "GeoJSON Polygon 或 MultiPolygon；坐标顺序 lon/lat。东北区域风险可由多个互不相连的局部面组成"
+      },
+      "data": { "type": ["object", "null"], "description": "图层载荷；风支持 points，天气 cells 含动态中心与不规则 polygon，风险 areas 为独立运行限制区并含 zoneType" },
+      "quality": {
+        "type": ["object", "null"],
+        "properties": {
+          "spatialMeaning": {
+            "enum": ["DEMO_SYMBOL", "POINT_OBSERVATION", "FORECAST_PROBABILITY", "OBSERVED_EVENT", "RULE_OUTPUT"],
+            "description": "空间语义：演示符号不得表述为实际覆盖范围"
+          },
+          "method": { "type": ["string", "null"], "description": "估算方法（如由降水概率推导雷暴概率）" }
+        }
+      },
+      "status": { "enum": ["READY", "NO_DATA", "EXPIRED", "ERROR"], "description": "后端状态；前端另维护 LOADING" },
+      "errorCode": { "type": ["string", "null"] }
+    }
+  }
+}

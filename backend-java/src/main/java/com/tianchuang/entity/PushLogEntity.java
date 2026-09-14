@@ -21,7 +21,7 @@ public class PushLogEntity {
     public Long alertId;
     public String channel;       // DINGTALK | FEISHU | WECOM | MAIL | SCREEN
     public String target;
-    public String status;        // SENT | FAILED | SKIPPED
+    public String status;        // SENT | DISPLAYED | FAILED | SKIPPED
     public int latencyMs;
     public String detail;
 }

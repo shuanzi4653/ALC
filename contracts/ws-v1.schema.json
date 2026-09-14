@@ -1,0 +1,59 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://tianchuang/contracts/ws-v1.schema.json",
+  "title": "天窗智巡 WebSocket 消息信封 v1",
+  "description": "WS /ws/dashboard 的所有消息统一使用 {type,version,runId,payload} 信封；payload 为完整 DTO，不再返回 JPA 实体或临时拼接 Map。",
+  "type": "object",
+  "required": ["type", "version"],
+  "properties": {
+    "type": { "enum": ["dashboard", "alert", "alert_ack"] },
+    "version": { "type": "integer", "const": 1 },
+    "runId": { "type": ["string", "null"], "description": "所属运行，便于前端拒绝过期消息" },
+    "payload": { "type": "object" }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "type": { "const": "dashboard" },
+        "payload": { "$ref": "dashboard-v1.schema.json" }
+      },
+      "required": ["type", "version", "payload"]
+    },
+    {
+      "properties": {
+        "type": { "const": "alert" },
+        "payload": {
+          "type": "object",
+          "required": ["eventId", "level", "levelLabel", "text"],
+          "properties": {
+            "eventId": { "type": "integer", "minimum": 1 },
+            "level": { "enum": ["FIT", "CAUTION", "DANGER", "BAN"] },
+            "levelLabel": { "type": "string", "description": "中文等级文案" },
+            "text": { "type": "string", "description": "预警正文（可直接展示）" },
+            "advice": { "type": ["string", "null"], "description": "规则模板生成的操作建议" },
+            "region": { "type": ["string", "null"] },
+            "factors": { "type": ["string", "null"] },
+            "runId": { "type": ["string", "null"] },
+            "ts": { "type": ["string", "null"] }
+          }
+        }
+      },
+      "required": ["type", "version", "payload"]
+    },
+    {
+      "properties": {
+        "type": { "const": "alert_ack" },
+        "payload": {
+          "type": "object",
+          "description": "客户端已渲染该预警的确认；仅代表该连接已显示，不代表他人已读",
+          "required": ["eventId", "displayedAt"],
+          "properties": {
+            "eventId": { "type": "integer", "minimum": 1 },
+            "displayedAt": { "type": "string" }
+          }
+        }
+      },
+      "required": ["type", "version", "payload"]
+    }
+  ]
+}

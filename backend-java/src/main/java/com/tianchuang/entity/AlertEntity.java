@@ -19,6 +19,9 @@ public class AlertEntity {
     public Long id;
 
     public LocalDateTime ts = LocalDateTime.now();
+    public String runId;
+    public String episodeId;
+    public int transitionVersion;
     public String level;         // DANGER | BAN（或骤变骤升的级别）
     public String triggerType;   // LEVEL_REACH | SFI_DROP
     public String region;

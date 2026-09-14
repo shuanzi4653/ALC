@@ -1,0 +1,9 @@
+security:
+  enabled: true
+  allow-demo-user: false
+spring:
+  h2:
+    console:
+      enabled: false
+  jpa:
+    open-in-view: false

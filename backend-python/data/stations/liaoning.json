@@ -1,0 +1,150 @@
+{
+  "sourceUrl": "https://www.ncei.noaa.gov/data/global-hourly/access/2025/54342099999.csv",
+  "retrievedAt": "2026-09-13T04:16:41.480046+00:00",
+  "rawSha256": "6fea319bf635a17e632a645f15bc7a0b0c158b554970ac368539d8488478020d",
+  "stations": [
+    {
+      "stationId": "54342099999",
+      "name": "SHENYANG",
+      "coord": [
+        123.517,
+        41.733
+      ],
+      "regionId": "liaoning",
+      "begin": "19560820",
+      "end": "20250824",
+      "source": "NOAA_ISD_CATALOG",
+      "sourceUrl": "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    }
+  ],
+  "samples": [
+    {
+      "observedAt": "2025-07-01T00:00:00Z",
+      "windSpeedMps": 1.5,
+      "windDirectionDeg": 161.0,
+      "temperatureC": 26.7,
+      "visibilityM": 30000.0,
+      "precipitationAccumulationMm": 14.8,
+      "precipitationPeriodHours": 24.0,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "161,1,N,0015,1",
+        "TMP": "+0267,1",
+        "VIS": "030000,1,9,9",
+        "AA1": "24,0148,3,1"
+      }
+    },
+    {
+      "observedAt": "2025-07-01T03:00:00Z",
+      "windSpeedMps": 3.9,
+      "windDirectionDeg": 200.0,
+      "temperatureC": 28.1,
+      "visibilityM": 30000.0,
+      "precipitationAccumulationMm": 2.8,
+      "precipitationPeriodHours": 24.0,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "200,1,N,0039,1",
+        "TMP": "+0281,1",
+        "VIS": "030000,1,9,9",
+        "AA1": "24,0028,3,1"
+      }
+    },
+    {
+      "observedAt": "2025-07-01T06:00:00Z",
+      "windSpeedMps": 2.6,
+      "windDirectionDeg": 186.0,
+      "temperatureC": 30.0,
+      "visibilityM": 30000.0,
+      "precipitationAccumulationMm": 2.7,
+      "precipitationPeriodHours": 24.0,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "186,1,N,0026,1",
+        "TMP": "+0300,1",
+        "VIS": "030000,1,9,9",
+        "AA1": "24,0027,3,1"
+      }
+    },
+    {
+      "observedAt": "2025-07-01T09:00:00Z",
+      "windSpeedMps": 3.5,
+      "windDirectionDeg": 209.0,
+      "temperatureC": 24.7,
+      "visibilityM": 13600.0,
+      "precipitationAccumulationMm": 18.8,
+      "precipitationPeriodHours": 24.0,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "209,1,N,0035,1",
+        "TMP": "+0247,1",
+        "VIS": "013600,1,9,9",
+        "AA1": "24,0188,3,1"
+      }
+    },
+    {
+      "observedAt": "2025-07-01T12:00:00Z",
+      "windSpeedMps": 2.3,
+      "windDirectionDeg": 205.0,
+      "temperatureC": 25.6,
+      "visibilityM": 25400.0,
+      "precipitationAccumulationMm": 18.3,
+      "precipitationPeriodHours": 24.0,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "205,1,N,0023,1",
+        "TMP": "+0256,1",
+        "VIS": "025400,1,9,9",
+        "AA1": "24,0183,3,1"
+      }
+    },
+    {
+      "observedAt": "2025-07-01T15:00:00Z",
+      "windSpeedMps": 2.0,
+      "windDirectionDeg": 200.0,
+      "temperatureC": 25.0,
+      "visibilityM": 18300.0,
+      "precipitationAccumulationMm": 18.6,
+      "precipitationPeriodHours": 24.0,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "200,1,N,0020,1",
+        "TMP": "+0250,1",
+        "VIS": "018300,1,9,9",
+        "AA1": "24,0186,3,1"
+      }
+    },
+    {
+      "observedAt": "2025-07-01T18:00:00Z",
+      "windSpeedMps": 2.5,
+      "windDirectionDeg": 213.0,
+      "temperatureC": 24.2,
+      "visibilityM": 12100.0,
+      "precipitationAccumulationMm": 18.9,
+      "precipitationPeriodHours": 24.0,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "213,1,N,0025,1",
+        "TMP": "+0242,1",
+        "VIS": "012100,1,9,9",
+        "AA1": "24,0189,3,1"
+      }
+    },
+    {
+      "observedAt": "2025-07-01T21:00:00Z",
+      "windSpeedMps": 1.9,
+      "windDirectionDeg": 211.0,
+      "temperatureC": 24.2,
+      "visibilityM": 30000.0,
+      "precipitationAccumulationMm": 18.9,
+      "precipitationPeriodHours": 24.0,
+      "thunderProbability": null,
+      "rawQuality": {
+        "WND": "211,1,N,0019,1",
+        "TMP": "+0242,1",
+        "VIS": "030000,1,9,9",
+        "AA1": "24,0189,3,1"
+      }
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "checkedAt": "2026-09-14T09:48:36.424564+00:00",
+  "status": "PASS",
+  "cases": [
+    {
+      "scenario": "moving",
+      "sessionId": "e1c4e8f3bcf4e3b2e304ec29",
+      "fingerprint": "c586a80528747719",
+      "stats": {
+        "cities": 36,
+        "routes": 161,
+        "carRoutes": 53,
+        "deliveryRoutes": 108,
+        "interprovincialRoutes": 2,
+        "flights": 1614,
+        "accepted": 1549,
+        "closed": 65,
+        "detours": 74,
+        "resolved": 390
+      },
+      "roundTripSeconds": 0.583
+    },
+    {
+      "scenario": "clear",
+      "sessionId": "56321c5a1ce9ec611e5d6605",
+      "fingerprint": "c586a80528747719",
+      "stats": {
+        "cities": 36,
+        "routes": 161,
+        "carRoutes": 53,
+        "deliveryRoutes": 108,
+        "interprovincialRoutes": 2,
+        "flights": 1614,
+        "accepted": 1608,
+        "closed": 6,
+        "detours": 0,
+        "resolved": 412
+      },
+      "roundTripSeconds": 2.058
+    },
+    {
+      "scenario": "unknown",
+      "sessionId": "b143b98bad1b0ece5f3dd5d1",
+      "fingerprint": "c586a80528747719",
+      "stats": {
+        "cities": 36,
+        "routes": 161,
+        "carRoutes": 53,
+        "deliveryRoutes": 108,
+        "interprovincialRoutes": 2,
+        "flights": 1614,
+        "accepted": 0,
+        "closed": 1614,
+        "detours": 0,
+        "resolved": 0
+      },
+      "roundTripSeconds": 0.672
+    }
+  ]
+}
