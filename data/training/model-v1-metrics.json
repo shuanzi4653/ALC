@@ -1,0 +1,350 @@
+{
+  "metrics": {
+    "ExtraTrees": {
+      "labels": [
+        "FIT",
+        "CAUTION",
+        "DANGER",
+        "BAN"
+      ],
+      "confusion": [
+        [
+          28,
+          5,
+          0,
+          0
+        ],
+        [
+          1,
+          35,
+          2,
+          0
+        ],
+        [
+          0,
+          7,
+          57,
+          2
+        ],
+        [
+          0,
+          0,
+          2,
+          31
+        ]
+      ],
+      "perClass": {
+        "FIT": {
+          "precision": 0.9655,
+          "recall": 0.8485,
+          "f1-score": 0.9032,
+          "support": 33.0
+        },
+        "CAUTION": {
+          "precision": 0.7447,
+          "recall": 0.9211,
+          "f1-score": 0.8235,
+          "support": 38.0
+        },
+        "DANGER": {
+          "precision": 0.9344,
+          "recall": 0.8636,
+          "f1-score": 0.8976,
+          "support": 66.0
+        },
+        "BAN": {
+          "precision": 0.9394,
+          "recall": 0.9394,
+          "f1-score": 0.9394,
+          "support": 33.0
+        }
+      },
+      "macroF1": 0.8909,
+      "accuracy": 0.8882,
+      "dangerMiss": 7,
+      "dangerHit": 92,
+      "dangerFalseAlarm": 2,
+      "dangerRecall": 0.9293
+    },
+    "RandomForest": {
+      "labels": [
+        "FIT",
+        "CAUTION",
+        "DANGER",
+        "BAN"
+      ],
+      "confusion": [
+        [
+          33,
+          0,
+          0,
+          0
+        ],
+        [
+          1,
+          37,
+          0,
+          0
+        ],
+        [
+          0,
+          2,
+          64,
+          0
+        ],
+        [
+          0,
+          0,
+          1,
+          32
+        ]
+      ],
+      "perClass": {
+        "FIT": {
+          "precision": 0.9706,
+          "recall": 1.0,
+          "f1-score": 0.9851,
+          "support": 33.0
+        },
+        "CAUTION": {
+          "precision": 0.9487,
+          "recall": 0.9737,
+          "f1-score": 0.961,
+          "support": 38.0
+        },
+        "DANGER": {
+          "precision": 0.9846,
+          "recall": 0.9697,
+          "f1-score": 0.9771,
+          "support": 66.0
+        },
+        "BAN": {
+          "precision": 1.0,
+          "recall": 0.9697,
+          "f1-score": 0.9846,
+          "support": 33.0
+        }
+      },
+      "macroF1": 0.977,
+      "accuracy": 0.9765,
+      "dangerMiss": 2,
+      "dangerHit": 97,
+      "dangerFalseAlarm": 0,
+      "dangerRecall": 0.9798
+    },
+    "LogisticRegression": {
+      "labels": [
+        "FIT",
+        "CAUTION",
+        "DANGER",
+        "BAN"
+      ],
+      "confusion": [
+        [
+          32,
+          1,
+          0,
+          0
+        ],
+        [
+          23,
+          0,
+          15,
+          0
+        ],
+        [
+          25,
+          0,
+          40,
+          1
+        ],
+        [
+          5,
+          0,
+          17,
+          11
+        ]
+      ],
+      "perClass": {
+        "FIT": {
+          "precision": 0.3765,
+          "recall": 0.9697,
+          "f1-score": 0.5424,
+          "support": 33.0
+        },
+        "CAUTION": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 38.0
+        },
+        "DANGER": {
+          "precision": 0.5556,
+          "recall": 0.6061,
+          "f1-score": 0.5797,
+          "support": 66.0
+        },
+        "BAN": {
+          "precision": 0.9167,
+          "recall": 0.3333,
+          "f1-score": 0.4889,
+          "support": 33.0
+        }
+      },
+      "macroF1": 0.4027,
+      "accuracy": 0.4882,
+      "dangerMiss": 30,
+      "dangerHit": 69,
+      "dangerFalseAlarm": 15,
+      "dangerRecall": 0.697
+    },
+    "HistGradientBoosting": {
+      "labels": [
+        "FIT",
+        "CAUTION",
+        "DANGER",
+        "BAN"
+      ],
+      "confusion": [
+        [
+          33,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          38,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          66,
+          0
+        ],
+        [
+          0,
+          0,
+          2,
+          31
+        ]
+      ],
+      "perClass": {
+        "FIT": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 33.0
+        },
+        "CAUTION": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 38.0
+        },
+        "DANGER": {
+          "precision": 0.9706,
+          "recall": 1.0,
+          "f1-score": 0.9851,
+          "support": 66.0
+        },
+        "BAN": {
+          "precision": 1.0,
+          "recall": 0.9394,
+          "f1-score": 0.9688,
+          "support": 33.0
+        }
+      },
+      "macroF1": 0.9885,
+      "accuracy": 0.9882,
+      "dangerMiss": 0,
+      "dangerHit": 99,
+      "dangerFalseAlarm": 0,
+      "dangerRecall": 1.0
+    },
+    "RuleBaseline": {
+      "labels": [
+        "FIT",
+        "CAUTION",
+        "DANGER",
+        "BAN"
+      ],
+      "confusion": [
+        [
+          32,
+          0,
+          0,
+          1
+        ],
+        [
+          12,
+          8,
+          1,
+          17
+        ],
+        [
+          18,
+          5,
+          2,
+          41
+        ],
+        [
+          0,
+          0,
+          0,
+          33
+        ]
+      ],
+      "perClass": {
+        "FIT": {
+          "precision": 0.5161,
+          "recall": 0.9697,
+          "f1-score": 0.6737,
+          "support": 33.0
+        },
+        "CAUTION": {
+          "precision": 0.6154,
+          "recall": 0.2105,
+          "f1-score": 0.3137,
+          "support": 38.0
+        },
+        "DANGER": {
+          "precision": 0.6667,
+          "recall": 0.0303,
+          "f1-score": 0.058,
+          "support": 66.0
+        },
+        "BAN": {
+          "precision": 0.3587,
+          "recall": 1.0,
+          "f1-score": 0.528,
+          "support": 33.0
+        }
+      },
+      "macroF1": 0.3933,
+      "accuracy": 0.4412,
+      "dangerMiss": 23,
+      "dangerHit": 76,
+      "dangerFalseAlarm": 19,
+      "dangerRecall": 0.7677,
+      "evaluated": 170,
+      "abstained": 0
+    }
+  },
+  "chosen": "RandomForest",
+  "bestByMetric": "HistGradientBoosting",
+  "parity": "100%",
+  "parityTested": 170,
+  "testSize": 170,
+  "samples": 1133,
+  "metricsNote": "标签来自 rule-label-spec（config/labels-v1.json）。因此本表的准确率衡量的是「模型对判据的复现能力」，不是「模型对天气的预测能力」—— 后者需要独立观测真值，本仓没有。RuleBaseline 行用的是运行规则 rules-v1.json（另一套阈值与另一套聚合方式），它与本模型回答的不是同一个问题，两者不可直接比优劣，只能各自独立解读。",
+  "labelSource": "rule-label-spec (config/labels-v1.json)",
+  "independentAnnotation": {
+    "raw": 0.6867,
+    "weightedKappa": 0.7946,
+    "n": 1133,
+    "source": "data/training/label-agreement.json"
+  }
+}

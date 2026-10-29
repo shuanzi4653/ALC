@@ -1,0 +1,1958 @@
+{
+ "generatedAt": "2026-09-17T16:35:44Z",
+ "seed": 42,
+ "scenario": "moving",
+ "minutesSampled": [
+  0,
+  60,
+  120,
+  240,
+  360,
+  479
+ ],
+ "cloudShape": {
+  "samples": 169,
+  "radiusCvMean": 0.1615,
+  "radiusCvMin": 0.0836,
+  "radiusCvMax": 0.3406,
+  "baselineNote": "a circle scores 0.000 and a regular polygon a constant turn; the pre-V1.6 three-harmonic ring scored roughly 0.03-0.05",
+  "rows": [
+   {
+    "minute": 0,
+    "cell": "WX-3-05",
+    "tier": "field",
+    "equivalentRadiusM": 6482.7,
+    "radiusCv": 0.1435
+   },
+   {
+    "minute": 0,
+    "cell": "WX-3-05",
+    "tier": "ban",
+    "equivalentRadiusM": 3762.1,
+    "radiusCv": 0.1479
+   },
+   {
+    "minute": 0,
+    "cell": "WX-3-05",
+    "tier": "caution",
+    "equivalentRadiusM": 4664.8,
+    "radiusCv": 0.1482
+   },
+   {
+    "minute": 0,
+    "cell": "WX-3-05-D1",
+    "tier": "field",
+    "equivalentRadiusM": 1772.4,
+    "radiusCv": 0.1738
+   },
+   {
+    "minute": 0,
+    "cell": "WX-3-05-D1",
+    "tier": "ban",
+    "equivalentRadiusM": 2972.2,
+    "radiusCv": 0.167
+   },
+   {
+    "minute": 0,
+    "cell": "WX-3-05-D1",
+    "tier": "caution",
+    "equivalentRadiusM": 3879.7,
+    "radiusCv": 0.1672
+   },
+   {
+    "minute": 0,
+    "cell": "WX-3-08",
+    "tier": "field",
+    "equivalentRadiusM": 1978.5,
+    "radiusCv": 0.1807
+   },
+   {
+    "minute": 0,
+    "cell": "WX-3-08",
+    "tier": "ban",
+    "equivalentRadiusM": 3922.3,
+    "radiusCv": 0.1658
+   },
+   {
+    "minute": 0,
+    "cell": "WX-3-08",
+    "tier": "caution",
+    "equivalentRadiusM": 4940.9,
+    "radiusCv": 0.1602
+   },
+   {
+    "minute": 0,
+    "cell": "WX-3-08-D1",
+    "tier": "field",
+    "equivalentRadiusM": 2421.8,
+    "radiusCv": 0.1383
+   },
+   {
+    "minute": 0,
+    "cell": "WX-3-08-D1",
+    "tier": "ban",
+    "equivalentRadiusM": 2615.7,
+    "radiusCv": 0.1093
+   },
+   {
+    "minute": 0,
+    "cell": "WX-3-08-D1",
+    "tier": "caution",
+    "equivalentRadiusM": 3547.8,
+    "radiusCv": 0.1096
+   },
+   {
+    "minute": 0,
+    "cell": "WX-2-04",
+    "tier": "field",
+    "equivalentRadiusM": 7033.0,
+    "radiusCv": 0.2641
+   },
+   {
+    "minute": 0,
+    "cell": "WX-2-04",
+    "tier": "ban",
+    "equivalentRadiusM": 4815.5,
+    "radiusCv": 0.282
+   },
+   {
+    "minute": 0,
+    "cell": "WX-2-04",
+    "tier": "caution",
+    "equivalentRadiusM": 5769.2,
+    "radiusCv": 0.2822
+   },
+   {
+    "minute": 0,
+    "cell": "WX-3-01",
+    "tier": "field",
+    "equivalentRadiusM": 3155.3,
+    "radiusCv": 0.1086
+   },
+   {
+    "minute": 0,
+    "cell": "WX-3-01",
+    "tier": "ban",
+    "equivalentRadiusM": 3473.8,
+    "radiusCv": 0.1109
+   },
+   {
+    "minute": 0,
+    "cell": "WX-3-01",
+    "tier": "caution",
+    "equivalentRadiusM": 4372.6,
+    "radiusCv": 0.1114
+   },
+   {
+    "minute": 0,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "field",
+    "equivalentRadiusM": 38758.5,
+    "radiusCv": 0.1981
+   },
+   {
+    "minute": 0,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "field",
+    "equivalentRadiusM": 6196.4,
+    "radiusCv": 0.1099
+   },
+   {
+    "minute": 0,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "field",
+    "equivalentRadiusM": 24155.8,
+    "radiusCv": 0.1274
+   },
+   {
+    "minute": 0,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "field",
+    "equivalentRadiusM": 9225.9,
+    "radiusCv": 0.2067
+   },
+   {
+    "minute": 0,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "field",
+    "equivalentRadiusM": 23417.0,
+    "radiusCv": 0.219
+   },
+   {
+    "minute": 0,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "field",
+    "equivalentRadiusM": 10268.8,
+    "radiusCv": 0.1246
+   },
+   {
+    "minute": 0,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "ban",
+    "equivalentRadiusM": 28652.1,
+    "radiusCv": 0.1832
+   },
+   {
+    "minute": 0,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "ban",
+    "equivalentRadiusM": 309.6,
+    "radiusCv": 0.1207
+   },
+   {
+    "minute": 0,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "ban",
+    "equivalentRadiusM": 14654.6,
+    "radiusCv": 0.1339
+   },
+   {
+    "minute": 0,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "ban",
+    "equivalentRadiusM": 462.2,
+    "radiusCv": 0.2276
+   },
+   {
+    "minute": 0,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "ban",
+    "equivalentRadiusM": 13233.3,
+    "radiusCv": 0.2105
+   },
+   {
+    "minute": 0,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "ban",
+    "equivalentRadiusM": 761.1,
+    "radiusCv": 0.1475
+   },
+   {
+    "minute": 0,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "caution",
+    "equivalentRadiusM": 38762.4,
+    "radiusCv": 0.1988
+   },
+   {
+    "minute": 0,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "caution",
+    "equivalentRadiusM": 6196.4,
+    "radiusCv": 0.1099
+   },
+   {
+    "minute": 0,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "caution",
+    "equivalentRadiusM": 24156.3,
+    "radiusCv": 0.1276
+   },
+   {
+    "minute": 0,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "caution",
+    "equivalentRadiusM": 9225.9,
+    "radiusCv": 0.2067
+   },
+   {
+    "minute": 0,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "caution",
+    "equivalentRadiusM": 23417.1,
+    "radiusCv": 0.2191
+   },
+   {
+    "minute": 0,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "caution",
+    "equivalentRadiusM": 10268.8,
+    "radiusCv": 0.1246
+   },
+   {
+    "minute": 60,
+    "cell": "WX-2-03",
+    "tier": "field",
+    "equivalentRadiusM": 2295.3,
+    "radiusCv": 0.1199
+   },
+   {
+    "minute": 60,
+    "cell": "WX-2-03",
+    "tier": "ban",
+    "equivalentRadiusM": 5857.1,
+    "radiusCv": 0.0866
+   },
+   {
+    "minute": 60,
+    "cell": "WX-2-03",
+    "tier": "caution",
+    "equivalentRadiusM": 6763.2,
+    "radiusCv": 0.0865
+   },
+   {
+    "minute": 60,
+    "cell": "WX-3-06",
+    "tier": "field",
+    "equivalentRadiusM": 3278.0,
+    "radiusCv": 0.143
+   },
+   {
+    "minute": 60,
+    "cell": "WX-3-06",
+    "tier": "ban",
+    "equivalentRadiusM": 3109.2,
+    "radiusCv": 0.1279
+   },
+   {
+    "minute": 60,
+    "cell": "WX-3-06",
+    "tier": "caution",
+    "equivalentRadiusM": 4008.9,
+    "radiusCv": 0.1282
+   },
+   {
+    "minute": 60,
+    "cell": "WX-1-09",
+    "tier": "field",
+    "equivalentRadiusM": 7523.1,
+    "radiusCv": 0.3192
+   },
+   {
+    "minute": 60,
+    "cell": "WX-1-09",
+    "tier": "ban",
+    "equivalentRadiusM": 4449.0,
+    "radiusCv": 0.3405
+   },
+   {
+    "minute": 60,
+    "cell": "WX-1-09",
+    "tier": "caution",
+    "equivalentRadiusM": 5464.6,
+    "radiusCv": 0.3406
+   },
+   {
+    "minute": 60,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "field",
+    "equivalentRadiusM": 30525.9,
+    "radiusCv": 0.1981
+   },
+   {
+    "minute": 60,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "field",
+    "equivalentRadiusM": 27480.3,
+    "radiusCv": 0.1274
+   },
+   {
+    "minute": 60,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "field",
+    "equivalentRadiusM": 13282.1,
+    "radiusCv": 0.2067
+   },
+   {
+    "minute": 60,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "field",
+    "equivalentRadiusM": 23069.3,
+    "radiusCv": 0.219
+   },
+   {
+    "minute": 60,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "field",
+    "equivalentRadiusM": 12313.2,
+    "radiusCv": 0.1246
+   },
+   {
+    "minute": 60,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "field",
+    "equivalentRadiusM": 21519.1,
+    "radiusCv": 0.135
+   },
+   {
+    "minute": 60,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "ban",
+    "equivalentRadiusM": 20442.6,
+    "radiusCv": 0.1832
+   },
+   {
+    "minute": 60,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "ban",
+    "equivalentRadiusM": 17979.3,
+    "radiusCv": 0.1339
+   },
+   {
+    "minute": 60,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "ban",
+    "equivalentRadiusM": 3432.5,
+    "radiusCv": 0.2276
+   },
+   {
+    "minute": 60,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "ban",
+    "equivalentRadiusM": 12886.8,
+    "radiusCv": 0.2105
+   },
+   {
+    "minute": 60,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "ban",
+    "equivalentRadiusM": 2806.2,
+    "radiusCv": 0.1475
+   },
+   {
+    "minute": 60,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "ban",
+    "equivalentRadiusM": 11876.2,
+    "radiusCv": 0.1279
+   },
+   {
+    "minute": 60,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "caution",
+    "equivalentRadiusM": 30528.2,
+    "radiusCv": 0.1986
+   },
+   {
+    "minute": 60,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "caution",
+    "equivalentRadiusM": 27480.9,
+    "radiusCv": 0.1276
+   },
+   {
+    "minute": 60,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "caution",
+    "equivalentRadiusM": 13282.2,
+    "radiusCv": 0.2067
+   },
+   {
+    "minute": 60,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "caution",
+    "equivalentRadiusM": 23069.5,
+    "radiusCv": 0.2191
+   },
+   {
+    "minute": 60,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "caution",
+    "equivalentRadiusM": 12313.2,
+    "radiusCv": 0.1246
+   },
+   {
+    "minute": 60,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "caution",
+    "equivalentRadiusM": 21519.2,
+    "radiusCv": 0.1351
+   },
+   {
+    "minute": 120,
+    "cell": "WX-1-06",
+    "tier": "field",
+    "equivalentRadiusM": 5242.9,
+    "radiusCv": 0.1795
+   },
+   {
+    "minute": 120,
+    "cell": "WX-1-06",
+    "tier": "ban",
+    "equivalentRadiusM": 4286.4,
+    "radiusCv": 0.1957
+   },
+   {
+    "minute": 120,
+    "cell": "WX-1-06",
+    "tier": "caution",
+    "equivalentRadiusM": 5200.1,
+    "radiusCv": 0.1959
+   },
+   {
+    "minute": 120,
+    "cell": "WX-2-03",
+    "tier": "field",
+    "equivalentRadiusM": 6191.4,
+    "radiusCv": 0.1199
+   },
+   {
+    "minute": 120,
+    "cell": "WX-2-03",
+    "tier": "ban",
+    "equivalentRadiusM": 5849.3,
+    "radiusCv": 0.0836
+   },
+   {
+    "minute": 120,
+    "cell": "WX-2-03",
+    "tier": "caution",
+    "equivalentRadiusM": 6766.8,
+    "radiusCv": 0.0841
+   },
+   {
+    "minute": 120,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "field",
+    "equivalentRadiusM": 14247.4,
+    "radiusCv": 0.1981
+   },
+   {
+    "minute": 120,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "field",
+    "equivalentRadiusM": 22855.2,
+    "radiusCv": 0.1274
+   },
+   {
+    "minute": 120,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "field",
+    "equivalentRadiusM": 14197.2,
+    "radiusCv": 0.2067
+   },
+   {
+    "minute": 120,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "field",
+    "equivalentRadiusM": 16597.1,
+    "radiusCv": 0.219
+   },
+   {
+    "minute": 120,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "field",
+    "equivalentRadiusM": 12139.9,
+    "radiusCv": 0.1246
+   },
+   {
+    "minute": 120,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "field",
+    "equivalentRadiusM": 32321.8,
+    "radiusCv": 0.135
+   },
+   {
+    "minute": 120,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "ban",
+    "equivalentRadiusM": 4209.6,
+    "radiusCv": 0.1832
+   },
+   {
+    "minute": 120,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "ban",
+    "equivalentRadiusM": 13353.9,
+    "radiusCv": 0.1339
+   },
+   {
+    "minute": 120,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "ban",
+    "equivalentRadiusM": 4349.4,
+    "radiusCv": 0.2276
+   },
+   {
+    "minute": 120,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "ban",
+    "equivalentRadiusM": 6435.3,
+    "radiusCv": 0.2105
+   },
+   {
+    "minute": 120,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "ban",
+    "equivalentRadiusM": 2632.9,
+    "radiusCv": 0.1475
+   },
+   {
+    "minute": 120,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "ban",
+    "equivalentRadiusM": 22662.7,
+    "radiusCv": 0.1279
+   },
+   {
+    "minute": 120,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "caution",
+    "equivalentRadiusM": 14247.6,
+    "radiusCv": 0.1982
+   },
+   {
+    "minute": 120,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "caution",
+    "equivalentRadiusM": 22855.7,
+    "radiusCv": 0.1276
+   },
+   {
+    "minute": 120,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "caution",
+    "equivalentRadiusM": 14197.3,
+    "radiusCv": 0.2067
+   },
+   {
+    "minute": 120,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "caution",
+    "equivalentRadiusM": 16597.1,
+    "radiusCv": 0.219
+   },
+   {
+    "minute": 120,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "caution",
+    "equivalentRadiusM": 12139.9,
+    "radiusCv": 0.1246
+   },
+   {
+    "minute": 120,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "caution",
+    "equivalentRadiusM": 32321.7,
+    "radiusCv": 0.135
+   },
+   {
+    "minute": 240,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "field",
+    "equivalentRadiusM": 6604.3,
+    "radiusCv": 0.2067
+   },
+   {
+    "minute": 240,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "field",
+    "equivalentRadiusM": 5140.7,
+    "radiusCv": 0.1246
+   },
+   {
+    "minute": 240,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "field",
+    "equivalentRadiusM": 37047.4,
+    "radiusCv": 0.135
+   },
+   {
+    "minute": 240,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "field",
+    "equivalentRadiusM": 12652.3,
+    "radiusCv": 0.113
+   },
+   {
+    "minute": 240,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "field",
+    "equivalentRadiusM": 14333.9,
+    "radiusCv": 0.115
+   },
+   {
+    "minute": 240,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "field",
+    "equivalentRadiusM": 6771.2,
+    "radiusCv": 0.1169
+   },
+   {
+    "minute": 240,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "ban",
+    "equivalentRadiusM": 330.9,
+    "radiusCv": 0.2276
+   },
+   {
+    "minute": 240,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "ban",
+    "equivalentRadiusM": 257.1,
+    "radiusCv": 0.1475
+   },
+   {
+    "minute": 240,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "ban",
+    "equivalentRadiusM": 27381.3,
+    "radiusCv": 0.1279
+   },
+   {
+    "minute": 240,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "ban",
+    "equivalentRadiusM": 3154.7,
+    "radiusCv": 0.1286
+   },
+   {
+    "minute": 240,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "ban",
+    "equivalentRadiusM": 4828.1,
+    "radiusCv": 0.1045
+   },
+   {
+    "minute": 240,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "ban",
+    "equivalentRadiusM": 338.5,
+    "radiusCv": 0.1336
+   },
+   {
+    "minute": 240,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "caution",
+    "equivalentRadiusM": 6604.3,
+    "radiusCv": 0.2067
+   },
+   {
+    "minute": 240,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "caution",
+    "equivalentRadiusM": 5140.7,
+    "radiusCv": 0.1246
+   },
+   {
+    "minute": 240,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "caution",
+    "equivalentRadiusM": 37047.2,
+    "radiusCv": 0.135
+   },
+   {
+    "minute": 240,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "caution",
+    "equivalentRadiusM": 12652.4,
+    "radiusCv": 0.113
+   },
+   {
+    "minute": 240,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "caution",
+    "equivalentRadiusM": 14334.0,
+    "radiusCv": 0.1151
+   },
+   {
+    "minute": 240,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "caution",
+    "equivalentRadiusM": 6771.2,
+    "radiusCv": 0.1169
+   },
+   {
+    "minute": 360,
+    "cell": "WX-1-07",
+    "tier": "field",
+    "equivalentRadiusM": 7614.2,
+    "radiusCv": 0.2547
+   },
+   {
+    "minute": 360,
+    "cell": "WX-1-07",
+    "tier": "ban",
+    "equivalentRadiusM": 6085.0,
+    "radiusCv": 0.2566
+   },
+   {
+    "minute": 360,
+    "cell": "WX-1-07",
+    "tier": "caution",
+    "equivalentRadiusM": 7043.3,
+    "radiusCv": 0.2567
+   },
+   {
+    "minute": 360,
+    "cell": "WX-1-07-D1",
+    "tier": "field",
+    "equivalentRadiusM": 6619.4,
+    "radiusCv": 0.1198
+   },
+   {
+    "minute": 360,
+    "cell": "WX-1-07-D1",
+    "tier": "ban",
+    "equivalentRadiusM": 4185.7,
+    "radiusCv": 0.1315
+   },
+   {
+    "minute": 360,
+    "cell": "WX-1-07-D1",
+    "tier": "caution",
+    "equivalentRadiusM": 5085.7,
+    "radiusCv": 0.1318
+   },
+   {
+    "minute": 360,
+    "cell": "WX-3-12",
+    "tier": "field",
+    "equivalentRadiusM": 8959.7,
+    "radiusCv": 0.1716
+   },
+   {
+    "minute": 360,
+    "cell": "WX-3-12",
+    "tier": "ban",
+    "equivalentRadiusM": 5195.8,
+    "radiusCv": 0.1819
+   },
+   {
+    "minute": 360,
+    "cell": "WX-3-12",
+    "tier": "caution",
+    "equivalentRadiusM": 6121.6,
+    "radiusCv": 0.1821
+   },
+   {
+    "minute": 360,
+    "cell": "WX-3-13",
+    "tier": "field",
+    "equivalentRadiusM": 5815.1,
+    "radiusCv": 0.1255
+   },
+   {
+    "minute": 360,
+    "cell": "WX-3-13",
+    "tier": "ban",
+    "equivalentRadiusM": 3450.9,
+    "radiusCv": 0.1274
+   },
+   {
+    "minute": 360,
+    "cell": "WX-3-13",
+    "tier": "caution",
+    "equivalentRadiusM": 4351.2,
+    "radiusCv": 0.1278
+   },
+   {
+    "minute": 360,
+    "cell": "WX-2-06",
+    "tier": "field",
+    "equivalentRadiusM": 11150.6,
+    "radiusCv": 0.1751
+   },
+   {
+    "minute": 360,
+    "cell": "WX-2-06",
+    "tier": "ban",
+    "equivalentRadiusM": 6520.2,
+    "radiusCv": 0.1394
+   },
+   {
+    "minute": 360,
+    "cell": "WX-2-06",
+    "tier": "caution",
+    "equivalentRadiusM": 7458.7,
+    "radiusCv": 0.14
+   },
+   {
+    "minute": 360,
+    "cell": "WX-3-10",
+    "tier": "field",
+    "equivalentRadiusM": 2637.8,
+    "radiusCv": 0.1332
+   },
+   {
+    "minute": 360,
+    "cell": "WX-3-10",
+    "tier": "ban",
+    "equivalentRadiusM": 3236.6,
+    "radiusCv": 0.1072
+   },
+   {
+    "minute": 360,
+    "cell": "WX-3-10",
+    "tier": "caution",
+    "equivalentRadiusM": 4199.7,
+    "radiusCv": 0.1069
+   },
+   {
+    "minute": 360,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "field",
+    "equivalentRadiusM": 19266.6,
+    "radiusCv": 0.135
+   },
+   {
+    "minute": 360,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "field",
+    "equivalentRadiusM": 14486.6,
+    "radiusCv": 0.113
+   },
+   {
+    "minute": 360,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "field",
+    "equivalentRadiusM": 26913.9,
+    "radiusCv": 0.115
+   },
+   {
+    "minute": 360,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "field",
+    "equivalentRadiusM": 13541.1,
+    "radiusCv": 0.1169
+   },
+   {
+    "minute": 360,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "field",
+    "equivalentRadiusM": 15882.8,
+    "radiusCv": 0.1483
+   },
+   {
+    "minute": 360,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "field",
+    "equivalentRadiusM": 5792.0,
+    "radiusCv": 0.2195
+   },
+   {
+    "minute": 360,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "field",
+    "equivalentRadiusM": 26830.3,
+    "radiusCv": 0.1602
+   },
+   {
+    "minute": 360,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "field",
+    "equivalentRadiusM": 13592.8,
+    "radiusCv": 0.1318
+   },
+   {
+    "minute": 360,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "ban",
+    "equivalentRadiusM": 9627.1,
+    "radiusCv": 0.1279
+   },
+   {
+    "minute": 360,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "ban",
+    "equivalentRadiusM": 4988.7,
+    "radiusCv": 0.1286
+   },
+   {
+    "minute": 360,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "ban",
+    "equivalentRadiusM": 17391.7,
+    "radiusCv": 0.1045
+   },
+   {
+    "minute": 360,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "ban",
+    "equivalentRadiusM": 4043.7,
+    "radiusCv": 0.1336
+   },
+   {
+    "minute": 360,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "ban",
+    "equivalentRadiusM": 6360.1,
+    "radiusCv": 0.1433
+   },
+   {
+    "minute": 360,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "ban",
+    "equivalentRadiusM": 290.3,
+    "radiusCv": 0.2421
+   },
+   {
+    "minute": 360,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "ban",
+    "equivalentRadiusM": 17198.1,
+    "radiusCv": 0.1588
+   },
+   {
+    "minute": 360,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "ban",
+    "equivalentRadiusM": 3944.3,
+    "radiusCv": 0.1359
+   },
+   {
+    "minute": 360,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "caution",
+    "equivalentRadiusM": 19266.7,
+    "radiusCv": 0.1351
+   },
+   {
+    "minute": 360,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "caution",
+    "equivalentRadiusM": 14486.7,
+    "radiusCv": 0.113
+   },
+   {
+    "minute": 360,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "caution",
+    "equivalentRadiusM": 26914.9,
+    "radiusCv": 0.1154
+   },
+   {
+    "minute": 360,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "caution",
+    "equivalentRadiusM": 13541.1,
+    "radiusCv": 0.1169
+   },
+   {
+    "minute": 360,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "caution",
+    "equivalentRadiusM": 15883.3,
+    "radiusCv": 0.1485
+   },
+   {
+    "minute": 360,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "caution",
+    "equivalentRadiusM": 5792.0,
+    "radiusCv": 0.2195
+   },
+   {
+    "minute": 360,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "caution",
+    "equivalentRadiusM": 26830.9,
+    "radiusCv": 0.1603
+   },
+   {
+    "minute": 360,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "caution",
+    "equivalentRadiusM": 13592.8,
+    "radiusCv": 0.1318
+   },
+   {
+    "minute": 479,
+    "cell": "WX-2-01",
+    "tier": "field",
+    "equivalentRadiusM": 7082.2,
+    "radiusCv": 0.2791
+   },
+   {
+    "minute": 479,
+    "cell": "WX-2-01",
+    "tier": "ban",
+    "equivalentRadiusM": 4729.3,
+    "radiusCv": 0.2983
+   },
+   {
+    "minute": 479,
+    "cell": "WX-2-01",
+    "tier": "caution",
+    "equivalentRadiusM": 5706.0,
+    "radiusCv": 0.2984
+   },
+   {
+    "minute": 479,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "field",
+    "equivalentRadiusM": 6357.7,
+    "radiusCv": 0.113
+   },
+   {
+    "minute": 479,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "field",
+    "equivalentRadiusM": 23191.5,
+    "radiusCv": 0.115
+   },
+   {
+    "minute": 479,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "field",
+    "equivalentRadiusM": 10787.7,
+    "radiusCv": 0.1169
+   },
+   {
+    "minute": 479,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "field",
+    "equivalentRadiusM": 22429.8,
+    "radiusCv": 0.1483
+   },
+   {
+    "minute": 479,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "field",
+    "equivalentRadiusM": 12770.8,
+    "radiusCv": 0.2195
+   },
+   {
+    "minute": 479,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "field",
+    "equivalentRadiusM": 48538.5,
+    "radiusCv": 0.2568
+   },
+   {
+    "minute": 479,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "ban",
+    "equivalentRadiusM": 317.8,
+    "radiusCv": 0.1286
+   },
+   {
+    "minute": 479,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "ban",
+    "equivalentRadiusM": 13674.1,
+    "radiusCv": 0.1045
+   },
+   {
+    "minute": 479,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "ban",
+    "equivalentRadiusM": 1291.0,
+    "radiusCv": 0.1336
+   },
+   {
+    "minute": 479,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "ban",
+    "equivalentRadiusM": 12907.5,
+    "radiusCv": 0.1433
+   },
+   {
+    "minute": 479,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "ban",
+    "equivalentRadiusM": 2858.8,
+    "radiusCv": 0.2421
+   },
+   {
+    "minute": 479,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "ban",
+    "equivalentRadiusM": 28330.2,
+    "radiusCv": 0.1588
+   },
+   {
+    "minute": 479,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "ban",
+    "equivalentRadiusM": 3280.3,
+    "radiusCv": 0.1359
+   },
+   {
+    "minute": 479,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "caution",
+    "equivalentRadiusM": 6357.7,
+    "radiusCv": 0.113
+   },
+   {
+    "minute": 479,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "caution",
+    "equivalentRadiusM": 23192.1,
+    "radiusCv": 0.1153
+   },
+   {
+    "minute": 479,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "caution",
+    "equivalentRadiusM": 10787.7,
+    "radiusCv": 0.1169
+   },
+   {
+    "minute": 479,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "caution",
+    "equivalentRadiusM": 22431.4,
+    "radiusCv": 0.1487
+   },
+   {
+    "minute": 479,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "caution",
+    "equivalentRadiusM": 12770.9,
+    "radiusCv": 0.2195
+   },
+   {
+    "minute": 479,
+    "cell": "WX-NORTHEAST-BAND",
+    "tier": "caution",
+    "equivalentRadiusM": 45722.0,
+    "radiusCv": 0.2476
+   }
+  ]
+ },
+ "sizeSpread": {
+  "samples": 24,
+  "minRadiusM": 1772.4,
+  "maxRadiusM": 38758.5,
+  "maxOverMin": 21.87,
+  "rows": [
+   {
+    "minute": 0,
+    "cell": "WX-3-05",
+    "equivalentRadiusM": 6482.7
+   },
+   {
+    "minute": 0,
+    "cell": "WX-3-05-D1",
+    "equivalentRadiusM": 1772.4
+   },
+   {
+    "minute": 0,
+    "cell": "WX-3-08",
+    "equivalentRadiusM": 1978.5
+   },
+   {
+    "minute": 0,
+    "cell": "WX-3-08-D1",
+    "equivalentRadiusM": 2421.8
+   },
+   {
+    "minute": 0,
+    "cell": "WX-2-04",
+    "equivalentRadiusM": 7033.0
+   },
+   {
+    "minute": 0,
+    "cell": "WX-3-01",
+    "equivalentRadiusM": 3155.3
+   },
+   {
+    "minute": 0,
+    "cell": "WX-NORTHEAST-BAND",
+    "equivalentRadiusM": 38758.5
+   },
+   {
+    "minute": 60,
+    "cell": "WX-2-03",
+    "equivalentRadiusM": 2295.3
+   },
+   {
+    "minute": 60,
+    "cell": "WX-3-06",
+    "equivalentRadiusM": 3278.0
+   },
+   {
+    "minute": 60,
+    "cell": "WX-1-09",
+    "equivalentRadiusM": 7523.1
+   },
+   {
+    "minute": 60,
+    "cell": "WX-NORTHEAST-BAND",
+    "equivalentRadiusM": 30525.9
+   },
+   {
+    "minute": 120,
+    "cell": "WX-1-06",
+    "equivalentRadiusM": 5242.9
+   },
+   {
+    "minute": 120,
+    "cell": "WX-2-03",
+    "equivalentRadiusM": 6191.4
+   },
+   {
+    "minute": 120,
+    "cell": "WX-NORTHEAST-BAND",
+    "equivalentRadiusM": 14247.4
+   },
+   {
+    "minute": 240,
+    "cell": "WX-NORTHEAST-BAND",
+    "equivalentRadiusM": 6604.3
+   },
+   {
+    "minute": 360,
+    "cell": "WX-1-07",
+    "equivalentRadiusM": 7614.2
+   },
+   {
+    "minute": 360,
+    "cell": "WX-1-07-D1",
+    "equivalentRadiusM": 6619.4
+   },
+   {
+    "minute": 360,
+    "cell": "WX-3-12",
+    "equivalentRadiusM": 8959.7
+   },
+   {
+    "minute": 360,
+    "cell": "WX-3-13",
+    "equivalentRadiusM": 5815.1
+   },
+   {
+    "minute": 360,
+    "cell": "WX-2-06",
+    "equivalentRadiusM": 11150.6
+   },
+   {
+    "minute": 360,
+    "cell": "WX-3-10",
+    "equivalentRadiusM": 2637.8
+   },
+   {
+    "minute": 360,
+    "cell": "WX-NORTHEAST-BAND",
+    "equivalentRadiusM": 19266.6
+   },
+   {
+    "minute": 479,
+    "cell": "WX-2-01",
+    "equivalentRadiusM": 7082.2
+   },
+   {
+    "minute": 479,
+    "cell": "WX-NORTHEAST-BAND",
+    "equivalentRadiusM": 6357.7
+   }
+  ]
+ },
+ "lifeCycle": {
+  "distinctLiveCounts": [
+   1,
+   2,
+   3,
+   4,
+   7
+  ],
+  "note": "a single distinct value would mean every cell is present for the whole timeline; more than one means cells genuinely appear and vanish",
+  "sampleCell": null,
+  "rows": [
+   {
+    "minute": 0,
+    "drawnCells": 7
+   },
+   {
+    "minute": 60,
+    "drawnCells": 4
+   },
+   {
+    "minute": 120,
+    "drawnCells": 3
+   },
+   {
+    "minute": 240,
+    "drawnCells": 1
+   },
+   {
+    "minute": 360,
+    "drawnCells": 7
+   },
+   {
+    "minute": 479,
+    "drawnCells": 2
+   }
+  ]
+ },
+ "geometryQuality": {
+  "turnLimitDeg": 45.0,
+  "hairlineLimitM": 10.0,
+  "worstConvexTurnDeg": 40.17,
+  "shortestEdgeM": 7.9,
+  "tierMinuteCombinationsOverTurnLimit": 0,
+  "tierMinuteCombinationsWithHairline": 1,
+  "rows": [
+   {
+    "minute": 0,
+    "tiers": {
+     "field": {
+      "tier": "field",
+      "polygons": 12,
+      "convexTurns": 810,
+      "concaveTurns": 356,
+      "worstConvexTurnDeg": 29.96,
+      "worstConcaveTurnDeg": 39.21,
+      "shortestEdgeM": 80.7,
+      "convexTurnsOverLimit": 0,
+      "hairlineEdges": 0
+     },
+     "ban": {
+      "tier": "ban",
+      "polygons": 12,
+      "convexTurns": 380,
+      "concaveTurns": 52,
+      "worstConvexTurnDeg": 33.82,
+      "worstConcaveTurnDeg": 17.36,
+      "shortestEdgeM": 40.1,
+      "convexTurnsOverLimit": 0,
+      "hairlineEdges": 0
+     },
+     "caution": {
+      "tier": "caution",
+      "polygons": 12,
+      "convexTurns": 631,
+      "concaveTurns": 232,
+      "worstConvexTurnDeg": 31.05,
+      "worstConcaveTurnDeg": 39.21,
+      "shortestEdgeM": 249.7,
+      "convexTurnsOverLimit": 0,
+      "hairlineEdges": 0
+     }
+    }
+   },
+   {
+    "minute": 60,
+    "tiers": {
+     "field": {
+      "tier": "field",
+      "polygons": 9,
+      "convexTurns": 632,
+      "concaveTurns": 282,
+      "worstConvexTurnDeg": 29.48,
+      "worstConcaveTurnDeg": 39.21,
+      "shortestEdgeM": 86.4,
+      "convexTurnsOverLimit": 0,
+      "hairlineEdges": 0
+     },
+     "ban": {
+      "tier": "ban",
+      "polygons": 9,
+      "convexTurns": 282,
+      "concaveTurns": 39,
+      "worstConvexTurnDeg": 40.17,
+      "worstConcaveTurnDeg": 17.36,
+      "shortestEdgeM": 390.1,
+      "convexTurnsOverLimit": 0,
+      "hairlineEdges": 0
+     },
+     "caution": {
+      "tier": "caution",
+      "polygons": 9,
+      "convexTurns": 519,
+      "concaveTurns": 213,
+      "worstConvexTurnDeg": 40.17,
+      "worstConcaveTurnDeg": 39.21,
+      "shortestEdgeM": 534.5,
+      "convexTurnsOverLimit": 0,
+      "hairlineEdges": 0
+     }
+    }
+   },
+   {
+    "minute": 120,
+    "tiers": {
+     "field": {
+      "tier": "field",
+      "polygons": 7,
+      "convexTurns": 506,
+      "concaveTurns": 237,
+      "worstConvexTurnDeg": 29.48,
+      "worstConcaveTurnDeg": 89.41,
+      "shortestEdgeM": 80.7,
+      "convexTurnsOverLimit": 0,
+      "hairlineEdges": 0
+     },
+     "ban": {
+      "tier": "ban",
+      "polygons": 8,
+      "convexTurns": 253,
+      "concaveTurns": 35,
+      "worstConvexTurnDeg": 33.82,
+      "worstConcaveTurnDeg": 17.36,
+      "shortestEdgeM": 366.1,
+      "convexTurnsOverLimit": 0,
+      "hairlineEdges": 0
+     },
+     "caution": {
+      "tier": "caution",
+      "polygons": 7,
+      "convexTurns": 467,
+      "concaveTurns": 206,
+      "worstConvexTurnDeg": 29.48,
+      "worstConcaveTurnDeg": 59.48,
+      "shortestEdgeM": 7.9,
+      "convexTurnsOverLimit": 0,
+      "hairlineEdges": 1
+     }
+    }
+   },
+   {
+    "minute": 240,
+    "tiers": {
+     "field": {
+      "tier": "field",
+      "polygons": 6,
+      "convexTurns": 404,
+      "concaveTurns": 196,
+      "worstConvexTurnDeg": 28.98,
+      "worstConcaveTurnDeg": 39.34,
+      "shortestEdgeM": 223.4,
+      "convexTurnsOverLimit": 0,
+      "hairlineEdges": 0
+     },
+     "ban": {
+      "tier": "ban",
+      "polygons": 6,
+      "convexTurns": 189,
+      "concaveTurns": 27,
+      "worstConvexTurnDeg": 30.27,
+      "worstConcaveTurnDeg": 9.76,
+      "shortestEdgeM": 35.7,
+      "convexTurnsOverLimit": 0,
+      "hairlineEdges": 0
+     },
+     "caution": {
+      "tier": "caution",
+      "polygons": 6,
+      "convexTurns": 404,
+      "concaveTurns": 196,
+      "worstConvexTurnDeg": 28.98,
+      "worstConcaveTurnDeg": 39.34,
+      "shortestEdgeM": 223.4,
+      "convexTurnsOverLimit": 0,
+      "hairlineEdges": 0
+     }
+    }
+   },
+   {
+    "minute": 360,
+    "tiers": {
+     "field": {
+      "tier": "field",
+      "polygons": 14,
+      "convexTurns": 944,
+      "concaveTurns": 412,
+      "worstConvexTurnDeg": 35.17,
+      "worstConcaveTurnDeg": 43.38,
+      "shortestEdgeM": 97.3,
+      "convexTurnsOverLimit": 0,
+      "hairlineEdges": 0
+     },
+     "ban": {
+      "tier": "ban",
+      "polygons": 14,
+      "convexTurns": 442,
+      "concaveTurns": 62,
+      "worstConvexTurnDeg": 32.59,
+      "worstConcaveTurnDeg": 18.43,
+      "shortestEdgeM": 40.1,
+      "convexTurnsOverLimit": 0,
+      "hairlineEdges": 0
+     },
+     "caution": {
+      "tier": "caution",
+      "polygons": 14,
+      "convexTurns": 717,
+      "concaveTurns": 263,
+      "worstConvexTurnDeg": 32.59,
+      "worstConcaveTurnDeg": 39.34,
+      "shortestEdgeM": 249.7,
+      "convexTurnsOverLimit": 0,
+      "hairlineEdges": 0
+     }
+    }
+   },
+   {
+    "minute": 479,
+    "tiers": {
+     "field": {
+      "tier": "field",
+      "polygons": 7,
+      "convexTurns": 540,
+      "concaveTurns": 234,
+      "worstConvexTurnDeg": 25.63,
+      "worstConcaveTurnDeg": 109.78,
+      "shortestEdgeM": 283.8,
+      "convexTurnsOverLimit": 0,
+      "hairlineEdges": 0
+     },
+     "ban": {
+      "tier": "ban",
+      "polygons": 8,
+      "convexTurns": 259,
+      "concaveTurns": 29,
+      "worstConvexTurnDeg": 34.7,
+      "worstConcaveTurnDeg": 9.76,
+      "shortestEdgeM": 42.2,
+      "convexTurnsOverLimit": 0,
+      "hairlineEdges": 0
+     },
+     "caution": {
+      "tier": "caution",
+      "polygons": 7,
+      "convexTurns": 502,
+      "concaveTurns": 212,
+      "worstConvexTurnDeg": 34.7,
+      "worstConcaveTurnDeg": 109.78,
+      "shortestEdgeM": 283.8,
+      "convexTurnsOverLimit": 0,
+      "hairlineEdges": 0
+     }
+    }
+   }
+  ]
+ },
+ "radarChannel": {
+  "provider": "CMA_DATA_NET",
+  "dataset": "RADAR_L3_MST_CREF_GISJPG_Tiles_CR",
+  "tileBase": "https://image.data.cma.cn/tiles/China/RADAR_L3_MST_CREF_GISJPG_Tiles_CR",
+  "credentialed": false,
+  "cadenceMinutes": 6,
+  "thresholdsDbz": {
+   "echo": 15.0,
+   "convective": 35.0,
+   "strong": 45.0,
+   "severe": 60.0
+  },
+  "note": "公开可访问的组网组合反射率瓦片，无需账号；接口无服务等级保证，失败时不产出风险几何，由调用方决定降级路径。",
+  "available": true,
+  "slot": "2026-09-17T16:30:00Z",
+  "slotAgeMinutes": 5.8,
+  "lookbackStepsUsed": 0,
+  "degreesPerCell": 0.17578125,
+  "gridTiles": [
+   [
+    6,
+    2
+   ],
+   [
+    6,
+    3
+   ]
+  ],
+  "provenance": {
+   "provider": "CMA_DATA_NET",
+   "dataset": "RADAR_L3_MST_CREF_GISJPG_Tiles_CR",
+   "transport": "PUBLIC_HTTP_TILE",
+   "credentialed": false,
+   "cadenceMinutes": 6,
+   "zoom": 3,
+   "tileFormat": "256x256 big-endian int16, dBZ = value * 0.1",
+   "retrievedAt": "2026-09-17T16:35:44.799779Z"
+  },
+  "stats": {
+   "cells": 65536,
+   "present": 30368,
+   "echoFraction": 0.0189666748046875,
+   "convectiveFraction": 0.00225830078125,
+   "strongFraction": 0.0003204345703125,
+   "minDbz": 0.0,
+   "maxDbz": 61.5
+  },
+  "error": null,
+  "tileFormat": "256x256 big-endian int16, dBZ = value * 0.1"
+ },
+ "radarDerivedRisk": {
+  "available": true,
+  "summary": {
+   "channel": "CMA_RADAR_TILES",
+   "drivesGeometry": true,
+   "available": true,
+   "slot": "2026-09-17T16:30:00Z",
+   "slotAgeMinutes": 5.8,
+   "echoFraction": 0.009483,
+   "components": 6,
+   "bands": {
+    "STRATIFORM": {
+     "components": 6,
+     "areaKm2": 1335.6
+    },
+    "CONVECTIVE": {
+     "components": 0,
+     "areaKm2": 0.0
+    },
+    "STRONG": {
+     "components": 0,
+     "areaKm2": 0.0
+    }
+   },
+   "note": "本通道几何为实测雷达反射率经阈值分类与配准后生成，与合成气象场分开标注。"
+  },
+  "watch": {
+   "id": "RADAR-CMA-CREF-WATCH",
+   "kind": "RADAR_WATCH",
+   "source": "CMA_DATA_NET_RADAR_CREF",
+   "slot": "2026-09-17T16:30:00Z",
+   "band": "STRATIFORM",
+   "areaKm2": 1335.6,
+   "note": "15-35 dBZ 层状降水，可飞越，仅作可见性说明，不构成限制。",
+   "field": {
+    "type": "MultiPolygon",
+    "coordinates": [
+     [
+      [
+       [
+        119.61914062500001,
+        40.78054143186032
+       ],
+       [
+        119.794921875,
+        40.780541431860314
+       ],
+       [
+        119.794921875,
+        40.64730356252252
+       ],
+       [
+        119.61914062500001,
+        40.64730356252252
+       ],
+       [
+        119.61914062500001,
+        40.78054143186032
+       ]
+      ]
+     ],
+     [
+      [
+       [
+        122.958984375,
+        45.02695045318545
+       ],
+       [
+        123.134765625,
+        45.02695045318545
+       ],
+       [
+        123.134765625,
+        44.90257799628886
+       ],
+       [
+        122.958984375,
+        44.90257799628887
+       ],
+       [
+        122.958984375,
+        45.02695045318545
+       ]
+      ]
+     ],
+     [
+      [
+       [
+        123.221592,
+        46.850373
+       ],
+       [
+        123.134765625,
+        46.739860599692676
+       ],
+       [
+        123.134765625,
+        46.86019101567025
+       ],
+       [
+        123.27093621378152,
+        46.86021410591984
+       ],
+       [
+        123.221592,
+        46.850373
+       ]
+      ]
+     ],
+     [
+      [
+       [
+        123.31054687499999,
+        46.86019101567026
+       ],
+       [
+        123.3850413117774,
+        46.86022331470738
+       ],
+       [
+        123.341084,
+        46.82662800000001
+       ],
+       [
+        123.31054687499999,
+        46.86019101567026
+       ]
+      ]
+     ],
+     [
+      [
+       [
+        123.48632858037806,
+        46.84348736410771
+       ],
+       [
+        123.483366,
+        46.84586999999999
+       ],
+       [
+        123.48632835566607,
+        46.852401462204824
+       ],
+       [
+        123.48632858037806,
+        46.84348736410771
+       ]
+      ]
+     ],
+     [
+      [
+       [
+        125.24414062499999,
+        47.81315451752766
+       ],
+       [
+        125.24414062499999,
+        47.93106634750977
+       ],
+       [
+        125.41992187500001,
+        47.93106634750977
+       ],
+       [
+        125.41992187500001,
+        47.69497434186282
+       ],
+       [
+        125.068359375,
+        47.69497434186282
+       ],
+       [
+        125.068359375,
+        47.81315451752766
+       ],
+       [
+        125.24414062499999,
+        47.81315451752766
+       ]
+      ]
+     ],
+     [
+      [
+       [
+        124.541015625,
+        47.93106634750977
+       ],
+       [
+        124.71679687500001,
+        47.93106634750977
+       ],
+       [
+        124.71679687500001,
+        47.81315451752766
+       ],
+       [
+        124.541015625,
+        47.813154517527664
+       ],
+       [
+        124.541015625,
+        47.93106634750977
+       ]
+      ]
+     ],
+     [
+      [
+       [
+        125.068359375,
+        48.04870994288688
+       ],
+       [
+        125.24414062499999,
+        48.048709942886866
+       ],
+       [
+        125.24414062499999,
+        47.93106634750977
+       ],
+       [
+        125.068359375,
+        47.93106634750977
+       ],
+       [
+        125.068359375,
+        48.04870994288688
+       ]
+      ]
+     ]
+    ]
+   }
+  },
+  "regions": 0,
+  "regionIds": [],
+  "banAreaKm2": 0.0,
+  "cautionAreaKm2": 0.0,
+  "independentCellsInBoundary": {
+   "cells": 9,
+   "areaKm2": 1357.4205111053475
+  },
+  "independentRasterAreaKm2": 1357.4,
+  "derivationMatchesIndependent": false
+ },
+ "browserFrameBudget": {
+  "measured": true,
+  "budgetMs": 33.3,
+  "driver": "headless Microsoft Edge over CDP (tools/probes/_probe_browser_fps.py)",
+  "worstCase": {
+   "flights": 7760,
+   "drawnFlightsPeak": 3690,
+   "meanMs": 3.136,
+   "p95Ms": 4.4,
+   "maxMs": 5.1,
+   "meanFps": 318.9,
+   "worstFps": 196.1,
+   "meets30Fps": true
+  },
+  "allFleetSizesMeetBudget": true,
+  "ledgerFilter": {
+   "budgetMs": 300.0,
+   "measuredMs": 0.699,
+   "flights": 7760,
+   "meetsBudget": true
+  },
+  "rows": [
+   {
+    "flights": 1000,
+    "drawnFlightsPeak": 486,
+    "meanMs": 0.428,
+    "p95Ms": 0.6,
+    "maxMs": 1.1,
+    "meanFps": 2339.2,
+    "worstFps": 909.1,
+    "meets30Fps": true
+   },
+   {
+    "flights": 3000,
+    "drawnFlightsPeak": 1449,
+    "meanMs": 1.125,
+    "p95Ms": 1.7,
+    "maxMs": 2.2,
+    "meanFps": 888.9,
+    "worstFps": 454.5,
+    "meets30Fps": true
+   },
+   {
+    "flights": 7760,
+    "drawnFlightsPeak": 3690,
+    "meanMs": 3.136,
+    "p95Ms": 4.4,
+    "maxMs": 5.1,
+    "meanFps": 318.9,
+    "worstFps": 196.1,
+    "meets30Fps": true
+   }
+  ]
+ },
+ "notYetDone": [
+  "plan computation is about 63-66 s against a design budget fixed when the network was 2910 flights; it is now 7760, so the two numbers are not comparable and the budget needs restating against the current fleet"
+ ]
+}

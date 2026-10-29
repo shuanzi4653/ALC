@@ -1,0 +1,672 @@
+{
+  "caseId": "fog-20250105",
+  "label": "历史回放 · 2025-01-05 沈阳大雾",
+  "kind": "HISTORICAL_REPLAY",
+  "timeBase": "2025-01-05T00:00:00Z",
+  "displayTz": "Asia/Shanghai",
+  "window": {
+    "from": "2025-01-05T00:00:00Z",
+    "to": "2025-01-05T06:00:00Z"
+  },
+  "stations": [
+    "ZYTX",
+    "ZYCC",
+    "ZYHB",
+    "ZYTL"
+  ],
+  "history": {
+    "ZYTX": [
+      {
+        "station": "ZYTX",
+        "timeUtc": "2025-01-04T18:00:00Z",
+        "epoch": 1736013600,
+        "visM": 9994.0,
+        "gustMs": 2.0,
+        "gustSource": "FALLBACK_WIND",
+        "windMs": 2.0,
+        "wdirDeg": 140.0,
+        "tempC": -1.0,
+        "dewC": -6.0,
+        "cloudBaseM": 792.5,
+        "cloudSource": "OBSERVED",
+        "skyCover": "BKN",
+        "qnhHpa": 1016.9
+      },
+      {
+        "station": "ZYTX",
+        "timeUtc": "2025-01-04T19:00:00Z",
+        "epoch": 1736017200,
+        "visM": 9994.0,
+        "gustMs": 2.0,
+        "gustSource": "FALLBACK_WIND",
+        "windMs": 2.0,
+        "wdirDeg": 120.0,
+        "tempC": -1.0,
+        "dewC": -6.0,
+        "cloudBaseM": 792.5,
+        "cloudSource": "OBSERVED",
+        "skyCover": "BKN",
+        "qnhHpa": 1015.9
+      },
+      {
+        "station": "ZYTX",
+        "timeUtc": "2025-01-04T20:00:00Z",
+        "epoch": 1736020800,
+        "visM": 9994.0,
+        "gustMs": 2.0,
+        "gustSource": "FALLBACK_WIND",
+        "windMs": 2.0,
+        "wdirDeg": 90.0,
+        "tempC": -2.0,
+        "dewC": -6.0,
+        "cloudBaseM": 792.5,
+        "cloudSource": "OBSERVED",
+        "skyCover": "BKN",
+        "qnhHpa": 1015.9
+      },
+      {
+        "station": "ZYTX",
+        "timeUtc": "2025-01-04T21:00:00Z",
+        "epoch": 1736024400,
+        "visM": 9994.0,
+        "gustMs": 2.0,
+        "gustSource": "FALLBACK_WIND",
+        "windMs": 2.0,
+        "wdirDeg": 130.0,
+        "tempC": -1.0,
+        "dewC": -5.0,
+        "cloudBaseM": 792.5,
+        "cloudSource": "OBSERVED",
+        "skyCover": "BKN",
+        "qnhHpa": 1015.9
+      },
+      {
+        "station": "ZYTX",
+        "timeUtc": "2025-01-04T22:00:00Z",
+        "epoch": 1736028000,
+        "visM": 9994.0,
+        "gustMs": 1.0,
+        "gustSource": "FALLBACK_WIND",
+        "windMs": 1.0,
+        "wdirDeg": null,
+        "tempC": -2.0,
+        "dewC": -5.0,
+        "cloudBaseM": 792.5,
+        "cloudSource": "OBSERVED",
+        "skyCover": "BKN",
+        "qnhHpa": 1015.9
+      },
+      {
+        "station": "ZYTX",
+        "timeUtc": "2025-01-04T23:00:00Z",
+        "epoch": 1736031600,
+        "visM": 6002.9,
+        "gustMs": 3.0,
+        "gustSource": "FALLBACK_WIND",
+        "windMs": 3.0,
+        "wdirDeg": 220.0,
+        "tempC": -2.0,
+        "dewC": -6.0,
+        "cloudBaseM": 487.7,
+        "cloudSource": "OBSERVED",
+        "skyCover": "OVC",
+        "qnhHpa": 1015.9
+      },
+      {
+        "station": "ZYTX",
+        "timeUtc": "2025-01-05T00:00:00Z",
+        "epoch": 1736035200,
+        "visM": 997.8,
+        "gustMs": 4.0,
+        "gustSource": "FALLBACK_WIND",
+        "windMs": 4.0,
+        "wdirDeg": 220.0,
+        "tempC": -3.0,
+        "dewC": -4.0,
+        "cloudBaseM": 152.4,
+        "cloudSource": "OBSERVED",
+        "skyCover": "SCT",
+        "qnhHpa": 1015.9
+      }
+    ],
+    "ZYCC": [
+      {
+        "station": "ZYCC",
+        "timeUtc": "2025-01-04T18:00:00Z",
+        "epoch": 1736013600,
+        "visM": 5005.1,
+        "gustMs": 1.0,
+        "gustSource": "FALLBACK_WIND",
+        "windMs": 1.0,
+        "wdirDeg": 350.0,
+        "tempC": -17.0,
+        "dewC": -19.0,
+        "cloudBaseM": 5000.0,
+        "cloudSource": "CLEAR_SENTINEL",
+        "skyCover": "NSC",
+        "qnhHpa": 1017.9
+      },
+      {
+        "station": "ZYCC",
+        "timeUtc": "2025-01-04T19:00:00Z",
+        "epoch": 1736017200,
+        "visM": 5005.1,
+        "gustMs": 1.0,
+        "gustSource": "FALLBACK_WIND",
+        "windMs": 1.0,
+        "wdirDeg": null,
+        "tempC": -16.0,
+        "dewC": -18.0,
+        "cloudBaseM": 5000.0,
+        "cloudSource": "CLEAR_SENTINEL",
+        "skyCover": "NSC",
+        "qnhHpa": 1017.9
+      },
+      {
+        "station": "ZYCC",
+        "timeUtc": "2025-01-04T20:00:00Z",
+        "epoch": 1736020800,
+        "visM": 5005.1,
+        "gustMs": 0.0,
+        "gustSource": "FALLBACK_WIND",
+        "windMs": 0.0,
+        "wdirDeg": 0.0,
+        "tempC": -16.0,
+        "dewC": -19.0,
+        "cloudBaseM": 5000.0,
+        "cloudSource": "CLEAR_SENTINEL",
+        "skyCover": "NSC",
+        "qnhHpa": 1016.9
+      },
+      {
+        "station": "ZYCC",
+        "timeUtc": "2025-01-04T21:00:00Z",
+        "epoch": 1736024400,
+        "visM": 5005.1,
+        "gustMs": 1.0,
+        "gustSource": "FALLBACK_WIND",
+        "windMs": 1.0,
+        "wdirDeg": null,
+        "tempC": -16.0,
+        "dewC": -19.0,
+        "cloudBaseM": 5000.0,
+        "cloudSource": "CLEAR_SENTINEL",
+        "skyCover": "NSC",
+        "qnhHpa": 1016.9
+      },
+      {
+        "station": "ZYCC",
+        "timeUtc": "2025-01-04T22:00:00Z",
+        "epoch": 1736028000,
+        "visM": 5005.1,
+        "gustMs": 0.0,
+        "gustSource": "FALLBACK_WIND",
+        "windMs": 0.0,
+        "wdirDeg": 0.0,
+        "tempC": -16.0,
+        "dewC": -19.0,
+        "cloudBaseM": 5000.0,
+        "cloudSource": "CLEAR_SENTINEL",
+        "skyCover": "NSC",
+        "qnhHpa": 1016.9
+      },
+      {
+        "station": "ZYCC",
+        "timeUtc": "2025-01-04T23:00:00Z",
+        "epoch": 1736031600,
+        "visM": 5005.1,
+        "gustMs": 2.0,
+        "gustSource": "FALLBACK_WIND",
+        "windMs": 2.0,
+        "wdirDeg": 40.0,
+        "tempC": -17.0,
+        "dewC": -20.0,
+        "cloudBaseM": 5000.0,
+        "cloudSource": "CLEAR_SENTINEL",
+        "skyCover": "NSC",
+        "qnhHpa": 1016.9
+      },
+      {
+        "station": "ZYCC",
+        "timeUtc": "2025-01-05T00:00:00Z",
+        "epoch": 1736035200,
+        "visM": 2993.4,
+        "gustMs": 2.0,
+        "gustSource": "FALLBACK_WIND",
+        "windMs": 2.0,
+        "wdirDeg": 350.0,
+        "tempC": -18.0,
+        "dewC": -20.0,
+        "cloudBaseM": 5000.0,
+        "cloudSource": "CLEAR_SENTINEL",
+        "skyCover": "NSC",
+        "qnhHpa": 1017.9
+      }
+    ],
+    "ZYHB": [
+      {
+        "station": "ZYHB",
+        "timeUtc": "2025-01-04T18:00:00Z",
+        "epoch": 1736013600,
+        "visM": 2494.5,
+        "gustMs": 2.0,
+        "gustSource": "FALLBACK_WIND",
+        "windMs": 2.0,
+        "wdirDeg": 40.0,
+        "tempC": -23.0,
+        "dewC": -25.0,
+        "cloudBaseM": 5000.0,
+        "cloudSource": "CLEAR_SENTINEL",
+        "skyCover": "NSC",
+        "qnhHpa": 1020.0
+      },
+      {
+        "station": "ZYHB",
+        "timeUtc": "2025-01-04T19:00:00Z",
+        "epoch": 1736017200,
+        "visM": 2494.5,
+        "gustMs": 2.0,
+        "gustSource": "FALLBACK_WIND",
+        "windMs": 2.0,
+        "wdirDeg": 10.0,
+        "tempC": -23.0,
+        "dewC": -25.0,
+        "cloudBaseM": 5000.0,
+        "cloudSource": "CLEAR_SENTINEL",
+        "skyCover": "NSC",
+        "qnhHpa": 1020.0
+      },
+      {
+        "station": "ZYHB",
+        "timeUtc": "2025-01-04T20:00:00Z",
+        "epoch": 1736020800,
+        "visM": 1995.6,
+        "gustMs": 2.0,
+        "gustSource": "FALLBACK_WIND",
+        "windMs": 2.0,
+        "wdirDeg": 40.0,
+        "tempC": -24.0,
+        "dewC": -27.0,
+        "cloudBaseM": 5000.0,
+        "cloudSource": "CLEAR_SENTINEL",
+        "skyCover": "NSC",
+        "qnhHpa": 1020.0
+      },
+      {
+        "station": "ZYHB",
+        "timeUtc": "2025-01-04T21:00:00Z",
+        "epoch": 1736024400,
+        "visM": 2993.4,
+        "gustMs": 2.0,
+        "gustSource": "FALLBACK_WIND",
+        "windMs": 2.0,
+        "wdirDeg": 30.0,
+        "tempC": -24.0,
+        "dewC": -27.0,
+        "cloudBaseM": 5000.0,
+        "cloudSource": "CLEAR_SENTINEL",
+        "skyCover": "NSC",
+        "qnhHpa": 1019.0
+      },
+      {
+        "station": "ZYHB",
+        "timeUtc": "2025-01-04T22:00:00Z",
+        "epoch": 1736028000,
+        "visM": 1995.6,
+        "gustMs": 3.0,
+        "gustSource": "FALLBACK_WIND",
+        "windMs": 3.0,
+        "wdirDeg": 30.0,
+        "tempC": -24.0,
+        "dewC": -27.0,
+        "cloudBaseM": 5000.0,
+        "cloudSource": "CLEAR_SENTINEL",
+        "skyCover": "NSC",
+        "qnhHpa": 1020.0
+      },
+      {
+        "station": "ZYHB",
+        "timeUtc": "2025-01-04T23:00:00Z",
+        "epoch": 1736031600,
+        "visM": 1995.6,
+        "gustMs": 3.0,
+        "gustSource": "FALLBACK_WIND",
+        "windMs": 3.0,
+        "wdirDeg": 10.0,
+        "tempC": -24.0,
+        "dewC": -26.0,
+        "cloudBaseM": 5000.0,
+        "cloudSource": "CLEAR_SENTINEL",
+        "skyCover": "NSC",
+        "qnhHpa": 1020.0
+      },
+      {
+        "station": "ZYHB",
+        "timeUtc": "2025-01-05T00:00:00Z",
+        "epoch": 1736035200,
+        "visM": 1593.3,
+        "gustMs": 2.0,
+        "gustSource": "FALLBACK_WIND",
+        "windMs": 2.0,
+        "wdirDeg": 20.0,
+        "tempC": -24.0,
+        "dewC": -27.0,
+        "cloudBaseM": 5000.0,
+        "cloudSource": "CLEAR_SENTINEL",
+        "skyCover": "NSC",
+        "qnhHpa": 1021.0
+      }
+    ],
+    "ZYTL": [
+      {
+        "station": "ZYTL",
+        "timeUtc": "2025-01-04T18:00:00Z",
+        "epoch": 0,
+        "visM": 2800.3,
+        "gustMs": 1.0,
+        "gustSource": "FALLBACK_WIND",
+        "windMs": 1.0,
+        "wdirDeg": null,
+        "tempC": 0.0,
+        "dewC": -3.0,
+        "cloudBaseM": 5000.0,
+        "cloudSource": "CLEAR_SENTINEL",
+        "skyCover": "NSC",
+        "qnhHpa": 1017.9
+      },
+      {
+        "station": "ZYTL",
+        "timeUtc": "2025-01-04T19:00:00Z",
+        "epoch": 0,
+        "visM": 3492.3,
+        "gustMs": 2.0,
+        "gustSource": "FALLBACK_WIND",
+        "windMs": 2.0,
+        "wdirDeg": 280.0,
+        "tempC": 0.0,
+        "dewC": -3.0,
+        "cloudBaseM": 5000.0,
+        "cloudSource": "CLEAR_SENTINEL",
+        "skyCover": "NSC",
+        "qnhHpa": 1017.9
+      },
+      {
+        "station": "ZYTL",
+        "timeUtc": "2025-01-04T20:00:00Z",
+        "epoch": 0,
+        "visM": 2993.4,
+        "gustMs": 1.0,
+        "gustSource": "FALLBACK_WIND",
+        "windMs": 1.0,
+        "wdirDeg": null,
+        "tempC": 0.0,
+        "dewC": -3.0,
+        "cloudBaseM": 5000.0,
+        "cloudSource": "CLEAR_SENTINEL",
+        "skyCover": "NSC",
+        "qnhHpa": 1016.9
+      },
+      {
+        "station": "ZYTL",
+        "timeUtc": "2025-01-04T21:00:00Z",
+        "epoch": 0,
+        "visM": 2993.4,
+        "gustMs": 2.0,
+        "gustSource": "FALLBACK_WIND",
+        "windMs": 2.0,
+        "wdirDeg": 270.0,
+        "tempC": 0.0,
+        "dewC": -3.0,
+        "cloudBaseM": 5000.0,
+        "cloudSource": "CLEAR_SENTINEL",
+        "skyCover": "NSC",
+        "qnhHpa": 1016.9
+      },
+      {
+        "station": "ZYTL",
+        "timeUtc": "2025-01-04T22:00:00Z",
+        "epoch": 0,
+        "visM": 2993.4,
+        "gustMs": 1.0,
+        "gustSource": "FALLBACK_WIND",
+        "windMs": 1.0,
+        "wdirDeg": null,
+        "tempC": -2.0,
+        "dewC": -4.0,
+        "cloudBaseM": 5000.0,
+        "cloudSource": "CLEAR_SENTINEL",
+        "skyCover": "NSC",
+        "qnhHpa": 1016.9
+      },
+      {
+        "station": "ZYTL",
+        "timeUtc": "2025-01-04T23:00:00Z",
+        "epoch": 0,
+        "visM": 2993.4,
+        "gustMs": 0.0,
+        "gustSource": "FALLBACK_WIND",
+        "windMs": 0.0,
+        "wdirDeg": 0.0,
+        "tempC": -2.0,
+        "dewC": -3.0,
+        "cloudBaseM": 5000.0,
+        "cloudSource": "CLEAR_SENTINEL",
+        "skyCover": "NSC",
+        "qnhHpa": 1016.9
+      },
+      {
+        "station": "ZYTL",
+        "timeUtc": "2025-01-05T00:00:00Z",
+        "epoch": 0,
+        "visM": 2800.3,
+        "gustMs": 1.0,
+        "gustSource": "FALLBACK_WIND",
+        "windMs": 1.0,
+        "wdirDeg": null,
+        "tempC": 1.0,
+        "dewC": -1.0,
+        "cloudBaseM": 5000.0,
+        "cloudSource": "CLEAR_SENTINEL",
+        "skyCover": "NSC",
+        "qnhHpa": 1016.9
+      }
+    ]
+  },
+  "frames": [
+    {
+      "t": "2025-01-05T00:00:00Z",
+      "ZYTX": {
+        "visM": 997.8,
+        "gustMs": 4.0,
+        "dewSpread": 1.0,
+        "cloudBaseM": 152.4
+      },
+      "ZYCC": {
+        "visM": 2993.4,
+        "gustMs": 2.0,
+        "dewSpread": 2.0,
+        "cloudBaseM": 5000.0
+      },
+      "ZYHB": {
+        "visM": 1593.3,
+        "gustMs": 2.0,
+        "dewSpread": 3.0,
+        "cloudBaseM": 5000.0
+      },
+      "ZYTL": {
+        "visM": 2800.3,
+        "gustMs": 1.0,
+        "dewSpread": 2.0,
+        "cloudBaseM": 5000.0
+      }
+    },
+    {
+      "t": "2025-01-05T01:00:00Z",
+      "ZYTX": {
+        "visM": 997.8,
+        "gustMs": 3.0,
+        "dewSpread": 1.0,
+        "cloudBaseM": 152.4
+      },
+      "ZYCC": {
+        "visM": 2993.4,
+        "gustMs": 2.0,
+        "dewSpread": 2.0,
+        "cloudBaseM": 5000.0
+      },
+      "ZYHB": {
+        "visM": 1593.3,
+        "gustMs": 2.0,
+        "dewSpread": 3.0,
+        "cloudBaseM": 5000.0
+      },
+      "ZYTL": {
+        "visM": 2800.3,
+        "gustMs": 1.0,
+        "dewSpread": 4.0,
+        "cloudBaseM": 5000.0
+      }
+    },
+    {
+      "t": "2025-01-05T02:00:00Z",
+      "ZYTX": {
+        "visM": 1496.7,
+        "gustMs": 2.0,
+        "dewSpread": 3.0,
+        "cloudBaseM": 152.4
+      },
+      "ZYCC": {
+        "visM": 4007.3,
+        "gustMs": 2.0,
+        "dewSpread": 3.0,
+        "cloudBaseM": 5000.0
+      },
+      "ZYHB": {
+        "visM": 2993.4,
+        "gustMs": 4.0,
+        "dewSpread": 3.0,
+        "cloudBaseM": 5000.0
+      },
+      "ZYTL": {
+        "visM": 3492.3,
+        "gustMs": 2.0,
+        "dewSpread": 7.0,
+        "cloudBaseM": 5000.0
+      }
+    },
+    {
+      "t": "2025-01-05T03:00:00Z",
+      "ZYTX": {
+        "visM": 1995.6,
+        "gustMs": 3.0,
+        "dewSpread": 3.0,
+        "cloudBaseM": 304.8
+      },
+      "ZYCC": {
+        "visM": 5005.1,
+        "gustMs": 3.0,
+        "dewSpread": 6.0,
+        "cloudBaseM": 5000.0
+      },
+      "ZYHB": {
+        "visM": 4007.3,
+        "gustMs": 4.0,
+        "dewSpread": 4.0,
+        "cloudBaseM": 5000.0
+      },
+      "ZYTL": {
+        "visM": 4007.3,
+        "gustMs": 4.0,
+        "dewSpread": 10.0,
+        "cloudBaseM": 5000.0
+      }
+    },
+    {
+      "t": "2025-01-05T04:00:00Z",
+      "ZYTX": {
+        "visM": 1995.6,
+        "gustMs": 3.0,
+        "dewSpread": 3.0,
+        "cloudBaseM": 304.8
+      },
+      "ZYCC": {
+        "visM": 7000.6,
+        "gustMs": 4.0,
+        "dewSpread": 6.0,
+        "cloudBaseM": 5000.0
+      },
+      "ZYHB": {
+        "visM": 4007.3,
+        "gustMs": 3.0,
+        "dewSpread": 4.0,
+        "cloudBaseM": 5000.0
+      },
+      "ZYTL": {
+        "visM": 4007.3,
+        "gustMs": 5.0,
+        "dewSpread": 10.0,
+        "cloudBaseM": 5000.0
+      }
+    },
+    {
+      "t": "2025-01-05T05:00:00Z",
+      "ZYTX": {
+        "visM": 1995.6,
+        "gustMs": 2.0,
+        "dewSpread": 6.0,
+        "cloudBaseM": 487.7
+      },
+      "ZYCC": {
+        "visM": 7000.6,
+        "gustMs": 3.0,
+        "dewSpread": 7.0,
+        "cloudBaseM": 5000.0
+      },
+      "ZYHB": {
+        "visM": 4007.3,
+        "gustMs": 4.0,
+        "dewSpread": 5.0,
+        "cloudBaseM": 5000.0
+      },
+      "ZYTL": {
+        "visM": 4007.3,
+        "gustMs": 6.0,
+        "dewSpread": 7.0,
+        "cloudBaseM": 5000.0
+      }
+    },
+    {
+      "t": "2025-01-05T06:00:00Z",
+      "ZYTX": {
+        "visM": 2993.4,
+        "gustMs": 3.0,
+        "dewSpread": 7.0,
+        "cloudBaseM": 609.6
+      },
+      "ZYCC": {
+        "visM": 6002.9,
+        "gustMs": 3.0,
+        "dewSpread": 6.0,
+        "cloudBaseM": 914.4
+      },
+      "ZYHB": {
+        "visM": 5005.1,
+        "gustMs": 5.0,
+        "dewSpread": 5.0,
+        "cloudBaseM": 5000.0
+      },
+      "ZYTL": {
+        "visM": 4007.3,
+        "gustMs": 4.0,
+        "dewSpread": 7.0,
+        "cloudBaseM": 5000.0
+      }
+    }
+  ],
+  "source": {
+    "metar": "Iowa State ASOS（与训练集同一源）",
+    "file": "data/training/metar/series.csv",
+    "retrieved": "本文件由 tools/maintenance/_build_case_fog_20250105.py 从上述 CSV 抄录，未做插值"
+  },
+  "note": "天气为 METAR 实测；班次骨架由平台按固定种子生成；结论由系统按本帧观测算出。"
+}

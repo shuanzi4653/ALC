@@ -1,0 +1,307 @@
+{
+  "generatedAt": "2026-09-16T17:53:47.363265Z",
+  "measurementNote": "本文件在 2026-09-17 的命名统一轮次中被**整份重跑**。重跑原因是计划结论已发生变化：V1.3 快照采集时运行网络生成 2910 个班次，当前网络为 7760 个班次；气象雨带的几何投影缺陷修复后，一度被径直放行穿越雨带的班次被正确阻断，关闭班次数因此显著上升。旧快照测量的是一个已不存在的代码版本，spuriousMetrics 字段列出其具体数值，仅供追溯，**不得与本次数字混用**。",
+  "spuriousMetrics": {
+    "generatedAt": "2026-09-16T17:51:13.582443Z",
+    "flightsPerRun": [
+      7760
+    ],
+    "acceptedSample": 5724,
+    "closedSample": 2036,
+    "planSecondsRange": [
+      7.56,
+      13.92
+    ]
+  },
+  "scopeNote": "同机同时刻串行测量，含 shapely 连续四维检查与资源日历；pythonPeakMemoryMb 为独立 tracemalloc 通路的峰值，该通路的墙钟时间不作为计划耗时。runs[].planSeconds 是**进程内纯计算**耗时（直接调用 traffic.service.simulate），不是用户等待时间。不含浏览器渲染帧率：FPS 与台账筛选响应需在真实界面复核。",
+  "networkSecondsCold": 0.115,
+  "networkSecondsWarm": 0.0,
+  "runs": [
+    {
+      "seed": 42,
+      "scenario": "moving",
+      "planSeconds": 12.72,
+      "flights": 7760,
+      "accepted": 5724,
+      "closed": 2036,
+      "detours": 46,
+      "groundHolds": 2325,
+      "alternateLayers": 475,
+      "resolvedConflicts": 1665,
+      "layerUsage": {
+        "CAR:350": 192,
+        "CAR:500": 186,
+        "DELIVERY:160": 2601,
+        "DELIVERY:80": 2745
+      },
+      "delivery": {
+        "orders": 6912,
+        "delivered": 5346,
+        "cancelled": 1566,
+        "beyondTimeline": 0,
+        "deliveryRate": 0.7734,
+        "averageGroundWaitMinutes": 2.4,
+        "maxGroundWaitMinutes": 25
+      },
+      "hubPads": 456,
+      "crossingZones": 26,
+      "crossingReservations": 499,
+      "highestCarAglM": 500.0,
+      "highestDeliveryAglM": 160.0,
+      "clearanceStatuses": [
+        "SIMULATION_ASSUMPTION_UNVERIFIED"
+      ],
+      "closureReasons": {
+        "WEATHER_BLOCKED": 1938,
+        "BEYOND_PLANNING_HORIZON": 83,
+        "SEPARATION_RESOURCE_OR_TIME_LIMIT": 15
+      },
+      "orderOutcomeReasons": {
+        "BEYOND_PLANNING_HORIZON": 36,
+        "ON_TIME": 5346,
+        "SEPARATION_RESOURCE_OR_TIME_LIMIT": 10,
+        "WEATHER_BLOCKED": 1520
+      },
+      "pythonPeakMemoryMb": 50.6
+    },
+    {
+      "seed": 42,
+      "scenario": "clear",
+      "planSeconds": 7.33,
+      "flights": 7760,
+      "accepted": 7637,
+      "closed": 123,
+      "detours": 0,
+      "groundHolds": 3500,
+      "alternateLayers": 715,
+      "resolvedConflicts": 2700,
+      "layerUsage": {
+        "CAR:350": 397,
+        "CAR:500": 390,
+        "DELIVERY:160": 3314,
+        "DELIVERY:80": 3536
+      },
+      "delivery": {
+        "orders": 6912,
+        "delivered": 6850,
+        "cancelled": 62,
+        "beyondTimeline": 0,
+        "deliveryRate": 0.991,
+        "averageGroundWaitMinutes": 2.84,
+        "maxGroundWaitMinutes": 25
+      },
+      "hubPads": 456,
+      "crossingZones": 32,
+      "crossingReservations": 724,
+      "highestCarAglM": 500.0,
+      "highestDeliveryAglM": 160.0,
+      "clearanceStatuses": [
+        "SIMULATION_ASSUMPTION_UNVERIFIED"
+      ],
+      "closureReasons": {
+        "BEYOND_PLANNING_HORIZON": 88,
+        "SEPARATION_RESOURCE_OR_TIME_LIMIT": 35
+      },
+      "orderOutcomeReasons": {
+        "BEYOND_PLANNING_HORIZON": 37,
+        "ON_TIME": 6850,
+        "SEPARATION_RESOURCE_OR_TIME_LIMIT": 25
+      },
+      "pythonPeakMemoryMb": null
+    },
+    {
+      "seed": 7,
+      "scenario": "moving",
+      "planSeconds": 13.83,
+      "flights": 7760,
+      "accepted": 5824,
+      "closed": 1936,
+      "detours": 65,
+      "groundHolds": 2411,
+      "alternateLayers": 488,
+      "resolvedConflicts": 1748,
+      "layerUsage": {
+        "CAR:350": 204,
+        "CAR:500": 204,
+        "DELIVERY:160": 2657,
+        "DELIVERY:80": 2759
+      },
+      "delivery": {
+        "orders": 6912,
+        "delivered": 5416,
+        "cancelled": 1496,
+        "beyondTimeline": 0,
+        "deliveryRate": 0.7836,
+        "averageGroundWaitMinutes": 2.4,
+        "maxGroundWaitMinutes": 20
+      },
+      "hubPads": 456,
+      "crossingZones": 26,
+      "crossingReservations": 521,
+      "highestCarAglM": 500.0,
+      "highestDeliveryAglM": 160.0,
+      "clearanceStatuses": [
+        "SIMULATION_ASSUMPTION_UNVERIFIED"
+      ],
+      "closureReasons": {
+        "WEATHER_BLOCKED": 1836,
+        "BEYOND_PLANNING_HORIZON": 83,
+        "SEPARATION_RESOURCE_OR_TIME_LIMIT": 17
+      },
+      "orderOutcomeReasons": {
+        "BEYOND_PLANNING_HORIZON": 32,
+        "ON_TIME": 5416,
+        "SEPARATION_RESOURCE_OR_TIME_LIMIT": 14,
+        "WEATHER_BLOCKED": 1450
+      },
+      "pythonPeakMemoryMb": null
+    },
+    {
+      "seed": 2026,
+      "scenario": "moving",
+      "planSeconds": 13.22,
+      "flights": 7760,
+      "accepted": 5619,
+      "closed": 2141,
+      "detours": 52,
+      "groundHolds": 2336,
+      "alternateLayers": 476,
+      "resolvedConflicts": 1668,
+      "layerUsage": {
+        "CAR:350": 184,
+        "CAR:500": 183,
+        "DELIVERY:160": 2544,
+        "DELIVERY:80": 2708
+      },
+      "delivery": {
+        "orders": 6912,
+        "delivered": 5252,
+        "cancelled": 1660,
+        "beyondTimeline": 0,
+        "deliveryRate": 0.7598,
+        "averageGroundWaitMinutes": 2.43,
+        "maxGroundWaitMinutes": 20
+      },
+      "hubPads": 456,
+      "crossingZones": 26,
+      "crossingReservations": 451,
+      "highestCarAglM": 500.0,
+      "highestDeliveryAglM": 160.0,
+      "clearanceStatuses": [
+        "SIMULATION_ASSUMPTION_UNVERIFIED"
+      ],
+      "closureReasons": {
+        "WEATHER_BLOCKED": 2047,
+        "BEYOND_PLANNING_HORIZON": 77,
+        "SEPARATION_RESOURCE_OR_TIME_LIMIT": 17
+      },
+      "orderOutcomeReasons": {
+        "BEYOND_PLANNING_HORIZON": 28,
+        "ON_TIME": 5252,
+        "SEPARATION_RESOURCE_OR_TIME_LIMIT": 14,
+        "WEATHER_BLOCKED": 1618
+      },
+      "pythonPeakMemoryMb": 49.1
+    }
+  ],
+  "endToEndRuns": {
+    "note": "HTTP 端到端等待时间由 _sim_harness.py 探测链路单独测量（三服务全栈启动后经 5180 前端代理打 8600 的 /traffic/session 并轮询到 READY）。planSeconds 是进程内纯计算，本字段是用户实际等待时间，两者不可互推。",
+    "measurements": [
+      {
+        "label": "canonical",
+        "scenario": "moving",
+        "seed": 42,
+        "seconds": 14.516,
+        "note": "默认口径，三方服务全部在线。"
+      },
+      {
+        "label": "cold",
+        "scenario": "moving",
+        "seed": 98765,
+        "seconds": 14.743,
+        "note": "换种子以避开计算缓存，观察冷缓存下的端到端等待。"
+      },
+      {
+        "label": "live",
+        "scenario": "live",
+        "seconds": 16.888,
+        "note": "实时气象源（open-meteo）参与，含外部取数与降级判断，比同口径离线慢约 2.1 s。"
+      }
+    ],
+    "supersededMeasurements": [
+      10.4,
+      11.3
+    ],
+    "supersededBecause": "测得于 2910 班次时期的网络与雨带修复之前，当前网络 7760 班次。见本文件 measurementNote。"
+  },
+  "computeAttribution": {
+    "measuredAt": "2026-09-16T17:53:47.363265Z",
+    "note": "计划纯计算的归因结果，来自 _profile_final.py（空闲机器、单次 warm 计划）。此前只证明了固定管制空域**不是**原因，本轮定位到真正热点并已修复。",
+    "profileBefore": {
+      "planSeconds": 13.32,
+      "envelopeSeconds": 11.25,
+      "envelopeCalls": 13419,
+      "sweptBandSeconds": 8.31,
+      "windowCacheHitRate": 0.0,
+      "cause": "envelope() 的调用点传入的是浮点分钟，13419 次调用产生 13411 个互不相同的浮点键，lru_cache 命中率为 0，于是每个窗口都重算雨带凸包。"
+    },
+    "profileAfter": {
+      "planSeconds": 12.69,
+      "envelopeSeconds": 5.6,
+      "envelopeCalls": 13419,
+      "sweptBandSeconds": 3.38,
+      "windowCacheHitRate": 0.923,
+      "cause": "envelope() 先按 5 分钟刻度分箱再进缓存，键数收敛到 1035，命中率 92.3%；_band_hull 只对落在缓动轨迹自身凸包上的偏移求外延，其余偏移不可能产生极点。"
+    },
+    "correctnessGate": {
+      "geometrySymmetricDifferenceM2": 0.0,
+      "planDigestSeed42": "e1ebc2ba39ab215b",
+      "planDigestSeed98765": "c4d7d8b120415378",
+      "note": "九个真实窗口的对称差均为 0.0000 m²，两个种子的计划摘要与优化前逐字节一致，accepted/closed 同为 5724/2036 与 5922/1838。提速**未**改变任何计划结论。"
+    },
+    "rejectedOptimisations": [
+      {
+        "what": "把窗口向外吸附到 1 小时网格以扩大缓存复用",
+        "safe": true,
+        "but": "包络更保守，关闭 2258 班而非 2036 班，属行为变更而非优化，已回退。"
+      },
+      {
+        "what": "用雨带缓动偏移凸包与轮廓凸包的并集近似扫描包络",
+        "safe": false,
+        "but": "缓动轨迹远非凸（97 个采样中 92 个落在自身凸包内部），该近似在 96 刻度窗口上只有 121,638,561,897 m²，比真实的 174,724,291,628 m² 少 53,085,729,730 m²，正是曾让航迹穿雨带的缺陷形态，已回退。"
+      },
+      {
+        "what": "按固定步长抽样刻度来减少凸包点数",
+        "safe": false,
+        "but": "步长 2 在窗口 (0,36) 上就少 303,023 m²，步长 5 在 (56,70) 上少 21,694,389 m²，不精确，未采用。"
+      }
+    ]
+  },
+  "ledgerFilter": {
+    "measuredBy": "_bench_ledger.py",
+    "payloadFlights": 7760,
+    "budgetMs": 300,
+    "worstMs": 0.185,
+    "worstCase": "groupFlights minute=60",
+    "verdict": "PASS",
+    "headroomFactor": 1622,
+    "note": "筛选与分组的最坏值 0.185 ms，虚拟窗口为常数级（0.000 ms）；相对 300 ms 预算有约 1620 倍余量。这是数据通路耗时，不含浏览器绘制。"
+  },
+  "browserRender": {
+    "fpsMeasured": null,
+    "ledgerPaintMeasuredMs": null,
+    "note": "未经真实浏览器实测。台账的**数据通路**已由 _bench_ledger.py 实测（最坏 0.185 ms），但合成与绘制帧率需在真实界面用 requestAnimationFrame 采样，本轮未做，故留空而不是给估值。"
+  },
+  "targets": {
+    "planSecondsBudget": 8.0,
+    "ledgerFilterBudgetMs": 300,
+    "browserFpsTarget": 30
+  },
+  "verdict": {
+    "networkWithinBudget": true,
+    "planComputeWithinBudget": false,
+    "slowestPlanSeconds": 13.83,
+    "altitudeCeilingRespected": true,
+    "note": "纯计算耗时仍超出 8 秒内部工程预算。已排除固定管制空域（整体关闭后同计划 11.42 s，开启 12.51 s，净增 1.09 s 约 9%，且班次口径逐项相同 —— _bench_zone_baseline.py 本轮实测）。真正的热点是气象包络计算，本轮回退了两处不安全的提速、落实了两处等价提速，把 envelope 从 11.25 s 降到 5.60 s；剩余超出部分属网络规模（7760 班次）带来的遗留项，尚未消除。"
+  }
+}

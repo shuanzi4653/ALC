@@ -1,0 +1,239 @@
+{
+  "catalogVersion": "northeast-fixed-airspace-v1",
+  "dataRetrievedAt": "2026-09-16",
+  "generatedAt": "2026-09-17",
+  "legalInstrument": "《无人驾驶航空器飞行管理暂行条例》（国令第 761 号，2024-01-01 施行）",
+  "clause": "第十九条",
+  "entryRule": "未经空中交通管理机构批准，不得在管制空域内实施无人驾驶航空器飞行活动。",
+  "publicationRule": "管制空域的具体范围由各级空中交通管理机构按照国家空中交通管理领导机构的规定确定，由设区的市级以上人民政府公布，民用航空管理部门和承担相应职责的单位发布航行情报。",
+  "totals": {
+    "sites": 69,
+    "withGeometry": 60,
+    "registeredOnly": 9,
+    "prohibited": 12,
+    "approvalRequired": 48,
+    "registered": 9,
+    "clauses": 8
+  },
+  "publishedRadiiM": [
+    500,
+    5000,
+    55000
+  ],
+  "clauseCoverage": [
+    {
+      "key": "AIRPORT",
+      "clause": "第十九条第（一）项",
+      "sector": "民航",
+      "geometryStatus": "PARTIALLY_PUBLISHED",
+      "sites": 48,
+      "withGeometry": 48,
+      "prohibited": 0,
+      "approvalRequired": 48,
+      "registered": 0,
+      "citation": "《运输机场净空保护管理办法》《民用机场管理条例》第四十九条；各地《机场净空保护管理规定》净空保护相关用语说明第 2 条"
+    },
+    {
+      "key": "BORDER",
+      "clause": "第十九条第（二）项",
+      "sector": "国防",
+      "geometryStatus": "PERIMETER_NOT_PUBLICLY_PUBLISHED",
+      "sites": 0,
+      "withGeometry": 0,
+      "prohibited": 0,
+      "approvalRequired": 0,
+      "registered": 0,
+      "citation": "范围由各级空中交通管理机构确定，由设区的市级以上人民政府公布"
+    },
+    {
+      "key": "CLASSIFIED_UNIT",
+      "clause": "第十九条第（三）项",
+      "sector": "机密",
+      "geometryStatus": "PERIMETER_NOT_PUBLICLY_PUBLISHED",
+      "sites": 0,
+      "withGeometry": 0,
+      "prohibited": 0,
+      "approvalRequired": 0,
+      "registered": 0,
+      "citation": "范围由各级空中交通管理机构确定，由设区的市级以上人民政府公布"
+    },
+    {
+      "key": "DEFENCE_INDUSTRY",
+      "clause": "第十九条第（四）项",
+      "sector": "国防",
+      "geometryStatus": "PARTIALLY_PUBLISHED",
+      "sites": 2,
+      "withGeometry": 2,
+      "prohibited": 2,
+      "approvalRequired": 0,
+      "registered": 0,
+      "citation": "GB 6249—2025《核动力厂环境辐射防护规定》第 5.6 条"
+    },
+    {
+      "key": "INFRASTRUCTURE",
+      "clause": "第十九条第（五）项",
+      "sector": "政务",
+      "geometryStatus": "AREA_EXTENT_REQUIRES_LOCAL_PUBLICATION",
+      "sites": 0,
+      "withGeometry": 0,
+      "prohibited": 0,
+      "approvalRequired": 0,
+      "registered": 0,
+      "citation": "饮用水水源保护区范围由省级人民政府批复公布；其余设施周边范围由各级空中交通管理机构确定"
+    },
+    {
+      "key": "ELECTROMAGNETIC",
+      "clause": "第十九条第（六）项",
+      "sector": "科研",
+      "geometryStatus": "PARTIALLY_PUBLISHED",
+      "sites": 11,
+      "withGeometry": 10,
+      "prohibited": 10,
+      "approvalRequired": 0,
+      "registered": 1,
+      "citation": "GB 6364—2013《航空无线电导航台站电磁环境要求》，MH/T 4003.1—2014《民用航空通信导航监视台（站）设置场地规范 第 1 部分：导航》；半径取值见《湖南省民用机场及民用航空无线电台（站）电磁环境保护区管理规定》第十一条；GB 31223—2014《气象探测环境保护规范 天气雷达站》第 4.2、4.3 条；《贵州省500米口径球面射电望远镜电磁波宁静区保护办法》"
+    },
+    {
+      "key": "HERITAGE",
+      "clause": "第十九条第（七）项",
+      "sector": "政务",
+      "geometryStatus": "AREA_EXTENT_REQUIRES_LOCAL_PUBLICATION",
+      "sites": 8,
+      "withGeometry": 0,
+      "prohibited": 0,
+      "approvalRequired": 0,
+      "registered": 8,
+      "citation": "范围由各级空中交通管理机构确定，由设区的市级以上人民政府公布"
+    },
+    {
+      "key": "OTHER",
+      "clause": "第十九条第（八）项",
+      "sector": "政务",
+      "geometryStatus": "PERIMETER_NOT_PUBLICLY_PUBLISHED",
+      "sites": 0,
+      "withGeometry": 0,
+      "prohibited": 0,
+      "approvalRequired": 0,
+      "registered": 0,
+      "citation": "由国家空中交通管理领导机构规定"
+    }
+  ],
+  "payload": {
+    "networkSeconds": 0.161,
+    "networkBytes": 628650,
+    "staticAirspaceBytes": 144853,
+    "zoneVertices": 3069
+  },
+  "envelopeAreaKm2": {
+    "approvalRequiredPolicy": 163.9,
+    "prohibitedPolicy": 20626.9
+  },
+  "planTiming": {
+    "coldProcessSeconds": 25.65,
+    "note": "表中为**热态**耗时（前面各跑一次丢弃的预热计划）。冷进程首调含导入、首次 STRtree 构建与投影器初始化，实测比热态多 3—5 s，因此不能作为本功能的成本。"
+  },
+  "plans": {
+    "defaultApprovalRequired": {
+      "policy": "APPROVAL_REQUIRED",
+      "warmSeconds": 26.64,
+      "flights": 7760,
+      "accepted": 6035,
+      "closed": 1725,
+      "stats": {
+        "policy": "APPROVAL_REQUIRED",
+        "zoneCount": 60,
+        "closedByStaticAirspace": 0,
+        "flightsRequiringApproval": 3289,
+        "prohibitedConflicts": 0,
+        "crossingRecords": 4700,
+        "clauses": [
+          "AIRPORT"
+        ]
+      },
+      "reasonHistogram": {
+        "CLEAR": 6008,
+        "WEATHER_BLOCKED": 1621,
+        "BEYOND_PLANNING_HORIZON": 87,
+        "WEATHER_DETOUR": 27,
+        "SEPARATION_RESOURCE_OR_TIME_LIMIT": 17
+      },
+      "flightsWithCrossings": 3289,
+      "maxZonesOnOneFlight": 4,
+      "exampleCrossing": {
+        "flightId": "CAR-1-01-1-05-0-0",
+        "route": "沈阳 ↔ 本溪",
+        "zones": 2,
+        "records": [
+          {
+            "zoneId": "FZ-AP-ZYTX-P",
+            "name": "沈阳桃仙国际机场净空保护区域",
+            "clause": "AIRPORT",
+            "sector": "CIVIL_AVIATION",
+            "enforcement": "APPROVAL_REQUIRED",
+            "entryMinute": 2.78,
+            "exitMinute": 23.83,
+            "maxAglM": 500.0,
+            "citation": "《运输机场净空保护管理办法》《民用机场管理条例》第四十九条"
+          },
+          {
+            "zoneId": "FZ-AP-ZYTX-I",
+            "name": "沈阳桃仙国际机场净空巡视检查区域",
+            "clause": "AIRPORT",
+            "sector": "CIVIL_AVIATION",
+            "enforcement": "APPROVAL_REQUIRED",
+            "entryMinute": 7.78,
+            "exitMinute": 7.88,
+            "maxAglM": 500.0,
+            "citation": "各地《机场净空保护管理规定》净空保护相关用语说明第 2 条"
+          }
+        ]
+      }
+    },
+    "strictProhibited": {
+      "policy": "PROHIBITED",
+      "warmSeconds": 19.09,
+      "flights": 7760,
+      "accepted": 4083,
+      "closed": 3677,
+      "stats": {
+        "policy": "PROHIBITED",
+        "zoneCount": 60,
+        "closedByStaticAirspace": 2187,
+        "flightsRequiringApproval": 1318,
+        "prohibitedConflicts": 0,
+        "crossingRecords": 1487,
+        "clauses": [
+          "AIRPORT"
+        ]
+      },
+      "reasonHistogram": {
+        "CLEAR": 4034,
+        "STATIC_AIRSPACE_BLOCKED": 2187,
+        "WEATHER_BLOCKED": 1439,
+        "WEATHER_DETOUR": 49,
+        "BEYOND_PLANNING_HORIZON": 44,
+        "SEPARATION_RESOURCE_OR_TIME_LIMIT": 7
+      },
+      "flightsWithCrossings": 1318,
+      "maxZonesOnOneFlight": 2,
+      "exampleCrossing": {
+        "flightId": "CAR-1-01-1-05-0-0",
+        "route": "沈阳 ↔ 本溪",
+        "zones": 1,
+        "records": [
+          {
+            "zoneId": "FZ-AP-ZYTX-P",
+            "name": "沈阳桃仙国际机场净空保护区域",
+            "clause": "AIRPORT",
+            "sector": "CIVIL_AVIATION",
+            "enforcement": "APPROVAL_REQUIRED",
+            "entryMinute": 2.78,
+            "exitMinute": 29.97,
+            "maxAglM": 500.0,
+            "citation": "《运输机场净空保护管理办法》《民用机场管理条例》第四十九条"
+          }
+        ]
+      }
+    }
+  }
+}

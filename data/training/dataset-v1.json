@@ -1,0 +1,47 @@
+{
+  "version": "v1",
+  "createdAt": "2026-10-17",
+  "source": "historical-forecast-api.open-meteo.com",
+  "cities": {
+    "SHE": "沈阳",
+    "CGQ": "长春",
+    "HRB": "哈尔滨"
+  },
+  "months": {
+    "2025-11": "winter",
+    "2025-12": "winter",
+    "2026-01": "winter",
+    "2026-02": "winter",
+    "2026-03": "winter",
+    "2026-06": "warm",
+    "2026-07": "warm",
+    "2026-09": "warm"
+  },
+  "rowsAvailable": 17424,
+  "samples": 1133,
+  "perScenario": 200,
+  "scenarioCounts": {
+    "calm": 200,
+    "windy": 200,
+    "gusty": 200,
+    "rain": 200,
+    "lowvis": 133,
+    "snow": 200
+  },
+  "seasonShares": {
+    "winter": 0.5852,
+    "warm": 0.4148
+  },
+  "missing": {
+    "temperatureC": 0,
+    "rhPct": 0,
+    "precipMmh": 0,
+    "snowCmh": 0,
+    "cloudPct": 0,
+    "pressureHpa": 0,
+    "windMps": 0,
+    "gustMps": 0,
+    "visibilityM": 0
+  },
+  "sha256": "735b199752d82f9c99e6619f0d55e77ca3b36c4879c3152a1293806562e86d08"
+}

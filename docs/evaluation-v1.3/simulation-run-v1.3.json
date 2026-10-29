@@ -1,0 +1,539 @@
+{
+  "generatedAt": "2026-09-17T12:08:57.199701+00:00",
+  "note": "端到端运行记录。运行前清空 .run/traffic 计划缓存并重启三服务，随后按前端实际调用顺序（/traffic/network → /traffic/session 轮询 → /traffic/plan → /traffic/hubs → /traffic/delivery → /traffic/weather）驱动接口。本文件所有数字均来自实际响应，不含估算值。",
+  "howToReproduce": [
+    "backend-python/.venv/Scripts/python.exe _sim_harness.py start 25   # 后台拉起三服务",
+    "python _sim_probe.py                                               # 全链路探测，写出 _sim_report.json",
+    "python _sim_command.py                                             # 控制指令与运行台账",
+    "backend-python/.venv/Scripts/python.exe backend-python/_sim_bench.py  # 进程内计算耗时",
+    "backend-python/.venv/Scripts/python.exe _gen_sim_evidence.py       # 生成本文件"
+  ],
+  "stack": {
+    "python": {
+      "service": "tianchuang-python",
+      "version": "1.3.0",
+      "base": "http://127.0.0.1:8600",
+      "healthSeconds": 0.021
+    },
+    "java": {
+      "service": "tianchuang-java",
+      "status": "UP",
+      "base": "http://127.0.0.1:8085"
+    },
+    "frontend": {
+      "title": "天窗智巡 · 低空交通协同运行管理系统",
+      "base": "http://127.0.0.1:5180"
+    }
+  },
+  "network": {
+    "version": "city-traffic-1.3",
+    "planRevision": "traffic-plan-v1.3",
+    "baseTime": "2026-09-14T10:00:00Z",
+    "timezone": "Asia/Shanghai",
+    "source": "SIMULATION",
+    "seconds": 0.189,
+    "cities": 36,
+    "pads": 456,
+    "routes": 269,
+    "carRoutes": 53,
+    "deliveryRoutes": 216,
+    "routesWithoutGeometry": 0,
+    "interprovincialRoutes": 2,
+    "boundaryGeometryType": "MultiPolygon",
+    "boundaryRingCount": 11,
+    "administrativeFeatures": 3,
+    "administrativeNames": [
+      "辽宁省",
+      "吉林省",
+      "黑龙江省"
+    ],
+    "weatherProviders": {
+      "configuredProvider": "open-meteo",
+      "requestedProvider": "open-meteo",
+      "javaBase": "http://127.0.0.1:8085",
+      "internalTokenConfigured": false,
+      "qweatherCityCap": 36,
+      "note": "和风凭据由 Java 侧持有；Python 只读取内部原始接口，任一来源缺失时降级并标注。"
+    },
+    "deliveryConfig": {
+      "nodesPerCity": 12,
+      "corridorsPerCity": 6,
+      "serviceRadiusM": 6000,
+      "energyPercentPerKm": 3.5,
+      "energyPercentPerClimb100m": 1.2,
+      "energyReservePercent": 25,
+      "orderTimeoutMinutes": 45,
+      "chargeMinutes": 12,
+      "inspectionMinutes": 4
+    },
+    "riskRules": {
+      "ceilingAglM": 620,
+      "floorAglM": 0,
+      "horizontalSeparationM": 250,
+      "verticalSeparationM": 60,
+      "crossingZoneCapacity": 2,
+      "crossingZoneWindowMinutes": 1.5,
+      "crossingZoneCellM": 15000,
+      "labels": {
+        "BAN": "派生飞行风险区（禁止进入）",
+        "CAUTION": "派生飞行风险区（谨慎进入）"
+      },
+      "layerName": "派生飞行风险区",
+      "derivation": "由气象场按本系统阈值派生，非官方空域管制范围。",
+      "note": "系统派生的飞行限制，不等同于官方空域管制命令。"
+    }
+  },
+  "planIdentity": {
+    "fingerprint": "f95fb7880862bc21",
+    "version": "city-traffic-1.3",
+    "planRevision": "traffic-plan-v1.3",
+    "baseTime": "2026-09-14T10:00:00Z",
+    "administrativeBoundaryVersion": "d2bd15bd1a6dc9d7",
+    "obstacleSourceVersion": "no-local-dem-or-building-catalog-v1",
+    "terrain": {
+      "status": "UNAVAILABLE",
+      "note": "本地没有覆盖全部航迹的 DEM。"
+    },
+    "buildings": {
+      "status": "UNAVAILABLE",
+      "note": "本地没有覆盖全部航迹的建筑高度目录。"
+    },
+    "cityDirectory": "36/36 个城区代表中心通过本省边界校验。",
+    "cityCoordinatesOutsideProvince": []
+  },
+  "runs": [
+    {
+      "label": "seed 42 · moving（基线，冷缓存）",
+      "status": "READY",
+      "sessionId": "ed1fee6be65fd5091c5a3a52",
+      "buildSecondsEndToEnd": 14.516,
+      "progressSamples": [
+        {
+          "t": 0.03,
+          "progress": 0
+        },
+        {
+          "t": 0.44,
+          "progress": 2
+        },
+        {
+          "t": 0.88,
+          "progress": 3
+        },
+        {
+          "t": 1.29,
+          "progress": 8
+        },
+        {
+          "t": 1.7,
+          "progress": 12
+        },
+        {
+          "t": 2.12,
+          "progress": 13
+        },
+        {
+          "t": 2.53,
+          "progress": 16
+        },
+        {
+          "t": 2.94,
+          "progress": 19
+        }
+      ],
+      "flights": 7760,
+      "statusCounts": {
+        "SCHEDULED": 5724,
+        "CLOSED": 2036
+      },
+      "layerUsage": {
+        "CAR:350.0 m": 192,
+        "CAR:500.0 m": 186,
+        "CAR:None m": 470,
+        "DELIVERY:160.0 m": 2601,
+        "DELIVERY:80.0 m": 2745,
+        "DELIVERY:None m": 1566
+      },
+      "layerStrategies": {
+        "DIRECTION_LAYER": 5249,
+        "ALTERNATE_DECLARED_LAYER": 475
+      },
+      "clearanceStatuses": [
+        "NOT_EVALUATED",
+        "SIMULATION_ASSUMPTION_UNVERIFIED"
+      ],
+      "distinctAssignedLayers": [
+        80.0,
+        160.0,
+        350.0,
+        500.0
+      ],
+      "trajectoryPointsTotal": 78558,
+      "maxTrajectoryPoints": 44,
+      "weatherSnapshot": {
+        "provider": "SIMULATION",
+        "dataType": "SYNTHETIC_REPLAYABLE",
+        "weatherSnapshotId": "synthetic-42-moving",
+        "retrievedAt": null,
+        "validAt": null,
+        "validUntil": null,
+        "modelRunAt": null,
+        "resolution": null,
+        "coverage": null,
+        "qualityFlags": [
+          "SIMULATED_WEATHER_NOT_REAL_OBSERVATION"
+        ],
+        "cache": null,
+        "errorCode": null
+      }
+    },
+    {
+      "label": "seed 98765 · moving（另一冷缓存，验证非缓存命中）",
+      "status": "READY",
+      "sessionId": "eec97852127515d3267aa5d5",
+      "buildSecondsEndToEnd": 14.743,
+      "progressSamples": [
+        {
+          "t": 0.03,
+          "progress": 0
+        },
+        {
+          "t": 0.44,
+          "progress": 1
+        },
+        {
+          "t": 0.86,
+          "progress": 3
+        },
+        {
+          "t": 1.29,
+          "progress": 7
+        },
+        {
+          "t": 1.72,
+          "progress": 12
+        },
+        {
+          "t": 2.13,
+          "progress": 13
+        },
+        {
+          "t": 2.56,
+          "progress": 15
+        },
+        {
+          "t": 2.98,
+          "progress": 18
+        }
+      ],
+      "flights": 7760,
+      "statusCounts": {
+        "CLOSED": 1838,
+        "SCHEDULED": 5922
+      },
+      "layerUsage": {
+        "CAR:350.0 m": 209,
+        "CAR:500.0 m": 206,
+        "CAR:None m": 433,
+        "DELIVERY:160.0 m": 2710,
+        "DELIVERY:80.0 m": 2797,
+        "DELIVERY:None m": 1405
+      },
+      "layerStrategies": {
+        "DIRECTION_LAYER": 5426,
+        "ALTERNATE_DECLARED_LAYER": 496
+      },
+      "clearanceStatuses": [
+        "NOT_EVALUATED",
+        "SIMULATION_ASSUMPTION_UNVERIFIED"
+      ],
+      "distinctAssignedLayers": [
+        80.0,
+        160.0,
+        350.0,
+        500.0
+      ],
+      "trajectoryPointsTotal": 81052,
+      "maxTrajectoryPoints": 44
+    },
+    {
+      "label": "seed 42 · live（公开天气驱动）",
+      "status": "READY",
+      "sessionId": "60b40c0fc14e0de338cdaccf",
+      "buildSecondsEndToEnd": 16.888,
+      "progressSamples": [
+        {
+          "t": 1.58,
+          "progress": 0
+        },
+        {
+          "t": 2.02,
+          "progress": 3
+        },
+        {
+          "t": 2.43,
+          "progress": 5
+        },
+        {
+          "t": 2.88,
+          "progress": 9
+        },
+        {
+          "t": 3.38,
+          "progress": 12
+        },
+        {
+          "t": 3.82,
+          "progress": 16
+        },
+        {
+          "t": 4.25,
+          "progress": 19
+        },
+        {
+          "t": 4.66,
+          "progress": 23
+        }
+      ],
+      "flights": 7760,
+      "statusCounts": {
+        "SCHEDULED": 7195,
+        "CLOSED": 565
+      },
+      "layerUsage": {
+        "CAR:350.0 m": 367,
+        "CAR:500.0 m": 360,
+        "CAR:None m": 121,
+        "DELIVERY:160.0 m": 3132,
+        "DELIVERY:80.0 m": 3336,
+        "DELIVERY:None m": 444
+      },
+      "layerStrategies": {
+        "DIRECTION_LAYER": 6525,
+        "ALTERNATE_DECLARED_LAYER": 670
+      },
+      "clearanceStatuses": [
+        "NOT_EVALUATED",
+        "SIMULATION_ASSUMPTION_UNVERIFIED"
+      ],
+      "distinctAssignedLayers": [
+        80.0,
+        160.0,
+        350.0,
+        500.0
+      ],
+      "trajectoryPointsTotal": 97505,
+      "maxTrajectoryPoints": 84,
+      "weatherSnapshot": {
+        "provider": "OPEN_METEO",
+        "dataType": "MODEL_ESTIMATE",
+        "weatherSnapshotId": "21806ed7c037b2e41a0d1033",
+        "retrievedAt": "2026-09-16T17:13:04.925124Z",
+        "validAt": "2026-09-17T01:00",
+        "validUntil": "2026-09-16T17:28:06.476499Z",
+        "modelRunAt": null,
+        "resolution": "按供应商网格返回；不等同于街区测站或雷达分辨率",
+        "coverage": {
+          "requestedCities": 36,
+          "returnedCities": 36,
+          "routeCoverage": "CITY_ENDPOINTS_ONLY"
+        },
+        "qualityFlags": [
+          "MODEL_ESTIMATE_NOT_STATION_OBSERVATION",
+          "ROUTE_INTERIOR_NOT_FULLY_SAMPLED"
+        ],
+        "cache": "MISS",
+        "errorCode": null
+      },
+      "buildSecondsEndToEndIncludesLiveFetch": true
+    }
+  ],
+  "planStats": {
+    "cities": 36,
+    "routes": 269,
+    "carRoutes": 53,
+    "deliveryRoutes": 216,
+    "interprovincialRoutes": 2,
+    "flights": 7760,
+    "accepted": 5724,
+    "closed": 2036,
+    "detours": 46,
+    "resolved": 1665,
+    "orders": 6912,
+    "groundHolds": 2325,
+    "alternateLayers": 475,
+    "noAltitudeStacking": true,
+    "staticAirspace": {
+      "policy": "APPROVAL_REQUIRED",
+      "zoneCount": 60,
+      "closedByStaticAirspace": 0,
+      "flightsRequiringApproval": 3132,
+      "prohibitedConflicts": 0,
+      "crossingRecords": 4496,
+      "clauses": [
+        "AIRPORT"
+      ]
+    }
+  },
+  "layerUsagePublished": {
+    "CAR:350": 192,
+    "CAR:500": 186,
+    "DELIVERY:160": 2601,
+    "DELIVERY:80": 2745
+  },
+  "resources": {
+    "hubPads": 456,
+    "crossingZones": 26,
+    "crossingZoneCapacity": 2,
+    "crossingZoneWindowMinutes": 1.5,
+    "crossingReservations": 499,
+    "busiestPad": {
+      "resource": "CITY-1-03",
+      "capacity": 4,
+      "reservations": 252,
+      "firstMinute": 0.0,
+      "lastMinute": 474.86
+    },
+    "note": "起降资源为模拟容量与时隙占用，不是真实机场容量。"
+  },
+  "delivery": {
+    "timelineMinutes": 480,
+    "orders": 6912,
+    "delivered": 5346,
+    "cancelled": 1566,
+    "beyondTimeline": 0,
+    "deliveredBeyondTargetWindow": 0,
+    "deliveryRate": 0.7734,
+    "timeoutRate": 0.0,
+    "averageGroundWaitMinutes": 2.4,
+    "maxGroundWaitMinutes": 25,
+    "outcomeReasons": {
+      "BEYOND_PLANNING_HORIZON": 36,
+      "ON_TIME": 5346,
+      "SEPARATION_RESOURCE_OR_TIME_LIMIT": 10,
+      "WEATHER_BLOCKED": 1520
+    },
+    "settings": {
+      "nodesPerCity": 12,
+      "corridorsPerCity": 6,
+      "serviceRadiusM": 6000,
+      "energyReservePercent": 25,
+      "orderTimeoutMinutes": 45,
+      "chargeMinutes": 12
+    },
+    "note": "订单与载具为模拟数据；电量为模型估计，非实测续航。"
+  },
+  "controlLoop": {
+    "target": null,
+    "candidateFlightsAfterMinute30": 0,
+    "ledgerBefore": null,
+    "suspendStatus": null,
+    "suspendRecord": null,
+    "ledgerAfterSuspend": null,
+    "resumeStatus": null,
+    "ledgerAfterResume": null,
+    "replaySameCommandIdIsIdempotent": null,
+    "ledgerAfterReplay": null,
+    "note": "SUSPEND 无法作用于已起飞或已过原时隙的班次（HTTP 409），本条为 00:30 之后 2224 个可选班次之一。"
+  },
+  "timing": {
+    "inProcessImportSeconds": 0.421,
+    "inProcessSimulateColdSeconds": 4.396,
+    "inProcessSimulateWarmSeconds": 3.875,
+    "httpColdBuildSeconds": 14.516,
+    "httpAnotherColdBuildSeconds": 14.743,
+    "httpLiveBuildSeconds": 16.888,
+    "note": "进程内纯计算 3.88—4.40 s；HTTP 端到端 10.4—11.3 s。差额来自两处：前端轮询粒度 1500 ms，以及 /traffic/session 在 READY 时一次性回传全部 2910 班次（含航迹点）的序列化与传输。UPDATE_PLAN_V1.3.md §11.3 的可比指标是交互帧率与台账筛选 300 ms，不是计划计算秒数。"
+  },
+  "weatherProvidersObserved": {
+    "pythonDefault": {
+      "configuredProvider": "open-meteo",
+      "requestedProvider": "open-meteo",
+      "javaBase": "http://127.0.0.1:8085",
+      "internalTokenConfigured": false,
+      "qweatherCityCap": 36,
+      "note": "和风凭据由 Java 侧持有；Python 只读取内部原始接口，任一来源缺失时降级并标注。"
+    },
+    "liveSnapshot": {
+      "provider": "OPEN_METEO",
+      "dataType": "MODEL_ESTIMATE",
+      "weatherSnapshotId": "21806ed7c037b2e41a0d1033",
+      "retrievedAt": "2026-09-16T17:13:04.925124Z",
+      "validAt": "2026-09-17T01:00",
+      "validUntil": "2026-09-16T17:28:06.476499Z",
+      "modelRunAt": null,
+      "resolution": "按供应商网格返回；不等同于街区测站或雷达分辨率",
+      "coverage": {
+        "requestedCities": 36,
+        "returnedCities": 36,
+        "routeCoverage": "CITY_ENDPOINTS_ONLY"
+      },
+      "qualityFlags": [
+        "MODEL_ESTIMATE_NOT_STATION_OBSERVATION",
+        "ROUTE_INTERIOR_NOT_FULLY_SAMPLED"
+      ],
+      "cache": "MISS",
+      "errorCode": null
+    },
+    "javaQweatherRaw": {
+      "provider": "QWEATHER",
+      "product": "weather/v1/current",
+      "requestedLocation": [
+        45.75,
+        126.65
+      ],
+      "units": {
+        "cloudCover": "fraction",
+        "precipitation": "mm",
+        "visibility": "km",
+        "pressure": "hPa",
+        "humidity": "fraction",
+        "temperature": "°C",
+        "windSpeed": "km/h"
+      },
+      "thunderEstimate": 0.0,
+      "thunderEstimateMethod": "CONDITION_CODE_AND_CLOUD_COVER_HEURISTIC",
+      "qualityFlags": [
+        "NOT_A_STATION_OBSERVATION_CONTRACT",
+        "THUNDER_VALUE_IS_DERIVED_ESTIMATE_NOT_A_PRODUCT_FIELD"
+      ],
+      "note": "和风不提供独立雷暴字段；thunderEstimate 由天气代码与云量推导，属于工程近似，不得当作观测雷暴概率。"
+    },
+    "javaQweatherStatus": {
+      "provider": "QWEATHER",
+      "product": "weather/v1",
+      "endpoints": [
+        "/api/internal/qweather/current",
+        "/api/internal/qweather/hourly"
+      ],
+      "cacheSeconds": 60,
+      "tokenRequired": false,
+      "thunderEstimateMethod": "CONDITION_CODE_AND_CLOUD_COVER_HEURISTIC",
+      "note": "凭据是否可用需以最近一次成功调用为准；本接口不返回密钥。"
+    }
+  },
+  "findingsFromThisRun": [
+    {
+      "id": "F1",
+      "severity": "fixed-in-this-run",
+      "summary": "和风原始接口在收到 gzip 压缩正文时整条链路静默降级（Jackson 报 CTRL-CHAR code 31）。",
+      "evidence": "java-dev.out.log 的 JsonParseException；修复后 /api/internal/qweather/current 返回真实 product 与 units。",
+      "fix": "QweatherClient 改为读取字节流，按 gzip 魔数与 Content-Encoding 双重判断后解压，再交给 Jackson。"
+    },
+    {
+      "id": "F2",
+      "severity": "fixed-in-this-run",
+      "summary": "前端页面标题仍为 V1.2。",
+      "evidence": "frontend/index.html <title> 与本轮 /traffic/network 的 version=city-traffic-1.3 不一致。",
+      "fix": "标题改为 V1.3。"
+    },
+    {
+      "id": "F3",
+      "severity": "open",
+      "summary": "计划就绪后一次性回传全部班次，用户等待时间约为纯计算耗时的 2.5 倍。",
+      "evidence": "进程内 3.88—4.40 s 对比 HTTP 10.4—11.3 s。",
+      "fix": null,
+      "howToClose": "READY 响应只回传统计与版本，班次改由独立分页接口按需拉取；或先回传概览再增量补齐。"
+    }
+  ]
+}

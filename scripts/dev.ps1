@@ -41,6 +41,21 @@ $nodeExe = (Get-Command node.exe -ErrorAction Stop).Source
 $javaExe = Join-Path $jdk 'bin/java.exe'
 $classes = Join-Path $projectRoot 'backend-java/target/classes'
 $classpath = $classes + ';' + (Get-Content -LiteralPath $classpathFile -Raw).Trim()
+# 静态包新鲜度。Spring Boot 会把 `target/classes/static` 当 `classpath:/static` 提供，
+# 于是 8085 端口**可能悄悄回答一份几天前的前端** —— 而浏览器真正该用的是 vite 的 5180。
+# 留一份过期包在那里，等于给"改了却看不到"留一个永远查不出来的出口：
+# 2026-09-12 的包一直躺到 2026-09-24，期间任何前端修复都到不了 8085。
+# 规则：有当前构建产物就同步过去；没有就删掉，让 8085 老老实实 404 而不是说谎。
+$staticRoot = Join-Path $projectRoot 'backend-java/target/classes/static'
+$distRoot = Join-Path $projectRoot 'frontend/dist'
+if (Test-Path -LiteralPath (Join-Path $distRoot 'index.html')) {
+    if (Test-Path -LiteralPath $staticRoot) { Remove-Item -LiteralPath $staticRoot -Recurse -Force }
+    Copy-Item -LiteralPath $distRoot -Destination $staticRoot -Recurse -Force
+    Write-Host '已同步前端产物：frontend/dist -> target/classes/static（8085 与 5180 同一版本）。'
+} elseif (Test-Path -LiteralPath $staticRoot) {
+    Remove-Item -LiteralPath $staticRoot -Recurse -Force
+    Write-Host '未找到 frontend/dist，已移除过期静态包：8085 不再提供前端，请访问 http://127.0.0.1:5180/。'
+}
 foreach ($port in @(8085,8600,5180)) {
     $probe = New-Object System.Net.Sockets.TcpClient
     try { $probe.Connect('127.0.0.1',$port); throw "端口 $port 已占用，请先停止对应服务。" }

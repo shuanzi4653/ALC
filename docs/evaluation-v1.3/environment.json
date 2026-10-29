@@ -1,0 +1,13 @@
+{
+  "generatedAt": "2026-09-17T12:04:33.068840Z",
+  "python": "3.13.14",
+  "trafficVersion": "city-traffic-1.3",
+  "planRevision": "traffic-plan-v1.3",
+  "fingerprint": "67945b407c8cbdcf",
+  "baseTime": "2026-09-14T10:00:00Z",
+  "displayTimezone": "Asia/Shanghai",
+  "timelineMinutes": 480,
+  "boundaryVersion": "d2bd15bd1a6dc9d7",
+  "catalogueSchemaVersion": "1.3",
+  "catalogueCrs": "EPSG:4326"
+}

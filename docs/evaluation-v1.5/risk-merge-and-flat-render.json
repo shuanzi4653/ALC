@@ -1,0 +1,372 @@
+{
+  "generatedAt": "2026-09-17T12:02:13Z",
+  "seed": 42,
+  "scenario": "moving",
+  "fixedAirspace": {
+    "ready": true,
+    "catalogVersion": "northeast-fixed-airspace-v1",
+    "dataRetrievedAt": "2026-09-16",
+    "sites": 69,
+    "withGeometry": 60,
+    "prohibited": 12,
+    "approvalRequired": 48,
+    "registered": 9,
+    "policy": "APPROVAL_REQUIRED"
+  },
+  "riskMerge": {
+    "minutesSampled": [
+      0,
+      30,
+      60,
+      120,
+      240
+    ],
+    "rows": [
+      {
+        "minute": 0,
+        "cells": 7,
+        "drawableCells": 7,
+        "regions": 25,
+        "mergedGroups": [],
+        "polygonsBefore": 21,
+        "polygonsAfter": 75
+      },
+      {
+        "minute": 30,
+        "cells": 3,
+        "drawableCells": 3,
+        "regions": 21,
+        "mergedGroups": [],
+        "polygonsBefore": 9,
+        "polygonsAfter": 63
+      },
+      {
+        "minute": 60,
+        "cells": 4,
+        "drawableCells": 4,
+        "regions": 22,
+        "mergedGroups": [],
+        "polygonsBefore": 12,
+        "polygonsAfter": 66
+      },
+      {
+        "minute": 120,
+        "cells": 3,
+        "drawableCells": 3,
+        "regions": 20,
+        "mergedGroups": [
+          {
+            "id": "WX-2-03+1",
+            "members": 2,
+            "sources": [
+              "WX-2-03",
+              "WX-NORTHEAST-BAND::CLUSTER"
+            ]
+          }
+        ],
+        "polygonsBefore": 9,
+        "polygonsAfter": 60
+      },
+      {
+        "minute": 240,
+        "cells": 1,
+        "drawableCells": 1,
+        "regions": 19,
+        "mergedGroups": [],
+        "polygonsBefore": 3,
+        "polygonsAfter": 57
+      }
+    ],
+    "cellsPerMinute": 7,
+    "regionsRange": [
+      19,
+      25
+    ]
+  },
+  "rainBand": {
+    "band": {
+      "centroidLonLat": [
+        126.0807,
+        44.7029
+      ],
+      "boundsM": [
+        -411066.5,
+        -472060.5,
+        392042.4,
+        461894.2
+      ],
+      "insideBoundary": true,
+      "clusters": [
+        {
+          "minute": 0,
+          "parts": 20,
+          "minGapM": 8655.9,
+          "gapsUnder1km": 0,
+          "clippedParts": 19,
+          "clippedAreaKm2": 20648.3,
+          "worstWestEastShare": 0.0704
+        },
+        {
+          "minute": 120,
+          "parts": 20,
+          "minGapM": 8655.9,
+          "gapsUnder1km": 0,
+          "clippedParts": 19,
+          "clippedAreaKm2": 19788.8,
+          "worstWestEastShare": 0.0912
+        },
+        {
+          "minute": 240,
+          "parts": 20,
+          "minGapM": 8655.9,
+          "gapsUnder1km": 0,
+          "clippedParts": 19,
+          "clippedAreaKm2": 19723.2,
+          "worstWestEastShare": 0.0911
+        },
+        {
+          "minute": 479,
+          "parts": 20,
+          "minGapM": 8655.9,
+          "gapsUnder1km": 0,
+          "clippedParts": 17,
+          "clippedAreaKm2": 19362.2,
+          "worstWestEastShare": 0.0956
+        }
+      ],
+      "clusterRadiiM": 30000,
+      "centrelineLonLat": [
+        [
+          121.4,
+          41.0
+        ],
+        [
+          123.6,
+          42.6
+        ],
+        [
+          126.2,
+          44.4
+        ],
+        [
+          128.9,
+          46.6
+        ],
+        [
+          131.4,
+          49.2
+        ]
+      ],
+      "projectedFirstVertexM": [
+        -387141.4,
+        -433632.1
+      ]
+    },
+    "withBandEnvelope": {
+      "flights": 7760,
+      "accepted": 6035,
+      "closed": 1725,
+      "detours": 27,
+      "resolved": 1848,
+      "reasons": {
+        "CLEAR": 6008,
+        "WEATHER_BLOCKED": 1621,
+        "BEYOND_PLANNING_HORIZON": 87,
+        "WEATHER_DETOUR": 27,
+        "SEPARATION_RESOURCE_OR_TIME_LIMIT": 17
+      },
+      "flightsRequiringApproval": 3289,
+      "prohibitedConflicts": 0
+    },
+    "withoutBandEnvelope": {
+      "flights": 7760,
+      "accepted": 7463,
+      "closed": 297,
+      "detours": 47,
+      "resolved": 2579,
+      "reasons": {
+        "CLEAR": 7416,
+        "WEATHER_BLOCKED": 177,
+        "BEYOND_PLANNING_HORIZON": 90,
+        "WEATHER_DETOUR": 47,
+        "SEPARATION_RESOURCE_OR_TIME_LIMIT": 30
+      },
+      "flightsRequiringApproval": 3769,
+      "prohibitedConflicts": 0
+    },
+    "delta": {
+      "weatherBlocked": 1444,
+      "closed": 1428,
+      "accepted": -1428,
+      "detours": -20
+    }
+  },
+  "crossings": {
+    "policy": "APPROVAL_REQUIRED",
+    "seconds": 15.27,
+    "flights": 7760,
+    "enteringAnyZone": {
+      "CAR": 401,
+      "DELIVERY": 2888
+    },
+    "enteringAnyZoneTotal": 3289,
+    "enteringAnyZoneShare": 0.4238,
+    "enteringProhibitedTotal": 0,
+    "zonesPerFlight": {
+      "0": 4471,
+      "1": 2057,
+      "2": 1091,
+      "3": 103,
+      "4": 38
+    },
+    "alertRuleBasis": {
+      "tintOn": "PROHIBITED only",
+      "reported": "APPROVAL_REQUIRED, counted and shown, never tinted"
+    },
+    "planStats": {
+      "cities": 36,
+      "routes": 269,
+      "carRoutes": 53,
+      "deliveryRoutes": 216,
+      "interprovincialRoutes": 2,
+      "flights": 7760,
+      "accepted": 6035,
+      "closed": 1725,
+      "detours": 27,
+      "resolved": 1848,
+      "orders": 6912,
+      "groundHolds": 2527,
+      "alternateLayers": 495,
+      "noAltitudeStacking": true
+    }
+  },
+  "alignment": {
+    "pads": 456,
+    "minutesCovered": 480,
+    "facilities": [
+      {
+        "minute": 0,
+        "regions": 25,
+        "fieldHits": 21,
+        "banHits": 0,
+        "fieldHitsHub": 2,
+        "fieldHitsNode": 19
+      },
+      {
+        "minute": 30,
+        "regions": 21,
+        "fieldHits": 8,
+        "banHits": 0,
+        "fieldHitsHub": 1,
+        "fieldHitsNode": 7
+      },
+      {
+        "minute": 60,
+        "regions": 22,
+        "fieldHits": 15,
+        "banHits": 1,
+        "fieldHitsHub": 2,
+        "fieldHitsNode": 13
+      },
+      {
+        "minute": 120,
+        "regions": 20,
+        "fieldHits": 4,
+        "banHits": 0,
+        "fieldHitsHub": 0,
+        "fieldHitsNode": 4
+      },
+      {
+        "minute": 240,
+        "regions": 19,
+        "fieldHits": 4,
+        "banHits": 0,
+        "fieldHitsHub": 0,
+        "fieldHitsNode": 4
+      }
+    ],
+    "trajectories": {
+      "accepted": 6035,
+      "fieldHits": 0,
+      "banHits": 0,
+      "banSamples": []
+    }
+  },
+  "elapsedSeconds": 143.78,
+  "uiLayout": {
+    "whatThisMeasures": "Counts the layout constructs that have actually produced overlapping text or content in this frontend. Overlap does not fail vite build or node --test because neither runs CSS layout, so this scan is the check rather than the build.",
+    "patternsTargeted": [
+      "bare fr grid track (minimum is auto, not 0, so a wide non-wrapping child expands the track)",
+      "margin-left:auto in a row that cannot wrap (nothing left to absorb)",
+      "repeat(auto-fit|auto-fill, ...) whose track count changes with viewport width"
+    ],
+    "stillPresent": {
+      "bareFrTrack": [],
+      "marginLeftAuto": [
+        {
+          "file": "components/PanelSfi.vue",
+          "selector": ".sfi-checks",
+          "wraps": true,
+          "display": "flex"
+        },
+        {
+          "file": "components/PanelTracks.vue",
+          "selector": ".tr-ts",
+          "wraps": false,
+          "display": "block"
+        },
+        {
+          "file": "components/TrafficWorkbench.vue",
+          "selector": ".operations-nav select",
+          "wraps": false,
+          "display": "block"
+        },
+        {
+          "file": "components/TrafficWorkbench.vue",
+          "selector": ".traffic-session",
+          "wraps": false,
+          "display": "block"
+        }
+      ],
+      "autoFitOrFill": [
+        {
+          "file": "components/OperationsConsole.vue",
+          "selector": ".alert-grid",
+          "tracks": "repeat(auto-fill,minmax(280px,1fr))"
+        },
+        {
+          "file": "components/OperationsConsole.vue",
+          "selector": ".weather-metrics",
+          "tracks": "repeat(auto-fit,minmax(210px,1fr))"
+        },
+        {
+          "file": "components/OperationsConsole.vue",
+          "selector": ".weather-cells",
+          "tracks": "repeat(auto-fit,minmax(220px,1fr))"
+        },
+        {
+          "file": "components/OperationsConsole.vue",
+          "selector": ".answer-cards",
+          "tracks": "repeat(auto-fit,minmax(300px,1fr))"
+        },
+        {
+          "file": "components/RegionalObservations.vue",
+          "selector": ".station-cards",
+          "tracks": "repeat(auto-fit,minmax(240px,1fr))"
+        },
+        {
+          "file": "components/traffic/DispatchBoard.vue",
+          "selector": ".db-grid",
+          "tracks": "repeat(auto-fill,minmax(430px,1fr))"
+        }
+      ]
+    },
+    "counts": {
+      "bareFrTrack": 0,
+      "marginLeftAuto": 4,
+      "marginLeftAutoWithoutWrap": 3,
+      "autoFitOrFill": 6
+    },
+    "reading": "bareFrTrack = 0 is the load-bearing result: that construct is never safe. marginLeftAutoWithoutWrap > 0 is only a defect when the row can actually get tight, so each remaining case carries its own `display` and `wraps` for inspection rather than being claimed clean. autoFitOrFill entries all use minmax(..., 1fr), which cannot overflow its container, so they are counted but not treated as defects."
+  }
+}

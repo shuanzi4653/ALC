@@ -1,0 +1,47 @@
+{
+  "specVersion": "v1",
+  "samples": 1133,
+  "specDistribution": {
+    "FIT": 148,
+    "CAUTION": 321,
+    "DANGER": 285,
+    "BAN": 379
+  },
+  "dsDistribution": {
+    "FIT": 27,
+    "CAUTION": 212,
+    "DANGER": 507,
+    "BAN": 387
+  },
+  "agreement": {
+    "n": 1133,
+    "raw": 0.6867,
+    "weightedKappa": 0.7946
+  },
+  "matrix": [
+    [
+      22,
+      104,
+      22,
+      0
+    ],
+    [
+      5,
+      106,
+      210,
+      0
+    ],
+    [
+      0,
+      2,
+      273,
+      10
+    ],
+    [
+      0,
+      0,
+      2,
+      377
+    ]
+  ]
+}

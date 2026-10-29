@@ -1,0 +1,99 @@
+{
+  "version": "v1",
+  "effectiveDate": "2026-10-17",
+  "description": "标注判据 v1：把一小时的气象要素判成四档（FIT/CAUTION/DANGER/BAN）。本文件只服务『造训练标签』，不参与运行放行；运行放行仍由 config/rules-v1.json 决定。两者允许不同，关系声明见 relationToRuntimeRules。",
+  "relationToRuntimeRules": {
+    "runtimeFile": "config/rules-v1.json",
+    "relationship": "DISTINCT_BY_DESIGN",
+    "note": "运行放行用累减扣分 + 一票封顶（SFI = 100 - Σ惩罚），它回答『这一轮能不能飞』；标注判据用逐要素分段 + 取最坏档（worst-band），它回答『这一小时该标成哪一档』。实测两者的分布差异极大：累减扣分在 2026-09 三城 2160 小时上判 BAN 65.0%、DANGER 0.14%（中档被两侧挤掉），而分段取最坏档得到的是同量级四档。这不是『谁更对』，而是两个问题本来就不该用同一个聚合方式。"
+  },
+  "aggregation": {
+    "method": "worst-band",
+    "note": "逐要素判出一条档位，取其中最坏的一档（BAN > DANGER > CAUTION > FIT）。不做加权求和、不做扣分累减：扣分累减会让『多个轻微不利』压过『一个严重不利』，正是运行规则中档被挤掉的成因。"
+  },
+  "provenance": {
+    "kind": "ENGINEERING",
+    "note": "本版每条阈值均为**工程经验值**：截至 2026-10-17，仓库内没有任何一条阈值记录着公开出处（config/rules-v1.json 只有 version 与语义说明）。因此本文件不冒充公开标准。",
+    "missing": [
+      "通航/低空运行的能见度与云底高最低条件（需引到具体条款）",
+      "轻小型飞行器（含 eVTOL）的允许平均风与阵风包线（需引到型号或运行规范）",
+      "降水强度与运行限制的对应关系（需引到运行规范或厂家手册）"
+    ],
+    "rule": "补出处时逐条填 source 字段；查不到就保留 ENGINEERING，并在报告里如实写『工程经验值』。不得为了让分布好看而调数。"
+  },
+  "levels": ["FIT", "CAUTION", "DANGER", "BAN"],
+  "factors": [
+    {
+      "key": "windSpeed",
+      "label": "10 米平均风速",
+      "unit": "m/s",
+      "direction": "high",
+      "bands": {"fit": 8.0, "caution": 10.0, "danger": 12.0},
+      "meaning": "超过 danger 即 BAN",
+      "source": "ENGINEERING"
+    },
+    {
+      "key": "windGust",
+      "label": "阵风",
+      "unit": "m/s",
+      "direction": "none",
+      "bands": {},
+      "meaning": "**不设绝对阵风阈值**，理由见 gustFieldNote。阵风只作为模型特征与『阵风因子』组合规则使用。",
+      "source": "ENGINEERING"
+    },
+    {
+      "key": "precipMmh",
+      "label": "降水强度",
+      "unit": "mm/h",
+      "direction": "high",
+      "bands": {"fit": 0.5, "caution": 3.0, "danger": 5.0},
+      "meaning": "超过 danger 即 BAN",
+      "source": "ENGINEERING"
+    },
+    {
+      "key": "visibilityM",
+      "label": "能见度",
+      "unit": "m",
+      "direction": "low",
+      "bands": {"fit": 5000.0, "caution": 2500.0, "danger": 1000.0},
+      "meaning": "低于 danger 即 BAN",
+      "source": "ENGINEERING"
+    },
+    {
+      "key": "tempC",
+      "label": "温度",
+      "unit": "℃",
+      "direction": "range",
+      "bands": {"warnLow": -10.0, "warnHigh": 40.0, "banLow": -20.0, "banHigh": 45.0},
+      "meaning": "超出 warn 区间为 CAUTION，超出 ban 区间为 BAN；温度本身不给 DANGER（不给未经验证的中间档）",
+      "source": "ENGINEERING"
+    }
+  ],
+  "combinationRules": [
+    {
+      "key": "gustFactor",
+      "label": "阵风因子（阵风/平均风）",
+      "when": "windSpeed >= 3.0 时，gustFactor = windGust / windSpeed",
+      "cautionAt": 2.6,
+      "dangerAt": 3.2,
+      "level": "CAUTION_OR_DANGER",
+      "note": "阵风因子反映湍流/对流强度，与绝对风速无关，因此不受 gustFieldNote 里那个口径问题的影响。"
+    },
+    {
+      "key": "icing",
+      "label": "结冰风险",
+      "when": "tempC < 2 且 rhPct >= 90",
+      "level": "CAUTION",
+      "note": "低温高湿只升到 CAUTION：结冰的严重程度取决于过冷水含量与暴露时间，本判据没有这两个量，不据此判 DANGER/BAN。"
+    }
+  ],
+  "gustFieldNote": {
+    "observed": "2026-10-17 实测 historical-forecast-api 的 `wind_gusts_10m`：沈阳/长春/哈尔滨 2026-09 共 2160 小时，p50 = 22.0 m/s、p90 = 38.2 m/s、最大 59.0 m/s；同批 `wind_speed_10m` p50 = 8.7 m/s。阵风/平均风比值 p50 = 2.49、p90 = 3.41。",
+    "problem": "陆地上常规阵风因子约 1.3–1.8。p50 就达到 2.49，意味着『一半的小时都有 80 km/h 级阵风』—— 这在东北 9 月不成立。该字段的口径（是否 3 秒阵风、是否同高度）无法从接口自证。",
+    "decision": "因此标签**不用绝对阵风阈值**：若照 18 m/s 判禁飞，64% 的小时会被判 BAN（实测），得到的不是『天气很糟』，而是『字段口径不明』。阵风改为两处使用：① 作为模型特征；② 以**阵风因子**（无量纲、与口径无关）参与升档。",
+    "followUp": "运行放行那套（config/rules-v1.json 的 gust 12/18）本轮**不改**：改它会改变线上放行行为、且现有测试基线以它为锚。校准运行阈值属独立一轮，需先把这个字段的口径问清楚。"
+  },
+  "missingDataPolicy": {
+    "note": "要素缺席时不判该要素、也不当 0。若四个必需要素（平均风、阵风、降水、能见度）中缺席两个以上，整条样本标 SKIP，不进入训练集（宁可不标，不猜）。"
+  }
+}

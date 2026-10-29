@@ -33,11 +33,11 @@ deepseek:
   model: deepseek-chat
 
 monitor:
-  mode: sim
-  scenario: clear
+  # 气象全部为真实来源，已无 sim（模拟生成器）模式。
+  mode: live
+  scenario: live          # live | clear | unknown
   initial-delay-ms: 6000
   fixed-delay-ms: 600000
-  allow-sim-fallback: false
 
 rules:
   version: v1

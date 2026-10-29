@@ -1,0 +1,303 @@
+{
+  "generatedAt": "2026-09-17T12:04:33.068840Z",
+  "cityDirectory": {
+    "file": "backend-python/data/traffic/city-centers.json",
+    "cities": 36,
+    "validated": 36,
+    "invalid": []
+  },
+  "aircraftProfiles": {
+    "file": "backend-python/data/traffic/aircraft-profiles.json",
+    "cruiseLayersAglM": {
+      "CAR": [
+        350,
+        500
+      ],
+      "DELIVERY": [
+        80,
+        160
+      ]
+    },
+    "ceilingsAglM": {
+      "CAR": 600,
+      "DELIVERY": 200
+    },
+    "noAltitudeStacking": "冲突以已声明高度层、时隙或地面等待解决，不叠加高度。",
+    "altitudeDatum": "AGL 模拟相对高度；DEM 与建筑净空数据当前未覆盖本地全部航迹。"
+  },
+  "deliveryConfig": {
+    "nodesPerCity": 12,
+    "corridorsPerCity": 6,
+    "serviceRadiusM": 6000,
+    "energyPercentPerKm": 3.5,
+    "energyPercentPerClimb100m": 1.2,
+    "energyReservePercent": 25,
+    "orderTimeoutMinutes": 45,
+    "chargeMinutes": 12,
+    "inspectionMinutes": 4
+  },
+  "riskRules": {
+    "ceilingAglM": 620,
+    "floorAglM": 0,
+    "horizontalSeparationM": 250,
+    "verticalSeparationM": 60,
+    "crossingZoneCapacity": 2,
+    "crossingZoneWindowMinutes": 1.5,
+    "crossingZoneCellM": 15000,
+    "labels": {
+      "BAN": "派生飞行风险区（禁止进入）",
+      "CAUTION": "派生飞行风险区（谨慎进入）"
+    },
+    "layerName": "派生飞行风险区",
+    "derivation": "由气象场按本系统阈值派生，非官方空域管制范围。",
+    "note": "系统派生的飞行限制，不等同于官方空域管制命令。"
+  },
+  "staticAirspace": {
+    "module": "traffic/zones.py + data/traffic/fixed-zones.json",
+    "status": {
+      "ready": true,
+      "catalogVersion": "northeast-fixed-airspace-v1",
+      "dataRetrievedAt": "2026-09-16",
+      "sites": 69,
+      "withGeometry": 60,
+      "prohibited": 12,
+      "approvalRequired": 48,
+      "registered": 9,
+      "clauses": 8,
+      "policy": "APPROVAL_REQUIRED",
+      "note": "未取得公开定量范围的类别只登记、不生成几何。"
+    },
+    "rules": {
+      "catalogVersion": "northeast-fixed-airspace-v1",
+      "dataRetrievedAt": "2026-09-16",
+      "airportFootprintPolicy": "APPROVAL_REQUIRED",
+      "legalFramework": {
+        "instrument": "《无人驾驶航空器飞行管理暂行条例》（国令第 761 号，2024-01-01 施行）",
+        "clause": "第十九条",
+        "publicationRule": "管制空域的具体范围由各级空中交通管理机构按照国家空中交通管理领导机构的规定确定，由设区的市级以上人民政府公布，民用航空管理部门和承担相应职责的单位发布航行情报。",
+        "entryRule": "未经空中交通管理机构批准，不得在管制空域内实施无人驾驶航空器飞行活动。",
+        "freeFlightRule": "管制空域范围以外的空域为微型、轻型、小型无人驾驶航空器的适飞空域。",
+        "reviewPlatform": "民用无人驾驶航空器综合管理平台 https://uom.caac.gov.cn"
+      },
+      "disclaimer": "本目录依据公开法规与公开数据登记固定管制空域，用于模拟运行中心的合规检查。它不是航行情报，不构成飞行许可，也不能替代空中交通管理机构公布的管制空域边界。凡未取得公开定量范围者一律不生成几何。",
+      "labels": {
+        "STATIC_PROHIBITED": "固定管制区（未获批准不得进入）",
+        "STATIC_APPROVAL_REQUIRED": "固定管制空域（须经批准）",
+        "STATIC_REGISTERED": "已登记待补范围"
+      },
+      "enforcementNote": "固定管制区与气象派生风险区是两套东西：前者来自法规与公开数据，不随时间变化；后者是本系统按气象阈值推导的飞行风险区，不是官方空域管制。"
+    },
+    "audit": {
+      "catalogVersion": "northeast-fixed-airspace-v1",
+      "sites": 69,
+      "withGeometry": 60,
+      "clauses": [
+        {
+          "key": "AIRPORT",
+          "clause": "第十九条第（一）项",
+          "title": "机场以及周边一定范围的区域",
+          "sector": "CIVIL_AVIATION",
+          "sectorLabel": "民航",
+          "geometryStatus": "PARTIALLY_PUBLISHED",
+          "geometryRule": "运输机场净空保护区域：以机场基准点为圆心、水平半径 55 公里的空间区域。见《运输机场净空保护管理办法》及各地《机场净空保护管理规定》净空保护相关用语说明第 1 条。 净空巡视检查区域：机场跑道中心线两侧各 10 公里、跑道端外 20 公里以内的区域（机场障碍物限制面区域加上适当的面外区域）。见各地《机场净空保护管理规定》净空保护相关用语说明第 2 条。",
+          "citation": "《运输机场净空保护管理办法》《民用机场管理条例》第四十九条；各地《机场净空保护管理规定》净空保护相关用语说明第 2 条",
+          "authority": "民用航空管理部门 / 空中交通管理机构",
+          "reviewAction": null,
+          "sites": 48,
+          "withGeometry": 48,
+          "prohibited": 0,
+          "approvalRequired": 48,
+          "registered": 0
+        },
+        {
+          "key": "BORDER",
+          "clause": "第十九条第（二）项",
+          "title": "国界线、实际控制线、边境线向我方一侧一定范围的区域",
+          "sector": "DEFENCE",
+          "sectorLabel": "国防",
+          "geometryStatus": "PERIMETER_NOT_PUBLICLY_PUBLISHED",
+          "geometryRule": null,
+          "citation": "范围由各级空中交通管理机构确定，由设区的市级以上人民政府公布",
+          "authority": "空中交通管理机构 / 边境管理部门",
+          "reviewAction": "本系统不自行测绘边境带宽度。需按设区的市级以上人民政府公布的范围补全；在此之前，边境城市航线的合规性只能标注为待核。",
+          "sites": 0,
+          "withGeometry": 0,
+          "prohibited": 0,
+          "approvalRequired": 0,
+          "registered": 0
+        },
+        {
+          "key": "CLASSIFIED_UNIT",
+          "clause": "第十九条第（三）项",
+          "title": "军事禁区、军事管理区、监管场所等涉密单位以及周边一定范围的区域",
+          "sector": "CLASSIFIED",
+          "sectorLabel": "机密",
+          "geometryStatus": "PERIMETER_NOT_PUBLICLY_PUBLISHED",
+          "geometryRule": null,
+          "citation": "范围由各级空中交通管理机构确定，由设区的市级以上人民政府公布",
+          "authority": "空中交通管理机构 / 有关涉密单位",
+          "reviewAction": "涉密单位与监管场所边界依法不公开，本系统不生成、不推测任何几何，也不以任何形式声称已避开该类区域。",
+          "sites": 0,
+          "withGeometry": 0,
+          "prohibited": 0,
+          "approvalRequired": 0,
+          "registered": 0
+        },
+        {
+          "key": "DEFENCE_INDUSTRY",
+          "clause": "第十九条第（四）项",
+          "title": "重要军工设施保护区域、核设施控制区域、易燃易爆等危险品的生产和仓储区域，以及可燃重要物资的大型仓储区域",
+          "sector": "DEFENCE",
+          "sectorLabel": "国防",
+          "geometryStatus": "PARTIALLY_PUBLISHED",
+          "geometryRule": "核设施按 GB 6249—2025 非居住区与规划限制区下限建最小包络；重要军工设施保护区域无公开范围。",
+          "citation": "GB 6249—2025《核动力厂环境辐射防护规定》第 5.6 条",
+          "authority": "空中交通管理机构 / 生态环境主管部门 / 有关涉密单位",
+          "reviewAction": "重要军工设施与危险品仓储的边界不公开，仅登记类别，不生成几何。",
+          "sites": 2,
+          "withGeometry": 2,
+          "prohibited": 2,
+          "approvalRequired": 0,
+          "registered": 0
+        },
+        {
+          "key": "INFRASTRUCTURE",
+          "clause": "第十九条第（五）项",
+          "title": "发电厂、变电站、加油（气）站、供水厂、公共交通枢纽、航电枢纽、重大水利设施、港口、高速公路、铁路电气化线路等公共基础设施以及周边一定范围的区域和饮用水水源保护区",
+          "sector": "GOVERNMENT",
+          "sectorLabel": "政务",
+          "geometryStatus": "AREA_EXTENT_REQUIRES_LOCAL_PUBLICATION",
+          "geometryRule": null,
+          "citation": "饮用水水源保护区范围由省级人民政府批复公布；其余设施周边范围由各级空中交通管理机构确定",
+          "authority": "空中交通管理机构 / 地方人民政府",
+          "reviewAction": "本系统登记已公开定位的设施参考点，但不自行给设施套用统一缓冲半径：该类设施\"周边一定范围\"没有全国统一定量标准，需要逐项按地方公布范围补全。",
+          "sites": 0,
+          "withGeometry": 0,
+          "prohibited": 0,
+          "approvalRequired": 0,
+          "registered": 0
+        },
+        {
+          "key": "ELECTROMAGNETIC",
+          "clause": "第十九条第（六）项",
+          "title": "射电天文台、卫星测控（导航）站、航空无线电导航台、雷达站等需要电磁环境特殊保护的设施以及周边一定范围的区域",
+          "sector": "RESEARCH",
+          "sectorLabel": "科研",
+          "geometryStatus": "PARTIALLY_PUBLISHED",
+          "geometryRule": "无方向信标台（NDB）与多普勒全向信标台／常规测距仪台（DVOR/DME）以天线中心为基准，半径 500 米的圆形区域为有源保护区，针对有源干扰进行保护；半径 5 千米范围为限制保护区，该区域内限制障碍物高度。此处只按有源保护区生成禁止进入区，限制保护区属障碍物高度管控，不是飞行禁区，故不生成几何。 天气雷达站探测环境保护区由一级保护区和二级保护区构成；二级保护区为一级保护区外沿至距离雷达 20 km 的环形区域。 但天气雷达站的探测环境保护区不是飞行管制空域，本系统仅登记设施位置，不据此生成几何。射电天文台电磁波宁静区仅贵州省有公开地方立法（半径 30 km），东北三省未见公开定量范围。",
+          "citation": "GB 6364—2013《航空无线电导航台站电磁环境要求》，MH/T 4003.1—2014《民用航空通信导航监视台（站）设置场地规范 第 1 部分：导航》；半径取值见《湖南省民用机场及民用航空无线电台（站）电磁环境保护区管理规定》第十一条；GB 31223—2014《气象探测环境保护规范 天气雷达站》第 4.2、4.3 条；《贵州省500米口径球面射电望远镜电磁波宁静区保护办法》",
+          "authority": "气象主管机构 / 无线电管理机构 / 空中交通管理机构",
+          "reviewAction": "待该雷达站周边管制空域范围由设区的市级以上人民政府公布后补全几何；在此之前，本系统不以 GB 31223 的保护半径推算禁飞范围。",
+          "sites": 11,
+          "withGeometry": 10,
+          "prohibited": 10,
+          "approvalRequired": 0,
+          "registered": 1
+        },
+        {
+          "key": "HERITAGE",
+          "clause": "第十九条第（七）项",
+          "title": "重要革命纪念地、重要不可移动文物以及周边一定范围的区域",
+          "sector": "GOVERNMENT",
+          "sectorLabel": "政务",
+          "geometryStatus": "AREA_EXTENT_REQUIRES_LOCAL_PUBLICATION",
+          "geometryRule": null,
+          "citation": "范围由各级空中交通管理机构确定，由设区的市级以上人民政府公布",
+          "authority": "空中交通管理机构 / 文物主管部门",
+          "reviewAction": "本系统登记已公开定位的纪念地与不可移动文物参考点，不自行套用缓冲半径。",
+          "sites": 8,
+          "withGeometry": 0,
+          "prohibited": 0,
+          "approvalRequired": 0,
+          "registered": 8
+        },
+        {
+          "key": "OTHER",
+          "clause": "第十九条第（八）项",
+          "title": "国家空中交通管理领导机构规定的其他区域",
+          "sector": "GOVERNMENT",
+          "sectorLabel": "政务",
+          "geometryStatus": "PERIMETER_NOT_PUBLICLY_PUBLISHED",
+          "geometryRule": null,
+          "citation": "由国家空中交通管理领导机构规定",
+          "authority": "国家空中交通管理领导机构",
+          "reviewAction": "无法预先枚举，随国家规定与临时公告更新。",
+          "sites": 0,
+          "withGeometry": 0,
+          "prohibited": 0,
+          "approvalRequired": 0,
+          "registered": 0
+        }
+      ]
+    },
+    "zoneCount": 69,
+    "withGeometry": 60,
+    "evidence": "docs/evaluation-v1.4/fixed-airspace.json"
+  },
+  "derivedRiskRegions": {
+    "module": "traffic/weather.py（NetworkWeather）+ traffic/service._risk_rules()",
+    "layerName": "派生飞行风险区",
+    "derivation": "由气象场按本系统阈值派生，非官方空域管制范围。",
+    "labels": {
+      "BAN": "派生飞行风险区（禁止进入）",
+      "CAUTION": "派生飞行风险区（谨慎进入）"
+    },
+    "mergeState": "按场区连通分量合并后展示：单体 → 区域，CAUTION 重建为「成员外缘 − 合并后核心」，两层恒不相交；避让包络仍逐单体计算，因此恒为已画区域的超集。见 docs/evaluation-v1.5/risk-merge-and-flat-render.json。",
+    "renderMode": "平面范围（填充 + 轮廓），不画立体柱体；未公布垂直限制则不作图示。",
+    "authority": "SYSTEM_DERIVED_NOT_OFFICIAL_AIRSPACE_CONTROL"
+  },
+  "networkSummary": {
+    "pads": 456,
+    "routes": 269,
+    "carRoutes": 53,
+    "deliveryRoutes": 216,
+    "interprovincialRoutes": 2
+  },
+  "weatherProviders": {
+    "configuredProvider": "open-meteo",
+    "requestedProvider": "open-meteo",
+    "javaBase": "http://127.0.0.1:8085",
+    "internalTokenConfigured": false,
+    "qweatherCityCap": 36,
+    "note": "和风凭据由 Java 侧持有；Python 只读取内部原始接口，任一来源缺失时降级并标注。"
+  },
+  "missingOrUnverified": {
+    "terrainDem": {
+      "status": "UNAVAILABLE",
+      "impact": "净空判定为条件未验证，不按零高度地面放行。"
+    },
+    "buildingHeights": {
+      "status": "UNAVAILABLE",
+      "impact": "楼宇仅用于显示，未进入后端避障。"
+    },
+    "obstacleSourceVersion": "no-local-dem-or-building-catalog-v1",
+    "independentThunderField": {
+      "status": "UNAVAILABLE",
+      "impact": "不使用降水概率乘固定系数冒充雷暴概率。"
+    },
+    "routeInteriorWeather": "仅城际端点与采样城市有天气值，航路内部未全程采样。",
+    "stationNetwork": {
+      "status": "UNAVAILABLE",
+      "impact": "不以省级地面测站代替 36 城城区观测。"
+    },
+    "aviationMetarTaf": {
+      "status": "NOT_INTEGRATED",
+      "impact": "未接入，也不代表 36 城城区覆盖。"
+    },
+    "radarDerivedRiskRegions": {
+      "status": "IMPLEMENTED_IMAGE_CHANNEL_ONLY",
+      "impact": "中国气象数据网雷达为图像产品，色标反查 dBZ 的阈值与配准尚未标定，未接入运行计划，仅作为派生飞行风险区的待接入第二源。",
+      "namingRule": "标定完成前不得把回波强度写入风险区名称或阈值口径。"
+    },
+    "derivedRegionGranularity": {
+      "status": "MEASURED",
+      "impact": "按场区连通分量合并后实测 15—17 个展示区域；雷达源接入后若沿用同一条「栅格场 → 风险区」管线，该粒度是否适用须重新测量，不得直接沿用。",
+      "evidence": "docs/evaluation-v1.5/risk-merge-and-flat-render.json"
+    }
+  },
+  "statedCosts": {
+    "openMeteo": "免费服务有调用限额且不保证 SLA；多地点多变量计入计量。",
+    "qweather": "凭据由 Java 侧持有；Python 只读内部原始接口，端点默认仅本机可调用，并带 60 秒缓存。",
+    "scheduling": "36 城每 15 分钟刷新约等于每天 3456 次地点请求，尚未计入变量权重与航路网格。"
+  }
+}

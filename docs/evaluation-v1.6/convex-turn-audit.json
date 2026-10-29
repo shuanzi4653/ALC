@@ -1,0 +1,161 @@
+{
+  "version": "city-traffic-1.6.1",
+  "geometryAudit": {
+    "stride": 5,
+    "limitDeg": 45.0,
+    "seeds": [
+      {
+        "seed": 42,
+        "geometriesSampled": 945,
+        "turnsMeasured": 363405,
+        "worstConvexTurnDeg": 42.75,
+        "worstAt": {
+          "minute": 280,
+          "cell": "WX-1-08-D1",
+          "tier": "Field"
+        },
+        "turnsAbove45Deg": 0,
+        "medianTurnDeg": 7.56,
+        "p95TurnDeg": 20.57,
+        "shortestEdgeM": 43.0,
+        "edgesBelow10M": 0
+      },
+      {
+        "seed": 7,
+        "geometriesSampled": 933,
+        "turnsMeasured": 362227,
+        "worstConvexTurnDeg": 41.39,
+        "worstAt": {
+          "minute": 260,
+          "cell": "WX-1-04",
+          "tier": "Ban"
+        },
+        "turnsAbove45Deg": 0,
+        "medianTurnDeg": 7.56,
+        "p95TurnDeg": 20.55,
+        "shortestEdgeM": 49.7,
+        "edgesBelow10M": 0
+      },
+      {
+        "seed": 13,
+        "geometriesSampled": 798,
+        "turnsMeasured": 355711,
+        "worstConvexTurnDeg": 39.12,
+        "worstAt": {
+          "minute": 0,
+          "cell": "WX-3-10",
+          "tier": "Field"
+        },
+        "turnsAbove45Deg": 0,
+        "medianTurnDeg": 7.63,
+        "p95TurnDeg": 20.45,
+        "shortestEdgeM": 58.7,
+        "edgesBelow10M": 0
+      }
+    ],
+    "claim": "no generated risk tier carries a convex turn above 45 degrees",
+    "holds": true,
+    "note": "The v1.6 pack sampled 18 tier x minute combinations and reported 40.66 degrees. A 5-minute stride over the full timeline found 17 turns up to 46.88 degrees on seed 42, at minutes the coarse sample skipped. The sampler-phase fix removes them; this audit is the replacement figure."
+  },
+  "envelopeAudit": {
+    "combinationsChecked": 945,
+    "leaksAboveOneSquareMetre": 0,
+    "claim": "the routing envelope is a strict superset of every drawn risk tier",
+    "holds": true
+  },
+  "shapeDiversity": {
+    "radiusCvMean": 0.1598,
+    "radiusCvMin": 0.1205,
+    "radiusCvMax": 0.2533,
+    "sampleCount": 10,
+    "areaSpreadRatio": 22.79,
+    "claim": "outlines are non-circular (CV far from 0) and mutually dissimilar in size"
+  },
+  "lifeCycle": {
+    "cell": "WX-1-07",
+    "lifeMinutes": 42.2,
+    "peakAgeFractionParam": 0.42,
+    "peakObservedAtProgress": 0.4,
+    "peakRadiusFraction": 0.9981,
+    "zeroBeforeBirth": true,
+    "zeroAfterDeath": true,
+    "visibleCellCountRange": [
+      1,
+      7
+    ],
+    "claim": "cell size follows the measured inverted-parabola life cycle"
+  },
+  "splitCells": {
+    "pairs": [
+      {
+        "seed": 1,
+        "child": "WX-2-06-D1",
+        "parent": "WX-2-06",
+        "gapFirstKm": 13.8,
+        "gapLastKm": 18.4,
+        "separating": true
+      },
+      {
+        "seed": 1,
+        "child": "WX-1-08-D1",
+        "parent": "WX-1-08",
+        "gapFirstKm": 6.4,
+        "gapLastKm": 8.1,
+        "separating": true
+      },
+      {
+        "seed": 13,
+        "child": "WX-1-14-D1",
+        "parent": "WX-1-14",
+        "gapFirstKm": -5.6,
+        "gapLastKm": 0.5,
+        "separating": true
+      },
+      {
+        "seed": 42,
+        "child": "WX-3-05-D1",
+        "parent": "WX-3-05",
+        "gapFirstKm": 2.0,
+        "gapLastKm": -0.9,
+        "separating": false
+      },
+      {
+        "seed": 42,
+        "child": "WX-1-08-D1",
+        "parent": "WX-1-08",
+        "gapFirstKm": 15.7,
+        "gapLastKm": 19.8,
+        "separating": true
+      },
+      {
+        "seed": 99,
+        "child": "WX-3-02-D1",
+        "parent": "WX-3-02",
+        "gapFirstKm": 25.4,
+        "gapLastKm": 32.7,
+        "separating": true
+      },
+      {
+        "seed": 99,
+        "child": "WX-1-03-D1",
+        "parent": "WX-1-03",
+        "gapFirstKm": 9.4,
+        "gapLastKm": 8.9,
+        "separating": false
+      },
+      {
+        "seed": 2026,
+        "child": "WX-1-04-D1",
+        "parent": "WX-1-04",
+        "gapFirstKm": 33.0,
+        "gapLastKm": 38.5,
+        "separating": true
+      }
+    ],
+    "pairCount": 8,
+    "separating": 6,
+    "lineageKeyPresent": false,
+    "claim": "shed daughters separate from their parent over time",
+    "note": "Daughters carry no \"parent\" key, so they are identified by the -D1 id suffix. Any probe keying on cell[\"parent\"] reports zero daughters; the earlier version of this probe did exactly that."
+  }
+}

@@ -1,0 +1,33 @@
+{"sampleId": "SHE-2026-09-28T1300", "humanLevel": "CAUTION", "why": "阵风 14.8 m/s 明显不利但未到禁飞"}
+{"sampleId": "SHE-2026-09-03T0800", "humanLevel": "CAUTION", "why": "阵风 13.7 m/s，轻度不利"}
+{"sampleId": "SHE-2026-09-27T0800", "humanLevel": "CAUTION", "why": "能见度 2560 m 受限、低云 100%"}
+{"sampleId": "SHE-2026-09-22T0700", "humanLevel": "DANGER", "why": "阵风 16.9 m/s 接近上限"}
+{"sampleId": "SHE-2026-09-25T0900", "humanLevel": "CAUTION", "why": "能见度 3460 m、降水 0.6 mm/h"}
+{"sampleId": "SHE-2026-09-02T2200", "humanLevel": "CAUTION", "why": "阵风 14.0 m/s"}
+{"sampleId": "HRB-2026-09-03T2000", "humanLevel": "FIT", "why": "各要素均在包线内"}
+{"sampleId": "HRB-2026-09-13T0400", "humanLevel": "FIT", "why": "阵风 10.8、能见度 7.8 km，可飞"}
+{"sampleId": "CGQ-2026-09-26T2200", "humanLevel": "FIT", "why": "风 3.7 阵风 11.2，能见度好"}
+{"sampleId": "HRB-2026-09-21T2300", "humanLevel": "FIT", "why": "静风、能见度 19.9 km"}
+{"sampleId": "HRB-2026-09-29T0000", "humanLevel": "DANGER", "why": "阵风 16.6 m/s 接近 18 上限"}
+{"sampleId": "SHE-2026-09-25T1700", "humanLevel": "DANGER", "why": "阵风 17.6 m/s 逼近禁飞"}
+{"sampleId": "SHE-2026-09-14T0100", "humanLevel": "DANGER", "why": "阵风 15.8 m/s"}
+{"sampleId": "CGQ-2026-09-30T0700", "humanLevel": "DANGER", "why": "阵风 15.1 m/s，清晨低温"}
+{"sampleId": "SHE-2026-09-07T0000", "humanLevel": "DANGER", "why": "阵风 17.3 m/s"}
+{"sampleId": "SHE-2026-09-29T2000", "humanLevel": "DANGER", "why": "阵风 15.8 m/s、湿度 95%"}
+{"sampleId": "CGQ-2026-09-14T0100", "humanLevel": "DANGER", "why": "阵风 16.6 m/s"}
+{"sampleId": "SHE-2026-09-29T1800", "humanLevel": "DANGER", "why": "阵风 16.6、能见度 5.8 km、有降水"}
+{"sampleId": "HRB-2026-09-06T1900", "humanLevel": "DANGER", "why": "阵风 16.2 m/s"}
+{"sampleId": "CGQ-2026-09-29T0000", "humanLevel": "DANGER", "why": "阵风 16.2 m/s"}
+{"sampleId": "SHE-2026-09-25T0600", "humanLevel": "DANGER", "why": "降水 4.1 mm/h、能见度 1.9 km、阵风 15.8"}
+{"sampleId": "SHE-2026-09-25T0500", "humanLevel": "DANGER", "why": "降水 4.4 mm/h、能见度 2.2 km"}
+{"sampleId": "SHE-2026-09-26T0000", "humanLevel": "DANGER", "why": "降水 2.8、能见度 1.9 km、阵风 17.6"}
+{"sampleId": "HRB-2026-09-23T1500", "humanLevel": "BAN", "why": "平均风 13.5、阵风 35.6 m/s"}
+{"sampleId": "CGQ-2026-09-22T0700", "humanLevel": "BAN", "why": "阵风 19.4 m/s 超上限"}
+{"sampleId": "SHE-2026-09-09T0100", "humanLevel": "BAN", "why": "阵风 25.9 m/s"}
+{"sampleId": "CGQ-2026-09-15T0900", "humanLevel": "BAN", "why": "平均风 16.5、阵风 40.0 m/s"}
+{"sampleId": "SHE-2026-09-08T0700", "humanLevel": "BAN", "why": "平均风 12.8、阵风 31.0 m/s"}
+{"sampleId": "CGQ-2026-09-06T1100", "humanLevel": "BAN", "why": "阵风 22.3 m/s"}
+{"sampleId": "HRB-2026-09-06T1200", "humanLevel": "BAN", "why": "阵风 23.0 m/s"}
+{"sampleId": "CGQ-2026-09-12T1100", "humanLevel": "BAN", "why": "平均风 12.2、阵风 34.2 m/s"}
+{"sampleId": "HRB-2026-09-22T1900", "humanLevel": "BAN", "why": "阵风 23.0 m/s、平均风 11.1"}
+{"sampleId": "SHE-2026-09-03T1300", "humanLevel": "BAN", "why": "阵风 23.4 m/s"}

@@ -5,10 +5,22 @@
 | 数据 | 用途 | 来源及限制 |
 |---|---|---|
 | 三省行政边界 | 地图和米制裁剪 | 从既有china.json提取；保留SHA版本；素材授权与精度在公开发布前复核 |
+| 三省离线底图 | 断网时的地图兜底 | 由上面的 `china.json` **派生**：`frontend/src/assets/northeast-offline.json`，Douglas-Peucker 以 **0.01°（约 1 km）** 容差抽稀，45 851 字节；形状由 `tools/maintenance/_verify_offline_basemap.py` 四判据独立校验（面积比 100.0%、外接框漂移 0.0000°） |
 | 中国境内站点目录 | 真实站号、名称和坐标 | [NOAA ISD目录](https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv)，按省界筛选，保存下载时间和原文件SHA256 |
 | 三省历史观测 | 2025-07-01台账 | 沈阳54342099999、龙嘉54161099999、哈尔滨50953099999，共48条；各省JSON保存原链接和哈希 |
+| 公开气象（运行源） | 36 城气象输入 | **open-meteo**，`dataType='MODEL_ESTIMATE'`（模型估算，**不是测站实况**）；零凭据；经 `weather_sources.py::weather_snapshot()` 单一入口 |
+| 雷达回波 | 风险几何驱动 | CMA 公开组网组合反射率瓦片（免凭据），`provider='CMA_DATA_NET'`；虚拟通道下改标 `SYNTHETIC_RADAR` |
 | 雨雷单体与风场 | 推演与实验 | SIMULATION / SIMULATED_CELL / SIMULATED_GRID，不是站网实况 |
 | 原监测点 | 兼容已有监测 | live/sim/degraded独立标识，不能替代区域空间预报 |
+
+**气象已无合成路径**（2026-09-18）：`simulator.py` 更名为 `simulator.py.retired`，不再是可 import 的模块。
+唯一运行源是 open-meteo；`thunderProb` 无真实来源 → 置 `None`，**不编造**。
+`NetworkWeather` 类保留，但只作几何回归夹具使用，不对外产出数据。
+交通数据仍为模拟生成（不属气象，用户明确不动）。
+
+**离线底图的标注是硬判据**：它只有省界轮廓，**没有城市道路、没有立体建筑、没有地名注记**
+（地名靠静态 DOM 标签，不走远端 glyph 字体）。因此进入离线态时界面必须显示橙色徽标 + 提示条，
+否则运行人员会拿一条 1 km 精度的省界去判断航路方位。详见根 `README.md` §离线底图。
 
 [NOAA产品说明](https://www.ncei.noaa.gov/products/land-based-station/integrated-surface-database)介绍该数据集包含不同时段累计降水。归一化同时保留累计量和时段，不把24小时累计量当成瞬时mm/h。WND、TMP、VIS、AA1保留原质控字符串；保守接收质控码1/5，缺测或不合格字段为null。无雷暴概率来源则保持缺测。
 
@@ -41,3 +53,11 @@ SQLite保存输入、版本、引擎指纹、候选、证据和解释轨迹。�
 800米缓冲与0米对照，三省各5个种子共30组敏感性结果在 `evaluation-v1/sensitivity.csv`。这是有限情景敏感性，不是概率、置信区间或真实误差界。
 
 48条单日点观测不含区域雷暴真值、航迹结果或独立训练/验证/测试切分，未通过学习数据闸门。因此不训练或宣传XGBoost/ONNX增强，保留规则与合成基线。不报告未经实测的业务收益、用户访谈结论或飞行安全认证。
+
+---
+
+## 文档修订记录
+
+| 日期 | 变更 |
+|---|---|
+| 2026-09-18 | 补离线底图来源与校验口径；明确气象已无合成路径（`simulator.py.retired`）、唯一运行源为 open-meteo、`thunderProb` 置 `None` 不编造；把「标注是硬判据」写进本文。 |

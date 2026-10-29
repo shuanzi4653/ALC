@@ -1,0 +1,723 @@
+{
+  "generatedAt": "2026-09-17T12:04:33.068840Z",
+  "catalogueFile": "backend-python/data/traffic/city-centers.json",
+  "catalogueSchemaVersion": "1.3",
+  "coordinateReferenceSystem": "EPSG:4326",
+  "coordinatePolicy": "城区代表中心；城市中心与模拟起降点分开建模；不得自动吸附或静默改写坐标。",
+  "catalogueCount": 36,
+  "validCount": 36,
+  "outsideProvince": [],
+  "fixedSouthwestOffsetRemoved": true,
+  "removedOffsetMetres": 2690.72,
+  "maximumHubOffsetFromCentreM": 0,
+  "specialCases": [
+    {
+      "cityId": "2-09",
+      "name": "延边州",
+      "centerType": "州府城区代表中心",
+      "coordinateWgs84": [
+        129.51,
+        42.9
+      ],
+      "source": "项目城市目录人工复核",
+      "handling": "州府城区代表点，按地级行政区纳入，未按自治州几何质心取点。"
+    },
+    {
+      "cityId": "3-13",
+      "name": "大兴安岭地区",
+      "centerType": "服务枢纽代表点",
+      "coordinateWgs84": [
+        124.71,
+        52.34
+      ],
+      "source": "项目城市目录人工复核；需保留行政驻地差异说明",
+      "handling": "行政驻地在内蒙古境内，本省边界内无可覆盖驻地，按三省运行边界选定合规服务枢纽代表点并保留差异说明；未移动省界也未改写坐标。"
+    }
+  ],
+  "cities": [
+    {
+      "cityId": "1-01",
+      "name": "沈阳",
+      "province": "辽宁省",
+      "capital": true,
+      "centerType": "城区代表中心",
+      "coordinateWgs84": [
+        123.43,
+        41.8
+      ],
+      "source": "项目城市目录人工复核",
+      "reviewedAt": "2026-09-14",
+      "quality": "PROJECT_REFERENCE",
+      "coordinateValid": true,
+      "coordinateStatus": "VALID",
+      "hubId": "CITY-1-01",
+      "hubOffsetFromCentreM": 0.0,
+      "hubStatus": "SIMULATED_REFERENCE"
+    },
+    {
+      "cityId": "1-02",
+      "name": "大连",
+      "province": "辽宁省",
+      "capital": false,
+      "centerType": "城区代表中心",
+      "coordinateWgs84": [
+        121.61,
+        38.91
+      ],
+      "source": "项目城市目录人工复核",
+      "reviewedAt": "2026-09-14",
+      "quality": "PROJECT_REFERENCE",
+      "coordinateValid": true,
+      "coordinateStatus": "VALID",
+      "hubId": "CITY-1-02",
+      "hubOffsetFromCentreM": 0.0,
+      "hubStatus": "SIMULATED_REFERENCE"
+    },
+    {
+      "cityId": "1-03",
+      "name": "鞍山",
+      "province": "辽宁省",
+      "capital": false,
+      "centerType": "城区代表中心",
+      "coordinateWgs84": [
+        122.99,
+        41.11
+      ],
+      "source": "项目城市目录人工复核",
+      "reviewedAt": "2026-09-14",
+      "quality": "PROJECT_REFERENCE",
+      "coordinateValid": true,
+      "coordinateStatus": "VALID",
+      "hubId": "CITY-1-03",
+      "hubOffsetFromCentreM": 0.0,
+      "hubStatus": "SIMULATED_REFERENCE"
+    },
+    {
+      "cityId": "1-04",
+      "name": "抚顺",
+      "province": "辽宁省",
+      "capital": false,
+      "centerType": "城区代表中心",
+      "coordinateWgs84": [
+        123.96,
+        41.88
+      ],
+      "source": "项目城市目录人工复核",
+      "reviewedAt": "2026-09-14",
+      "quality": "PROJECT_REFERENCE",
+      "coordinateValid": true,
+      "coordinateStatus": "VALID",
+      "hubId": "CITY-1-04",
+      "hubOffsetFromCentreM": 0.0,
+      "hubStatus": "SIMULATED_REFERENCE"
+    },
+    {
+      "cityId": "1-05",
+      "name": "本溪",
+      "province": "辽宁省",
+      "capital": false,
+      "centerType": "城区代表中心",
+      "coordinateWgs84": [
+        123.77,
+        41.3
+      ],
+      "source": "项目城市目录人工复核",
+      "reviewedAt": "2026-09-14",
+      "quality": "PROJECT_REFERENCE",
+      "coordinateValid": true,
+      "coordinateStatus": "VALID",
+      "hubId": "CITY-1-05",
+      "hubOffsetFromCentreM": 0.0,
+      "hubStatus": "SIMULATED_REFERENCE"
+    },
+    {
+      "cityId": "1-06",
+      "name": "丹东",
+      "province": "辽宁省",
+      "capital": false,
+      "centerType": "城区代表中心",
+      "coordinateWgs84": [
+        124.35,
+        40.0
+      ],
+      "source": "项目城市目录人工复核",
+      "reviewedAt": "2026-09-14",
+      "quality": "PROJECT_REFERENCE",
+      "coordinateValid": true,
+      "coordinateStatus": "VALID",
+      "hubId": "CITY-1-06",
+      "hubOffsetFromCentreM": 0.0,
+      "hubStatus": "SIMULATED_REFERENCE"
+    },
+    {
+      "cityId": "1-07",
+      "name": "锦州",
+      "province": "辽宁省",
+      "capital": false,
+      "centerType": "城区代表中心",
+      "coordinateWgs84": [
+        121.13,
+        41.1
+      ],
+      "source": "项目城市目录人工复核",
+      "reviewedAt": "2026-09-14",
+      "quality": "PROJECT_REFERENCE",
+      "coordinateValid": true,
+      "coordinateStatus": "VALID",
+      "hubId": "CITY-1-07",
+      "hubOffsetFromCentreM": 0.0,
+      "hubStatus": "SIMULATED_REFERENCE"
+    },
+    {
+      "cityId": "1-08",
+      "name": "营口",
+      "province": "辽宁省",
+      "capital": false,
+      "centerType": "城区代表中心",
+      "coordinateWgs84": [
+        122.24,
+        40.67
+      ],
+      "source": "项目城市目录人工复核",
+      "reviewedAt": "2026-09-14",
+      "quality": "PROJECT_REFERENCE",
+      "coordinateValid": true,
+      "coordinateStatus": "VALID",
+      "hubId": "CITY-1-08",
+      "hubOffsetFromCentreM": 0.0,
+      "hubStatus": "SIMULATED_REFERENCE"
+    },
+    {
+      "cityId": "1-09",
+      "name": "阜新",
+      "province": "辽宁省",
+      "capital": false,
+      "centerType": "城区代表中心",
+      "coordinateWgs84": [
+        121.67,
+        42.02
+      ],
+      "source": "项目城市目录人工复核",
+      "reviewedAt": "2026-09-14",
+      "quality": "PROJECT_REFERENCE",
+      "coordinateValid": true,
+      "coordinateStatus": "VALID",
+      "hubId": "CITY-1-09",
+      "hubOffsetFromCentreM": 0.0,
+      "hubStatus": "SIMULATED_REFERENCE"
+    },
+    {
+      "cityId": "1-10",
+      "name": "辽阳",
+      "province": "辽宁省",
+      "capital": false,
+      "centerType": "城区代表中心",
+      "coordinateWgs84": [
+        123.17,
+        41.27
+      ],
+      "source": "项目城市目录人工复核",
+      "reviewedAt": "2026-09-14",
+      "quality": "PROJECT_REFERENCE",
+      "coordinateValid": true,
+      "coordinateStatus": "VALID",
+      "hubId": "CITY-1-10",
+      "hubOffsetFromCentreM": 0.0,
+      "hubStatus": "SIMULATED_REFERENCE"
+    },
+    {
+      "cityId": "1-11",
+      "name": "盘锦",
+      "province": "辽宁省",
+      "capital": false,
+      "centerType": "城区代表中心",
+      "coordinateWgs84": [
+        122.07,
+        41.12
+      ],
+      "source": "项目城市目录人工复核",
+      "reviewedAt": "2026-09-14",
+      "quality": "PROJECT_REFERENCE",
+      "coordinateValid": true,
+      "coordinateStatus": "VALID",
+      "hubId": "CITY-1-11",
+      "hubOffsetFromCentreM": 0.0,
+      "hubStatus": "SIMULATED_REFERENCE"
+    },
+    {
+      "cityId": "1-12",
+      "name": "铁岭",
+      "province": "辽宁省",
+      "capital": false,
+      "centerType": "城区代表中心",
+      "coordinateWgs84": [
+        123.84,
+        42.29
+      ],
+      "source": "项目城市目录人工复核",
+      "reviewedAt": "2026-09-14",
+      "quality": "PROJECT_REFERENCE",
+      "coordinateValid": true,
+      "coordinateStatus": "VALID",
+      "hubId": "CITY-1-12",
+      "hubOffsetFromCentreM": 0.0,
+      "hubStatus": "SIMULATED_REFERENCE"
+    },
+    {
+      "cityId": "1-13",
+      "name": "朝阳",
+      "province": "辽宁省",
+      "capital": false,
+      "centerType": "城区代表中心",
+      "coordinateWgs84": [
+        120.45,
+        41.57
+      ],
+      "source": "项目城市目录人工复核",
+      "reviewedAt": "2026-09-14",
+      "quality": "PROJECT_REFERENCE",
+      "coordinateValid": true,
+      "coordinateStatus": "VALID",
+      "hubId": "CITY-1-13",
+      "hubOffsetFromCentreM": 0.0,
+      "hubStatus": "SIMULATED_REFERENCE"
+    },
+    {
+      "cityId": "1-14",
+      "name": "葫芦岛",
+      "province": "辽宁省",
+      "capital": false,
+      "centerType": "城区代表中心",
+      "coordinateWgs84": [
+        120.84,
+        40.71
+      ],
+      "source": "项目城市目录人工复核",
+      "reviewedAt": "2026-09-14",
+      "quality": "PROJECT_REFERENCE",
+      "coordinateValid": true,
+      "coordinateStatus": "VALID",
+      "hubId": "CITY-1-14",
+      "hubOffsetFromCentreM": 0.0,
+      "hubStatus": "SIMULATED_REFERENCE"
+    },
+    {
+      "cityId": "2-01",
+      "name": "长春",
+      "province": "吉林省",
+      "capital": true,
+      "centerType": "城区代表中心",
+      "coordinateWgs84": [
+        125.32,
+        43.82
+      ],
+      "source": "项目城市目录人工复核",
+      "reviewedAt": "2026-09-14",
+      "quality": "PROJECT_REFERENCE",
+      "coordinateValid": true,
+      "coordinateStatus": "VALID",
+      "hubId": "CITY-2-01",
+      "hubOffsetFromCentreM": 0.0,
+      "hubStatus": "SIMULATED_REFERENCE"
+    },
+    {
+      "cityId": "2-02",
+      "name": "吉林",
+      "province": "吉林省",
+      "capital": false,
+      "centerType": "城区代表中心",
+      "coordinateWgs84": [
+        126.55,
+        43.84
+      ],
+      "source": "项目城市目录人工复核",
+      "reviewedAt": "2026-09-14",
+      "quality": "PROJECT_REFERENCE",
+      "coordinateValid": true,
+      "coordinateStatus": "VALID",
+      "hubId": "CITY-2-02",
+      "hubOffsetFromCentreM": 0.0,
+      "hubStatus": "SIMULATED_REFERENCE"
+    },
+    {
+      "cityId": "2-03",
+      "name": "四平",
+      "province": "吉林省",
+      "capital": false,
+      "centerType": "城区代表中心",
+      "coordinateWgs84": [
+        124.35,
+        43.17
+      ],
+      "source": "项目城市目录人工复核",
+      "reviewedAt": "2026-09-14",
+      "quality": "PROJECT_REFERENCE",
+      "coordinateValid": true,
+      "coordinateStatus": "VALID",
+      "hubId": "CITY-2-03",
+      "hubOffsetFromCentreM": 0.0,
+      "hubStatus": "SIMULATED_REFERENCE"
+    },
+    {
+      "cityId": "2-04",
+      "name": "辽源",
+      "province": "吉林省",
+      "capital": false,
+      "centerType": "城区代表中心",
+      "coordinateWgs84": [
+        125.14,
+        42.89
+      ],
+      "source": "项目城市目录人工复核",
+      "reviewedAt": "2026-09-14",
+      "quality": "PROJECT_REFERENCE",
+      "coordinateValid": true,
+      "coordinateStatus": "VALID",
+      "hubId": "CITY-2-04",
+      "hubOffsetFromCentreM": 0.0,
+      "hubStatus": "SIMULATED_REFERENCE"
+    },
+    {
+      "cityId": "2-05",
+      "name": "通化",
+      "province": "吉林省",
+      "capital": false,
+      "centerType": "城区代表中心",
+      "coordinateWgs84": [
+        125.94,
+        41.73
+      ],
+      "source": "项目城市目录人工复核",
+      "reviewedAt": "2026-09-14",
+      "quality": "PROJECT_REFERENCE",
+      "coordinateValid": true,
+      "coordinateStatus": "VALID",
+      "hubId": "CITY-2-05",
+      "hubOffsetFromCentreM": 0.0,
+      "hubStatus": "SIMULATED_REFERENCE"
+    },
+    {
+      "cityId": "2-06",
+      "name": "白山",
+      "province": "吉林省",
+      "capital": false,
+      "centerType": "城区代表中心",
+      "coordinateWgs84": [
+        126.42,
+        41.94
+      ],
+      "source": "项目城市目录人工复核",
+      "reviewedAt": "2026-09-14",
+      "quality": "PROJECT_REFERENCE",
+      "coordinateValid": true,
+      "coordinateStatus": "VALID",
+      "hubId": "CITY-2-06",
+      "hubOffsetFromCentreM": 0.0,
+      "hubStatus": "SIMULATED_REFERENCE"
+    },
+    {
+      "cityId": "2-07",
+      "name": "松原",
+      "province": "吉林省",
+      "capital": false,
+      "centerType": "城区代表中心",
+      "coordinateWgs84": [
+        124.82,
+        45.14
+      ],
+      "source": "项目城市目录人工复核",
+      "reviewedAt": "2026-09-14",
+      "quality": "PROJECT_REFERENCE",
+      "coordinateValid": true,
+      "coordinateStatus": "VALID",
+      "hubId": "CITY-2-07",
+      "hubOffsetFromCentreM": 0.0,
+      "hubStatus": "SIMULATED_REFERENCE"
+    },
+    {
+      "cityId": "2-08",
+      "name": "白城",
+      "province": "吉林省",
+      "capital": false,
+      "centerType": "城区代表中心",
+      "coordinateWgs84": [
+        122.84,
+        45.62
+      ],
+      "source": "项目城市目录人工复核",
+      "reviewedAt": "2026-09-14",
+      "quality": "PROJECT_REFERENCE",
+      "coordinateValid": true,
+      "coordinateStatus": "VALID",
+      "hubId": "CITY-2-08",
+      "hubOffsetFromCentreM": 0.0,
+      "hubStatus": "SIMULATED_REFERENCE"
+    },
+    {
+      "cityId": "2-09",
+      "name": "延边州",
+      "province": "吉林省",
+      "capital": false,
+      "centerType": "州府城区代表中心",
+      "coordinateWgs84": [
+        129.51,
+        42.9
+      ],
+      "source": "项目城市目录人工复核",
+      "reviewedAt": "2026-09-14",
+      "quality": "PROJECT_REFERENCE",
+      "coordinateValid": true,
+      "coordinateStatus": "VALID",
+      "hubId": "CITY-2-09",
+      "hubOffsetFromCentreM": 0.0,
+      "hubStatus": "SIMULATED_REFERENCE"
+    },
+    {
+      "cityId": "3-01",
+      "name": "哈尔滨",
+      "province": "黑龙江省",
+      "capital": true,
+      "centerType": "城区代表中心",
+      "coordinateWgs84": [
+        126.64,
+        45.76
+      ],
+      "source": "项目城市目录人工复核",
+      "reviewedAt": "2026-09-14",
+      "quality": "PROJECT_REFERENCE",
+      "coordinateValid": true,
+      "coordinateStatus": "VALID",
+      "hubId": "CITY-3-01",
+      "hubOffsetFromCentreM": 0.0,
+      "hubStatus": "SIMULATED_REFERENCE"
+    },
+    {
+      "cityId": "3-02",
+      "name": "齐齐哈尔",
+      "province": "黑龙江省",
+      "capital": false,
+      "centerType": "城区代表中心",
+      "coordinateWgs84": [
+        123.95,
+        47.34
+      ],
+      "source": "项目城市目录人工复核",
+      "reviewedAt": "2026-09-14",
+      "quality": "PROJECT_REFERENCE",
+      "coordinateValid": true,
+      "coordinateStatus": "VALID",
+      "hubId": "CITY-3-02",
+      "hubOffsetFromCentreM": 0.0,
+      "hubStatus": "SIMULATED_REFERENCE"
+    },
+    {
+      "cityId": "3-03",
+      "name": "鸡西",
+      "province": "黑龙江省",
+      "capital": false,
+      "centerType": "城区代表中心",
+      "coordinateWgs84": [
+        130.97,
+        45.3
+      ],
+      "source": "项目城市目录人工复核",
+      "reviewedAt": "2026-09-14",
+      "quality": "PROJECT_REFERENCE",
+      "coordinateValid": true,
+      "coordinateStatus": "VALID",
+      "hubId": "CITY-3-03",
+      "hubOffsetFromCentreM": 0.0,
+      "hubStatus": "SIMULATED_REFERENCE"
+    },
+    {
+      "cityId": "3-04",
+      "name": "鹤岗",
+      "province": "黑龙江省",
+      "capital": false,
+      "centerType": "城区代表中心",
+      "coordinateWgs84": [
+        130.3,
+        47.35
+      ],
+      "source": "项目城市目录人工复核",
+      "reviewedAt": "2026-09-14",
+      "quality": "PROJECT_REFERENCE",
+      "coordinateValid": true,
+      "coordinateStatus": "VALID",
+      "hubId": "CITY-3-04",
+      "hubOffsetFromCentreM": 0.0,
+      "hubStatus": "SIMULATED_REFERENCE"
+    },
+    {
+      "cityId": "3-05",
+      "name": "双鸭山",
+      "province": "黑龙江省",
+      "capital": false,
+      "centerType": "城区代表中心",
+      "coordinateWgs84": [
+        131.16,
+        46.65
+      ],
+      "source": "项目城市目录人工复核",
+      "reviewedAt": "2026-09-14",
+      "quality": "PROJECT_REFERENCE",
+      "coordinateValid": true,
+      "coordinateStatus": "VALID",
+      "hubId": "CITY-3-05",
+      "hubOffsetFromCentreM": 0.0,
+      "hubStatus": "SIMULATED_REFERENCE"
+    },
+    {
+      "cityId": "3-06",
+      "name": "大庆",
+      "province": "黑龙江省",
+      "capital": false,
+      "centerType": "城区代表中心",
+      "coordinateWgs84": [
+        125.1,
+        46.59
+      ],
+      "source": "项目城市目录人工复核",
+      "reviewedAt": "2026-09-14",
+      "quality": "PROJECT_REFERENCE",
+      "coordinateValid": true,
+      "coordinateStatus": "VALID",
+      "hubId": "CITY-3-06",
+      "hubOffsetFromCentreM": 0.0,
+      "hubStatus": "SIMULATED_REFERENCE"
+    },
+    {
+      "cityId": "3-07",
+      "name": "伊春",
+      "province": "黑龙江省",
+      "capital": false,
+      "centerType": "城区代表中心",
+      "coordinateWgs84": [
+        128.84,
+        47.73
+      ],
+      "source": "项目城市目录人工复核",
+      "reviewedAt": "2026-09-14",
+      "quality": "PROJECT_REFERENCE",
+      "coordinateValid": true,
+      "coordinateStatus": "VALID",
+      "hubId": "CITY-3-07",
+      "hubOffsetFromCentreM": 0.0,
+      "hubStatus": "SIMULATED_REFERENCE"
+    },
+    {
+      "cityId": "3-08",
+      "name": "佳木斯",
+      "province": "黑龙江省",
+      "capital": false,
+      "centerType": "城区代表中心",
+      "coordinateWgs84": [
+        130.36,
+        46.8
+      ],
+      "source": "项目城市目录人工复核",
+      "reviewedAt": "2026-09-14",
+      "quality": "PROJECT_REFERENCE",
+      "coordinateValid": true,
+      "coordinateStatus": "VALID",
+      "hubId": "CITY-3-08",
+      "hubOffsetFromCentreM": 0.0,
+      "hubStatus": "SIMULATED_REFERENCE"
+    },
+    {
+      "cityId": "3-09",
+      "name": "七台河",
+      "province": "黑龙江省",
+      "capital": false,
+      "centerType": "城区代表中心",
+      "coordinateWgs84": [
+        131.0,
+        45.77
+      ],
+      "source": "项目城市目录人工复核",
+      "reviewedAt": "2026-09-14",
+      "quality": "PROJECT_REFERENCE",
+      "coordinateValid": true,
+      "coordinateStatus": "VALID",
+      "hubId": "CITY-3-09",
+      "hubOffsetFromCentreM": 0.0,
+      "hubStatus": "SIMULATED_REFERENCE"
+    },
+    {
+      "cityId": "3-10",
+      "name": "牡丹江",
+      "province": "黑龙江省",
+      "capital": false,
+      "centerType": "城区代表中心",
+      "coordinateWgs84": [
+        129.63,
+        44.55
+      ],
+      "source": "项目城市目录人工复核",
+      "reviewedAt": "2026-09-14",
+      "quality": "PROJECT_REFERENCE",
+      "coordinateValid": true,
+      "coordinateStatus": "VALID",
+      "hubId": "CITY-3-10",
+      "hubOffsetFromCentreM": 0.0,
+      "hubStatus": "SIMULATED_REFERENCE"
+    },
+    {
+      "cityId": "3-11",
+      "name": "黑河",
+      "province": "黑龙江省",
+      "capital": false,
+      "centerType": "城区代表中心",
+      "coordinateWgs84": [
+        127.5,
+        50.25
+      ],
+      "source": "项目城市目录人工复核",
+      "reviewedAt": "2026-09-14",
+      "quality": "PROJECT_REFERENCE",
+      "coordinateValid": true,
+      "coordinateStatus": "VALID",
+      "hubId": "CITY-3-11",
+      "hubOffsetFromCentreM": 0.0,
+      "hubStatus": "SIMULATED_REFERENCE"
+    },
+    {
+      "cityId": "3-12",
+      "name": "绥化",
+      "province": "黑龙江省",
+      "capital": false,
+      "centerType": "城区代表中心",
+      "coordinateWgs84": [
+        126.97,
+        46.64
+      ],
+      "source": "项目城市目录人工复核",
+      "reviewedAt": "2026-09-14",
+      "quality": "PROJECT_REFERENCE",
+      "coordinateValid": true,
+      "coordinateStatus": "VALID",
+      "hubId": "CITY-3-12",
+      "hubOffsetFromCentreM": 0.0,
+      "hubStatus": "SIMULATED_REFERENCE"
+    },
+    {
+      "cityId": "3-13",
+      "name": "大兴安岭地区",
+      "province": "黑龙江省",
+      "capital": false,
+      "centerType": "服务枢纽代表点",
+      "coordinateWgs84": [
+        124.71,
+        52.34
+      ],
+      "source": "项目城市目录人工复核；需保留行政驻地差异说明",
+      "reviewedAt": "2026-09-14",
+      "quality": "PROJECT_REFERENCE",
+      "coordinateValid": true,
+      "coordinateStatus": "VALID",
+      "hubId": "CITY-3-13",
+      "hubOffsetFromCentreM": 0.0,
+      "hubStatus": "SIMULATED_REFERENCE"
+    }
+  ]
+}

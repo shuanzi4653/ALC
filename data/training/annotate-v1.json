@@ -1,0 +1,21 @@
+{
+  "promptVersion": "labels-v1-2026-10-17",
+  "model": "deepseek-chat",
+  "samples": 1133,
+  "annotated": 1133,
+  "failed": 0,
+  "failedIds": [],
+  "fromCache": 6,
+  "tokensIn": 713067,
+  "tokensOut": 150038,
+  "wallSeconds": 250.1,
+  "latencyMedian": 1.32,
+  "latencyMax": 2.83,
+  "concurrency": 6,
+  "levels": {
+    "BAN": 387,
+    "CAUTION": 212,
+    "DANGER": 507,
+    "FIT": 27
+  }
+}

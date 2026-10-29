@@ -120,12 +120,22 @@ finally { Pop-Location }
 
 Push-Location $frontendRoot
 try {
-    & npm ci
-    if ($LASTEXITCODE -ne 0) { throw 'npm ci 失败' }
-    if (-not $SkipTests) { & npm test; if ($LASTEXITCODE -ne 0) { throw '前端测试失败' } }
-    $env:TIANCHUANG_FRONTEND_OUT = $generatedRoot
-    & npm run build
-    if ($LASTEXITCODE -ne 0) { throw '前端构建失败' }
+    # 2026-10-15: npm/vite 把**良性**提示写到 stderr（如 vite 的分块体积告警
+    # "[plugin builtin:vite-reporter]"，本仓产物 2.1 MB > chunkSizeWarningLimit 1600 kB），
+    # 而 PowerShell 5.1 在 $ErrorActionPreference='Stop' 下把**原生进程的 stderr**
+    # 当成终止错误 —— 于是"vite 已经建好、脚本却在下一行之前中止"，留下一个没有 JAR
+    # 的半成品。这与本文件 34–37 行给 `java -version` 的处理是同一个坑、同一种修法。
+    # **判据仍然是退出码**，不因为放宽错误偏好而少检查一条。
+    $previousEap = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & npm ci
+        if ($LASTEXITCODE -ne 0) { throw 'npm ci 失败' }
+        if (-not $SkipTests) { & npm test; if ($LASTEXITCODE -ne 0) { throw '前端测试失败' } }
+        $env:TIANCHUANG_FRONTEND_OUT = $generatedRoot
+        & npm run build
+        if ($LASTEXITCODE -ne 0) { throw '前端构建失败' }
+    } finally { $ErrorActionPreference = $previousEap }
 } finally {
     Remove-Item Env:TIANCHUANG_FRONTEND_OUT -ErrorAction SilentlyContinue
     Pop-Location
@@ -155,5 +165,25 @@ try {
 $version = (Get-Content -LiteralPath (Join-Path $projectRoot 'VERSION') -Raw).Trim()
 $jar = Join-Path $javaRoot "target/tianchuang-server-$version.jar"
 if (-not (Test-Path -LiteralPath $jar)) { throw '构建完成但未找到 JAR。' }
+
+# Static-bundle self-check (2026-10-16). `maven-resources-plugin` is COPY, not mirror,
+# so the moment `clean` is removed from the flow above the JAR carries BOTH the old and
+# the new content-hashed generation at once -- and the build, the tests and the running
+# app all stay silent (0.9.31: 6 orphan js/css entries, about 9 MB).
+# The check lives here as well as in the gate for the same reason M87 gives: fix it where
+# it is produced, and this script is what produces the JAR.
+# NOTE: keep this block ASCII. PowerShell 5.1 reads a BOM-less .ps1 in the system ANSI
+# codepage (936 here); a multi-byte comment desynchronises its parser (observed 2026-10-16).
+# The interpreter is the project venv (`check-environment.ps1` guards it). When it is
+# absent we warn only: "no venv" must not read as "build failed" -- the gate copy is hard.
+$bundleCheck = Join-Path $projectRoot 'tools/maintenance/_verify_static_bundle.py'
+$venvPython = Join-Path $projectRoot 'backend-python/.venv/Scripts/python.exe'
+if (Test-Path -LiteralPath $venvPython) {
+    & $venvPython -X utf8 $bundleCheck --jar $jar
+    if ($LASTEXITCODE -ne 0) { throw "静态包自检失败（产物里有多代 assets，见上方 ORPHAN 行）。" }
+} else {
+    Write-Log '警告：未找到 backend-python\.venv，跳过静态包自检（先跑 check-env.bat）。闸门里那一份仍会检查。'
+}
+
 Write-Log "构建成功：$jar"
 Get-FileHash -LiteralPath $jar -Algorithm SHA256 | Format-List

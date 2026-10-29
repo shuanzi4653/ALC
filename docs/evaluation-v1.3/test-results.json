@@ -1,0 +1,138 @@
+{
+  "generatedAt": "2026-09-14T16:45:19Z",
+  "note": "以下数字来自本轮实际执行的测试命令，不是估算值。逐项命令与结果见本文件 suites 字段。本轮为 V1.3 收尾轮：在完成用户批准的三项改动（航迹已飞段落变暗、省界线加粗、台账虚拟滚动）后重跑全部套件，并额外记录一次端到端模拟运行。",
+  "suites": [
+    {
+      "name": "Python 后端",
+      "command": "backend-python/.venv/Scripts/python.exe -m pytest tests -q --basetemp=<项目内目录>",
+      "result": "141 passed, 2 warnings",
+      "failed": 0,
+      "durationSeconds": 58.9,
+      "v1_2Baseline": "137 passed",
+      "newTests": [
+        "tests/test_traffic_v13.py：已声明高度层分配与上限、发布班次保持自身高度层、资源日历容量与时隙、交叉区解决、配送电量/返航/状态流转、电量不足取消、计划发布 layers/hubs/delivery、投影共享同一 planRevision、接口参数校验",
+        "tests/test_traffic_qweather.py：和风单位归一化（km/h→m/s、km→m）与城市中心不被网格点覆盖、派生风险单元、不可用时降级标注、默认来源配置"
+      ],
+      "rewrittenTests": [
+        "tests/test_traffic_network.py：原 test_profile_caps_crossing_lift_and_keeps_terminal_ground_points 断言旧的“交叉点抬升”行为，改为 test_profile_holds_a_declared_layer_without_stacking，验证高度恒定、超出机型上限与零高度/零速度被拒绝"
+      ]
+    },
+    {
+      "name": "前端单元测试",
+      "command": "frontend: node --test",
+      "result": "41 passed, 0 failed",
+      "failed": 0,
+      "durationMs": 1144,
+      "v1_2Baseline": "33 passed / 7 files",
+      "files": {
+        "authRecovery.test.mjs": 1,
+        "decisionLayers.test.mjs": 5,
+        "mapLayerLifecycle.test.mjs": 1,
+        "mapLayers.test.mjs": 10,
+        "store.test.mjs": 6,
+        "traffic.test.mjs": 5,
+        "trafficV13.test.mjs": 8,
+        "utils.test.mjs": 5
+      },
+      "newTests": [
+        "trafficV13.test.mjs：状态标记不含 emoji、已声明高度层标签不虚构高度、订单与载具状态只随时钟推进、放行队列只暴露窗口内已排班次、分组不丢班次、风险包络回退到机型上限",
+        "trafficV13.test.mjs：splitTrajectoryAt 在当分钟处切分航迹，两段共享同一个插值拐点、原始拐点不丢失、输入航迹不被修改；当分钟正好落在已声明拐点上时不产生零长线段",
+        "trafficV13.test.mjs：virtualWindow 只挂载可视范围行、带 overscan、越界与空列表不产生负区间或反向区间"
+      ],
+      "scriptChange": "package.json 的 test 脚本由 node --test tests/*.test.mjs 改为 node --test，避免在 Windows 上依赖 shell 展开 glob",
+      "defectFoundByTest": "splitTrajectoryAt 原先在“当分钟等于已声明拐点”时会重复该拐点，产生零长线段；Line2 对零长线段会得到未定义法线。已修复为两段共享该拐点。"
+    },
+    {
+      "name": "前端生产构建",
+      "command": "frontend: vite build",
+      "result": "built in 2280 ms, 146 modules transformed",
+      "failed": 0,
+      "modulesBefore": 142,
+      "artifacts": {
+        "dist/assets/index.css": "115.47 kB (gzip 17.90 kB)",
+        "dist/assets/index.js": "1878.44 kB (gzip 512.36 kB)"
+      },
+      "warning": "单 chunk 超过 1600 kB，属既有情况，未在本轮做代码分割。"
+    },
+    {
+      "name": "Java 后端",
+      "command": "backend-java: mvnw.cmd -o -B test（JAVA_HOME 指向 .jdks/ms-17.0.19）",
+      "result": "Tests run: 22, Failures: 0, Errors: 0, Skipped: 0 — BUILD SUCCESS",
+      "failed": 0,
+      "durationSeconds": 25,
+      "classes": {
+        "com.tianchuang.qweather.QweatherClientTest": 6,
+        "com.tianchuang.service.AlertStateServiceTest": 4,
+        "com.tianchuang.service.FusionServiceTest": 2,
+        "com.tianchuang.service.LayerServiceTest": 2,
+        "com.tianchuang.service.RunCommitRecoveryTest": 1,
+        "com.tianchuang.service.SfiEngineTest": 5,
+        "com.tianchuang.service.SfiRuleCasesTest": 2
+      },
+      "newTests": [
+        "QweatherClientTest：显式坐标进入 URL、小时数与坐标同时携带、越界与 NaN/Infinity 坐标被拒绝、东北坐标不被吸附",
+        "QweatherClientTest：gzip 压缩正文在交给 Jackson 前被解压；明文、空正文与过短正文原样返回"
+      ]
+    }
+  ],
+  "endToEndRun": {
+    "reference": "docs/evaluation-v1.3/simulation-run-v1.3.json",
+    "summary": "清空 .run/traffic 计划缓存并重启三服务后，按前端实际调用顺序驱动全部交通接口：36 城 / 456 起降点 / 269 条走廊（53 城际 + 216 城内）/ 11 环省界 / 3 个省级行政区；计划 2910 班次，接受 2789、关闭 121、绕行 64、解决冲突 918；32 个交叉区 255 次预约；配送 2592 单，送达 2499、取消 93，送达率 0.9641。控制指令 SUSPEND/RESUME 均可写入台账，重复 commandId 幂等。",
+    "nowVerified": [
+      "和风天气真实调用：/api/internal/qweather/current 返回真实 product=weather/v1/current、单位表与诚实标注（thunderEstimate 为推导值），不再是降级占位。",
+      "公开天气驱动：scenario=live 的成功构建使用了 Open-Meteo 真实模型估算（provider=OPEN_METEO，qualityFlags 标注 MODEL_ESTIMATE_NOT_STATION_OBSERVATION 与 ROUTE_INTERIOR_NOT_FULLY_SAMPLED）。",
+      "start.ps1 启动链：scripts/dev.ps1 被实际执行并返回 0，三个服务就绪且 /health、/api/health/live、5180 全部响应。",
+      "控制指令与运行台账：SUSPEND → 台账 1 条，RESUME → 2 条，重复 commandId 返回 idempotent=true 且台账仍为 2 条。",
+      "净空状态：全部被接受班次的 clearanceStatus 仍为 SIMULATION_ASSUMPTION_UNVERIFIED，关闭班次为 NOT_EVALUATED；本轮未获得 DEM 与建筑数据，因此不宣称已通过净空。"
+    ]
+  },
+  "notVerifiedInThisRound": [
+    {
+      "item": "浏览器渲染帧率（目标 30 FPS 以上）",
+      "reason": "本轮仍未在真实浏览器中做长时间帧率采样。性能记录只覆盖后端计划计算与传输，不覆盖界面渲染。",
+      "howToClose": "在 1366×768 与 1920×1080 下用浏览器性能面板采样城区典型视图。"
+    },
+    {
+      "item": "台账筛选响应 300 ms 与虚拟滚动实际收益",
+      "reason": "台账已由分页改为固定高度虚拟窗口（只挂载可视行 + overscan），但未在真实浏览器中测量筛选与滚动的实际耗时，因此不宣称达标。",
+      "howToClose": "在 2910 班次数据集下测量展开台账、切换分组与滚动的交互耗时。"
+    },
+    {
+      "item": "start.bat / stop.bat 双击端到端",
+      "reason": "scripts/dev.ps1 与 stop.ps1 均已实际执行成功（启动返回 0，停止逐个 PID 报告正常），但本轮是在自动化宿主内调用，未双击 bat、未验证窗口驻留与自动打开浏览器三项。另：本机自动化宿主环境存在大小写重复的环境变量（Path/PATH、http_proxy/HTTP_PROXY），会让 PowerShell 的 Start-Process 重定向重载直接抛错；该问题在普通用户会话中不存在，故未改动脚本。",
+      "howToClose": "双击 start.bat，确认窗口驻留且浏览器自动打开 http://127.0.0.1:5180；再双击 stop.bat 确认三个进程停止且其他程序不受影响。"
+    },
+    {
+      "item": "省界与行政区外遮罩的视觉效果",
+      "reason": "省界已改为双层描边（内 2.8 px / 外 4.4 px）并新增行政区外压暗遮罩，环方向依据右手法则修正；但只做了构建与单元级验证，未在浏览器中确认遮罩不遮死道路、地名与航迹。",
+      "howToClose": "在真实浏览器中检查三省全域视图与城市视图下的描边清晰度、遮罩透明度和文字可读性。"
+    },
+    {
+      "item": "航迹已飞段落变暗的实际观感",
+      "reason": "已飞段落不透明度 0.32（选中 0.55）、未飞 0.88，并对已到达班次保留 8 分钟且最多 100 条线，属于为避免 WebGL 线数无上限的实现取舍；未在浏览器中确认明暗对比合适。",
+      "howToClose": "拖动时间轴核对已飞/未飞对比度，并确认长时间运行后线数不会持续增长。"
+    },
+    {
+      "item": "DEM 与建筑净空",
+      "reason": "本地没有覆盖全部航迹的 DEM 与建筑高度数据。",
+      "howToClose": "接入数据源后替换 traffic/obstacles.py 的 evaluate，并重新生成覆盖率报告。"
+    },
+    {
+      "item": "资源日历与配送在多种子下的稳定性",
+      "reason": "本轮对 42/moving、98765/moving、42/live 三组参数做了完整计划计算，仍未做 36 城逐城或长时间连续运行验证。",
+      "howToClose": "在多种子与连续刷新下重复运行，统计放行率与关闭原因分布的稳定性。"
+    }
+  ],
+  "superseded": {
+    "supersededAt": "2026-09-17",
+    "reason": "测试基线已随 V1.4/V1.5 与命名统一轮次变化，本文件的套件计数属 V1.3 收尾轮口径。",
+    "currentBaseline": {
+      "python": 204,
+      "frontend": 63,
+      "java": 22,
+      "viteModules": 146
+    },
+    "currentEvidence": "docs/evaluation-v1.5/risk-merge-and-flat-render.json + 本轮实测",
+    "warning": "本文件的 Python 141 / 前端 41 不再是当前基线。"
+  }
+}
