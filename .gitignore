@@ -47,3 +47,31 @@ backend-java/src/main/resources/application.yml
 config/qweather/*.pem
 *.key
 *.secret
+
+# Encrypted credential store: ciphertext only, but it must never be distributed.
+backend-python/data/secrets.db
+backend-python/data/secrets.db-journal
+backend-python/data/secrets.db-wal
+
+# External site credentials (plaintext password inside — never distribute)
+SHUANZI_SITE_CREDENTIALS.md
+
+# 部署用的 Python 打包产物（由 tools/deploy/_deploy_release.py 现场生成）
+py-*.tar.gz
+
+# 调试产物与工具缓存（体积大、可再生成）
+artifacts/
+.playwright-cli/
+.workbuddy/
+
+# 打包副本与已退役代码
+TianChuang.zip
+backend-python/simulator.py.retired
+
+# 误创建的空文件（文件名本身是说明文字）
+本目录索引*
+
+# 训练原始数据（42 MB，可由 data/training 脚本重新下载；指标与标签仍入库）
+data/training/metar/
+data/training/annotate-cache/
+data/training/raw/
