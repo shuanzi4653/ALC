@@ -16,7 +16,6 @@ export const store = reactive({
   requestedScenario: null,
   pendingAction: null,
   actionError: ''
-  ,auth: { enabled: false, authenticated: true, username: '', loading: true, error: '' }
 })
 
 export function isNewerDashboard(next, current = store.dash) {

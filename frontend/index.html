@@ -3,10 +3,41 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>天窗智巡 · 东北低空交通运行 V1.2</title>
+    <title>天窗智巡 · 低空交通协同运行管理系统</title>
 </head>
 <body>
-  <div id="app"></div>
+  <div id="app">
+    <!-- 0.11.15（K-7）：**首屏兜底**。
+         复测复现过一次主包 `ERR_CONNECTION_RESET`：整页白屏、0 个元素、0 字、无提示、
+         无重试 —— 答辩现场撞上就没救了。这里在 Vue 挂载前放一层占位，两条兜底：
+           ① 6 秒还没挂载（`body` 元素数 < 20）→ 给"加载较慢"提示 + 可点的重新加载；
+           ② 脚本自身的 `error` 事件（module 脚本被截断/断流）→ 立刻给"脚本加载失败"。
+         Vue 挂载会把 `#app` 的内容整体替换，所以成功路径上它 <200 ms 就消失，
+         不会闪。 -->
+    <div id="boot" style="min-height:60vh;display:flex;align-items:center;justify-content:center;
+         font:14px/1.7 'Microsoft YaHei',sans-serif;color:#9fb6cd;background:#070f18;text-align:center">
+      正在加载运行态势…
+    </div>
+  </div>
+  <script>
+    (function () {
+      var boot = function () { return document.getElementById('boot'); };
+      var fail = function (text) {
+        var el = boot();
+        if (el) {
+          el.innerHTML = text + '<br><button style="margin-top:10px;padding:6px 16px;cursor:pointer"'
+            + ' onclick="location.reload()">重新加载</button>';
+        }
+      };
+      setTimeout(function () {
+        if (boot() && document.querySelectorAll('body *').length < 20) fail('加载较慢或网络中断');
+      }, 6000);
+      window.addEventListener('error', function (event) {
+        var target = event.target;
+        if (target && target.tagName === 'SCRIPT') fail('脚本加载失败');
+      }, true);
+    })();
+  </script>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>

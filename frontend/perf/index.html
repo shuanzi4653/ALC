@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<!--
+  Host page for the per-frame FPS benchmark.
+
+  Opened by `tools/probes/_probe_browser_fps.py` in headless Edge. The page
+  imports the real `runtime.js` and runs the same per-frame work the traffic
+  panel runs, then writes its result to `window.__ALC_FPS__` and the <title>, so
+  the driver can read it from a DOM dump without needing a debugger connection.
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>ALC-FPS-PENDING</title>
+<style>
+  body { font-family: ui-monospace, Consolas, monospace; background:#12161c; color:#e7ecf3; padding:24px; }
+  h1 { font-size:16px; font-weight:600; margin:0 0 12px; }
+  pre { white-space:pre-wrap; line-height:1.5; font-size:13px; }
+</style>
+</head>
+<body>
+<h1>ALC 帧率基准（真实浏览器）</h1>
+<pre id="out">running…</pre>
+<script type="module">
+import * as runtime from '../src/traffic/runtime.js';
+import { runBenchmark } from './fpsBench.mjs';
+import { runStageBenchmark } from './stageBench.mjs';
+
+const fleetSizes = [1000, 3000, 7760];
+const results = [];
+
+try {
+  for (const size of fleetSizes) {
+    const result = await runBenchmark(runtime, size);
+    results.push(result);
+  }
+  // Attribute the per-flight loop before changing anything: the frame total
+  // alone already sent one optimisation at the wrong stage.
+  const stageResults = [];
+  for (const size of fleetSizes) {
+    stageResults.push(await runStageBenchmark(runtime, size));
+  }
+  const payload = { ok: true, results, perFlightStages: stageResults };
+  window.__ALC_FPS__ = payload;
+  document.getElementById('out').textContent = JSON.stringify(payload, null, 2);
+  document.title = 'ALC-FPS-DONE ' + JSON.stringify(payload);
+} catch (error) {
+  const payload = { ok: false, error: String(error && error.stack || error) };
+  window.__ALC_FPS__ = payload;
+  document.getElementById('out').textContent = JSON.stringify(payload, null, 2);
+  document.title = 'ALC-FPS-ERROR ' + String(error);
+}
+</script>
+</body>
+</html>

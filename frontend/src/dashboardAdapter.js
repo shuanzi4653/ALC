@@ -1,4 +1,3 @@
-/** 过渡适配器：v1 后端仍提供旧面板所需的 current/tracks 字段。 */
 export function normalizeDashboard(payload) {
   if (!payload || typeof payload !== 'object') throw new Error('大屏响应为空或格式错误')
   return {

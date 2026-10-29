@@ -13,5 +13,7 @@ onMounted(async()=>{try{data.value=await requestJson('/api/observations')}catch(
  <p class="muted">雷暴概率：无数据 · 区域预报：未接入</p></article></div></section>
 </template>
 <style scoped>
-.regional-observations{margin:14px 0}.station-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.station-cards article{padding:14px;border:1px solid #294657;border-radius:8px;line-height:1.8;overflow-wrap:anywhere}.station-cards h3{font-size:14px;color:#a6d6c9}.station-cards p{font-size:12px;color:#9ab3c4;margin:8px 0}dl{display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px}dd{margin:0}a{color:#8dd1ca}@media(max-width:900px){.station-cards{grid-template-columns:1fr}}
+.regional-observations{margin:14px 0}.station-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}.station-cards article{padding:14px;border:1px solid #294657;border-radius:8px;line-height:1.8;overflow-wrap:anywhere;min-width:0}.station-cards h3{font-size:14px;color:#a6d6c9}.station-cards p{font-size:12px;color:#9ab3c4;margin:8px 0}
+dl{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;font-size:12px}dt{min-width:0;overflow-wrap:anywhere}dd{margin:0;min-width:0;overflow-wrap:anywhere}a{color:#8dd1ca}
+@media(max-width:900px){.station-cards{grid-template-columns:1fr}dl{grid-template-columns:minmax(0,1fr)}}
 </style>

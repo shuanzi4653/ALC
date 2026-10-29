@@ -1,0 +1,21 @@
+-- ============================================================
+-- V5 工作区隔离：把「谁问的」记在智能体问答记录上
+-- ============================================================
+--
+-- 背景：2026-10-14 按用户要求拆掉登录门 —— 同一条链接会被不同的人同时打开。
+--       agent_chat 存的是**用户自己提的问题**（不是观测），必须能分辨归属。
+--
+-- 为什么只加 agent_chat、不动 monitoring_run / sfi_record / alert / alert_state：
+--   那四张表是**同一片天空下的同一份观测**（采集按机器一轮一轮跑，规则引擎
+--   是观测流的确定性函数）。按工作区去切它们，会让刚打开浏览器的人看到一个
+--   「空系统」——那不是隔离，是把共享的现实切开。工作区隔离的是**用户发起的
+--   东西**：计划/会话、气象通道、人工干预日志、决策记录、已应用情景、WS 推送。
+--   完整契约见 docs/云端部署与运维说明.md §11。
+--
+-- 幂等：ADD COLUMN IF NOT EXISTS；Flyway 另行记录版本，重复执行无副作用。
+--   旧行落空串 = 「未标识」，与 Python `workspace.py::UNIDENTIFIED`、
+--   Java `WorkspaceContext.UNIDENTIFIED` 同义 —— 三者必须是同一个字面量。
+--
+-- 注：ts 可空，索引里的 ts 只用于倒序取最近，不参与唯一性。
+ALTER TABLE agent_chat ADD COLUMN IF NOT EXISTS workspace VARCHAR(64) NOT NULL DEFAULT '';
+CREATE INDEX IF NOT EXISTS idx_agent_chat_workspace ON agent_chat (workspace, ts);

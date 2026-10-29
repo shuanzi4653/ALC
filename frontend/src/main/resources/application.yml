@@ -1,0 +1,22 @@
+spring:
+  application:
+    name: tianchuang
+  config:
+    # 外部共享配置：工程根目录 config/application.yml（start.bat 保证工作目录为工程根）
+    import: "optional:file:./config/application.yml"
+  jackson:
+    # 0.11.3：`non_null` → `always`。
+    #
+    # 网关的职责是**透传**，不是改写载荷。`non_null` 会把 Python 明确给出的
+    # `"value": null`（"这一格没有数字"）整个键删掉，于是下游拿到的是 `undefined`：
+    # 界面靠 `=== null || === undefined` 兜住了，但"没有这个键"与"键的值是 null"
+    # 在载荷层已经不可区分 —— 任何按 `'value' in x` 判断的消费者都会把
+    # "本轮不评估"读成"字段缺失"。
+    #
+    # 这在本轮有具体证据：切到「气象中断」后 `/api/traffic/v2/overview` 的
+    # 两个走廊 KPI 的 `value` 键直接消失（Python 侧是 `None`），而 W-01 的判据
+    # 恰恰要求"没有数字"与"数字是 0"是两种**可区分**的渲染。
+    # 保留 null 是让这个区分在传输层也成立，而不只是在前端碰巧成立。
+    default-property-inclusion: always
+server:
+  address: 127.0.0.1

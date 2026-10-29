@@ -1,179 +1,176 @@
-/* 天窗智巡大屏 · 深色科技风全局样式（V2 重排版） */
+/* 天窗智巡 · 全局基础样式
+ *
+ * 0.9.27 起，本文件只保留四组**真正全局**的规则：元素重置、舞台根尺寸、
+ * 正文字体、滚动条。原先 V2 大屏的整套类样式已被移除。
+ *
+ * 为什么可以删：主入口 index.html → main.js → App.vue 只挂
+ * <TrafficWorkbench/>（2026-10-14 之前还挂过一个 <LoginOverlay/>，随登录门一
+ * 起拆掉了）；这一个（以及它下面
+ * HomeStage / CityTrafficMap / OperationsConsole / FlightStrip /
+ * WeatherSourceSwitch / DispatchBoard / ScrollList）的美术**全部在自己的
+ * <style scoped> 里**，用的也是自己的前缀（hs- / traffic- / city-map- /
+ * k- / db- / sl- …）。全局表里那 58 个类选择器（.stage .panel .btn
+ * .alert-flash .wx-item .push-* .chat-* .msg .sfi-* .track-* .lv …）随旧
+ * ECharts 仪表盘一起作废，属于「样式留在了全局、组件已删除」的残留。
+ *
+ * 判据不是肉眼看的：`.run/_cssaudit2.py` 只在 **class 绑定上下文**
+ * （class="…" / :class="…" / classList.*('…')）里查找引用，因此不会被
+ * `panelEl` 这样的标识符误判成"用到了 .panel"。实测 style.css 58 个类
+ * 选择器里被活代码真正当 class 引用的为 0 —— 唯一出现的 active/num/warn
+ * 三个词都来自各组件自己的 scoped 类。删除时以 vite build + 实机渲染复核。
+ *
+ * 另：这次收敛同时清掉了残留的**砖红/玫红状态色**（.btn.danger、
+ * .action-error、.push-FAILED、.alert-flash、.wx-item.ban），它们是
+ * 0.9.27「状态色统一为暖橙系」里最后一批没走到的字面量 —— 由删除而非
+ * 改色解决，比改一份永不渲染的规则更干净。
+ */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body, #app { width: 100%; height: 100%; background: #050b16; overflow: hidden; }
-body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; color: #cfe3ff; font-size: 13px; }
-
-/* 1920x1080 舞台，scale 适配；背景 = 顶部光晕 + 细网格纹理 */
-.stage-wrap { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
-.stage {
-  width: 1920px; height: 1080px; flex: none;
-  display: grid; gap: 10px; padding: 10px;
-  grid-template-rows: 64px 1fr 286px;
-  grid-template-columns: 440px 1fr 470px;
-  background:
-    radial-gradient(1300px 560px at 50% -12%, rgba(38, 108, 205, 0.20), transparent 62%),
-    radial-gradient(900px 420px at 88% 108%, rgba(24, 84, 168, 0.12), transparent 60%),
-    linear-gradient(rgba(64, 140, 230, 0.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(64, 140, 230, 0.045) 1px, transparent 1px),
-    #050b16;
-  background-size: auto, auto, 44px 44px, 44px 44px, auto;
+/* 字体栈（0.11.4 · W-27）。
+ *
+ * 原来只有 `"Microsoft YaHei", "PingFang SC", sans-serif`：拉丁字母与数字也走雅黑，
+ * 而雅黑的西文字形偏窄、字重偏轻，中文 12px 与半角 9px 混排时视觉重量突变 ——
+ * 观感就是"字很奇怪、大小也很奇怪"。
+ *
+ * 现在让**拉丁与数字走系统 UI 字体**（Segoe UI / SF / Roboto），中文仍由雅黑/
+ * 苹方/思源承担。这是 Windows 与 macOS 上都稳的组合，且不引入任何网络字体
+ * （离线演示时不会因为字体拉不到而闪一次宋体）。
+ *
+ * `font-optical-sizing`/`text-rendering` 只影响观感、不影响布局，安全。
+ */
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei",
+               "PingFang SC", "Noto Sans SC", "Source Han Sans SC", sans-serif;
+  color: #cfe3ff;
+  font-size: 14px;
+  line-height: 1.5;
+  text-rendering: optimizeLegibility;
 }
-
-/* ---------- 面板卡片：渐变底 + 科技角标 ---------- */
-.panel {
-  position: relative;
-  background: linear-gradient(165deg, rgba(17, 38, 72, 0.90) 0%, rgba(9, 22, 44, 0.90) 55%, rgba(8, 18, 38, 0.92) 100%);
-  border: 1px solid rgba(64, 140, 230, 0.26);
-  border-radius: 10px;
-  display: flex; flex-direction: column; overflow: hidden;
-  box-shadow: inset 0 1px 0 rgba(120, 180, 255, 0.10), inset 0 0 30px rgba(28, 92, 180, 0.07), 0 4px 18px rgba(0, 0, 0, 0.35);
-  transition: border-color .25s;
-}
-.panel:hover { border-color: rgba(80, 160, 255, 0.45); }
-/* 四角亮角（左上 / 右上 / 左下 / 右下） */
-.panel::before {
-  content: ""; position: absolute; left: -1px; top: -1px; width: 14px; height: 14px; z-index: 5; pointer-events: none;
-  border-left: 2px solid #3d8bff; border-top: 2px solid #3d8bff; border-top-left-radius: 10px;
-  filter: drop-shadow(0 0 4px rgba(61, 139, 255, 0.8));
-}
-.panel::after {
-  content: ""; position: absolute; right: -1px; bottom: -1px; width: 14px; height: 14px; z-index: 5; pointer-events: none;
-  border-right: 2px solid #3d8bff; border-bottom: 2px solid #3d8bff; border-bottom-right-radius: 10px;
-  filter: drop-shadow(0 0 4px rgba(61, 139, 255, 0.8));
-}
-
-.panel-hd {
-  padding: 9px 14px; font-size: 14.5px; font-weight: 700; color: #bfe0ff; letter-spacing: 1px;
-  border-bottom: 1px solid transparent;
-  border-image: linear-gradient(90deg, rgba(61, 139, 255, 0.55), rgba(61, 139, 255, 0.08)) 1;
-  background: linear-gradient(90deg, rgba(61, 139, 255, 0.10), transparent 55%);
-  display: flex; align-items: center; gap: 8px; flex: none;
-}
-.panel-hd::before {
-  content: ""; width: 4px; height: 15px; border-radius: 2px; flex: none;
-  background: linear-gradient(180deg, #3d8bff, #27e0ff);
-  box-shadow: 0 0 8px rgba(61, 170, 255, 0.9);
-}
-.panel-bd { flex: 1; padding: 10px 14px; overflow: auto; min-height: 0; }
-
-/* ---------- 顶部 ---------- */
-.top { grid-column: 1 / 4; display: flex; align-items: center; gap: 22px; padding: 0 20px; position: relative; }
-.top .title {
-  font-size: 25px; font-weight: 800; letter-spacing: 7px;
-  background: linear-gradient(180deg, #ffffff 20%, #8ec4ff 90%);
-  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 0 14px rgba(61, 139, 255, 0.55));
-}
-.top .sub { font-size: 12px; color: #6f95c4; letter-spacing: 2px; margin-top: 2px; }
-.top .spacer { flex: 1; }
-.top .clock { font-size: 20px; font-weight: 700; color: #bfe0ff; font-variant-numeric: tabular-nums; text-shadow: 0 0 10px rgba(61, 139, 255, 0.4); }
-.status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
-.status-item { font-size: 12px; color: #8fb4de; }
-
-/* ---------- 三栏 ---------- */
-.left-col { display: grid; grid-template-rows: 1.25fr .75fr; gap: 10px; min-height: 0; }
-.center-col { min-height: 0; display: flex; flex-direction: column; }
-.right-col { min-height: 0; display: flex; }
-.right-col > .panel { flex: 1; }
-.bottom { grid-column: 1 / 4; display: grid; grid-template-columns: 1.3fr 1fr; gap: 10px; min-height: 0; }
-.decision-body { display: grid; grid-template-rows: minmax(0, 1.15fr) auto minmax(0, .85fr); gap: 9px; overflow: hidden; }
-.decision-tracks, .decision-alerts { min-height: 0; overflow: hidden; }
-.decision-subhead { color: #8dbce8; font-size: 12px; font-weight: 700; letter-spacing: 1px;
-  padding: 7px 2px 4px; border-top: 1px solid rgba(64,140,230,.24); }
-
-/* ---------- 气象要素网格 ---------- */
-.wx-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; height: 100%; }
-.wx-item {
-  background: linear-gradient(160deg, rgba(28, 58, 104, 0.5), rgba(16, 36, 68, 0.4));
-  border: 1px solid rgba(64, 140, 230, 0.20);
-  border-radius: 8px; padding: 8px 9px; min-width: 0; min-height: 0; overflow: hidden;
-}
-.wx-item .lab { font-size: 11px; color: #87afd9; white-space: nowrap; }
-.wx-item .val { max-width: 100%; font-size: 18px; line-height: 1.35; font-weight: 700; color: #eaf5ff; margin-top: 3px;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; text-shadow: 0 0 10px rgba(120, 180, 255, 0.25); }
-.wx-item .val small { font-size: 9px; color: #7ba0cc; font-weight: 400; margin-left: 2px; }
-.wx-item.warn { border-color: rgba(217, 138, 43, 0.55); background: linear-gradient(160deg, rgba(96, 62, 16, 0.35), rgba(16, 36, 68, 0.4)); }
-.wx-item.ban { border-color: rgba(192, 57, 43, 0.65); background: linear-gradient(160deg, rgba(96, 26, 22, 0.4), rgba(16, 36, 68, 0.4)); }
-
-/* ---------- 等级标签（带同色发光） ---------- */
-.lv { display: inline-block; padding: 2px 10px; border-radius: 4px; font-size: 12px; font-weight: 700; color: #fff; }
-.lv-FIT { background: #2e8b57; box-shadow: 0 0 10px rgba(46, 139, 87, 0.65); }
-.lv-CAUTION { background: #d98a2b; box-shadow: 0 0 10px rgba(217, 138, 43, 0.6); }
-.lv-DANGER { background: #d85a30; box-shadow: 0 0 10px rgba(216, 90, 48, 0.65); }
-.lv-BAN { background: #c0392b; box-shadow: 0 0 10px rgba(192, 57, 43, 0.75); }
-
-/* ---------- SFI 大数字 ---------- */
-.sfi-hero { display: flex; align-items: center; gap: 16px; }
-.sfi-hero .num { font-size: 52px; font-weight: 700; font-variant-numeric: tabular-nums; }
-
-/* ---------- 预警列表 ---------- */
-.alert-item {
-  border-left: 3px solid; padding: 6px 10px; margin-bottom: 8px;
-  background: linear-gradient(90deg, rgba(28, 58, 104, 0.42), rgba(16, 36, 68, 0.28));
-  border-radius: 0 6px 6px 0;
-}
-.alert-item .t { font-size: 11px; color: #7ba0cc; }
-.alert-item .x { font-size: 12px; color: #d9e8fa; white-space: pre-line; }
-
-/* ---------- 双轨对比 ---------- */
-.track-row { display: flex; gap: 10px; margin-bottom: 10px; }
-.track-card {
-  flex: 1; background: rgba(22, 48, 88, 0.45); border: 1px solid rgba(64, 140, 230, 0.2);
-  border-radius: 8px; padding: 8px 12px;
-}
-.track-card .h { font-size: 12px; color: #7ba0cc; margin-bottom: 4px; display: flex; justify-content: space-between; }
-.track-card .lv { font-size: 16px; }
-.fused { border-color: rgba(61, 139, 255, 0.6); background: rgba(28, 74, 140, 0.4); }
-.factors { font-size: 12px; color: #a9c8ea; line-height: 1.6; margin-top: 6px; white-space: pre-line; }
-
-/* ---------- 智能体问答 ---------- */
-.chat-box { display: flex; flex-direction: column; height: 100%; }
-.chat-list { flex: 1; overflow: auto; padding-right: 4px; }
-.msg { margin-bottom: 8px; max-width: 95%; }
-.msg .who { font-size: 11px; color: #6f95c4; margin-bottom: 2px; }
-.msg .bubble { padding: 7px 10px; border-radius: 8px; font-size: 12.5px; line-height: 1.6; white-space: pre-line; }
-.msg.user .bubble { background: rgba(61, 139, 255, 0.25); }
-.msg.bot .bubble { background: rgba(22, 48, 88, 0.6); }
-.chat-input { display: flex; gap: 8px; padding-top: 8px; flex: none; }
-.chat-input input { flex: 1; background: rgba(10, 25, 48, 0.8); border: 1px solid rgba(64, 140, 230, 0.35);
-  color: #eaf5ff; border-radius: 6px; padding: 8px 10px; font-size: 13px; outline: none; }
-.chat-input input:focus { border-color: #3d8bff; box-shadow: 0 0 8px rgba(61, 139, 255, 0.35); }
-
-/* ---------- 按钮 ---------- */
-.btn {
-  background: rgba(61, 139, 255, 0.16); border: 1px solid rgba(80, 158, 255, 0.45); color: #cfe6ff;
-  border-radius: 6px; padding: 7px 14px; cursor: pointer; font-size: 12.5px;
-  transition: all .18s;
-}
-.btn:hover { background: rgba(61, 139, 255, 0.38); box-shadow: 0 0 10px rgba(61, 139, 255, 0.35); }
-.btn:disabled { opacity: 0.45; cursor: not-allowed; }
-.btn.danger { border-color: rgba(192, 57, 43, 0.6); background: rgba(192, 57, 43, 0.18); }
-.btn.danger:hover { box-shadow: 0 0 10px rgba(192, 57, 43, 0.5); }
-
-/* ---------- 剧本切换 ---------- */
-.scenario-bar { display: flex; gap: 8px; align-items: center; }
-.action-error { margin-left: 8px; color: #ff9a8a; font-size: 10px; max-width: 220px;
-  overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.scenario-bar .btn.active {
-  background: linear-gradient(180deg, #3d84e0, #2b5fa8); border-color: #5aa4ff; color: #fff;
-  box-shadow: 0 0 12px rgba(61, 139, 255, 0.55);
-}
-
-.push-status { display: flex; flex-wrap: wrap; gap: 6px; align-content: flex-start; }
-.push-chip { font-size: 11.5px; padding: 3px 9px; border-radius: 12px; border: 1px solid; }
-.push-SENT { color: #7ee2a8; border-color: rgba(46, 139, 87, 0.5); }
-.push-FAILED { color: #ff9a8a; border-color: rgba(192, 57, 43, 0.6); }
-.push-SKIPPED { color: #7ba0cc; border-color: rgba(64, 140, 230, 0.3); }
-
-/* ---------- 预警弹窗 ---------- */
-.alert-flash { position: absolute; left: 50%; top: 92px; transform: translateX(-50%);
-  width: 560px; z-index: 50; border-radius: 10px; padding: 16px 20px;
-  background: rgba(140, 20, 20, 0.92); border: 1px solid #ff7a6b; color: #fff;
-  box-shadow: 0 8px 40px rgba(192, 57, 43, 0.5); font-size: 14px; white-space: pre-line; }
-.alert-flash.warn { background: rgba(150, 90, 10, 0.92); border-color: #ffc46b; }
-.alert-flash .close { position: absolute; right: 12px; top: 8px; cursor: pointer; color: #ffd9d3; }
 
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(64, 140, 230, 0.35); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(64, 140, 230, 0.6); }
+
+/* =============================================================================
+ * 0.11.1（Beta）· 设计令牌（手册 §4）
+ * =============================================================================
+ *
+ * 令牌先落地在 :root，**新写的组件只允许用令牌**，老组件的字面量按"改到哪、
+ * 换到哪"逐步收敛。不做一次性全站替换的理由：那会把 4 000 行 scoped CSS 里
+ * 每一处颜色都变成一次回归风险，而判据（构建、测试）对"颜色变了"完全沉默。
+ *
+ * 三条硬规则（写进令牌，不是写进文档）：
+ *   ① 红色只表达"不可飞/禁飞"，一屏最多 3 处；
+ *   ② 颜色必须配文字（色 + 字双编码，投影色偏与色弱都要兜住）；
+ *   ③ 正文 14px、辅助 12px，禁止 <12（7–9px 在投影仪上等于看不见）。
+ */
+:root {
+  --alc-bg-0: #0b1220;
+  --alc-bg-1: #111a2b;
+  --alc-bg-2: #16223a;
+  --alc-line: rgba(255, 255, 255, .08);
+  --alc-text: #dce6f5;
+  --alc-text-dim: #93a4bc;
+  --alc-text-mute: #8a99ad;
+
+  --alc-danger: #ff4d4f;
+  --alc-watch: #faad14;
+  --alc-ok: #52c41a;
+  --alc-info: #4c8dff;
+  --alc-neutral: #8a99ad;
+
+  --alc-fs-aux: 12px;
+  --alc-fs-body: 14px;
+  --alc-fs-title: 18px;
+  --alc-fs-page: 24px;
+  --alc-fs-hero: 44px;
+
+  --alc-space-card: 16px 20px;
+  --alc-space-gap: 12px;
+  --alc-space-block: 24px;
+  --alc-radius: 6px;
+
+  --alc-ease: cubic-bezier(.2, .8, .2, 1);
+}
+
+/* ---- 投影模式（快捷键 P）---------------------------------------------------
+ *
+ * 答辩现场 90% 是投影 + 明亮会议室，深色低对比界面会糊成一片。
+ * 这里做三件事，都**不重写主题**：
+ *   ① 整体提亮 18%、对比 +6%（一条 filter，不改任何组件的 scoped CSS）；
+ *   ② 正文行高与字重微调，让 3 米外能认出主谓宾；
+ *   ③ 隐藏工程字段（`[data-engineering]`）：快照号、指纹、内网地址、版本号。
+ * 地图底图**不切亮色** —— 中途换底图会突变，反而更刺眼。
+ */
+html[data-projection="on"] {
+  filter: brightness(1.18) contrast(1.06);
+  /* 手册 §4.5「字号整体 +2 px」。**改令牌而不是缩放页面**：
+     缩放会把固定 1080 高的舞台连同地图一起放大、必然裁边；改令牌只让
+     "按令牌排版的部分"变大，几何与轨道预算一个像素都不动。
+     代价是：仍在写 px 字面量的老规则不会跟着涨 —— 所以 0.11.2 把 7–11 px
+     全部抬到了 12 px，并加了一条判据（tests/visualTokens.test.mjs）钉住下限。 */
+  --alc-fs-aux: 14px;
+  --alc-fs-body: 16px;
+  --alc-fs-title: 20px;
+  --alc-fs-page: 26px;
+  --alc-fs-hero: 52px;
+}
+html[data-projection="on"] [data-engineering] { display: none !important; }
+html[data-projection="on"] body { letter-spacing: .2px; }
+
+/* ── 0.11.4（W-22a）投影模式的**字号下限** ────────────────────────────────
+ *
+ * 上面那组 `--alc-fs-*` 令牌只被 2 处引用，而全站 9/10/11px 的硬编码有 81 处。
+ * 于是"投影"实际只等于"隐藏工程字段"——实测投影档最小字号仍是 9px、最大 15px，
+ * 而投影仪后排的可读下限是 18–20px。改 81 处字面量是三天活，且改完还会再长出来。
+ *
+ * 这里改用一条**上限受控的下限规则**：`clamp(16px, 1em, 18px)`
+ *   · 父级 12px 的标签 → 抬到 16px（可读）
+ *   · 父级 20px 的标题内的正文 → 收到 18px（不会被大字标题带着爆炸）
+ *   · 已经 ≥18px 的标题 → 保持（`<h*>` 另给 20px 下限）
+ * `1em` 在 `font-size` 里取的是**父元素**字号，所以逐层收敛、不会递归放大。
+ * 用 `!important` 是因为要越过 81 处 scoped 规则的 `(0,2,0)` 特异性 ——
+ * 这一条的全部目的就是"比它们都优先"。
+ *
+ * 代价说清楚：投影档下 `<small>` 与正文将一样大，层次感变弱。这是投影的取舍
+ * （3 米外先要读得清，再谈排版）；退出投影即恢复。
+ */
+html[data-projection="on"] :where(p, span, small, em, i, li, dd, dt, td, th,
+  label, button, summary, textarea, input, a, time, code) {
+  font-size: clamp(16px, 1em, 18px) !important;
+}
+html[data-projection="on"] :where(h1, h2, h3, h4, h5, h6, b, strong) {
+  font-size: clamp(20px, 1em, 40px) !important;
+}
+
+/* 0.11.5（W-29）：上面那两条漏了 **SVG 文本**。
+ * `<text font-size="9">起点 / 地面</text>` 这类是 SVG 元素，不在 HTML 标签选择器里，
+ * 于是投影档最小字号卡在 9px（实测 46 → 1 个 <12px 节点，剩下那 1 个就是它）。
+ * SVG 的 `font-size` 同样接受 CSS 与 `clamp()`，`1em` 取父级字号，行为一致。
+ */
+html[data-projection="on"] svg text {
+  font-size: clamp(16px, 1em, 18px) !important;
+}
+
+/* 全站最小字号兜底：辅助文字统一抬到 12px。只作用于**新组件**用的类，
+ * 老组件的 7–9px 字面量在 §6 的文案清理里逐块替换，不在这里一刀切 ——
+ * 一刀切会把固定 1080 高的舞台撑破（高度类错误不会让测试变红）。 */
+.alc-aux { font-size: var(--alc-fs-aux); color: var(--alc-text-dim); }
+.alc-body { font-size: var(--alc-fs-body); color: var(--alc-text); line-height: 1.5; }
+.alc-num { font-variant-numeric: tabular-nums; }
+
+/* 回放模式的"本页口径边界"提示（0.11.4 / W-14d）。全局一条，因为台账页头
+ * 与气象监测页头分属两个组件，各写一份迟早会漏改一处。
+ * 视觉上刻意**不像警告**：它是口径说明，不是故障提示；用中性的虚线边框，
+ * 与"气象通道中断"那种红条区分开。 */
+.case-scope-hint {
+  margin-left: 10px;
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--alc-text-dim);
+  border: 1px dashed rgba(194, 65, 12, .45);
+  border-radius: 4px;
+  vertical-align: 2px;
+}

@@ -1,5 +1,6 @@
 import { applyDashboard, store } from './store.js'
 import { normalizeDashboard } from './dashboardAdapter.js'
+import { workspaceId } from './workspace.js'
 
 export { store }
 
@@ -20,6 +21,22 @@ export class ApiError extends Error {
   }
 }
 
+export function operatorRole() {
+  try {
+    const value = localStorage.getItem('alc-operator')
+    return ['observer', 'duty', 'admin'].includes(value) ? value : 'duty'
+  } catch (_) {
+    return 'duty'
+  }
+}
+
+export function setOperatorRole(role) {
+  try {
+    if (['observer', 'duty', 'admin'].includes(role)) localStorage.setItem('alc-operator', role)
+  } catch (_) {
+  }
+}
+
 export async function requestJson(path, options = {}) {
   const timeoutMs = options.timeoutMs ?? 25_000
   const controller = new AbortController()
@@ -27,6 +44,8 @@ export async function requestJson(path, options = {}) {
   const { timeoutMs: _ignored, ...fetchOptions } = options
   const method = String(fetchOptions.method || 'GET').toUpperCase()
   const headers = new Headers(fetchOptions.headers || {})
+  headers.set('X-ALC-Workspace', workspaceId())
+  headers.set('X-ALC-Operator', operatorRole())
   if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
     const token = document.cookie.split('; ').find(value => value.startsWith('XSRF-TOKEN='))?.split('=')[1]
     if (token) headers.set('X-XSRF-TOKEN', decodeURIComponent(token))
@@ -65,33 +84,6 @@ export async function fetchConfigStatus() {
   try {
     store.configStatus = await requestJson('/api/config/status', { timeoutMs: 8_000 })
   } catch (_) {
-    // 顶部将配置状态与连接状态分开显示，失败不覆盖已知配置。
-  }
-}
-
-export async function fetchAuthStatus() {
-  store.auth.loading = true
-  try {
-    store.auth = { ...(await requestJson('/api/auth/status', { timeoutMs: 8000 })), loading: false, statusUnavailable: false, error: '' }
-  } catch (error) {
-    store.auth = { enabled: true, authenticated: false, username: '', loading: false, statusUnavailable: true, error: error.message }
-  }
-  return store.auth
-}
-
-export async function login(username, password) {
-  try {
-    const result = await requestJson('/api/auth/login', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password }), timeoutMs: 8000
-    })
-    store.auth = { ...result, loading: false, error: '' }
-    connectWs()
-    await Promise.allSettled([fetchDashboard(), fetchConfigStatus()])
-    return true
-  } catch (error) {
-    store.auth = { ...store.auth, authenticated: false, loading: false, error: error.message }
-    return false
   }
 }
 
@@ -117,16 +109,19 @@ function scheduleReconnect() {
   retryTimer = setTimeout(connectWs, delay)
 }
 
+export function dashboardSocketUrl(host = location.host, secure = location.protocol === 'https:') {
+  return `${secure ? 'wss' : 'ws'}://${host}/ws/dashboard?ws=${encodeURIComponent(workspaceId())}`
+}
+
 function connectWs() {
   if (stopped) return
-  const proto = location.protocol === 'https:' ? 'wss' : 'ws'
   store.connectionState = 'connecting'
-  ws = new WebSocket(`${proto}://${location.host}/ws/dashboard`)
+  ws = new WebSocket(dashboardSocketUrl())
   ws.onopen = async () => {
     retryCount = 0
     store.wsConnected = true
     store.connectionState = 'connected'
-    try { await fetchDashboard() } catch (_) { /* 状态已由 fetchDashboard 记录 */ }
+    try { await fetchDashboard() } catch (_) {  }
   }
   ws.onclose = () => {
     store.wsConnected = false
@@ -164,16 +159,9 @@ function connectWs() {
 export function initRealtime() {
   stopped = false
   clearTimeout(retryTimer)
-  fetchAuthStatus().then(auth => {
-    if (stopped) return
-    if (!auth.enabled || auth.authenticated) {
-      connectWs()
-      fetchDashboard().catch(() => {})
-      fetchConfigStatus()
-    } else if (auth.statusUnavailable) {
-      retryTimer = setTimeout(() => { if (!stopped) initRealtime() }, 3000)
-    }
-  })
+  connectWs()
+  fetchDashboard().catch(() => {})
+  fetchConfigStatus()
   return disposeRealtime
 }
 
