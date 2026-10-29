@@ -2,18 +2,26 @@
 
 覆盖 36 个地级行政区的本地运行系统：城际飞行汽车走廊、城区外卖无人机配送走廊、按已声明高度层与时隙协同的连续四维调度、以及按推演时间轴连续呈现的运行总览与放行队列。跨省仅连接沈阳—长春—哈尔滨。真实城市矢量地图、飞行器、公开天气驱动的风险场与 AI 研判已整合到统一操作界面。
 
-**版本号口径（2026-09-19 起）**：版本线自 **0.9.0** 起，**默认只递增第三位 `z`**（`0.9.0` → `0.9.1` → …）。
-第三位之外的**代位**只在「这一版的改动让旧版的运行数据或对外契约无法沿用」时递增（0.10.1 就是第一次：
-库结构新增 `ml_inference`、判定链路由纯规则改为规则＋模型双路、`/track1/ml` 由占位改为真实现）——
-判据与反面清单见 [`docs/NAMING.md`](docs/NAMING.md) **§7.2**，**代位不存在 `0.10.0`**。
-从 0.9.0 到当前**全部**为测试版本，文档中一律写作 **`x.y.z（Beta）`**；
-程序文件（`VERSION` / `pom.xml` / `package.json` / `package-lock.json` 两处）写合法 semver **`0.11.1-beta`** —— Maven 与 npm 不接受全角括号。
-回归前后的新旧对照表见 [`changelog/CHANGELOG.md`](changelog/CHANGELOG.md) §版本总览。
+**版本**：`V1.0.0`（正式版，2026-10-28）。程序文件（`VERSION` / `pom.xml` / `package.json` / `package-lock.json` 两处）写合法 semver **`1.0.0`** —— Maven 与 npm 不接受 `V` 前缀与全角括号。此前 `0.9.0` … `0.11.27` 为 Beta 线，已于 `0.11.27` 收口；版本口径与递增规则见 [`docs/NAMING.md`](docs/NAMING.md) **§7**。
 
-**完整开发史料见 [`changelog/`](changelog/README.md)**：版本演进史、问题档案（119 条）、技术决策记录（50 条 ADR + 35 条跨决策方法论）、证据索引。
-写论文、答辩或复现前，先读 [`changelog/README.md`](changelog/README.md) 的引用纪律。
+**完整开发史料见 [`changelog/`](changelog/README.md)**：版本演进史、问题档案、技术决策记录、证据索引。
+引用前先读 [`changelog/README.md`](changelog/README.md) 的引用纪律。
 
-**当前交付为源码更新。未上传、未生成新 JAR、未生成前端发布包。**
+## 材料数字的核查入口
+
+作品方案与应用成效中的每一项数值，都能在本仓库找到唯一来源。按表对应即可复算。
+
+| 材料中的数字 | 仓库中的依据 |
+|---|---|
+| 训练样本 26 193 条；正样本 1 657 / 202 / 917 | [`data/training/metar/dataset.json`](data/training/metar/dataset.json) |
+| TS 0.4936、BSS 0.5053、AUC 0.9470 / 0.9528 / 0.9358；三条基线对照 | [`data/training/metar/model-v2-metrics.json`](data/training/metar/model-v2-metrics.json) |
+| 三个目标模型本体（含校准参数） | [`models/`](models) 下 `ml-v2-vis.json`、`ml-v2-vis3k.json`、`ml-v2-gust.json` |
+| 逐 5 km 插值、σ 合成、判据分档、班次处置 | [`backend-python/traffic/v2.py`](backend-python/traffic/v2.py) |
+| 判据阈值（能见度 3000 / 1000 m、阵风 10 / 13 m/s 等） | [`config/rules-v1.json`](config/rules-v1.json) |
+| 走廊与城市台账（36 城、53 + 216 条走廊） | [`backend-python/data/traffic/`](backend-python/data/traffic) |
+| 筛选与消融的复现命令 | `changelog/CHANGELOG.md` §复现方式 |
+
+原始 METAR 序列（`data/training/metar/*.csv`，42 MB）未入库，因其为公开归档的可再下载副本；指标、标签与数据集清单已全部入库，上游数字可由此独立复算。
 
 ## 竞赛定位与主题关联
 
