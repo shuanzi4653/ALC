@@ -13,7 +13,11 @@
 
   <groupId>com.tianchuang</groupId>
   <artifactId>tianchuang-server</artifactId>
-  <version>1.2.0</version>
+  <!-- 版本号口径自 2026-09-19 起变更：整条版本线回归 0.9.x，只递增第三位（z）。
+       此前全部版本均为测试版本，文档侧一律写作「x.y.z（Beta）」；
+       但 Maven / npm 不接受全角括号，所以本文件（以及 VERSION、package.json）
+       只写合法的 semver 预发布形式 `0.9.x-beta`，两者是同一个版本。 -->
+  <version>1.0.0</version>
   <name>tianchuang-server</name>
   <description>天窗智巡：低空飞行气象保障系统 · 主服务</description>
 

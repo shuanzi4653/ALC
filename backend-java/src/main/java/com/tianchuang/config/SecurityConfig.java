@@ -25,7 +25,6 @@ import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 
-/** 可切换的本机演示与受控部署权限边界。 */
 @Configuration
 public class SecurityConfig {
     private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
@@ -34,7 +33,10 @@ public class SecurityConfig {
     @ConditionalOnProperty(name = "security.enabled", havingValue = "false", matchIfMissing = true)
     SecurityFilterChain permitAllChain(HttpSecurity http) throws Exception {
         log.info("权限关闭：本机演示模式");
-        http.csrf(csrf -> csrf.disable()).authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+        http.csrf(csrf -> csrf.disable())
+            .logout(logout -> logout.disable())
+            .headers(headers -> headers.cacheControl(cache -> cache.disable()))
+            .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
         return http.build();
     }
 
@@ -48,6 +50,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/", "/index.html", "/assets/**", "/favicon.ico",
                         "/api/health/**", "/api/auth/**", "/actuator/health/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/internal/qweather/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/**").hasAnyRole("VIEWER", "OPERATOR", "ADMIN")
                 .requestMatchers("/ws/**").authenticated()
                 .requestMatchers(HttpMethod.POST, "/api/monitor/**", "/api/sim/**").hasAnyRole("OPERATOR", "ADMIN")

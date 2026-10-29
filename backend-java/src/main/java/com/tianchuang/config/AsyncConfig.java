@@ -5,7 +5,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
-/** 有界轨2执行器：避免外部模型变慢时无限创建线程或堆积请求。 */
 @Configuration
 public class AsyncConfig {
     @Bean("track2Executor")

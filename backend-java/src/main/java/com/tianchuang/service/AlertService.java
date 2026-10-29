@@ -20,10 +20,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * 预警服务：生成预警文本（模板）+ 多渠道推送（对应计划书 6.1/6.2 节）
- * 初代版本发布文本以规则模板为准，LLM 润色文本作为补充展示（轨2 alert_text）。
- */
 @Service
 public class AlertService {
 
@@ -75,7 +71,6 @@ public class AlertService {
         log.warn("触发预警 [{}] {} {}：{}", triggerType, fused.label, a.region,
                 a.text.replace("\n", " | "));
 
-        // 外部渠道通过事务 outbox 异步发送；SCREEN 只有实际在线会话收到才记 SENT。
         pushService.enqueueExternal(a);
         int delivered = ws.broadcastAlert(rec.runId, Map.of(
                 "id", a.id, "eventId", a.id, "ts", a.ts.toString(), "level", a.level,

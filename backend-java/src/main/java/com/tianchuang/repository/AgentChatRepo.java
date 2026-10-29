@@ -5,10 +5,16 @@ import java.util.List;
 import com.tianchuang.entity.AgentChatEntity;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface AgentChatRepo extends JpaRepository<AgentChatEntity, Long> {
     List<AgentChatEntity> findTop20ByOrderByTsDesc();
 
-    /** 保留策略（E02）：删除早于截止时间的问答记录 */
-    long deleteByTsBefore(java.time.LocalDateTime cutoff);
+    List<AgentChatEntity> findTop20ByWorkspaceOrderByTsDesc(String workspace);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("delete from AgentChatEntity e where e.ts < :cutoff")
+    int deleteByTsBefore(@Param("cutoff") java.time.LocalDateTime cutoff);
 }

@@ -6,9 +6,6 @@ import org.springframework.web.servlet.config.annotation.ViewControllerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.beans.factory.annotation.Value;
 
-/**
- * 发布默认只托管 JAR 内构建产物；开发环境可显式配置 frontend.external-path 覆盖。
- */
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
     private final String externalPath;

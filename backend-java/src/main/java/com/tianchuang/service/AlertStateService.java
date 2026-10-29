@@ -8,7 +8,6 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 去重、升级和连续两轮恢复的预警状态机。未知/无数据不会调用恢复。 */
 @Service
 public class AlertStateService {
     private final AlertStateRepo repo;

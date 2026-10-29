@@ -20,9 +20,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * 大屏与控制端 REST API
- */
 @RestController
 @RequestMapping("/api")
 public class DashboardController {
@@ -45,25 +42,21 @@ public class DashboardController {
         this.pushLogRepo = pushLogRepo;
     }
 
-    /** 大屏全量快照 */
     @GetMapping("/dashboard")
     public Map<String, Object> dashboard() {
         return monitor.buildDashboard();
     }
 
-    /** 手动触发一轮监测 */
     @PostMapping("/monitor/run-now")
     public ResponseEntity<Map<String, Object>> runNow() throws Exception {
         return ResponseEntity.ok(monitor.runOnce());
     }
 
-    /** 切换模拟剧本（clear/wind/rain/storm）并立即触发一轮 */
-    @PostMapping("/sim/switch")
+    @PostMapping("/scenario/switch")
     public ResponseEntity<Map<String, Object>> switchScenario(@RequestParam String scenario) throws Exception {
         return ResponseEntity.ok(monitor.switchScenario(scenario));
     }
 
-    /** 配置状态（供大屏顶部状态灯） */
     @GetMapping("/config/status")
     public Map<String, Object> configStatus() {
         boolean qweatherReady = qw.jwtReady();
@@ -79,7 +72,6 @@ public class DashboardController {
                         : "和风凭据未完整配置");
     }
 
-    /** 智能体问答（大屏右栏交互窗口） */
     public record AskBody(String question) {
     }
 
@@ -98,6 +90,7 @@ public class DashboardController {
             e.answer = String.valueOf(result.get("answer"));
             e.source = String.valueOf(result.get("source"));
             e.latencyMs = (int) (System.currentTimeMillis() - t0);
+            e.workspace = com.tianchuang.config.WorkspaceContext.current();
             chatRepo.save(e);
             return ResponseEntity.ok(result);
         } catch (Exception e) {
@@ -107,7 +100,6 @@ public class DashboardController {
         }
     }
 
-    /** 最近推送日志 */
     @GetMapping("/push/logs")
     public List<?> pushLogs() {
         return pushLogRepo.findTop50ByOrderByTsDesc();

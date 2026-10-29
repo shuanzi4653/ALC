@@ -1,5 +1,6 @@
 package com.tianchuang.entity;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -9,7 +10,6 @@ import jakarta.persistence.Table;
 
 import java.time.LocalDateTime;
 
-/** 智能体问答历史 */
 @Entity
 @Table(name = "agent_chat")
 public class AgentChatEntity {
@@ -23,6 +23,8 @@ public class AgentChatEntity {
     public String question;
     @Lob
     public String answer;
-    public String source;        // deepseek | fallback
+    public String source;
     public int latencyMs;
+    @Column(length = 64, nullable = false)
+    public String workspace = "";
 }

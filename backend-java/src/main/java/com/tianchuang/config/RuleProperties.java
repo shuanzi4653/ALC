@@ -15,11 +15,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
-/**
- * 版本化规则配置加载（可审计）。
- * 优先级：外部 config/rules-v1.json → classpath rules-v1.json → 内置默认（等价 v1 阈值）。
- * 阈值、比较方向、扣分与等级边界全部来自配置，代码不再硬编码数值。
- */
 @Component
 public class RuleProperties {
 
@@ -62,7 +57,6 @@ public class RuleProperties {
                 spec.version(), source, spec.factors().size(), spec.hardBanEnabled());
     }
 
-    /** 兼容手工构造（单元测试使用内置默认阈值）。 */
     public RuleProperties(String version, boolean hardBanEnabled) {
         this.spec = RuleSpec.defaults(version, hardBanEnabled);
         this.source = "test-defaults";
@@ -85,7 +79,6 @@ public class RuleProperties {
         return spec.hardBanEnabled();
     }
 
-    /** 硬约束命中时对外 SFI 的上限（默认 39，来自配置）。 */
     public int hardBanSfiCap() {
         return spec.hardBanSfiCap();
     }
@@ -102,7 +95,6 @@ public class RuleProperties {
         return spec;
     }
 
-    /** 配置来源（外部路径 / classpath / 内置默认），供健康与审计展示。 */
     public String source() {
         return source;
     }

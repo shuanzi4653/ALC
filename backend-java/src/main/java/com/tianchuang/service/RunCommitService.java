@@ -17,7 +17,6 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 把一轮运行及其规则/双轨结果作为一个数据库事务提交。 */
 @Service
 public class RunCommitService {
     private final MonitoringRunRepo runRepo;
@@ -91,12 +90,6 @@ public class RunCommitService {
         runRepo.save(run);
     }
 
-    // ---------------- 轨2任务持久化（C01） ----------------
-
-    /**
-     * 提交轨2任务记录（幂等）：jobKey 唯一，重复提交不会产生重复任务。
-     * 任务先落库，随后才交给有界 executor 执行；JVM 崩溃时任务仍可在下次启动被收敛。
-     */
     @Transactional
     public Track2JobEntity startTrack2Job(String runId, String regionId, LocalDateTime dueAt) {
         String key = jobKey(runId);
@@ -121,7 +114,6 @@ public class RunCommitService {
         return jobRepo.save(job);
     }
 
-    /** 单 worker 原子领取；非 PENDING 或已过期任务不再执行。 */
     @Transactional
     public Track2JobEntity claimTrack2Job(String runId) {
         Track2JobEntity job = jobRepo.findFirstByJobKey(jobKey(runId)).orElse(null);
@@ -133,7 +125,6 @@ public class RunCommitService {
         return jobRepo.save(job);
     }
 
-    /** 任务收敛为终态；旧轮结果不得据此改写当前运行指针（由调用方按 runId 校验）。 */
     @Transactional
     public void finishTrack2Job(String runId, String status, String errorCode) {
         jobRepo.findFirstByJobKey(jobKey(runId)).ifPresent(job -> {
@@ -144,7 +135,6 @@ public class RunCommitService {
         });
     }
 
-    /** 启动恢复：把上次进程退出时仍未收敛的任务标记为过期失败。 */
     @Transactional
     public int expireUnfinishedJobs(String errorCode) {
         List<Track2JobEntity> unfinished = jobRepo.findByStatusIn(List.of("PENDING", "RUNNING"));

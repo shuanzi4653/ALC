@@ -1,6 +1,7 @@
 package com.tianchuang.ws;
 
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.Map;
 
@@ -14,16 +15,13 @@ import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 import com.tianchuang.service.PushService;
 
-/**
- * 大屏 WebSocket 推送（/ws/dashboard）
- * 事件类型：dashboard（全量快照）、alert（预警弹窗）
- */
 @Component
 public class DashboardWebSocketHandler extends TextWebSocketHandler {
 
     private static final Logger log = LoggerFactory.getLogger(DashboardWebSocketHandler.class);
 
     private final List<WebSocketSession> sessions = new CopyOnWriteArrayList<>();
+    private final Map<String, String> workspaceBySession = new ConcurrentHashMap<>();
     private final ObjectMapper mapper;
     private final PushService pushService;
 
@@ -48,16 +46,82 @@ public class DashboardWebSocketHandler extends TextWebSocketHandler {
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
         sessions.add(session);
+        workspaceBySession.put(session.getId(), workspaceOf(session));
         log.info("大屏客户端接入: {}（当前 {} 个）", session.getId(), sessions.size());
     }
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, org.springframework.web.socket.CloseStatus status) {
         sessions.remove(session);
+        workspaceBySession.remove(session.getId());
         log.info("大屏客户端断开: {}（剩余 {} 个）", session.getId(), sessions.size());
     }
 
-    /** 向全部在线大屏广播 JSON 消息 */
+    private String workspaceOf(WebSocketSession session) {
+        try {
+            String query = session.getUri() == null ? null : session.getUri().getQuery();
+            if (query != null) {
+                for (String pair : query.split("&")) {
+                    int eq = pair.indexOf('=');
+                    if (eq > 0 && com.tianchuang.config.WorkspaceContext.QUERY.equals(pair.substring(0, eq))) {
+                        String value = com.tianchuang.config.WorkspaceContext.normalize(pair.substring(eq + 1));
+                        if (!com.tianchuang.config.WorkspaceContext.UNIDENTIFIED.equals(value)) {
+                            return value;
+                        }
+                    }
+                }
+            }
+            String cookie = session.getHandshakeHeaders().getFirst("cookie");
+            if (cookie != null) {
+                for (String piece : cookie.split(";")) {
+                    String trimmed = piece.trim();
+                    if (trimmed.startsWith(com.tianchuang.config.WorkspaceContext.COOKIE + "=")) {
+                        String value = com.tianchuang.config.WorkspaceContext
+                                .normalize(trimmed.substring(com.tianchuang.config.WorkspaceContext.COOKIE.length() + 1));
+                        if (!com.tianchuang.config.WorkspaceContext.UNIDENTIFIED.equals(value)) {
+                            return value;
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.debug("解析 WS 工作区失败，按未标识处理: {}", e.getMessage());
+        }
+        return com.tianchuang.config.WorkspaceContext.UNIDENTIFIED;
+    }
+
+    public java.util.Set<String> onlineWorkspaces() {
+        return new java.util.LinkedHashSet<>(workspaceBySession.values());
+    }
+
+    public int broadcastDashboardTo(String workspace, String runId, Map<String, Object> dashboard) {
+        try {
+            String json = mapper.writeValueAsString(Map.of(
+                    "type", "dashboard", "version", 1, "runId", runId, "payload", dashboard));
+            int delivered = 0;
+            for (WebSocketSession s : sessions) {
+                if (!workspace.equals(workspaceBySession.getOrDefault(s.getId(),
+                        com.tianchuang.config.WorkspaceContext.UNIDENTIFIED))) {
+                    continue;
+                }
+                try {
+                    if (s.isOpen()) {
+                        synchronized (s) {
+                            s.sendMessage(new TextMessage(json));
+                            delivered++;
+                        }
+                    }
+                } catch (Exception e) {
+                    log.warn("WS 推送失败 {}: {}", s.getId(), e.getMessage());
+                }
+            }
+            return delivered;
+        } catch (Exception e) {
+            log.warn("Dashboard WS 序列化失败: {}", e.getMessage());
+            return 0;
+        }
+    }
+
     public int broadcast(String json) {
         int delivered = 0;
         for (WebSocketSession s : sessions) {

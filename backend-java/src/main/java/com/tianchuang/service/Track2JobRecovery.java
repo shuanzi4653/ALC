@@ -6,11 +6,6 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
-/**
- * 轨2任务启动恢复（C01）。
- * 内存队列不跨进程存活：上次退出时仍为 PENDING/RUNNING 的任务在本次启动即收敛为失败，
- * 避免任务永远停留在「进行中」而无法解释。
- */
 @Component
 public class Track2JobRecovery {
 

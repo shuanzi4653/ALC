@@ -1,8 +1,5 @@
 package com.tianchuang.model;
 
-/**
- * 适飞指数等级（四级窗口）
- */
 public enum FlightLevel {
     FIT("适飞", 90, "#2e8b57"),
     CAUTION("谨慎", 70, "#d98a2b"),
@@ -19,7 +16,6 @@ public enum FlightLevel {
         this.color = color;
     }
 
-    /** 风险概率映射（用于双轨加权融合） */
     public double riskProb() {
         return switch (this) {
             case FIT -> 0.10;

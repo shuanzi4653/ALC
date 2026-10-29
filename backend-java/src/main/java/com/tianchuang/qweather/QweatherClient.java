@@ -1,12 +1,19 @@
 package com.tianchuang.qweather;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.zip.GZIPInputStream;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -18,16 +25,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-/**
- * 和风天气 v1 API 客户端
- *   GET /weather/v1/current/{lat}/{lon}      实时天气
- *   GET /weather/v1/hourly/{lat}/{lon}?hours=N  逐小时预报
- * 认证：Authorization: Bearer <JWT>
- */
 @Service
 public class QweatherClient {
 
     private static final Logger log = LoggerFactory.getLogger(QweatherClient.class);
+
+    public static final String THUNDER_ESTIMATE_METHOD = "CONDITION_CODE_AND_CLOUD_COVER_HEURISTIC";
 
     private final QweatherProperties props;
     private final QweatherJwtService jwtService;
@@ -43,22 +46,27 @@ public class QweatherClient {
         this.jwtService = jwtService;
     }
 
-    /** 拉取实时观测并标准化 */
     public WeatherSnapshot current() throws Exception {
-        String url = "https://" + props.apiHost() + "/weather/v1/current/"
-                + props.lat() + "/" + props.lon() + "?localTime=true&lang=zh";
-        JsonNode root = getJson(url);
+        return current(props.lat(), props.lon());
+    }
+
+    public WeatherSnapshot current(double lat, double lon) throws Exception {
+        checkCoordinate(lat, lon);
+        JsonNode root = getJson(currentUrl(lat, lon));
         JsonNode c = root.path("condition");
         JsonNode wind = root.path("wind").path("speed");
         JsonNode gust = root.path("windGust");
         JsonNode precip = root.path("precipitation").path("intensity");
         JsonNode vis = root.path("visibility");
-        String time = requiredText(root.path("metadata").path("obsTime"), "metadata.obsTime");
+        String time = optionalText(root.path("metadata").path("obsTime"));
+        String timeBasis = time == null
+                ? WeatherSnapshot.TIME_BASIS_NOT_PROVIDED
+                : WeatherSnapshot.TIME_BASIS_OBSERVED;
         double cloudCover = requiredDouble(root.path("cloudCover"), "cloudCover");
         double humidity = normalizeFraction(requiredDouble(root.path("humidity"), "humidity"), "humidity");
         double thunder = estimateThunder(c.path("code").asText(""), cloudCover);
         return new WeatherSnapshot(
-                time, "live", props.lat(), props.lon(),
+                time, "live", lat, lon,
                 requiredText(c.path("text"), "condition.text"),
                 requiredDouble(root.path("temperature").path("value"), "temperature.value"),
                 humidity,
@@ -69,14 +77,83 @@ public class QweatherClient {
                 requiredDouble(vis.path("value"), "visibility.value"),
                 requiredDouble(root.path("pressure").path("value"), "pressure.value"),
                 cloudCover,
-                thunder);
+                thunder,
+                timeBasis);
     }
 
-    /** 拉取逐小时预报并标准化 */
     public List<ForecastHour> hourly(int hours) throws Exception {
-        String url = "https://" + props.apiHost() + "/weather/v1/hourly/"
-                + props.lat() + "/" + props.lon() + "?hours=" + hours + "&localTime=true&lang=zh";
-        JsonNode root = getJson(url);
+        return hourly(hours, props.lat(), props.lon());
+    }
+
+    public List<ForecastHour> hourly(int hours, double lat, double lon) throws Exception {
+        if (hours < 1 || hours > 240) throw new IllegalArgumentException("和风预报小时数超出接口范围: " + hours);
+        return parseHourly(getJson(hourlyUrl(hours, lat, lon)));
+    }
+
+    public Map<String, Object> rawCurrent(double lat, double lon) throws Exception {
+        checkCoordinate(lat, lon);
+        JsonNode root = getJson(currentUrl(lat, lon));
+        Map<String, Object> value = new LinkedHashMap<>();
+        value.put("provider", "QWEATHER");
+        value.put("product", "weather/v1/current");
+        value.put("requestedLocation", List.of(lat, lon));
+        value.put("raw", mapper.convertValue(root, Map.class));
+        value.put("units", Map.of(
+                "temperature", "°C", "windSpeed", "km/h", "precipitation", "mm",
+                "visibility", "km", "pressure", "hPa",
+                "humidity", "fraction", "cloudCover", "fraction"));
+        value.put("thunderEstimate", estimateThunder(root.path("condition").path("code").asText(""),
+                root.path("cloudCover").isNumber() ? root.path("cloudCover").asDouble() : 0.0));
+        value.put("thunderEstimateMethod", THUNDER_ESTIMATE_METHOD);
+        value.put("qualityFlags", List.of(
+                "NOT_A_STATION_OBSERVATION_CONTRACT",
+                "THUNDER_VALUE_IS_DERIVED_ESTIMATE_NOT_A_PRODUCT_FIELD"));
+        value.put("note", "和风不提供独立雷暴字段；thunderEstimate 由天气代码与云量推导，属于工程近似，不得当作观测雷暴概率。");
+        return value;
+    }
+
+    public Map<String, Object> rawHourly(int hours, double lat, double lon) throws Exception {
+        if (hours < 1 || hours > 240) throw new IllegalArgumentException("和风预报小时数超出接口范围: " + hours);
+        checkCoordinate(lat, lon);
+        JsonNode root = getJson(hourlyUrl(hours, lat, lon));
+        Map<String, Object> value = new LinkedHashMap<>();
+        value.put("provider", "QWEATHER");
+        value.put("product", "weather/v1/hourly");
+        value.put("requestedLocation", List.of(lat, lon));
+        value.put("hours", hours);
+        value.put("raw", mapper.convertValue(root, Map.class));
+        value.put("units", Map.of("temperature", "°C", "windSpeed", "km/h", "precipitation", "mm", "visibility", "km"));
+        value.put("qualityFlags", List.of("THUNDER_VALUE_IS_DERIVED_ESTIMATE_NOT_A_PRODUCT_FIELD"));
+        value.put("note", "逐小时雷暴为降水概率推导值，非产品字段。");
+        return value;
+    }
+
+    static String currentUrl(String host, double lat, double lon) {
+        return "https://" + host + "/weather/v1/current/" + lat + "/" + lon + "?localTime=true&lang=zh";
+    }
+
+    static String hourlyUrl(String host, int hours, double lat, double lon) {
+        return "https://" + host + "/weather/v1/hourly/" + lat + "/" + lon
+                + "?hours=" + hours + "&localTime=true&lang=zh";
+    }
+
+    private String currentUrl(double lat, double lon) {
+        return currentUrl(props.apiHost(), lat, lon);
+    }
+
+    private String hourlyUrl(int hours, double lat, double lon) {
+        return hourlyUrl(props.apiHost(), hours, lat, lon);
+    }
+
+    static void checkCoordinate(double lat, double lon) {
+        if (!Double.isFinite(lat) || !Double.isFinite(lon)) {
+            throw new IllegalArgumentException("和风坐标必须为有限数值");
+        }
+        if (lat < -90 || lat > 90) throw new IllegalArgumentException("和风纬度超出范围: " + lat);
+        if (lon < -180 || lon > 180) throw new IllegalArgumentException("和风经度超出范围: " + lon);
+    }
+
+    private List<ForecastHour> parseHourly(JsonNode root) {
         List<ForecastHour> list = new ArrayList<>();
         for (JsonNode h : root.path("hours")) {
             list.add(new ForecastHour(
@@ -93,9 +170,7 @@ public class QweatherClient {
         return list;
     }
 
-    /** 用云量+降水概率粗估雷暴概率（v1 API 无独立雷暴字段时的工程近似，方案中已说明） */
     private double estimateThunder(String conditionCode, double cloudCover) {
-        // 30x 段天气代码：30 开头为雷雨/降水类现象
         if (conditionCode.startsWith("302") || conditionCode.startsWith("304")) return 0.85;
         if (conditionCode.startsWith("30")) return 0.35;
         return Math.max(0, Math.min(0.2, (cloudCover - 0.7) * 0.5));
@@ -110,6 +185,12 @@ public class QweatherClient {
             throw new IllegalArgumentException("和风字段缺失: " + field);
         }
         return node.asText();
+    }
+
+    private String optionalText(JsonNode node) {
+        if (node == null || node.isMissingNode() || node.isNull()) return null;
+        String text = node.asText();
+        return text == null || text.isBlank() ? null : text;
     }
 
     private double requiredDouble(JsonNode node, String field) {
@@ -141,14 +222,34 @@ public class QweatherClient {
         HttpRequest req = HttpRequest.newBuilder(URI.create(url))
                 .timeout(Duration.ofSeconds(20))
                 .header("Authorization", "Bearer " + jwtService.bearerToken())
+                .header("Accept-Encoding", "gzip")
                 .GET()
                 .build();
-        HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<byte[]> resp = http.send(req, HttpResponse.BodyHandlers.ofByteArray());
+        byte[] body = decodeBody(resp.body(), resp.headers().firstValue("content-encoding").orElse(""));
         if (resp.statusCode() != 200) {
-            log.warn("和风 API 响应 {} {}: {}", resp.statusCode(), url, abbreviate(resp.body()));
+            log.warn("和风 API 响应 {} {}: {}", resp.statusCode(), url,
+                    abbreviate(new String(body, StandardCharsets.UTF_8)));
             throw new IllegalStateException("和风 API HTTP " + resp.statusCode());
         }
-        return mapper.readTree(resp.body());
+        return mapper.readTree(body);
+    }
+
+    static byte[] decodeBody(byte[] raw, String contentEncoding) throws IOException {
+        if (raw == null) return new byte[0];
+        if (raw.length < 2) return raw;
+        boolean gzipMagic = (raw[0] & 0xFF) == 0x1F && (raw[1] & 0xFF) == 0x8B;
+        boolean declaredGzip = contentEncoding != null
+                && contentEncoding.toLowerCase(Locale.ROOT).contains("gzip");
+        if (!gzipMagic) {
+            if (declaredGzip) {
+                log.warn("响应声明 gzip 但正文没有压缩魔数，按明文解析");
+            }
+            return raw;
+        }
+        try (GZIPInputStream in = new GZIPInputStream(new ByteArrayInputStream(raw))) {
+            return in.readAllBytes();
+        }
     }
 
     private String abbreviate(String s) {

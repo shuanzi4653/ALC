@@ -16,21 +16,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-/**
- * 和风天气 JWT 签发服务（JDK 15+ 原生 Ed25519，零第三方依赖）
- *
- * 规范（依据和风官方文档）：
- *   Header  = {"alg":"EdDSA","kid":"<凭据ID>"}
- *   Payload = {"iss":"<开发者ID>","sub":"<项目ID>","iat":<now-30s>,"exp":<iat+900>}
- *   签名    = Ed25519(EdDSA)，Base64URL 编码
- *   请求头  = Authorization: Bearer <jwt>
- */
 @Service
 public class QweatherJwtService {
 
     private static final Logger log = LoggerFactory.getLogger(QweatherJwtService.class);
-    private static final long TTL_SECONDS = 900;          // 15 分钟
-    private static final long CLOCK_SKEW = 30;            // iat 提前量
+    private static final long TTL_SECONDS = 900;
+    private static final long CLOCK_SKEW = 30;
 
     private final QweatherProperties props;
     private volatile PrivateKey privateKey;
@@ -41,7 +32,6 @@ public class QweatherJwtService {
         this.props = props;
     }
 
-    /** 获取有效 JWT（缓存至过期前 60 秒） */
     public synchronized String bearerToken() {
         long now = Instant.now().getEpochSecond();
         if (cachedJwt != null && now < cachedExpAt - 60) {

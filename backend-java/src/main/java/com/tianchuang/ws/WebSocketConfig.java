@@ -5,9 +5,6 @@ import org.springframework.web.socket.config.annotation.EnableWebSocket;
 import org.springframework.web.socket.config.annotation.WebSocketConfigurer;
 import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry;
 
-/**
- * WebSocket 端点注册
- */
 @Configuration
 @EnableWebSocket
 public class WebSocketConfig implements WebSocketConfigurer {
@@ -21,6 +18,9 @@ public class WebSocketConfig implements WebSocketConfigurer {
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
         registry.addHandler(handler, "/ws/dashboard")
-                .setAllowedOriginPatterns("http://127.0.0.1:*", "http://localhost:*");
+                .setAllowedOriginPatterns(
+                        "https://tianchuang.shuanzi.site",
+                        "http://127.0.0.1:*",
+                        "http://localhost:*");
     }
 }

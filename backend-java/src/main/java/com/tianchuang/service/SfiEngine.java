@@ -12,12 +12,6 @@ import com.tianchuang.config.RuleProperties;
 
 import org.springframework.stereotype.Service;
 
-/**
- * 轨1：数据驱动规则基线（L1，必做层）
- * 阈值、比较方向、扣分与等级边界全部来自 {@link RuleProperties}（config/rules-v1.json），
- * 代码不硬编码数值，保证规则可审计、可版本化。
- * 特点：全程可解释（逐要素扣分明细），永不失灵。
- */
 @Service
 public class SfiEngine {
 
@@ -29,24 +23,26 @@ public class SfiEngine {
         this.rules = rules;
     }
 
-    /** 要素检查结果 */
     public record Check(String factor, double value, String unit, boolean banned,
                         boolean warn, int penalty, String note) {
     }
 
     public record SfiResult(int sfi, int rawSfi, FlightLevel level, boolean hardBan,
-                            String ruleVersion, List<Check> checks) {
-    }
-
-    public SfiResult evaluate(WeatherSnapshot s) {
+                            String ruleVersion, List<Check> checks,
+                            List<String> unavailableOptional) {
+    }    public SfiResult evaluate(WeatherSnapshot s) {
         validator.validate(s);
         List<Check> checks = new ArrayList<>();
         int penalty = 0;
+        List<String> unavailableOptional = new ArrayList<>();
 
         for (RuleSpec.FactorRule f : rules.factors()) {
             Double raw = rawValue(f.key(), s);
             if (raw == null) {
-                // 该要素缺失：不计分也不臆断，由校验层决定本轮是否可信
+                if (f.required()) {
+                    throw new IllegalArgumentException(f.label() + "缺失或超出有效范围");
+                }
+                unavailableOptional.add(f.label());
                 continue;
             }
             double v = raw;
@@ -62,10 +58,15 @@ public class SfiEngine {
         boolean hardBan = rules.hardBanEnabled() && checks.stream().anyMatch(Check::banned);
         int sfi = hardBan ? Math.min(rawSfi, rules.hardBanSfiCap()) : rawSfi;
         FlightLevel level = hardBan ? FlightLevel.BAN : levelFromSfi(sfi);
-        return new SfiResult(sfi, rawSfi, level, hardBan, rules.version(), checks);
+        return new SfiResult(sfi, rawSfi, level, hardBan, rules.version(), checks,
+                List.copyOf(unavailableOptional));
     }
 
-    /** 按配置的等级边界判定（不再使用硬编码 80/60/40）。 */
+    public SfiResult abstain() {
+        return new SfiResult(100, 100, FlightLevel.FIT, false, rules.version(), List.of(),
+                rules.factors().stream().map(RuleSpec.FactorRule::label).toList());
+    }
+
     private FlightLevel levelFromSfi(int sfi) {
         RuleSpec.LevelBounds b = rules.levels();
         if (sfi >= b.fit()) return FlightLevel.FIT;
@@ -74,7 +75,6 @@ public class SfiEngine {
         return FlightLevel.BAN;
     }
 
-    /** 从观测快照提取规则要素原始值；未知返回 null（不补零、不视为安全）。 */
     private Double rawValue(String key, WeatherSnapshot s) {
         return switch (key) {
             case "windSpeed" -> s.windSpeed();
@@ -87,7 +87,6 @@ public class SfiEngine {
         };
     }
 
-    /** 转为可序列化 Map（供前端/存储） */
     public Map<String, Object> toMap(SfiResult r) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("sfi", r.sfi());
@@ -97,6 +96,7 @@ public class SfiEngine {
         m.put("color", r.level().color);
         m.put("hardBan", r.hardBan());
         m.put("ruleVersion", r.ruleVersion());
+        m.put("unavailableOptional", r.unavailableOptional());
         m.put("checks", r.checks().stream().map(c -> {
             Map<String, Object> cm = new LinkedHashMap<>();
             cm.put("factor", c.factor());

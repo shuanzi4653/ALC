@@ -83,7 +83,8 @@ class SfiRuleCasesTest {
     private WeatherSnapshot toSnapshot(JsonNode n) {
         return new WeatherSnapshot(
                 text(n, "time", "2026-09-11T02:00+08:00"),
-                "sim",
+                // 来源标签只用于记录；本夹具构造的是规则引擎的输入，不涉及取数。
+                "fixture",
                 38.91, 121.61,
                 "测试",
                 num(n, "tempC", 20.0),
@@ -95,7 +96,10 @@ class SfiRuleCasesTest {
                 num(n, "visibilityM", 20000.0),
                 num(n, "pressureHpa", 1013.0),
                 num(n, "cloudCover", 0.5),
-                num(n, "thunderProb", 0.0)
+                num(n, "thunderProb", 0.0),
+                // 时间基准也由夹具给：用例可以显式声明「来源不提供观测时刻」，
+                // 于是「time 缺席 + 已表态」这条路径在规则侧也有对照（不只是校验器单测）。
+                text(n, "timeBasis", WeatherSnapshot.TIME_BASIS_OBSERVED)
         );
     }
 

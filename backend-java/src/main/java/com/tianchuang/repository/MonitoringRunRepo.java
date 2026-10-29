@@ -7,6 +7,9 @@ import java.util.Collection;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface MonitoringRunRepo extends JpaRepository<MonitoringRunEntity, Long> {
     Optional<MonitoringRunEntity> findFirstByStatusOrderByIdDesc(String status);
@@ -14,10 +17,14 @@ public interface MonitoringRunRepo extends JpaRepository<MonitoringRunEntity, Lo
     Optional<MonitoringRunEntity> findFirstByOrderByIdDesc();
     Optional<MonitoringRunEntity> findFirstByRegionIdAndConfiguredModeAndStatusInOrderByIdDesc(String regionId, String configuredMode, Collection<String> statuses);
     Optional<MonitoringRunEntity> findFirstByRegionIdAndConfiguredModeOrderByIdDesc(String regionId, String configuredMode);
-    Optional<MonitoringRunEntity> findByRunId(String runId);
 
-    // ---------------- 历史分页（E02） ----------------
-    // 按 id 倒序等价于运行先后；配合 Pageable 限制单页大小，避免一次拉全表。
+    Optional<MonitoringRunEntity> findFirstByRegionIdAndConfiguredModeAndScenarioAndStatusInOrderByIdDesc(
+            String regionId, String configuredMode, String scenario, Collection<String> statuses);
+
+    Optional<MonitoringRunEntity> findFirstByRegionIdAndConfiguredModeAndScenarioOrderByIdDesc(
+            String regionId, String configuredMode, String scenario);
+
+    Optional<MonitoringRunEntity> findByRunId(String runId);
 
     Page<MonitoringRunEntity> findAllByOrderByIdDesc(Pageable pageable);
 
@@ -28,6 +35,7 @@ public interface MonitoringRunRepo extends JpaRepository<MonitoringRunEntity, Lo
     Page<MonitoringRunEntity> findByRegionIdAndStartedAtAfterOrderByIdDesc(
             String regionId, LocalDateTime since, Pageable pageable);
 
-    /** 保留策略：删除早于截止时间的运行记录 */
-    long deleteByStartedAtBefore(LocalDateTime cutoff);
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("delete from MonitoringRunEntity e where e.startedAt < :cutoff")
+    int deleteByStartedAtBefore(@Param("cutoff") LocalDateTime cutoff);
 }

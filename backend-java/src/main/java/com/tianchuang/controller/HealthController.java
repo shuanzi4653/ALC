@@ -10,7 +10,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** 进程存活和数据就绪分离，供启动脚本与运维探针使用。 */
 @RestController
 @RequestMapping("/api/health")
 public class HealthController {

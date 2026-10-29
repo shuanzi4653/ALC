@@ -9,7 +9,6 @@ import jakarta.persistence.Lob;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 
-/** 一轮监测的归属、来源、状态与时间边界。数据库主键同时作为可排序序号。 */
 @Entity
 @Table(name = "monitoring_run")
 public class MonitoringRunEntity {

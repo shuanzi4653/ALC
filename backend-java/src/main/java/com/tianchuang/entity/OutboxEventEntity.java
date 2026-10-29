@@ -9,7 +9,6 @@ import jakarta.persistence.Lob;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 
-/** 预警外部投递任务；eventKey 保证同一预警与渠道只入队一次。 */
 @Entity
 @Table(name = "outbox_event")
 public class OutboxEventEntity {

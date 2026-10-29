@@ -24,7 +24,6 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 事务 outbox 入队后异步投递；HTTP 200 仍需通过渠道业务码校验。 */
 @Service
 public class PushService {
     private static final Logger log = LoggerFactory.getLogger(PushService.class);
@@ -62,7 +61,6 @@ public class PushService {
                 deliveredSessions > 0 ? "已发送至 " + deliveredSessions + " 个在线客户端" : "当前无在线客户端");
     }
 
-    /** 客户端展示确认；同一会话重复 ACK 不重复记账。 */
     @Transactional
     public synchronized void recordScreenAck(Long alertId, String sessionId) {
         if (alertId == null || blank(sessionId)) return;

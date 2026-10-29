@@ -21,11 +21,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * 历史数据查询（E02）。
- * 统一分页：单页上限由 history.max-page-size 控制，超限或非法参数返回 400；
- * cursor 语义用 page 表达（按主键倒序，稳定有序），不使用 OFFSET 超出 total 的请求。
- */
 @RestController
 @RequestMapping("/api/history")
 public class HistoryController {
@@ -43,7 +38,6 @@ public class HistoryController {
         this.history = history;
     }
 
-    /** 运行历史：GET /api/history/runs?regionId=&since=&page=0&size=20 */
     @GetMapping("/runs")
     public Map<String, Object> runs(@RequestParam(required = false) String regionId,
                                     @RequestParam(required = false) String since,
@@ -65,7 +59,6 @@ public class HistoryController {
         return pageBody(result);
     }
 
-    /** 观测历史：GET /api/history/sfi?regionId=&page=0&size=20 */
     @GetMapping("/sfi")
     public Map<String, Object> sfi(@RequestParam(required = false) String regionId,
                                    @RequestParam(defaultValue = "0") int page,
@@ -77,7 +70,6 @@ public class HistoryController {
         return pageBody(result);
     }
 
-    /** 预警历史：GET /api/history/alerts?page=0&size=20 */
     @GetMapping("/alerts")
     public Map<String, Object> alerts(@RequestParam(defaultValue = "0") int page,
                                       @RequestParam(defaultValue = "20") int size) {
@@ -108,7 +100,6 @@ public class HistoryController {
         }
     }
 
-    /** 统一分页响应体：items + 分页元信息，字段顺序稳定便于前端解析 */
     private Map<String, Object> pageBody(Page<?> result) {
         Map<String, Object> body = new LinkedHashMap<>();
         List<?> items = result.getContent();

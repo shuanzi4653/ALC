@@ -8,7 +8,6 @@ import jakarta.persistence.Table;
 
 import java.time.LocalDateTime;
 
-/** 推送日志 */
 @Entity
 @Table(name = "push_log")
 public class PushLogEntity {
@@ -19,9 +18,9 @@ public class PushLogEntity {
 
     public LocalDateTime ts = LocalDateTime.now();
     public Long alertId;
-    public String channel;       // DINGTALK | FEISHU | WECOM | MAIL | SCREEN
+    public String channel;
     public String target;
-    public String status;        // SENT | DISPLAYED | FAILED | SKIPPED
+    public String status;
     public int latencyMs;
     public String detail;
 }

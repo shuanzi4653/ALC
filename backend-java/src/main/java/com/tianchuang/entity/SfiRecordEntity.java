@@ -9,7 +9,6 @@ import jakarta.persistence.Table;
 
 import java.time.LocalDateTime;
 
-/** 每轮监测记录：SFI + 观测快照 */
 @Entity
 @Table(name = "sfi_record")
 public class SfiRecordEntity {
@@ -28,11 +27,11 @@ public class SfiRecordEntity {
     public String obsTime;
     public LocalDateTime ingestedAt;
     public LocalDateTime evaluatedAt;
-    public String source;        // live | sim
-    public String scenario;      // 模拟剧本（sim 模式）
+    public String source;
+    public String scenario;
     public int sfi;
     public int rawSfi;
-    public String level;         // FIT/CAUTION/DANGER/BAN
+    public String level;
     public boolean hardBan;
     public String ruleVersion;
     public Double lat;
@@ -45,9 +44,9 @@ public class SfiRecordEntity {
     public double visibilityM;
     public double thunderProb;
     public double tempC;
-    public double humidity;      // 相对湿度 0-1
+    public double humidity;
     public double pressureHpa;
     public double cloudCover;
     @Lob
-    public String checksJson;    // 轨1 逐要素明细 JSON
+    public String checksJson;
 }

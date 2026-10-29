@@ -9,7 +9,6 @@ import jakarta.persistence.Table;
 
 import java.time.LocalDateTime;
 
-/** 双轨推演结果 */
 @Entity
 @Table(name = "track_result")
 public class TrackResultEntity {
@@ -25,15 +24,15 @@ public class TrackResultEntity {
     public String track1Level;
     public int track1Sfi;
     @Lob
-    public String track1Reason;      // 主要要素原因摘要
+    public String track1Reason;
     public String track2Level;
     public double track2Confidence;
-    public String track2Source;      // deepseek | fallback
+    public String track2Source;
     @Lob
     public String track2Factors;
     @Lob
     public String track2Advice;
     public String fusedLevel;
-    public String agreement;         // CONSISTENT | WEIGHTED | SAFETY_FIRST
+    public String agreement;
     public int fusedSfi;
 }

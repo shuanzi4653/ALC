@@ -1,6 +1,7 @@
 package com.tianchuang.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tianchuang.config.MonitorProperties;
 import com.tianchuang.config.QweatherProperties;
@@ -26,6 +27,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.RejectedExecutionException;
@@ -39,9 +41,6 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.stereotype.Service;
 
-/**
- * 一轮监测只使用创建时冻结的场景和来源策略。成功提交后才改变大屏的已生效状态。
- */
 @Service
 public class MonitorService {
     private static final Logger log = LoggerFactory.getLogger(MonitorService.class);
@@ -66,7 +65,10 @@ public class MonitorService {
     private final TaskExecutor track2Executor;
     private final ReentrantLock runLock = new ReentrantLock();
 
-    private volatile Scenario appliedScenario;
+    private volatile Scenario defaultScenario;
+
+    private static final int MAX_WORKSPACES = 64;
+    private final Map<String, Scenario> appliedScenarios = new ConcurrentHashMap<>();
 
     public MonitorService(MonitorProperties monitor, QweatherProperties qw,
                           QweatherClient qweatherClient, PythonClient python,
@@ -92,15 +94,44 @@ public class MonitorService {
         this.ws = ws;
         this.mapper = mapper;
         this.track2Executor = track2Executor;
-        this.appliedScenario = Scenario.parse(monitor.scenario());
+        this.defaultScenario = Scenario.parse(monitor.scenario());
     }
 
-    /** 首次 6 秒，之后默认 10 分钟；两个值均按毫秒解释。 */
+    private Scenario applied() {
+        return applied(com.tianchuang.config.WorkspaceContext.current());
+    }
+
+    private Scenario applied(String workspace) {
+        if (workspace == null || workspace.isBlank()) {
+            return defaultScenario;
+        }
+        return appliedScenarios.getOrDefault(workspace, defaultScenario);
+    }
+
+    private void remember(Scenario requested) {
+        String workspace = com.tianchuang.config.WorkspaceContext.current();
+        if (workspace == null || workspace.isBlank()) {
+            defaultScenario = requested;
+            return;
+        }
+        if (appliedScenarios.size() >= MAX_WORKSPACES && !appliedScenarios.containsKey(workspace)) {
+            appliedScenarios.keySet().stream().findFirst().ifPresent(appliedScenarios::remove);
+        }
+        appliedScenarios.put(workspace, requested);
+    }
+
+    private void broadcastDashboard(String runId) {
+        for (String workspace : ws.onlineWorkspaces()) {
+            Map<String, Object> payload = com.tianchuang.config.WorkspaceContext.call(workspace, this::buildDashboard);
+            ws.broadcastDashboardTo(workspace, runId, payload);
+        }
+    }
+
     @Scheduled(initialDelayString = "${monitor.initial-delay-ms:6000}",
             fixedDelayString = "${monitor.fixed-delay-ms:600000}")
     public void scheduledRun() {
         try {
-            execute(appliedScenario, false);
+            execute(applied(), false);
         } catch (RunBusyException e) {
             log.info("定时监测跳过：已有监测轮正在执行");
         } catch (Exception e) {
@@ -114,21 +145,17 @@ public class MonitorService {
                 .map(run -> run.scenario)
                 .filter(value -> value != null && !value.isBlank())
                 .ifPresent(value -> {
-                    try { appliedScenario = Scenario.parse(value); }
+                    try { defaultScenario = Scenario.parse(value); }
                     catch (IllegalArgumentException e) { log.warn("忽略历史运行中的未知剧本：{}", value); }
                 });
     }
 
     public Map<String, Object> runOnce() throws Exception {
-        return execute(appliedScenario, true);
+        return execute(applied(), true);
     }
 
     public Map<String, Object> switchScenario(String rawScenario) throws Exception {
-        Scenario requested = Scenario.parse(rawScenario);
-        if (monitor.live()) {
-            throw new IllegalArgumentException("live 模式不允许切换模拟剧本");
-        }
-        return execute(requested, true);
+        return execute(Scenario.parse(rawScenario), true);
     }
 
     private Map<String, Object> execute(Scenario requested, boolean manual) throws Exception {
@@ -152,32 +179,42 @@ public class MonitorService {
 
             WeatherSnapshot snapshot;
             List<ForecastHour> forecast;
-            if (monitor.live()) {
+            if (requested.needsWeather()) {
                 try {
                     snapshot = qweatherClient.current();
                     forecast = qweatherClient.hourly(6);
                     run.effectiveSource = "live";
                 } catch (Exception liveError) {
-                    if (!monitor.allowSimFallback()) {
-                        throw new ExternalDataUnavailableException("实时气象不可用: " + liveError.getMessage(), liveError);
+                    Map<String, Object> fetched;
+                    try {
+                        fetched = python.currentWeather(6);
+                    } catch (Exception fallbackError) {
+                        throw new ExternalDataUnavailableException(
+                                "真实气象不可用（和风失败：" + liveError.getMessage()
+                                        + "；公共源失败：" + fallbackError.getMessage() + "）",
+                                fallbackError);
                     }
-                    Map<String, Object> generated = python.generateSim(requested.key(), 6);
-                    snapshot = convertSnapshot(generated);
-                    forecast = convertForecast(generated);
-                    run.effectiveSource = "sim";
+                    snapshot = convertSnapshot(fetched);
+                    forecast = convertForecast(fetched);
+                    run.effectiveSource = "live-public";
                     run.degraded = true;
-                    run.degradeReason = "LIVE_SOURCE_UNAVAILABLE";
+                    run.degradeReason = "QWEATHER_UNAVAILABLE_PUBLIC_SOURCE_USED";
                 }
             } else {
-                Map<String, Object> generated = python.generateSim(requested.key(), 6);
-                snapshot = convertSnapshot(generated);
-                forecast = convertForecast(generated);
-                run.effectiveSource = "sim";
+                snapshot = absentSnapshot();
+                forecast = List.of();
+                run.effectiveSource = "none";
+                if (requested == Scenario.UNKNOWN) {
+                    run.degraded = true;
+                    run.degradeReason = "WEATHER_SOURCE_UNAVAILABLE";
+                }
             }
             run.obsTime = snapshot.time();
             run.ingestedAt = LocalDateTime.now();
 
-            SfiEngine.SfiResult rule = sfiEngine.evaluate(snapshot);
+            SfiEngine.SfiResult rule = requested.needsWeather()
+                    ? sfiEngine.evaluate(snapshot)
+                    : sfiEngine.abstain();
             run.evaluatedAt = LocalDateTime.now();
 
             Map<String, Object> track2 = pendingTrack2();
@@ -191,11 +228,11 @@ public class MonitorService {
             commits.completeWithTrack2Job(run, snapshot, forecast, record, track,
                     LocalDateTime.now().plusSeconds(20));
 
-            appliedScenario = requested;
+            remember(requested);
             checkAndAlert(run.runId, record, previous, rule, track2, fused, rule.level(), null);
 
             Map<String, Object> dashboard = buildDashboard();
-            ws.broadcastDashboard(run.runId, dashboard);
+            broadcastDashboard(run.runId);
             try {
                 WeatherSnapshot submittedSnapshot = snapshot;
                 List<ForecastHour> submittedForecast = List.copyOf(forecast);
@@ -205,7 +242,7 @@ public class MonitorService {
                 commits.failTrack2(run, track, "QUEUE_REJECTED", "轨2队列已满，本轮保留规则结果");
                 commits.finishTrack2Job(run.runId, "FAILED", "QUEUE_REJECTED");
                 dashboard = buildDashboard();
-                ws.broadcastDashboard(run.runId, dashboard);
+                broadcastDashboard(run.runId);
             }
             log.info("规则阶段完成 runId={} source={} SFI={} level={} costMs={}",
                     run.runId, run.effectiveSource, rule.sfi(), fused.fused(),
@@ -238,7 +275,7 @@ public class MonitorService {
                 commits.finishTrack2Job(run.runId, "TIMEOUT", "DEADLINE_EXCEEDED");
                 Map<String, Object> timedOutDashboard = buildDashboard();
                 if (run.runId.equals(timedOutDashboard.get("runId"))) {
-                    ws.broadcastDashboard(run.runId, timedOutDashboard);
+                    broadcastDashboard(run.runId);
                 }
                 return;
             }
@@ -249,7 +286,7 @@ public class MonitorService {
                 commits.finishTrack2Job(run.runId, "INVALID", "RULE_VERSION_MISMATCH");
                 Map<String, Object> invalidDashboard = buildDashboard();
                 if (run.runId.equals(invalidDashboard.get("runId"))) {
-                    ws.broadcastDashboard(run.runId, invalidDashboard);
+                    broadcastDashboard(run.runId);
                 }
                 return;
             }
@@ -275,7 +312,7 @@ public class MonitorService {
         }
         Map<String, Object> dashboard = buildDashboard();
         if (run.runId.equals(dashboard.get("runId"))) {
-            ws.broadcastDashboard(run.runId, dashboard);
+            broadcastDashboard(run.runId);
         }
     }
 
@@ -286,6 +323,13 @@ public class MonitorService {
     private List<ForecastHour> convertForecast(Map<String, Object> generated) {
         return mapper.convertValue(generated.get("hourly"),
                 mapper.getTypeFactory().constructCollectionType(List.class, ForecastHour.class));
+    }
+
+    private WeatherSnapshot absentSnapshot() {
+        return new WeatherSnapshot(
+                null, "none", qw.lat(), qw.lon(),
+                null, null, null, null, null, null, null, null, null, null, null,
+                WeatherSnapshot.TIME_BASIS_UNSPECIFIED);
     }
 
     private SfiRecordEntity newRecord(MonitoringRunEntity run, WeatherSnapshot s, SfiEngine.SfiResult rule) {
@@ -300,7 +344,7 @@ public class MonitorService {
         e.ingestedAt = run.ingestedAt;
         e.evaluatedAt = run.evaluatedAt;
         e.source = s.source();
-        e.scenario = "sim".equals(run.effectiveSource) ? run.scenario : null;
+        e.scenario = run.degraded ? run.scenario : null;
         e.sfi = rule.sfi();
         e.rawSfi = rule.rawSfi();
         e.level = rule.level().name();
@@ -309,16 +353,16 @@ public class MonitorService {
         e.lat = s.lat();
         e.lon = s.lon();
         e.conditionText = s.conditionText();
-        e.windSpeed = s.windSpeed();
-        e.windGust = s.windGust();
+        e.windSpeed = boxed(s.windSpeed());
+        e.windGust = boxed(s.windGust());
         e.windDeg = s.windDeg();
-        e.precipMmh = s.precipMmh();
-        e.visibilityM = s.visibilityM();
-        e.thunderProb = s.thunderProb();
-        e.tempC = s.tempC();
-        e.humidity = s.humidity();
-        e.pressureHpa = s.pressureHpa();
-        e.cloudCover = s.cloudCover();
+        e.precipMmh = boxed(s.precipMmh());
+        e.visibilityM = boxed(s.visibilityM());
+        e.thunderProb = boxed(s.thunderProb());
+        e.tempC = boxed(s.tempC());
+        e.humidity = boxed(s.humidity());
+        e.pressureHpa = boxed(s.pressureHpa());
+        e.cloudCover = boxed(s.cloudCover());
         try {
             e.checksJson = mapper.writeValueAsString(sfiEngine.toMap(rule).get("checks"));
         } catch (Exception ignored) {
@@ -408,26 +452,28 @@ public class MonitorService {
     }
 
     public Map<String, Object> buildDashboard() {
+        Scenario scenario = applied();
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("version", 1);
         out.put("serverTime", LocalDateTime.now().toString());
         out.put("configuredMode", monitor.mode());
-        out.put("mode", monitor.mode()); // 前端过渡兼容
+        out.put("mode", monitor.mode());
         out.put("regionId", regionId());
         out.put("region", qw.regionName());
         out.put("taskType", qw.taskType());
 
-        Optional<MonitoringRunEntity> completed = runRepo.findFirstByRegionIdAndConfiguredModeAndStatusInOrderByIdDesc(
-                regionId(), monitor.mode(), List.of("RULE_READY", "COMPLETE"));
-        Optional<MonitoringRunEntity> latestAttempt = runRepo.findFirstByRegionIdAndConfiguredModeOrderByIdDesc(regionId(), monitor.mode());
+        Optional<MonitoringRunEntity> completed = runRepo.findFirstByRegionIdAndConfiguredModeAndScenarioAndStatusInOrderByIdDesc(
+                regionId(), monitor.mode(), scenario.key(), List.of("RULE_READY", "COMPLETE"));
+        Optional<MonitoringRunEntity> latestAttempt = runRepo.findFirstByRegionIdAndConfiguredModeAndScenarioOrderByIdDesc(
+                regionId(), monitor.mode(), scenario.key());
         if (completed.isEmpty()) {
             out.put("runId", null);
             out.put("runSequence", 0);
             out.put("revision", 0);
             out.put("status", "WAITING");
             out.put("dataStatus", "NO_DATA");
-            out.put("scenario", appliedScenario.key());
-            out.put("appliedScenario", appliedScenario.key());
+            out.put("scenario", scenario.key());
+            out.put("appliedScenario", scenario.key());
             out.put("current", null);
             out.put("forecast", List.of());
             out.put("forecastSfi", List.of());
@@ -440,12 +486,14 @@ public class MonitorService {
             out.put("effectiveSource", run.effectiveSource);
             out.put("degraded", run.degraded);
             out.put("degradeReason", run.degradeReason);
-            out.put("scenario", run.scenario);
-            out.put("appliedScenario", run.scenario);
+            out.put("scenario", scenario.key());
+            out.put("appliedScenario", scenario.key());
+            out.put("runScenario", run.scenario);
             out.put("obsTime", run.obsTime);
+            out.put("obsTimeBasis", observationTimeBasis(run.snapshotJson));
             out.put("updatedAt", value(run.updatedAt));
             out.put("lastRunAt", value(run.updatedAt));
-            out.put("dataStatus", freshness(run.obsTime));
+            out.put("dataStatus", freshness(run.obsTime, run.ingestedAt));
             List<ForecastHour> forecast = readForecast(run.forecastJson);
             out.put("forecast", forecast);
             out.put("forecastSfi", forecastSfi(forecast));
@@ -482,16 +530,16 @@ public class MonitorService {
         snapshot.put("lat", e.lat);
         snapshot.put("lon", e.lon);
         snapshot.put("conditionText", e.conditionText);
-        snapshot.put("tempC", e.tempC);
-        snapshot.put("humidity", e.humidity);
-        snapshot.put("windSpeed", e.windSpeed);
-        snapshot.put("windGust", e.windGust);
+        snapshot.put("tempC", jsonly(e.tempC));
+        snapshot.put("humidity", jsonly(e.humidity));
+        snapshot.put("windSpeed", jsonly(e.windSpeed));
+        snapshot.put("windGust", jsonly(e.windGust));
         snapshot.put("windDeg", e.windDeg);
-        snapshot.put("precipMmh", e.precipMmh);
-        snapshot.put("visibilityM", e.visibilityM);
-        snapshot.put("pressureHpa", e.pressureHpa);
-        snapshot.put("cloudCover", e.cloudCover);
-        snapshot.put("thunderProb", e.thunderProb);
+        snapshot.put("precipMmh", jsonly(e.precipMmh));
+        snapshot.put("visibilityM", jsonly(e.visibilityM));
+        snapshot.put("pressureHpa", jsonly(e.pressureHpa));
+        snapshot.put("cloudCover", jsonly(e.cloudCover));
+        snapshot.put("thunderProb", jsonly(e.thunderProb));
 
         Map<String, Object> current = new LinkedHashMap<>();
         current.put("runId", e.runId);
@@ -576,7 +624,8 @@ public class MonitorService {
             try {
                 WeatherSnapshot synthetic = new WeatherSnapshot(h.time(), "forecast", qw.lat(), qw.lon(),
                         "预报", h.tempC(), 0.65, h.windSpeed(), h.windGust(), null,
-                        h.precipMmh(), h.visibilityM(), 1010.0, 0.8, h.thunderProb());
+                        h.precipMmh(), h.visibilityM(), 1010.0, 0.8, h.thunderProb(),
+                        WeatherSnapshot.TIME_BASIS_OBSERVED);
                 SfiEngine.SfiResult r = sfiEngine.evaluate(synthetic);
                 result.add(Map.of("time", h.time(), "sfi", r.sfi(), "level", r.level().name(),
                         "levelLabel", r.level().label));
@@ -587,13 +636,36 @@ public class MonitorService {
         return result;
     }
 
-    private String freshness(String obsTime) {
-        if (obsTime == null) return "UNKNOWN";
+    private String observationTimeBasis(String snapshotJson) {
+        if (snapshotJson == null || snapshotJson.isBlank()) return null;
         try {
-            long age = Duration.between(OffsetDateTime.parse(obsTime), OffsetDateTime.now()).toMinutes();
+            JsonNode basis = mapper.readTree(snapshotJson).path("timeBasis");
+            return basis.isTextual() && !basis.asText().isBlank() ? basis.asText() : null;
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private String freshness(String obsTime, LocalDateTime ingestedAt) {
+        OffsetDateTime at = parseInstant(obsTime);
+        if (at == null && ingestedAt != null) {
+            at = ingestedAt.atZone(ZoneId.systemDefault()).toOffsetDateTime();
+        }
+        if (at == null) return "UNKNOWN";
+        try {
+            long age = Duration.between(at, OffsetDateTime.now()).toMinutes();
             return age >= 0 && age <= Math.max(20, monitor.fixedDelayMs() / 30_000) ? "FRESH" : "STALE";
         } catch (Exception ignored) {
             return "UNKNOWN";
+        }
+    }
+
+    private OffsetDateTime parseInstant(String text) {
+        if (text == null || text.isBlank()) return null;
+        try {
+            return OffsetDateTime.parse(text);
+        } catch (Exception ignored) {
+            return null;
         }
     }
 
@@ -631,6 +703,14 @@ public class MonitorService {
         List<String> reasons = result.checks().stream().filter(c -> c.banned() || c.warn())
                 .map(c -> c.factor() + " " + c.value() + c.unit() + "（" + c.note() + "）").toList();
         return reasons.isEmpty() ? "各要素均在适飞阈值内" : String.join("；", reasons);
+    }
+
+    private double boxed(Double value) {
+        return value == null ? Double.NaN : value;
+    }
+
+    private Double jsonly(double value) {
+        return Double.isNaN(value) ? null : value;
     }
 
     private double toDouble(Object value, double fallback) {

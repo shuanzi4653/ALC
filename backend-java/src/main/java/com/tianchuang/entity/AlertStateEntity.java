@@ -8,7 +8,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 
-/** 每个区域、来源、规则和触发类型的预警 episode 状态。 */
 @Entity
 @Table(name = "alert_state")
 public class AlertStateEntity {
@@ -21,7 +20,6 @@ public class AlertStateEntity {
     public String level;
     public int transitionVersion;
     public int recoveryCount;
-    /** 同一运行的规则阶段与轨2补全只计作一轮恢复观察。 */
     public Long lastEvaluatedRunSequence;
     public LocalDateTime lastSeenAt;
     public LocalDateTime updatedAt = LocalDateTime.now();

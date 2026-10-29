@@ -6,6 +6,9 @@ import java.util.Optional;
 import com.tianchuang.entity.SfiRecordEntity;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface SfiRecordRepo extends JpaRepository<SfiRecordEntity, Long> {
     List<SfiRecordEntity> findTop48ByOrderByTsDesc();
@@ -22,8 +25,9 @@ public interface SfiRecordRepo extends JpaRepository<SfiRecordEntity, Long> {
     List<SfiRecordEntity> findTop10ByRegionIdAndEffectiveSourceAndRuleVersionAndScenarioOrderByTsDesc(
             String regionId, String effectiveSource, String ruleVersion, String scenario);
 
-    /** 保留策略（E02）：删除早于截止时间的观测记录 */
-    long deleteByTsBefore(java.time.LocalDateTime cutoff);
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("delete from SfiRecordEntity e where e.ts < :cutoff")
+    int deleteByTsBefore(@Param("cutoff") java.time.LocalDateTime cutoff);
 
     org.springframework.data.domain.Page<SfiRecordEntity> findByRegionIdOrderByTsDesc(
             String regionId, org.springframework.data.domain.Pageable pageable);
