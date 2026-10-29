@@ -1,8 +1,3 @@
-"""Deterministic births, continuous advection, lifetimes and risk derivation.
-
-No real station or calibrated probability is implied by synthetic scenarios.
-Time is relative to a persisted origin, never modulo a wall-clock period.
-"""
 import math
 import random
 import hashlib
@@ -27,7 +22,6 @@ REGIONS = {
 }
 SCENARIOS = ('clear', 'wind', 'rain', 'storm', 'crossing', 'multi', 'unknown', 'calm')
 
-
 class WeatherWorld:
     def __init__(self, seed=42, scenario='crossing', origin='2026-09-12T00:00:00+08:00', uncertainty=True):
         if scenario not in SCENARIOS:
@@ -38,7 +32,6 @@ class WeatherWorld:
     def wind(self, x, y, minute):
         if self.scenario == 'calm':
             return 0.0, 0.0
-        # Smooth vector field. Advection uses the integral of these periodic components.
         return (3.0 + math.sin(minute / 45 + y / 180000),
                 1.5 + math.cos(minute / 60 + x / 180000))
 
@@ -49,7 +42,6 @@ class WeatherWorld:
         result = []
         for region_index, (region_id, region) in enumerate(REGIONS.items()):
             cx, cy = project(region['center'])
-            # Birth every 100 minutes, finite lifetime, positions vary by seed AND birth index.
             for birth in range(math.floor((minute - 150) / 100), math.floor(minute / 100) + 1):
                 rng = random.Random(self.seed * 100003 + region_index * 1009 + birth * 97)
                 born = birth * 100 - 30
@@ -62,7 +54,6 @@ class WeatherWorld:
                     phase = rng.uniform(-math.pi, math.pi)
                     x0 = cx + rng.uniform(-5000, 5000) + index * 14000
                     y0 = cy - 12000 + rng.uniform(-3000, 3000)
-                    # Integral in seconds of a bounded, changing velocity, rather than v(now)*age.
                     vx, vy = 0.5 + index, 5.0 + region_index * .4
                     x = x0 + vx * age * 60 + 1800 * (math.cos(phase) - math.cos(age / 30 + phase))
                     y = y0 + vy * age * 60 + 1200 * (math.sin(age / 40 + phase) - math.sin(phase))
@@ -97,7 +88,6 @@ class WeatherWorld:
             warn, ban = factor['warnValue'], factor['banValue']
             if cell['value'] < warn:
                 continue
-            # The uncertain footprint is a scenario envelope, NOT a calibrated probability.
             uncertainty_m = 800 if self.uncertainty else 0
             influence = cell['polygon'].buffer(buffer_m + uncertainty_m).intersection(boundary(REGIONS[region_id]['name']))
             areas.append({'id': cell['cellId'], 'zoneType': 'BAN' if cell['value'] >= ban else 'CAUTION',
@@ -107,8 +97,6 @@ class WeatherWorld:
         return areas
 
     def swept(self, start, end, region_id, buffer_m=500):
-        # At most one-minute spacing plus a conservative envelope for movement and shape change.
-        # Bound: <= 8 m/s translation + 10 m/s boundary growth, including birth/death.
         return self._swept_minutes(math.floor(start), math.ceil(end), region_id, buffer_m)
 
     @lru_cache(maxsize=2048)
@@ -131,7 +119,6 @@ class WeatherWorld:
             for area in self.risks(minute, rid, buffer_m):
                 areas.append({**area, 'geometry': geojson(area['geometry']), 'regionId': rid})
         points = []
-        # Actual spatial grid, clipped to province polygons, no station-cluster replication.
         selected = boundary(REGIONS[region_id]['name'] if region_id else None)
         xmin, ymin, xmax, ymax = selected.bounds
         spacing = 23000 if region_id else 55000

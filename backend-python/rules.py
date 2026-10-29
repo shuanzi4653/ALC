@@ -1,15 +1,3 @@
-"""轨1 规则的 Python 实现（C02）。
-
-与 Java 侧 `SfiEngine` **读取同一份配置** `config/rules-v1.json`，并实现相同的比较符语义，
-使两端在任何输入下得到一致的 rawSfi / sfi / level / hardBan。`tests/fixtures/rule-cases.json`
-作为跨语言 golden cases 同时被两端断言，任何一侧偏离都会立即失败。
-
-比较符语义（与 Java 完全一致）：
-    direction=high ：v >= banValue 禁飞；v >= warnValue 警戒
-    direction=low  ：v <= banValue 禁飞；v <= warnValue 警戒
-    direction=range：v < banLow 或 v > banHigh 禁飞；v < warnLow 或 v > warnHigh 警戒
-"""
-
 from __future__ import annotations
 
 import json
@@ -23,8 +11,6 @@ RULES_PATH = APP_ROOT / "config" / "rules-v1.json"
 
 LEVEL_LABELS_CN = {"FIT": "适飞", "CAUTION": "谨慎", "DANGER": "危险", "BAN": "禁飞"}
 
-# 有效范围（与 Java ObservationValidator 一致）：缺失、非有限或越界一律判为不可用，
-# 不得默认成安全值。温度允许负值，不能套用非负校验。
 RANGE_LIMITS = {
     "windSpeed": (0.0, 150.0),
     "windGust": (0.0, 200.0),
@@ -34,7 +20,6 @@ RANGE_LIMITS = {
     "tempC": (-100.0, 70.0),
 }
 
-# 与 Java RuleSpec.defaultFactors() 等价的内置兜底（配置缺失时使用）
 _DEFAULT_FACTORS: List[Dict[str, Any]] = [
     {"key": "windSpeed", "label": "平均风速", "unit": "m/s", "direction": "high",
      "warnValue": 8, "banValue": 12, "penaltyWarn": 22, "penaltyBan": 40,
@@ -49,6 +34,7 @@ _DEFAULT_FACTORS: List[Dict[str, Any]] = [
      "warnValue": 5000, "banValue": 1000, "penaltyWarn": 12, "penaltyBan": 30,
      "displayDivisor": 1000, "noteOk": "良好", "noteWarn": "偏低", "noteBan": "低于禁飞阈值"},
     {"key": "thunderProb", "label": "雷暴概率", "unit": "%", "direction": "high",
+     "required": False,
      "warnValue": 0.2, "banValue": 0.6, "penaltyWarn": 12, "penaltyBan": 35,
      "displayMultiplier": 100, "noteOk": "低", "noteWarn": "存在风险", "noteBan": "过高"},
     {"key": "tempC", "label": "温度", "unit": "℃", "direction": "range",
@@ -56,7 +42,6 @@ _DEFAULT_FACTORS: List[Dict[str, Any]] = [
      "penaltyWarn": 10, "penaltyBan": 30,
      "noteOk": "正常", "noteWarn": "接近边界", "noteBan": "超出安全范围"},
 ]
-
 
 @dataclass
 class FactorRule:
@@ -77,6 +62,7 @@ class FactorRule:
     noteOk: str = "正常"
     noteWarn: str = "警戒"
     noteBan: str = "达禁飞阈值"
+    required: bool = True
 
     @classmethod
     def from_dict(cls, raw: Dict[str, Any]) -> "FactorRule":
@@ -100,6 +86,7 @@ class FactorRule:
             noteOk=str(raw.get("noteOk") or "正常"),
             noteWarn=str(raw.get("noteWarn") or "警戒"),
             noteBan=str(raw.get("noteBan") or "达禁飞阈值"),
+            required=bool(raw.get("required", True)),
         )
 
     def banned(self, value: float) -> bool:
@@ -120,7 +107,6 @@ class FactorRule:
 
     def display(self, raw: float) -> float:
         return raw / self.displayDivisor * self.displayMultiplier
-
 
 @dataclass
 class RuleSpec:
@@ -148,16 +134,13 @@ class RuleSpec:
             source=source,
         )
 
-
 def load_spec(path: Optional[Path] = None) -> RuleSpec:
-    """加载规则配置：指定路径 → 项目 config/rules-v1.json → 内置默认。"""
     candidate = Path(path) if path else RULES_PATH
     try:
         with open(candidate, "r", encoding="utf-8") as f:
             return RuleSpec.from_dict(json.load(f), source=str(candidate))
     except Exception:
         return RuleSpec.from_dict({}, source="built-in-defaults")
-
 
 def _numeric(snapshot: Dict[str, Any], key: str) -> Optional[float]:
     value = snapshot.get(key)
@@ -169,19 +152,21 @@ def _numeric(snapshot: Dict[str, Any], key: str) -> Optional[float]:
         return None
     return number if math.isfinite(number) else None
 
-
 def evaluate(snapshot: Dict[str, Any], spec: Optional[RuleSpec] = None) -> Dict[str, Any]:
-    """按配置计算规则结果。缺失/非法必需字段抛 ValueError（不得默认判定适飞）。"""
     rule_spec = spec or load_spec()
     checks: List[Dict[str, Any]] = []
     reasons: List[str] = []
     penalty = 0
     missing: List[str] = []
+    unavailable_optional: List[str] = []
 
     for rule in rule_spec.factors:
         raw = _numeric(snapshot, rule.key)
         if raw is None:
-            missing.append(rule.key)
+            if rule.required:
+                missing.append(rule.key)
+            else:
+                unavailable_optional.append(rule.label)
             continue
         limits = RANGE_LIMITS.get(rule.key)
         if limits and not (limits[0] <= raw <= limits[1]):
@@ -225,8 +210,8 @@ def evaluate(snapshot: Dict[str, Any], spec: Optional[RuleSpec] = None) -> Dict[
         "rule_source": rule_spec.source,
         "checks": checks,
         "reasons": reasons or ["各要素均在适飞阈值内"],
+        "unavailable_optional": unavailable_optional,
     }
-
 
 def level_of(sfi: int, spec: Optional[RuleSpec] = None) -> str:
     rule_spec = spec or load_spec()

@@ -1,4 +1,3 @@
-"""Verified historical station samples, isolated from synthetic forecasting."""
 import csv
 import hashlib
 import io
@@ -13,12 +12,10 @@ from shapely.geometry import Point
 DATA = Path(__file__).resolve().parent / 'data' / 'stations'
 CATALOG_URL = 'https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv'
 
-
 def normalize(row):
     def value(key, position, qc_position, missing, scale=1):
         parts = row.get(key, '').split(',')
         try:
-            # Retain only values that passed the documented quality checks.
             if parts[qc_position] not in ('1', '5') or parts[position].lstrip('+') == missing:
                 return None
             return float(parts[position]) / scale
@@ -32,7 +29,6 @@ def normalize(row):
                 precipitationAccumulationMm=value('AA1', 1, 3, '9999', 10),
                 precipitationPeriodHours=value('AA1', 0, 3, '99'),
                 thunderProbability=None, rawQuality={k: row.get(k) for k in ('WND', 'TMP', 'VIS', 'AA1')})
-
 
 def catalog_rows(raw):
     rows = []
@@ -50,7 +46,6 @@ def catalog_rows(raw):
                                  source='NOAA_ISD_CATALOG', sourceUrl=CATALOG_URL))
     return rows
 
-
 def observations():
     regions = []
     for rid, region in REGIONS.items():
@@ -67,7 +62,6 @@ def observations():
                                 forecastStatus='NO_DATA', samples=[], stations=[]))
     return dict(source='HISTORICAL_STATION', regions=regions,
                 note='历史站点观测，不是实时数据或区域雷暴预报；缺测保持为空。')
-
 
 def download():
     import httpx
@@ -97,7 +91,6 @@ def download():
                     break
                 except httpx.HTTPError as exc:
                     print(rid, station['stationId'], type(exc).__name__, flush=True)
-
 
 if __name__ == '__main__':
     download()

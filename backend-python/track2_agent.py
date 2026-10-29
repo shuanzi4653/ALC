@@ -1,21 +1,4 @@
 # -*- coding: utf-8 -*-
-"""
-天窗智巡 · 轨2 大模型研判智能体
-====================================
-基于 DeepSeek（OpenAI 兼容接口）的低空飞行气象研判智能体。
-
-输出五元组结构化 JSON（与计划书 5.4 节一致）：
-  risk_level   适飞 | 谨慎 | 危险 | 禁飞
-  confidence   0.0-1.0
-  key_factors  主要影响要素及原因（数组）
-  advice       具体作业建议
-  alert_text   可直接发布的预警文本
-
-可靠性工程（对应计划书 5.4）：
-  1. JSON Mode 强约束输出
-  2. Schema 校验 + 失败自动重试（2 次）
-  3. 全部失败时降级为本地规则研判（source=fallback），主流程零阻塞
-"""
 
 import json
 import logging
@@ -23,7 +6,7 @@ import math
 
 import httpx
 
-import rules  # 与 Java 共用 config/rules-v1.json（C02）
+import rules
 
 log = logging.getLogger("tianchuang.track2")
 
@@ -62,9 +45,7 @@ windGust=阵风m/s，precipMmh=降水强度mm/h，visibilityM=能见度米，thu
 
 请输出研判 JSON。"""
 
-
 def _chat(messages, cfg, timeout=45.0):
-    """调用 DeepSeek chat completions（OpenAI 兼容接口）"""
     url = cfg["base_url"].rstrip("/") + "/chat/completions"
     headers = {"Authorization": "Bearer " + cfg["api_key"], "Content-Type": "application/json"}
     body = {
@@ -80,7 +61,6 @@ def _chat(messages, cfg, timeout=45.0):
         resp.raise_for_status()
         data = resp.json()
         return data["choices"][0]["message"]["content"]
-
 
 def _parse_five(text):
     """解析并校验五元组输出"""
@@ -100,14 +80,10 @@ def _parse_five(text):
         "alert_text": str(obj.get("alert_text", ""))[:200],
     }
 
-
 def _clamp(v, lo, hi):
     return max(lo, min(hi, v))
 
-
 def _flatten_snapshot(snapshot):
-    """统一快照字段：扁平结构优先（Java 侧传入），嵌套结构兜底（和风原始 JSON）。
-    缺失或非有限值一律返回 None，由规则模块判定为「缺失」，不补零、不假设安全。"""
 
     def _num(d, *keys):
         cur = d
@@ -138,14 +114,7 @@ def _flatten_snapshot(snapshot):
         "tempC": _pick("tempC"),
     }
 
-
 def _fallback(snapshot, hours, region, task_type):
-    """本地规则降级研判（C02）。
-
-    读取与 Java 侧**同一份** config/rules-v1.json（见 rules.py），阈值、比较方向、
-    扣分与等级边界完全一致；缺失字段抛 ValueError，不得默认判定适飞。
-    source 标记为 fallback，不伪装成模型结果。
-    """
     flat = _flatten_snapshot(snapshot)
     result = rules.evaluate(flat)
 
@@ -178,13 +147,7 @@ def _fallback(snapshot, hours, region, task_type):
         "rule_version": result["rule_version"],
     }
 
-
 def analyze(snapshot, forecast, region, task_type, cfg, run_id="", deadline_epoch_ms=0):
-    """
-    轨2 研判主入口。
-    cfg 为 DeepSeek 配置 dict：{api_key, base_url, model}；api_key 为空时直接走降级。
-    返回: {五元组..., "source": "deepseek" | "fallback", "latency_ms": int}
-    """
     import time
     t0 = time.time()
 
@@ -210,8 +173,6 @@ def analyze(snapshot, forecast, region, task_type, cfg, run_id="", deadline_epoc
                 raise TimeoutError("track2 deadline exhausted")
             text = _chat(messages, cfg, timeout=max(1.0, min(8.0, remaining - 0.2)))
             result = _parse_five(text)
-            # 规则版本由本地受控规则文件写入，不能信任或要求模型生成。
-            # Java 侧以此校验轨2结论与当前运行规则是否一致。
             result["rule_version"] = rules.load_spec().version
             result["source"] = "deepseek"
             result["latency_ms"] = int((time.time() - t0) * 1000)
@@ -222,25 +183,17 @@ def analyze(snapshot, forecast, region, task_type, cfg, run_id="", deadline_epoc
             if deadline_epoch_ms and time.time() * 1000 >= deadline_epoch_ms:
                 break
 
-    # 三次尝试全部失败 → 规则降级，主流程零阻塞
     log.error("track2 degraded to fallback: %s", last_err)
     result = _fallback(snapshot, len(forecast), region, task_type)
     result["source"] = "fallback"
     result["latency_ms"] = int((time.time() - t0) * 1000)
     return result
 
-
 ASK_SYSTEM = """你是低空飞行气象保障智能助手"天窗"，面向无人机运营方与飞手。
 请依据提供的实时气象上下文，用简洁中文回答用户的飞行咨询（不超过 150 字），
 先给结论（能飞/不能飞/谨慎），再说明原因与建议。气象数据之外的问题请礼貌说明职责范围。"""
 
-
 def ask(question, context_text, cfg):
-    """
-    智能体问答（大屏右栏交互窗口）。
-    context_text 为 Java 侧拼接的当前气象态势文本。
-    返回: {"answer": str, "source": "deepseek"|"fallback"}
-    """
     if not cfg.get("api_key"):
         return {"answer": "（模拟模式）当前系统未配置大模型服务。基于本地规则研判：" + context_text[:120],
                 "source": "fallback"}

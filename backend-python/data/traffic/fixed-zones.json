@@ -1,0 +1,2296 @@
+{
+  "schemaVersion": "1.0",
+  "catalogVersion": "northeast-fixed-airspace-v1",
+  "coordinateReferenceSystem": "EPSG:4326",
+  "generatedAt": "2026-09-17",
+  "dataRetrievedAt": "2026-09-16",
+  "disclaimer": "本目录依据公开法规与公开数据登记固定管制空域，用于模拟运行中心的合规检查。它不是航行情报，不构成飞行许可，也不能替代空中交通管理机构公布的管制空域边界。凡未取得公开定量范围者一律不生成几何。",
+  "legalFramework": {
+    "instrument": "《无人驾驶航空器飞行管理暂行条例》（国令第 761 号，2024-01-01 施行）",
+    "clause": "第十九条",
+    "publicationRule": "管制空域的具体范围由各级空中交通管理机构按照国家空中交通管理领导机构的规定确定，由设区的市级以上人民政府公布，民用航空管理部门和承担相应职责的单位发布航行情报。",
+    "entryRule": "未经空中交通管理机构批准，不得在管制空域内实施无人驾驶航空器飞行活动。",
+    "freeFlightRule": "管制空域范围以外的空域为微型、轻型、小型无人驾驶航空器的适飞空域。",
+    "reviewPlatform": "民用无人驾驶航空器综合管理平台 https://uom.caac.gov.cn"
+  },
+  "clauses": [
+    {
+      "key": "AIRPORT",
+      "clause": "第十九条第（一）项",
+      "title": "机场以及周边一定范围的区域",
+      "geometryStatus": "PARTIALLY_PUBLISHED",
+      "geometryRule": "运输机场净空保护区域：以机场基准点为圆心、水平半径 55 公里的空间区域。见《运输机场净空保护管理办法》及各地《机场净空保护管理规定》净空保护相关用语说明第 1 条。 净空巡视检查区域：机场跑道中心线两侧各 10 公里、跑道端外 20 公里以内的区域（机场障碍物限制面区域加上适当的面外区域）。见各地《机场净空保护管理规定》净空保护相关用语说明第 2 条。",
+      "citation": "《运输机场净空保护管理办法》《民用机场管理条例》第四十九条；各地《机场净空保护管理规定》净空保护相关用语说明第 2 条",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "siteCount": 48
+    },
+    {
+      "key": "BORDER",
+      "clause": "第十九条第（二）项",
+      "title": "国界线、实际控制线、边境线向我方一侧一定范围的区域",
+      "geometryStatus": "PERIMETER_NOT_PUBLICLY_PUBLISHED",
+      "geometryRule": null,
+      "citation": "范围由各级空中交通管理机构确定，由设区的市级以上人民政府公布",
+      "authority": "空中交通管理机构 / 边境管理部门",
+      "reviewAction": "本系统不自行测绘边境带宽度。需按设区的市级以上人民政府公布的范围补全；在此之前，边境城市航线的合规性只能标注为待核。",
+      "sector": "DEFENCE",
+      "sectorLabel": "国防",
+      "siteCount": 0
+    },
+    {
+      "key": "CLASSIFIED_UNIT",
+      "clause": "第十九条第（三）项",
+      "title": "军事禁区、军事管理区、监管场所等涉密单位以及周边一定范围的区域",
+      "geometryStatus": "PERIMETER_NOT_PUBLICLY_PUBLISHED",
+      "geometryRule": null,
+      "citation": "范围由各级空中交通管理机构确定，由设区的市级以上人民政府公布",
+      "authority": "空中交通管理机构 / 有关涉密单位",
+      "reviewAction": "涉密单位与监管场所边界依法不公开，本系统不生成、不推测任何几何，也不以任何形式声称已避开该类区域。",
+      "sector": "CLASSIFIED",
+      "sectorLabel": "机密",
+      "siteCount": 0
+    },
+    {
+      "key": "DEFENCE_INDUSTRY",
+      "clause": "第十九条第（四）项",
+      "title": "重要军工设施保护区域、核设施控制区域、易燃易爆等危险品的生产和仓储区域，以及可燃重要物资的大型仓储区域",
+      "geometryStatus": "PARTIALLY_PUBLISHED",
+      "geometryRule": "核设施按 GB 6249—2025 非居住区与规划限制区下限建最小包络；重要军工设施保护区域无公开范围。",
+      "citation": "GB 6249—2025《核动力厂环境辐射防护规定》第 5.6 条",
+      "authority": "空中交通管理机构 / 生态环境主管部门 / 有关涉密单位",
+      "reviewAction": "重要军工设施与危险品仓储的边界不公开，仅登记类别，不生成几何。",
+      "sector": "DEFENCE",
+      "sectorLabel": "国防",
+      "siteCount": 2
+    },
+    {
+      "key": "INFRASTRUCTURE",
+      "clause": "第十九条第（五）项",
+      "title": "发电厂、变电站、加油（气）站、供水厂、公共交通枢纽、航电枢纽、重大水利设施、港口、高速公路、铁路电气化线路等公共基础设施以及周边一定范围的区域和饮用水水源保护区",
+      "geometryStatus": "AREA_EXTENT_REQUIRES_LOCAL_PUBLICATION",
+      "geometryRule": null,
+      "citation": "饮用水水源保护区范围由省级人民政府批复公布；其余设施周边范围由各级空中交通管理机构确定",
+      "authority": "空中交通管理机构 / 地方人民政府",
+      "reviewAction": "本系统登记已公开定位的设施参考点，但不自行给设施套用统一缓冲半径：该类设施\"周边一定范围\"没有全国统一定量标准，需要逐项按地方公布范围补全。",
+      "sector": "GOVERNMENT",
+      "sectorLabel": "政务",
+      "siteCount": 0
+    },
+    {
+      "key": "ELECTROMAGNETIC",
+      "clause": "第十九条第（六）项",
+      "title": "射电天文台、卫星测控（导航）站、航空无线电导航台、雷达站等需要电磁环境特殊保护的设施以及周边一定范围的区域",
+      "geometryStatus": "PARTIALLY_PUBLISHED",
+      "geometryRule": "无方向信标台（NDB）与多普勒全向信标台／常规测距仪台（DVOR/DME）以天线中心为基准，半径 500 米的圆形区域为有源保护区，针对有源干扰进行保护；半径 5 千米范围为限制保护区，该区域内限制障碍物高度。此处只按有源保护区生成禁止进入区，限制保护区属障碍物高度管控，不是飞行禁区，故不生成几何。 天气雷达站探测环境保护区由一级保护区和二级保护区构成；二级保护区为一级保护区外沿至距离雷达 20 km 的环形区域。 但天气雷达站的探测环境保护区不是飞行管制空域，本系统仅登记设施位置，不据此生成几何。射电天文台电磁波宁静区仅贵州省有公开地方立法（半径 30 km），东北三省未见公开定量范围。",
+      "citation": "GB 6364—2013《航空无线电导航台站电磁环境要求》，MH/T 4003.1—2014《民用航空通信导航监视台（站）设置场地规范 第 1 部分：导航》；半径取值见《湖南省民用机场及民用航空无线电台（站）电磁环境保护区管理规定》第十一条；GB 31223—2014《气象探测环境保护规范 天气雷达站》第 4.2、4.3 条；《贵州省500米口径球面射电望远镜电磁波宁静区保护办法》",
+      "authority": "气象主管机构 / 无线电管理机构 / 空中交通管理机构",
+      "reviewAction": "待该雷达站周边管制空域范围由设区的市级以上人民政府公布后补全几何；在此之前，本系统不以 GB 31223 的保护半径推算禁飞范围。",
+      "sector": "RESEARCH",
+      "sectorLabel": "科研",
+      "siteCount": 11
+    },
+    {
+      "key": "HERITAGE",
+      "clause": "第十九条第（七）项",
+      "title": "重要革命纪念地、重要不可移动文物以及周边一定范围的区域",
+      "geometryStatus": "AREA_EXTENT_REQUIRES_LOCAL_PUBLICATION",
+      "geometryRule": null,
+      "citation": "范围由各级空中交通管理机构确定，由设区的市级以上人民政府公布",
+      "authority": "空中交通管理机构 / 文物主管部门",
+      "reviewAction": "本系统登记已公开定位的纪念地与不可移动文物参考点，不自行套用缓冲半径。",
+      "sector": "GOVERNMENT",
+      "sectorLabel": "政务",
+      "siteCount": 8
+    },
+    {
+      "key": "OTHER",
+      "clause": "第十九条第（八）项",
+      "title": "国家空中交通管理领导机构规定的其他区域",
+      "geometryStatus": "PERIMETER_NOT_PUBLICLY_PUBLISHED",
+      "geometryRule": null,
+      "citation": "由国家空中交通管理领导机构规定",
+      "authority": "国家空中交通管理领导机构",
+      "reviewAction": "无法预先枚举，随国家规定与临时公告更新。",
+      "sector": "GOVERNMENT",
+      "sectorLabel": "政务",
+      "siteCount": 0
+    }
+  ],
+  "sites": [
+    {
+      "id": "FZ-AP-ZYAS-P",
+      "name": "鞍山腾鳌机场净空保护区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "CIRCLE",
+        "centre": [
+          122.854,
+          41.1053
+        ],
+        "radiusM": 55000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "floorAglM": 120,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "运输机场净空保护区域：以机场基准点为圆心、水平半径 55 公里的空间区域。见《运输机场净空保护管理办法》及各地《机场净空保护管理规定》净空保护相关用语说明第 1 条。",
+      "citation": "《运输机场净空保护管理办法》《民用机场管理条例》第四十九条",
+      "note": "真高 120 米以上属于管制空域；本系统按下限标注垂直范围，低于 120 米仍受《民用机场管理条例》第四十九条关于净空保护区域的限制。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYAS，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYAS）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYAS-I",
+      "name": "鞍山腾鳌机场净空巡视检查区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "RUNWAY_RECT",
+        "centre": [
+          122.854,
+          41.1053
+        ],
+        "bearingDeg": 14.1,
+        "runwayLengthM": 2600,
+        "halfWidthM": 10000,
+        "beyondEndM": 20000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "strictEnforcement": "PROHIBITED",
+      "floorAglM": 0,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "净空巡视检查区域：机场跑道中心线两侧各 10 公里、跑道端外 20 公里以内的区域（机场障碍物限制面区域加上适当的面外区域）。见各地《机场净空保护管理规定》净空保护相关用语说明第 2 条。",
+      "citation": "各地《机场净空保护管理规定》净空保护相关用语说明第 2 条",
+      "note": "跑道方位取自 OpenStreetMap 跑道几何（真实方位角），矩形按公布的两侧各 10 公里、端外 20 公里生成。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYAS，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYAS）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYBA-P",
+      "name": "白城长安机场净空保护区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "CIRCLE",
+        "centre": [
+          123.01972,
+          45.50528
+        ],
+        "radiusM": 55000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "floorAglM": 120,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "运输机场净空保护区域：以机场基准点为圆心、水平半径 55 公里的空间区域。见《运输机场净空保护管理办法》及各地《机场净空保护管理规定》净空保护相关用语说明第 1 条。",
+      "citation": "《运输机场净空保护管理办法》《民用机场管理条例》第四十九条",
+      "note": "真高 120 米以上属于管制空域；本系统按下限标注垂直范围，低于 120 米仍受《民用机场管理条例》第四十九条关于净空保护区域的限制。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYBA，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYBA）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYBA-I",
+      "name": "白城长安机场净空巡视检查区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "RUNWAY_RECT",
+        "centre": [
+          123.01972,
+          45.50528
+        ],
+        "bearingDeg": 56.8,
+        "runwayLengthM": 2500,
+        "halfWidthM": 10000,
+        "beyondEndM": 20000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "strictEnforcement": "PROHIBITED",
+      "floorAglM": 0,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "净空巡视检查区域：机场跑道中心线两侧各 10 公里、跑道端外 20 公里以内的区域（机场障碍物限制面区域加上适当的面外区域）。见各地《机场净空保护管理规定》净空保护相关用语说明第 2 条。",
+      "citation": "各地《机场净空保护管理规定》净空保护相关用语说明第 2 条",
+      "note": "跑道方位取自 OpenStreetMap 跑道几何（真实方位角），矩形按公布的两侧各 10 公里、端外 20 公里生成。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYBA，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYBA）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYBS-P",
+      "name": "长白山机场净空保护区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "CIRCLE",
+        "centre": [
+          127.60222,
+          42.06694
+        ],
+        "radiusM": 55000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "floorAglM": 120,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "运输机场净空保护区域：以机场基准点为圆心、水平半径 55 公里的空间区域。见《运输机场净空保护管理办法》及各地《机场净空保护管理规定》净空保护相关用语说明第 1 条。",
+      "citation": "《运输机场净空保护管理办法》《民用机场管理条例》第四十九条",
+      "note": "真高 120 米以上属于管制空域；本系统按下限标注垂直范围，低于 120 米仍受《民用机场管理条例》第四十九条关于净空保护区域的限制。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYBS，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYBS）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYBS-I",
+      "name": "长白山机场净空巡视检查区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "RUNWAY_RECT",
+        "centre": [
+          127.60222,
+          42.06694
+        ],
+        "bearingDeg": 185.0,
+        "runwayLengthM": 2600,
+        "halfWidthM": 10000,
+        "beyondEndM": 20000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "strictEnforcement": "PROHIBITED",
+      "floorAglM": 0,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "净空巡视检查区域：机场跑道中心线两侧各 10 公里、跑道端外 20 公里以内的区域（机场障碍物限制面区域加上适当的面外区域）。见各地《机场净空保护管理规定》净空保护相关用语说明第 2 条。",
+      "citation": "各地《机场净空保护管理规定》净空保护相关用语说明第 2 条",
+      "note": "跑道方位取自 OpenStreetMap 跑道几何（真实方位角），矩形按公布的两侧各 10 公里、端外 20 公里生成。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYBS，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYBS）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYCC-P",
+      "name": "长春龙嘉国际机场净空保护区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "CIRCLE",
+        "centre": [
+          125.685,
+          43.9962
+        ],
+        "radiusM": 55000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "floorAglM": 120,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "运输机场净空保护区域：以机场基准点为圆心、水平半径 55 公里的空间区域。见《运输机场净空保护管理办法》及各地《机场净空保护管理规定》净空保护相关用语说明第 1 条。",
+      "citation": "《运输机场净空保护管理办法》《民用机场管理条例》第四十九条",
+      "note": "真高 120 米以上属于管制空域；本系统按下限标注垂直范围，低于 120 米仍受《民用机场管理条例》第四十九条关于净空保护区域的限制。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYCC，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYCC）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYCC-I",
+      "name": "长春龙嘉国际机场净空巡视检查区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "RUNWAY_RECT",
+        "centre": [
+          125.685,
+          43.9962
+        ],
+        "bearingDeg": 49.2,
+        "runwayLengthM": 3200,
+        "halfWidthM": 10000,
+        "beyondEndM": 20000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "strictEnforcement": "PROHIBITED",
+      "floorAglM": 0,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "净空巡视检查区域：机场跑道中心线两侧各 10 公里、跑道端外 20 公里以内的区域（机场障碍物限制面区域加上适当的面外区域）。见各地《机场净空保护管理规定》净空保护相关用语说明第 2 条。",
+      "citation": "各地《机场净空保护管理规定》净空保护相关用语说明第 2 条",
+      "note": "跑道方位取自 OpenStreetMap 跑道几何（真实方位角），矩形按公布的两侧各 10 公里、端外 20 公里生成。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYCC，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYCC）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYCY-P",
+      "name": "朝阳机场净空保护区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "CIRCLE",
+        "centre": [
+          120.435,
+          41.5381
+        ],
+        "radiusM": 55000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "floorAglM": 120,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "运输机场净空保护区域：以机场基准点为圆心、水平半径 55 公里的空间区域。见《运输机场净空保护管理办法》及各地《机场净空保护管理规定》净空保护相关用语说明第 1 条。",
+      "citation": "《运输机场净空保护管理办法》《民用机场管理条例》第四十九条",
+      "note": "真高 120 米以上属于管制空域；本系统按下限标注垂直范围，低于 120 米仍受《民用机场管理条例》第四十九条关于净空保护区域的限制。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYCY，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYCY）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYCY-I",
+      "name": "朝阳机场净空巡视检查区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "RUNWAY_RECT",
+        "centre": [
+          120.435,
+          41.5381
+        ],
+        "bearingDeg": 168.0,
+        "runwayLengthM": 2000,
+        "halfWidthM": 10000,
+        "beyondEndM": 20000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "strictEnforcement": "PROHIBITED",
+      "floorAglM": 0,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "净空巡视检查区域：机场跑道中心线两侧各 10 公里、跑道端外 20 公里以内的区域（机场障碍物限制面区域加上适当的面外区域）。见各地《机场净空保护管理规定》净空保护相关用语说明第 2 条。",
+      "citation": "各地《机场净空保护管理规定》净空保护相关用语说明第 2 条",
+      "note": "跑道方位取自 OpenStreetMap 跑道几何（真实方位角），矩形按公布的两侧各 10 公里、端外 20 公里生成。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYCY，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYCY）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYDD-P",
+      "name": "丹东浪头机场净空保护区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "CIRCLE",
+        "centre": [
+          124.28669,
+          40.02545
+        ],
+        "radiusM": 55000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "floorAglM": 120,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "运输机场净空保护区域：以机场基准点为圆心、水平半径 55 公里的空间区域。见《运输机场净空保护管理办法》及各地《机场净空保护管理规定》净空保护相关用语说明第 1 条。",
+      "citation": "《运输机场净空保护管理办法》《民用机场管理条例》第四十九条",
+      "note": "真高 120 米以上属于管制空域；本系统按下限标注垂直范围，低于 120 米仍受《民用机场管理条例》第四十九条关于净空保护区域的限制。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYDD，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYDD）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYDD-I",
+      "name": "丹东浪头机场净空巡视检查区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "RUNWAY_RECT",
+        "centre": [
+          124.28669,
+          40.02545
+        ],
+        "bearingDeg": 181.0,
+        "runwayLengthM": 2600,
+        "halfWidthM": 10000,
+        "beyondEndM": 20000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "strictEnforcement": "PROHIBITED",
+      "floorAglM": 0,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "净空巡视检查区域：机场跑道中心线两侧各 10 公里、跑道端外 20 公里以内的区域（机场障碍物限制面区域加上适当的面外区域）。见各地《机场净空保护管理规定》净空保护相关用语说明第 2 条。",
+      "citation": "各地《机场净空保护管理规定》净空保护相关用语说明第 2 条",
+      "note": "跑道方位取自 OpenStreetMap 跑道几何（真实方位角），矩形按公布的两侧各 10 公里、端外 20 公里生成。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYDD，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYDD）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYDU-P",
+      "name": "五大连池德都机场净空保护区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "CIRCLE",
+        "centre": [
+          126.12837,
+          48.44104
+        ],
+        "radiusM": 55000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "floorAglM": 120,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "运输机场净空保护区域：以机场基准点为圆心、水平半径 55 公里的空间区域。见《运输机场净空保护管理办法》及各地《机场净空保护管理规定》净空保护相关用语说明第 1 条。",
+      "citation": "《运输机场净空保护管理办法》《民用机场管理条例》第四十九条",
+      "note": "真高 120 米以上属于管制空域；本系统按下限标注垂直范围，低于 120 米仍受《民用机场管理条例》第四十九条关于净空保护区域的限制。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYDU，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYDU）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYDU-I",
+      "name": "五大连池德都机场净空巡视检查区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "RUNWAY_RECT",
+        "centre": [
+          126.12837,
+          48.44104
+        ],
+        "bearingDeg": 250.5,
+        "runwayLengthM": 2500,
+        "halfWidthM": 10000,
+        "beyondEndM": 20000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "strictEnforcement": "PROHIBITED",
+      "floorAglM": 0,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "净空巡视检查区域：机场跑道中心线两侧各 10 公里、跑道端外 20 公里以内的区域（机场障碍物限制面区域加上适当的面外区域）。见各地《机场净空保护管理规定》净空保护相关用语说明第 2 条。",
+      "citation": "各地《机场净空保护管理规定》净空保护相关用语说明第 2 条",
+      "note": "跑道方位取自 OpenStreetMap 跑道几何（真实方位角），矩形按公布的两侧各 10 公里、端外 20 公里生成。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYDU，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYDU）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYFY-P",
+      "name": "抚远东极机场净空保护区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "CIRCLE",
+        "centre": [
+          134.36298,
+          48.19722
+        ],
+        "radiusM": 55000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "floorAglM": 120,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "运输机场净空保护区域：以机场基准点为圆心、水平半径 55 公里的空间区域。见《运输机场净空保护管理办法》及各地《机场净空保护管理规定》净空保护相关用语说明第 1 条。",
+      "citation": "《运输机场净空保护管理办法》《民用机场管理条例》第四十九条",
+      "note": "真高 120 米以上属于管制空域；本系统按下限标注垂直范围，低于 120 米仍受《民用机场管理条例》第四十九条关于净空保护区域的限制。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYFY，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYFY）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYFY-I",
+      "name": "抚远东极机场净空巡视检查区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "RUNWAY_RECT",
+        "centre": [
+          134.36298,
+          48.19722
+        ],
+        "bearingDeg": 50.7,
+        "runwayLengthM": 2500,
+        "halfWidthM": 10000,
+        "beyondEndM": 20000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "strictEnforcement": "PROHIBITED",
+      "floorAglM": 0,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "净空巡视检查区域：机场跑道中心线两侧各 10 公里、跑道端外 20 公里以内的区域（机场障碍物限制面区域加上适当的面外区域）。见各地《机场净空保护管理规定》净空保护相关用语说明第 2 条。",
+      "citation": "各地《机场净空保护管理规定》净空保护相关用语说明第 2 条",
+      "note": "跑道方位取自 OpenStreetMap 跑道几何（真实方位角），矩形按公布的两侧各 10 公里、端外 20 公里生成。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYFY，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYFY）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYHB-P",
+      "name": "哈尔滨太平国际机场净空保护区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "CIRCLE",
+        "centre": [
+          126.25,
+          45.6234
+        ],
+        "radiusM": 55000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "floorAglM": 120,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "运输机场净空保护区域：以机场基准点为圆心、水平半径 55 公里的空间区域。见《运输机场净空保护管理办法》及各地《机场净空保护管理规定》净空保护相关用语说明第 1 条。",
+      "citation": "《运输机场净空保护管理办法》《民用机场管理条例》第四十九条",
+      "note": "真高 120 米以上属于管制空域；本系统按下限标注垂直范围，低于 120 米仍受《民用机场管理条例》第四十九条关于净空保护区域的限制。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYHB，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYHB）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYHB-I",
+      "name": "哈尔滨太平国际机场净空巡视检查区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "RUNWAY_RECT",
+        "centre": [
+          126.25,
+          45.6234
+        ],
+        "bearingDeg": 39.3,
+        "runwayLengthM": 3600,
+        "halfWidthM": 10000,
+        "beyondEndM": 20000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "strictEnforcement": "PROHIBITED",
+      "floorAglM": 0,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "净空巡视检查区域：机场跑道中心线两侧各 10 公里、跑道端外 20 公里以内的区域（机场障碍物限制面区域加上适当的面外区域）。见各地《机场净空保护管理规定》净空保护相关用语说明第 2 条。",
+      "citation": "各地《机场净空保护管理规定》净空保护相关用语说明第 2 条",
+      "note": "跑道方位取自 OpenStreetMap 跑道几何（真实方位角），矩形按公布的两侧各 10 公里、端外 20 公里生成。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYHB，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYHB）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYHE-P",
+      "name": "黑河爱辉机场净空保护区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "CIRCLE",
+        "centre": [
+          127.30888,
+          50.17162
+        ],
+        "radiusM": 55000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "floorAglM": 120,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "运输机场净空保护区域：以机场基准点为圆心、水平半径 55 公里的空间区域。见《运输机场净空保护管理办法》及各地《机场净空保护管理规定》净空保护相关用语说明第 1 条。",
+      "citation": "《运输机场净空保护管理办法》《民用机场管理条例》第四十九条",
+      "note": "真高 120 米以上属于管制空域；本系统按下限标注垂直范围，低于 120 米仍受《民用机场管理条例》第四十九条关于净空保护区域的限制。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYHE，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYHE）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYHE-I",
+      "name": "黑河爱辉机场净空巡视检查区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "RUNWAY_RECT",
+        "centre": [
+          127.30888,
+          50.17162
+        ],
+        "bearingDeg": 156.9,
+        "runwayLengthM": 2500,
+        "halfWidthM": 10000,
+        "beyondEndM": 20000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "strictEnforcement": "PROHIBITED",
+      "floorAglM": 0,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "净空巡视检查区域：机场跑道中心线两侧各 10 公里、跑道端外 20 公里以内的区域（机场障碍物限制面区域加上适当的面外区域）。见各地《机场净空保护管理规定》净空保护相关用语说明第 2 条。",
+      "citation": "各地《机场净空保护管理规定》净空保护相关用语说明第 2 条",
+      "note": "跑道方位取自 OpenStreetMap 跑道几何（真实方位角），矩形按公布的两侧各 10 公里、端外 20 公里生成。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYHE，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYHE）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYJM-P",
+      "name": "佳木斯东郊机场净空保护区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "CIRCLE",
+        "centre": [
+          130.46426,
+          46.84279
+        ],
+        "radiusM": 55000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "floorAglM": 120,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "运输机场净空保护区域：以机场基准点为圆心、水平半径 55 公里的空间区域。见《运输机场净空保护管理办法》及各地《机场净空保护管理规定》净空保护相关用语说明第 1 条。",
+      "citation": "《运输机场净空保护管理办法》《民用机场管理条例》第四十九条",
+      "note": "真高 120 米以上属于管制空域；本系统按下限标注垂直范围，低于 120 米仍受《民用机场管理条例》第四十九条关于净空保护区域的限制。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYJM，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYJM）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYJM-I",
+      "name": "佳木斯东郊机场净空巡视检查区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "RUNWAY_RECT",
+        "centre": [
+          130.46426,
+          46.84279
+        ],
+        "bearingDeg": 48.0,
+        "runwayLengthM": 2500,
+        "halfWidthM": 10000,
+        "beyondEndM": 20000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "strictEnforcement": "PROHIBITED",
+      "floorAglM": 0,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "净空巡视检查区域：机场跑道中心线两侧各 10 公里、跑道端外 20 公里以内的区域（机场障碍物限制面区域加上适当的面外区域）。见各地《机场净空保护管理规定》净空保护相关用语说明第 2 条。",
+      "citation": "各地《机场净空保护管理规定》净空保护相关用语说明第 2 条",
+      "note": "跑道方位取自 OpenStreetMap 跑道几何（真实方位角），矩形按公布的两侧各 10 公里、端外 20 公里生成。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYJM，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYJM）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYJS-P",
+      "name": "建三江湿地机场净空保护区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "CIRCLE",
+        "centre": [
+          132.65792,
+          47.10825
+        ],
+        "radiusM": 55000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "floorAglM": 120,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "运输机场净空保护区域：以机场基准点为圆心、水平半径 55 公里的空间区域。见《运输机场净空保护管理办法》及各地《机场净空保护管理规定》净空保护相关用语说明第 1 条。",
+      "citation": "《运输机场净空保护管理办法》《民用机场管理条例》第四十九条",
+      "note": "真高 120 米以上属于管制空域；本系统按下限标注垂直范围，低于 120 米仍受《民用机场管理条例》第四十九条关于净空保护区域的限制。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYJS，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYJS）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYJS-I",
+      "name": "建三江湿地机场净空巡视检查区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "RUNWAY_RECT",
+        "centre": [
+          132.65792,
+          47.10825
+        ],
+        "bearingDeg": 137.3,
+        "runwayLengthM": 2500,
+        "halfWidthM": 10000,
+        "beyondEndM": 20000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "strictEnforcement": "PROHIBITED",
+      "floorAglM": 0,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "净空巡视检查区域：机场跑道中心线两侧各 10 公里、跑道端外 20 公里以内的区域（机场障碍物限制面区域加上适当的面外区域）。见各地《机场净空保护管理规定》净空保护相关用语说明第 2 条。",
+      "citation": "各地《机场净空保护管理规定》净空保护相关用语说明第 2 条",
+      "note": "跑道方位取自 OpenStreetMap 跑道几何（真实方位角），矩形按公布的两侧各 10 公里、端外 20 公里生成。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYJS，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYJS）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYJX-P",
+      "name": "鸡西兴凯湖机场净空保护区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "CIRCLE",
+        "centre": [
+          131.193,
+          45.293
+        ],
+        "radiusM": 55000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "floorAglM": 120,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "运输机场净空保护区域：以机场基准点为圆心、水平半径 55 公里的空间区域。见《运输机场净空保护管理办法》及各地《机场净空保护管理规定》净空保护相关用语说明第 1 条。",
+      "citation": "《运输机场净空保护管理办法》《民用机场管理条例》第四十九条",
+      "note": "真高 120 米以上属于管制空域；本系统按下限标注垂直范围，低于 120 米仍受《民用机场管理条例》第四十九条关于净空保护区域的限制。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYJX，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYJX）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYJX-I",
+      "name": "鸡西兴凯湖机场净空巡视检查区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "RUNWAY_RECT",
+        "centre": [
+          131.193,
+          45.293
+        ],
+        "bearingDeg": 110.1,
+        "runwayLengthM": 2300,
+        "halfWidthM": 10000,
+        "beyondEndM": 20000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "strictEnforcement": "PROHIBITED",
+      "floorAglM": 0,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "净空巡视检查区域：机场跑道中心线两侧各 10 公里、跑道端外 20 公里以内的区域（机场障碍物限制面区域加上适当的面外区域）。见各地《机场净空保护管理规定》净空保护相关用语说明第 2 条。",
+      "citation": "各地《机场净空保护管理规定》净空保护相关用语说明第 2 条",
+      "note": "跑道方位取自 OpenStreetMap 跑道几何（真实方位角），矩形按公布的两侧各 10 公里、端外 20 公里生成。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYJX，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYJX）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYJZ-P",
+      "name": "锦州湾机场净空保护区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "CIRCLE",
+        "centre": [
+          121.27711,
+          40.93603
+        ],
+        "radiusM": 55000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "floorAglM": 120,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "运输机场净空保护区域：以机场基准点为圆心、水平半径 55 公里的空间区域。见《运输机场净空保护管理办法》及各地《机场净空保护管理规定》净空保护相关用语说明第 1 条。",
+      "citation": "《运输机场净空保护管理办法》《民用机场管理条例》第四十九条",
+      "note": "真高 120 米以上属于管制空域；本系统按下限标注垂直范围，低于 120 米仍受《民用机场管理条例》第四十九条关于净空保护区域的限制。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYJZ，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYJZ）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYJZ-I",
+      "name": "锦州湾机场净空巡视检查区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "RUNWAY_RECT",
+        "centre": [
+          121.27711,
+          40.93603
+        ],
+        "bearingDeg": 31.0,
+        "runwayLengthM": 2500,
+        "halfWidthM": 10000,
+        "beyondEndM": 20000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "strictEnforcement": "PROHIBITED",
+      "floorAglM": 0,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "净空巡视检查区域：机场跑道中心线两侧各 10 公里、跑道端外 20 公里以内的区域（机场障碍物限制面区域加上适当的面外区域）。见各地《机场净空保护管理规定》净空保护相关用语说明第 2 条。",
+      "citation": "各地《机场净空保护管理规定》净空保护相关用语说明第 2 条",
+      "note": "跑道方位取自 OpenStreetMap 跑道几何（真实方位角），矩形按公布的两侧各 10 公里、端外 20 公里生成。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYJZ，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYJZ）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYLD-P",
+      "name": "伊春林都机场净空保护区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "CIRCLE",
+        "centre": [
+          129.01913,
+          47.75206
+        ],
+        "radiusM": 55000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "floorAglM": 120,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "运输机场净空保护区域：以机场基准点为圆心、水平半径 55 公里的空间区域。见《运输机场净空保护管理办法》及各地《机场净空保护管理规定》净空保护相关用语说明第 1 条。",
+      "citation": "《运输机场净空保护管理办法》《民用机场管理条例》第四十九条",
+      "note": "真高 120 米以上属于管制空域；本系统按下限标注垂直范围，低于 120 米仍受《民用机场管理条例》第四十九条关于净空保护区域的限制。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYLD，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYLD）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYLD-I",
+      "name": "伊春林都机场净空巡视检查区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "RUNWAY_RECT",
+        "centre": [
+          129.01913,
+          47.75206
+        ],
+        "bearingDeg": 285.1,
+        "runwayLengthM": 2300,
+        "halfWidthM": 10000,
+        "beyondEndM": 20000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "strictEnforcement": "PROHIBITED",
+      "floorAglM": 0,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "净空巡视检查区域：机场跑道中心线两侧各 10 公里、跑道端外 20 公里以内的区域（机场障碍物限制面区域加上适当的面外区域）。见各地《机场净空保护管理规定》净空保护相关用语说明第 2 条。",
+      "citation": "各地《机场净空保护管理规定》净空保护相关用语说明第 2 条",
+      "note": "跑道方位取自 OpenStreetMap 跑道几何（真实方位角），矩形按公布的两侧各 10 公里、端外 20 公里生成。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYLD，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYLD）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYMD-P",
+      "name": "牡丹江海浪机场净空保护区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "CIRCLE",
+        "centre": [
+          129.56863,
+          44.52517
+        ],
+        "radiusM": 55000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "floorAglM": 120,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "运输机场净空保护区域：以机场基准点为圆心、水平半径 55 公里的空间区域。见《运输机场净空保护管理办法》及各地《机场净空保护管理规定》净空保护相关用语说明第 1 条。",
+      "citation": "《运输机场净空保护管理办法》《民用机场管理条例》第四十九条",
+      "note": "真高 120 米以上属于管制空域；本系统按下限标注垂直范围，低于 120 米仍受《民用机场管理条例》第四十九条关于净空保护区域的限制。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYMD，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYMD）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYMD-I",
+      "name": "牡丹江海浪机场净空巡视检查区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "RUNWAY_RECT",
+        "centre": [
+          129.56863,
+          44.52517
+        ],
+        "bearingDeg": 25.9,
+        "runwayLengthM": 2600,
+        "halfWidthM": 10000,
+        "beyondEndM": 20000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "strictEnforcement": "PROHIBITED",
+      "floorAglM": 0,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "净空巡视检查区域：机场跑道中心线两侧各 10 公里、跑道端外 20 公里以内的区域（机场障碍物限制面区域加上适当的面外区域）。见各地《机场净空保护管理规定》净空保护相关用语说明第 2 条。",
+      "citation": "各地《机场净空保护管理规定》净空保护相关用语说明第 2 条",
+      "note": "跑道方位取自 OpenStreetMap 跑道几何（真实方位角），矩形按公布的两侧各 10 公里、端外 20 公里生成。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYMD，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYMD）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYMH-P",
+      "name": "漠河古莲机场净空保护区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "CIRCLE",
+        "centre": [
+          122.42276,
+          52.91687
+        ],
+        "radiusM": 55000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "floorAglM": 120,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "运输机场净空保护区域：以机场基准点为圆心、水平半径 55 公里的空间区域。见《运输机场净空保护管理办法》及各地《机场净空保护管理规定》净空保护相关用语说明第 1 条。",
+      "citation": "《运输机场净空保护管理办法》《民用机场管理条例》第四十九条",
+      "note": "真高 120 米以上属于管制空域；本系统按下限标注垂直范围，低于 120 米仍受《民用机场管理条例》第四十九条关于净空保护区域的限制。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYMH，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYMH）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYMH-I",
+      "name": "漠河古莲机场净空巡视检查区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "RUNWAY_RECT",
+        "centre": [
+          122.42276,
+          52.91687
+        ],
+        "bearingDeg": 135.2,
+        "runwayLengthM": 2200,
+        "halfWidthM": 10000,
+        "beyondEndM": 20000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "strictEnforcement": "PROHIBITED",
+      "floorAglM": 0,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "净空巡视检查区域：机场跑道中心线两侧各 10 公里、跑道端外 20 公里以内的区域（机场障碍物限制面区域加上适当的面外区域）。见各地《机场净空保护管理规定》净空保护相关用语说明第 2 条。",
+      "citation": "各地《机场净空保护管理规定》净空保护相关用语说明第 2 条",
+      "note": "跑道方位取自 OpenStreetMap 跑道几何（真实方位角），矩形按公布的两侧各 10 公里、端外 20 公里生成。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYMH，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYMH）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYQQ-P",
+      "name": "齐齐哈尔三家子机场净空保护区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "CIRCLE",
+        "centre": [
+          123.91418,
+          47.22997
+        ],
+        "radiusM": 55000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "floorAglM": 120,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "运输机场净空保护区域：以机场基准点为圆心、水平半径 55 公里的空间区域。见《运输机场净空保护管理办法》及各地《机场净空保护管理规定》净空保护相关用语说明第 1 条。",
+      "citation": "《运输机场净空保护管理办法》《民用机场管理条例》第四十九条",
+      "note": "真高 120 米以上属于管制空域；本系统按下限标注垂直范围，低于 120 米仍受《民用机场管理条例》第四十九条关于净空保护区域的限制。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYQQ，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYQQ）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYQQ-I",
+      "name": "齐齐哈尔三家子机场净空巡视检查区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "RUNWAY_RECT",
+        "centre": [
+          123.91418,
+          47.22997
+        ],
+        "bearingDeg": 157.5,
+        "runwayLengthM": 3600,
+        "halfWidthM": 10000,
+        "beyondEndM": 20000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "strictEnforcement": "PROHIBITED",
+      "floorAglM": 0,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "净空巡视检查区域：机场跑道中心线两侧各 10 公里、跑道端外 20 公里以内的区域（机场障碍物限制面区域加上适当的面外区域）。见各地《机场净空保护管理规定》净空保护相关用语说明第 2 条。",
+      "citation": "各地《机场净空保护管理规定》净空保护相关用语说明第 2 条",
+      "note": "跑道方位取自 OpenStreetMap 跑道几何（真实方位角），矩形按公布的两侧各 10 公里、端外 20 公里生成。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYQQ，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYQQ）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYSQ-P",
+      "name": "松原查干湖机场净空保护区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "CIRCLE",
+        "centre": [
+          124.55212,
+          44.93114
+        ],
+        "radiusM": 55000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "floorAglM": 120,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "运输机场净空保护区域：以机场基准点为圆心、水平半径 55 公里的空间区域。见《运输机场净空保护管理办法》及各地《机场净空保护管理规定》净空保护相关用语说明第 1 条。",
+      "citation": "《运输机场净空保护管理办法》《民用机场管理条例》第四十九条",
+      "note": "真高 120 米以上属于管制空域；本系统按下限标注垂直范围，低于 120 米仍受《民用机场管理条例》第四十九条关于净空保护区域的限制。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYSQ，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYSQ）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYSQ-I",
+      "name": "松原查干湖机场净空巡视检查区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "RUNWAY_RECT",
+        "centre": [
+          124.55212,
+          44.93114
+        ],
+        "bearingDeg": 32.7,
+        "runwayLengthM": 2500,
+        "halfWidthM": 10000,
+        "beyondEndM": 20000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "strictEnforcement": "PROHIBITED",
+      "floorAglM": 0,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "净空巡视检查区域：机场跑道中心线两侧各 10 公里、跑道端外 20 公里以内的区域（机场障碍物限制面区域加上适当的面外区域）。见各地《机场净空保护管理规定》净空保护相关用语说明第 2 条。",
+      "citation": "各地《机场净空保护管理规定》净空保护相关用语说明第 2 条",
+      "note": "跑道方位取自 OpenStreetMap 跑道几何（真实方位角），矩形按公布的两侧各 10 公里、端外 20 公里生成。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYSQ，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYSQ）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYTL-P",
+      "name": "大连周水子国际机场净空保护区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "CIRCLE",
+        "centre": [
+          121.53848,
+          38.96572
+        ],
+        "radiusM": 55000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "floorAglM": 120,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "运输机场净空保护区域：以机场基准点为圆心、水平半径 55 公里的空间区域。见《运输机场净空保护管理办法》及各地《机场净空保护管理规定》净空保护相关用语说明第 1 条。",
+      "citation": "《运输机场净空保护管理办法》《民用机场管理条例》第四十九条",
+      "note": "真高 120 米以上属于管制空域；本系统按下限标注垂直范围，低于 120 米仍受《民用机场管理条例》第四十九条关于净空保护区域的限制。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYTL，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYTL）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYTL-I",
+      "name": "大连周水子国际机场净空巡视检查区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "RUNWAY_RECT",
+        "centre": [
+          121.53848,
+          38.96572
+        ],
+        "bearingDeg": 275.7,
+        "runwayLengthM": 3300,
+        "halfWidthM": 10000,
+        "beyondEndM": 20000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "strictEnforcement": "PROHIBITED",
+      "floorAglM": 0,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "净空巡视检查区域：机场跑道中心线两侧各 10 公里、跑道端外 20 公里以内的区域（机场障碍物限制面区域加上适当的面外区域）。见各地《机场净空保护管理规定》净空保护相关用语说明第 2 条。",
+      "citation": "各地《机场净空保护管理规定》净空保护相关用语说明第 2 条",
+      "note": "跑道方位取自 OpenStreetMap 跑道几何（真实方位角），矩形按公布的两侧各 10 公里、端外 20 公里生成。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYTL，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYTL）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYTN-P",
+      "name": "通化三源浦机场净空保护区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "CIRCLE",
+        "centre": [
+          125.73396,
+          42.04843
+        ],
+        "radiusM": 55000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "floorAglM": 120,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "运输机场净空保护区域：以机场基准点为圆心、水平半径 55 公里的空间区域。见《运输机场净空保护管理办法》及各地《机场净空保护管理规定》净空保护相关用语说明第 1 条。",
+      "citation": "《运输机场净空保护管理办法》《民用机场管理条例》第四十九条",
+      "note": "真高 120 米以上属于管制空域；本系统按下限标注垂直范围，低于 120 米仍受《民用机场管理条例》第四十九条关于净空保护区域的限制。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYTN，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYTN）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYTN-I",
+      "name": "通化三源浦机场净空巡视检查区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "RUNWAY_RECT",
+        "centre": [
+          125.73396,
+          42.04843
+        ],
+        "bearingDeg": 36.9,
+        "runwayLengthM": 2300,
+        "halfWidthM": 10000,
+        "beyondEndM": 20000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "strictEnforcement": "PROHIBITED",
+      "floorAglM": 0,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "净空巡视检查区域：机场跑道中心线两侧各 10 公里、跑道端外 20 公里以内的区域（机场障碍物限制面区域加上适当的面外区域）。见各地《机场净空保护管理规定》净空保护相关用语说明第 2 条。",
+      "citation": "各地《机场净空保护管理规定》净空保护相关用语说明第 2 条",
+      "note": "跑道方位取自 OpenStreetMap 跑道几何（真实方位角），矩形按公布的两侧各 10 公里、端外 20 公里生成。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYTN，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYTN）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYTX-P",
+      "name": "沈阳桃仙国际机场净空保护区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "CIRCLE",
+        "centre": [
+          123.48367,
+          41.6398
+        ],
+        "radiusM": 55000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "floorAglM": 120,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "运输机场净空保护区域：以机场基准点为圆心、水平半径 55 公里的空间区域。见《运输机场净空保护管理办法》及各地《机场净空保护管理规定》净空保护相关用语说明第 1 条。",
+      "citation": "《运输机场净空保护管理办法》《民用机场管理条例》第四十九条",
+      "note": "真高 120 米以上属于管制空域；本系统按下限标注垂直范围，低于 120 米仍受《民用机场管理条例》第四十九条关于净空保护区域的限制。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYTX，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYTX）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYTX-I",
+      "name": "沈阳桃仙国际机场净空巡视检查区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "RUNWAY_RECT",
+        "centre": [
+          123.48367,
+          41.6398
+        ],
+        "bearingDeg": 48.5,
+        "runwayLengthM": 3200,
+        "halfWidthM": 10000,
+        "beyondEndM": 20000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "strictEnforcement": "PROHIBITED",
+      "floorAglM": 0,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "净空巡视检查区域：机场跑道中心线两侧各 10 公里、跑道端外 20 公里以内的区域（机场障碍物限制面区域加上适当的面外区域）。见各地《机场净空保护管理规定》净空保护相关用语说明第 2 条。",
+      "citation": "各地《机场净空保护管理规定》净空保护相关用语说明第 2 条",
+      "note": "跑道方位取自 OpenStreetMap 跑道几何（真实方位角），矩形按公布的两侧各 10 公里、端外 20 公里生成。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYTX，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYTX）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYYJ-P",
+      "name": "延吉朝阳川机场净空保护区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "CIRCLE",
+        "centre": [
+          129.451,
+          42.8828
+        ],
+        "radiusM": 55000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "floorAglM": 120,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "运输机场净空保护区域：以机场基准点为圆心、水平半径 55 公里的空间区域。见《运输机场净空保护管理办法》及各地《机场净空保护管理规定》净空保护相关用语说明第 1 条。",
+      "citation": "《运输机场净空保护管理办法》《民用机场管理条例》第四十九条",
+      "note": "真高 120 米以上属于管制空域；本系统按下限标注垂直范围，低于 120 米仍受《民用机场管理条例》第四十九条关于净空保护区域的限制。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYYJ，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYYJ）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYYJ-I",
+      "name": "延吉朝阳川机场净空巡视检查区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "RUNWAY_RECT",
+        "centre": [
+          129.451,
+          42.8828
+        ],
+        "bearingDeg": 81.7,
+        "runwayLengthM": 2600,
+        "halfWidthM": 10000,
+        "beyondEndM": 20000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "strictEnforcement": "PROHIBITED",
+      "floorAglM": 0,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "净空巡视检查区域：机场跑道中心线两侧各 10 公里、跑道端外 20 公里以内的区域（机场障碍物限制面区域加上适当的面外区域）。见各地《机场净空保护管理规定》净空保护相关用语说明第 2 条。",
+      "citation": "各地《机场净空保护管理规定》净空保护相关用语说明第 2 条",
+      "note": "跑道方位取自 OpenStreetMap 跑道几何（真实方位角），矩形按公布的两侧各 10 公里、端外 20 公里生成。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYYJ，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYYJ）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYYK-P",
+      "name": "营口兰旗机场净空保护区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "CIRCLE",
+        "centre": [
+          122.3586,
+          40.54252
+        ],
+        "radiusM": 55000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "floorAglM": 120,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "运输机场净空保护区域：以机场基准点为圆心、水平半径 55 公里的空间区域。见《运输机场净空保护管理办法》及各地《机场净空保护管理规定》净空保护相关用语说明第 1 条。",
+      "citation": "《运输机场净空保护管理办法》《民用机场管理条例》第四十九条",
+      "note": "真高 120 米以上属于管制空域；本系统按下限标注垂直范围，低于 120 米仍受《民用机场管理条例》第四十九条关于净空保护区域的限制。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYYK，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYYK）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-AP-ZYYK-I",
+      "name": "营口兰旗机场净空巡视检查区域",
+      "clause": "AIRPORT",
+      "sector": "CIVIL_AVIATION",
+      "sectorLabel": "民航",
+      "geometry": {
+        "kind": "RUNWAY_RECT",
+        "centre": [
+          122.3586,
+          40.54252
+        ],
+        "bearingDeg": 28.9,
+        "runwayLengthM": 2500,
+        "halfWidthM": 10000,
+        "beyondEndM": 20000
+      },
+      "enforcement": "APPROVAL_REQUIRED",
+      "strictEnforcement": "PROHIBITED",
+      "floorAglM": 0,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "净空巡视检查区域：机场跑道中心线两侧各 10 公里、跑道端外 20 公里以内的区域（机场障碍物限制面区域加上适当的面外区域）。见各地《机场净空保护管理规定》净空保护相关用语说明第 2 条。",
+      "citation": "各地《机场净空保护管理规定》净空保护相关用语说明第 2 条",
+      "note": "跑道方位取自 OpenStreetMap 跑道几何（真实方位角），矩形按公布的两侧各 10 公里、端外 20 公里生成。",
+      "facilityType": "CIVIL_TRANSPORT_AIRPORT",
+      "authority": "民用航空管理部门 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "provenance": {
+        "referencePoint": "OurAirports airports.csv（ICAO ZYYK，公共领域数据集）",
+        "runwayGeometry": "OpenStreetMap 跑道几何（ZYYK）",
+        "name": "项目人工中英文对照",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-NUC-299938184",
+      "name": "红沿河核电站控制区域（最小包络）",
+      "clause": "DEFENCE_INDUSTRY",
+      "sector": "DEFENCE",
+      "sectorLabel": "国防",
+      "geometry": {
+        "kind": "CIRCLE",
+        "centre": [
+          121.48058,
+          39.79161
+        ],
+        "radiusM": 5000,
+        "radiusRole": "STATUTORY_MINIMUM"
+      },
+      "enforcement": "PROHIBITED",
+      "floorAglM": 0,
+      "ceilingAglM": null,
+      "geometryStatus": "STATUTORY_MINIMUM_RADIUS",
+      "geometryRule": "非居住区边界与反应堆的距离不得小于 500 m；规划限制区外边界与反应堆的距离不得小于 5 km。按下限生成最小包络，实际边界由省级人民政府确认，可能更大。",
+      "citation": "GB 6249—2025《核动力厂环境辐射防护规定》第 5.6 条",
+      "facilityType": "NUCLEAR_POWER_PLANT",
+      "authority": "生态环境主管部门 / 空中交通管理机构",
+      "publication": "非居住区与规划限制区边界由省级人民政府确认",
+      "note": "核设施控制区域的实际范围由空中交通管理机构确定并公布；此处按国家标准下限生成最小包络，属于保守下界，真实范围可能更大。",
+      "provenance": {
+        "referencePoint": "OpenStreetMap way/299938184",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-NUC-948567657",
+      "name": "徐大堡核电站控制区域（最小包络）",
+      "clause": "DEFENCE_INDUSTRY",
+      "sector": "DEFENCE",
+      "sectorLabel": "国防",
+      "geometry": {
+        "kind": "CIRCLE",
+        "centre": [
+          120.54657,
+          40.35077
+        ],
+        "radiusM": 5000,
+        "radiusRole": "STATUTORY_MINIMUM"
+      },
+      "enforcement": "PROHIBITED",
+      "floorAglM": 0,
+      "ceilingAglM": null,
+      "geometryStatus": "STATUTORY_MINIMUM_RADIUS",
+      "geometryRule": "非居住区边界与反应堆的距离不得小于 500 m；规划限制区外边界与反应堆的距离不得小于 5 km。按下限生成最小包络，实际边界由省级人民政府确认，可能更大。",
+      "citation": "GB 6249—2025《核动力厂环境辐射防护规定》第 5.6 条",
+      "facilityType": "NUCLEAR_POWER_PLANT",
+      "authority": "生态环境主管部门 / 空中交通管理机构",
+      "publication": "非居住区与规划限制区边界由省级人民政府确认",
+      "note": "核设施控制区域的实际范围由空中交通管理机构确定并公布；此处按国家标准下限生成最小包络，属于保守下界，真实范围可能更大。",
+      "provenance": {
+        "referencePoint": "OpenStreetMap way/948567657",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-NAV-3-03-01",
+      "name": "鸡西航空无线电导航台电磁环境有源保护区",
+      "clause": "ELECTROMAGNETIC",
+      "sector": "RESEARCH",
+      "sectorLabel": "科研",
+      "geometry": {
+        "kind": "CIRCLE",
+        "centre": [
+          131.21453,
+          45.2875
+        ],
+        "radiusM": 500
+      },
+      "enforcement": "PROHIBITED",
+      "floorAglM": 0,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "无方向信标台（NDB）与多普勒全向信标台／常规测距仪台（DVOR/DME）以天线中心为基准，半径 500 米的圆形区域为有源保护区，针对有源干扰进行保护；半径 5 千米范围为限制保护区，该区域内限制障碍物高度。此处只按有源保护区生成禁止进入区，限制保护区属障碍物高度管控，不是飞行禁区，故不生成几何。",
+      "citation": "GB 6364—2013《航空无线电导航台站电磁环境要求》，MH/T 4003.1—2014《民用航空通信导航监视台（站）设置场地规范 第 1 部分：导航》；半径取值见《湖南省民用机场及民用航空无线电台（站）电磁环境保护区管理规定》第十一条",
+      "facilityType": "AERONAUTICAL_RADIO_NAVIGATION_AID",
+      "authority": "无线电管理机构 / 民用航空管理部门",
+      "publication": "由无线电管理机构与民用航空管理部门按国家规定确定",
+      "note": "距鸡西城区约 19.2 km；公开数据未区分 NDB 与 DVOR/DME，两者有源保护区半径同为 500 米。",
+      "provenance": {
+        "referencePoint": "OpenStreetMap node/10841361460、node/10841361461、node/10841361462、node/10841361463、node/10841361464、node/10841361465、node/10841361466、node/9561759712、node/9561759713、node/9561759714、node/9561759715、node/9561759716",
+        "retrievedAt": "2026-09-16",
+        "clusteredNodes": 12
+      }
+    },
+    {
+      "id": "FZ-NAV-3-08-02",
+      "name": "佳木斯航空无线电导航台电磁环境有源保护区",
+      "clause": "ELECTROMAGNETIC",
+      "sector": "RESEARCH",
+      "sectorLabel": "科研",
+      "geometry": {
+        "kind": "CIRCLE",
+        "centre": [
+          130.45572,
+          46.83816
+        ],
+        "radiusM": 500
+      },
+      "enforcement": "PROHIBITED",
+      "floorAglM": 0,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "无方向信标台（NDB）与多普勒全向信标台／常规测距仪台（DVOR/DME）以天线中心为基准，半径 500 米的圆形区域为有源保护区，针对有源干扰进行保护；半径 5 千米范围为限制保护区，该区域内限制障碍物高度。此处只按有源保护区生成禁止进入区，限制保护区属障碍物高度管控，不是飞行禁区，故不生成几何。",
+      "citation": "GB 6364—2013《航空无线电导航台站电磁环境要求》，MH/T 4003.1—2014《民用航空通信导航监视台（站）设置场地规范 第 1 部分：导航》；半径取值见《湖南省民用机场及民用航空无线电台（站）电磁环境保护区管理规定》第十一条",
+      "facilityType": "AERONAUTICAL_RADIO_NAVIGATION_AID",
+      "authority": "无线电管理机构 / 民用航空管理部门",
+      "publication": "由无线电管理机构与民用航空管理部门按国家规定确定",
+      "note": "距佳木斯城区约 8.4 km；公开数据未区分 NDB 与 DVOR/DME，两者有源保护区半径同为 500 米。",
+      "provenance": {
+        "referencePoint": "OpenStreetMap node/13814825170",
+        "retrievedAt": "2026-09-16",
+        "clusteredNodes": 1
+      }
+    },
+    {
+      "id": "FZ-NAV-3-08-03",
+      "name": "佳木斯航空无线电导航台电磁环境有源保护区",
+      "clause": "ELECTROMAGNETIC",
+      "sector": "RESEARCH",
+      "sectorLabel": "科研",
+      "geometry": {
+        "kind": "CIRCLE",
+        "centre": [
+          130.47501,
+          46.84881
+        ],
+        "radiusM": 500
+      },
+      "enforcement": "PROHIBITED",
+      "floorAglM": 0,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "无方向信标台（NDB）与多普勒全向信标台／常规测距仪台（DVOR/DME）以天线中心为基准，半径 500 米的圆形区域为有源保护区，针对有源干扰进行保护；半径 5 千米范围为限制保护区，该区域内限制障碍物高度。此处只按有源保护区生成禁止进入区，限制保护区属障碍物高度管控，不是飞行禁区，故不生成几何。",
+      "citation": "GB 6364—2013《航空无线电导航台站电磁环境要求》，MH/T 4003.1—2014《民用航空通信导航监视台（站）设置场地规范 第 1 部分：导航》；半径取值见《湖南省民用机场及民用航空无线电台（站）电磁环境保护区管理规定》第十一条",
+      "facilityType": "AERONAUTICAL_RADIO_NAVIGATION_AID",
+      "authority": "无线电管理机构 / 民用航空管理部门",
+      "publication": "由无线电管理机构与民用航空管理部门按国家规定确定",
+      "note": "距佳木斯城区约 10.3 km；公开数据未区分 NDB 与 DVOR/DME，两者有源保护区半径同为 500 米。",
+      "provenance": {
+        "referencePoint": "OpenStreetMap node/13814825171",
+        "retrievedAt": "2026-09-16",
+        "clusteredNodes": 1
+      }
+    },
+    {
+      "id": "FZ-NAV-3-02-04",
+      "name": "齐齐哈尔航空无线电导航台电磁环境有源保护区",
+      "clause": "ELECTROMAGNETIC",
+      "sector": "RESEARCH",
+      "sectorLabel": "科研",
+      "geometry": {
+        "kind": "CIRCLE",
+        "centre": [
+          123.92262,
+          47.2313
+        ],
+        "radiusM": 500
+      },
+      "enforcement": "PROHIBITED",
+      "floorAglM": 0,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "无方向信标台（NDB）与多普勒全向信标台／常规测距仪台（DVOR/DME）以天线中心为基准，半径 500 米的圆形区域为有源保护区，针对有源干扰进行保护；半径 5 千米范围为限制保护区，该区域内限制障碍物高度。此处只按有源保护区生成禁止进入区，限制保护区属障碍物高度管控，不是飞行禁区，故不生成几何。",
+      "citation": "GB 6364—2013《航空无线电导航台站电磁环境要求》，MH/T 4003.1—2014《民用航空通信导航监视台（站）设置场地规范 第 1 部分：导航》；半径取值见《湖南省民用机场及民用航空无线电台（站）电磁环境保护区管理规定》第十一条",
+      "facilityType": "AERONAUTICAL_RADIO_NAVIGATION_AID",
+      "authority": "无线电管理机构 / 民用航空管理部门",
+      "publication": "由无线电管理机构与民用航空管理部门按国家规定确定",
+      "note": "距齐齐哈尔城区约 12.3 km；公开数据未区分 NDB 与 DVOR/DME，两者有源保护区半径同为 500 米。",
+      "provenance": {
+        "referencePoint": "OpenStreetMap node/2238135295",
+        "retrievedAt": "2026-09-16",
+        "clusteredNodes": 1
+      }
+    },
+    {
+      "id": "FZ-NAV-1-07-05",
+      "name": "锦州航空无线电导航台电磁环境有源保护区",
+      "clause": "ELECTROMAGNETIC",
+      "sector": "RESEARCH",
+      "sectorLabel": "科研",
+      "geometry": {
+        "kind": "CIRCLE",
+        "centre": [
+          121.06455,
+          41.10997
+        ],
+        "radiusM": 500
+      },
+      "enforcement": "PROHIBITED",
+      "floorAglM": 0,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "无方向信标台（NDB）与多普勒全向信标台／常规测距仪台（DVOR/DME）以天线中心为基准，半径 500 米的圆形区域为有源保护区，针对有源干扰进行保护；半径 5 千米范围为限制保护区，该区域内限制障碍物高度。此处只按有源保护区生成禁止进入区，限制保护区属障碍物高度管控，不是飞行禁区，故不生成几何。",
+      "citation": "GB 6364—2013《航空无线电导航台站电磁环境要求》，MH/T 4003.1—2014《民用航空通信导航监视台（站）设置场地规范 第 1 部分：导航》；半径取值见《湖南省民用机场及民用航空无线电台（站）电磁环境保护区管理规定》第十一条",
+      "facilityType": "AERONAUTICAL_RADIO_NAVIGATION_AID",
+      "authority": "无线电管理机构 / 民用航空管理部门",
+      "publication": "由无线电管理机构与民用航空管理部门按国家规定确定",
+      "note": "距锦州城区约 5.6 km；公开数据未区分 NDB 与 DVOR/DME，两者有源保护区半径同为 500 米。",
+      "provenance": {
+        "referencePoint": "OpenStreetMap node/2371815920",
+        "retrievedAt": "2026-09-16",
+        "clusteredNodes": 1
+      }
+    },
+    {
+      "id": "FZ-NAV-1-13-06",
+      "name": "朝阳航空无线电导航台电磁环境有源保护区",
+      "clause": "ELECTROMAGNETIC",
+      "sector": "RESEARCH",
+      "sectorLabel": "科研",
+      "geometry": {
+        "kind": "CIRCLE",
+        "centre": [
+          120.43551,
+          41.53203
+        ],
+        "radiusM": 500
+      },
+      "enforcement": "PROHIBITED",
+      "floorAglM": 0,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "无方向信标台（NDB）与多普勒全向信标台／常规测距仪台（DVOR/DME）以天线中心为基准，半径 500 米的圆形区域为有源保护区，针对有源干扰进行保护；半径 5 千米范围为限制保护区，该区域内限制障碍物高度。此处只按有源保护区生成禁止进入区，限制保护区属障碍物高度管控，不是飞行禁区，故不生成几何。",
+      "citation": "GB 6364—2013《航空无线电导航台站电磁环境要求》，MH/T 4003.1—2014《民用航空通信导航监视台（站）设置场地规范 第 1 部分：导航》；半径取值见《湖南省民用机场及民用航空无线电台（站）电磁环境保护区管理规定》第十一条",
+      "facilityType": "AERONAUTICAL_RADIO_NAVIGATION_AID",
+      "authority": "无线电管理机构 / 民用航空管理部门",
+      "publication": "由无线电管理机构与民用航空管理部门按国家规定确定",
+      "note": "距朝阳城区约 4.4 km；公开数据未区分 NDB 与 DVOR/DME，两者有源保护区半径同为 500 米。",
+      "provenance": {
+        "referencePoint": "OpenStreetMap node/3039514476",
+        "retrievedAt": "2026-09-16",
+        "clusteredNodes": 1
+      }
+    },
+    {
+      "id": "FZ-NAV-1-13-07",
+      "name": "朝阳航空无线电导航台电磁环境有源保护区",
+      "clause": "ELECTROMAGNETIC",
+      "sector": "RESEARCH",
+      "sectorLabel": "科研",
+      "geometry": {
+        "kind": "CIRCLE",
+        "centre": [
+          120.43322,
+          41.54458
+        ],
+        "radiusM": 500
+      },
+      "enforcement": "PROHIBITED",
+      "floorAglM": 0,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "无方向信标台（NDB）与多普勒全向信标台／常规测距仪台（DVOR/DME）以天线中心为基准，半径 500 米的圆形区域为有源保护区，针对有源干扰进行保护；半径 5 千米范围为限制保护区，该区域内限制障碍物高度。此处只按有源保护区生成禁止进入区，限制保护区属障碍物高度管控，不是飞行禁区，故不生成几何。",
+      "citation": "GB 6364—2013《航空无线电导航台站电磁环境要求》，MH/T 4003.1—2014《民用航空通信导航监视台（站）设置场地规范 第 1 部分：导航》；半径取值见《湖南省民用机场及民用航空无线电台（站）电磁环境保护区管理规定》第十一条",
+      "facilityType": "AERONAUTICAL_RADIO_NAVIGATION_AID",
+      "authority": "无线电管理机构 / 民用航空管理部门",
+      "publication": "由无线电管理机构与民用航空管理部门按国家规定确定",
+      "note": "距朝阳城区约 3.2 km；公开数据未区分 NDB 与 DVOR/DME，两者有源保护区半径同为 500 米。",
+      "provenance": {
+        "referencePoint": "OpenStreetMap node/3039514477",
+        "retrievedAt": "2026-09-16",
+        "clusteredNodes": 1
+      }
+    },
+    {
+      "id": "FZ-NAV-2-06-08",
+      "name": "白山航空无线电导航台电磁环境有源保护区",
+      "clause": "ELECTROMAGNETIC",
+      "sector": "RESEARCH",
+      "sectorLabel": "科研",
+      "geometry": {
+        "kind": "CIRCLE",
+        "centre": [
+          127.60396,
+          42.07551
+        ],
+        "radiusM": 500
+      },
+      "enforcement": "PROHIBITED",
+      "floorAglM": 0,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "无方向信标台（NDB）与多普勒全向信标台／常规测距仪台（DVOR/DME）以天线中心为基准，半径 500 米的圆形区域为有源保护区，针对有源干扰进行保护；半径 5 千米范围为限制保护区，该区域内限制障碍物高度。此处只按有源保护区生成禁止进入区，限制保护区属障碍物高度管控，不是飞行禁区，故不生成几何。",
+      "citation": "GB 6364—2013《航空无线电导航台站电磁环境要求》，MH/T 4003.1—2014《民用航空通信导航监视台（站）设置场地规范 第 1 部分：导航》；半径取值见《湖南省民用机场及民用航空无线电台（站）电磁环境保护区管理规定》第十一条",
+      "facilityType": "AERONAUTICAL_RADIO_NAVIGATION_AID",
+      "authority": "无线电管理机构 / 民用航空管理部门",
+      "publication": "由无线电管理机构与民用航空管理部门按国家规定确定",
+      "note": "距白山城区约 99.3 km；公开数据未区分 NDB 与 DVOR/DME，两者有源保护区半径同为 500 米。",
+      "provenance": {
+        "referencePoint": "OpenStreetMap node/3039523638",
+        "retrievedAt": "2026-09-16",
+        "clusteredNodes": 1
+      }
+    },
+    {
+      "id": "FZ-NAV-1-02-09",
+      "name": "大连航空无线电导航台电磁环境有源保护区",
+      "clause": "ELECTROMAGNETIC",
+      "sector": "RESEARCH",
+      "sectorLabel": "科研",
+      "geometry": {
+        "kind": "CIRCLE",
+        "centre": [
+          121.55053,
+          38.96429
+        ],
+        "radiusM": 500
+      },
+      "enforcement": "PROHIBITED",
+      "floorAglM": 0,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "无方向信标台（NDB）与多普勒全向信标台／常规测距仪台（DVOR/DME）以天线中心为基准，半径 500 米的圆形区域为有源保护区，针对有源干扰进行保护；半径 5 千米范围为限制保护区，该区域内限制障碍物高度。此处只按有源保护区生成禁止进入区，限制保护区属障碍物高度管控，不是飞行禁区，故不生成几何。",
+      "citation": "GB 6364—2013《航空无线电导航台站电磁环境要求》，MH/T 4003.1—2014《民用航空通信导航监视台（站）设置场地规范 第 1 部分：导航》；半径取值见《湖南省民用机场及民用航空无线电台（站）电磁环境保护区管理规定》第十一条",
+      "facilityType": "AERONAUTICAL_RADIO_NAVIGATION_AID",
+      "authority": "无线电管理机构 / 民用航空管理部门",
+      "publication": "由无线电管理机构与民用航空管理部门按国家规定确定",
+      "note": "距大连城区约 7.9 km；公开数据未区分 NDB 与 DVOR/DME，两者有源保护区半径同为 500 米。",
+      "provenance": {
+        "referencePoint": "OpenStreetMap node/8142881663",
+        "retrievedAt": "2026-09-16",
+        "clusteredNodes": 1
+      }
+    },
+    {
+      "id": "FZ-NAV-1-02-10",
+      "name": "大连航空无线电导航台电磁环境有源保护区",
+      "clause": "ELECTROMAGNETIC",
+      "sector": "RESEARCH",
+      "sectorLabel": "科研",
+      "geometry": {
+        "kind": "CIRCLE",
+        "centre": [
+          121.52566,
+          38.96716
+        ],
+        "radiusM": 500
+      },
+      "enforcement": "PROHIBITED",
+      "floorAglM": 0,
+      "ceilingAglM": null,
+      "geometryStatus": "PUBLISHED_STANDARD",
+      "geometryRule": "无方向信标台（NDB）与多普勒全向信标台／常规测距仪台（DVOR/DME）以天线中心为基准，半径 500 米的圆形区域为有源保护区，针对有源干扰进行保护；半径 5 千米范围为限制保护区，该区域内限制障碍物高度。此处只按有源保护区生成禁止进入区，限制保护区属障碍物高度管控，不是飞行禁区，故不生成几何。",
+      "citation": "GB 6364—2013《航空无线电导航台站电磁环境要求》，MH/T 4003.1—2014《民用航空通信导航监视台（站）设置场地规范 第 1 部分：导航》；半径取值见《湖南省民用机场及民用航空无线电台（站）电磁环境保护区管理规定》第十一条",
+      "facilityType": "AERONAUTICAL_RADIO_NAVIGATION_AID",
+      "authority": "无线电管理机构 / 民用航空管理部门",
+      "publication": "由无线电管理机构与民用航空管理部门按国家规定确定",
+      "note": "距大连城区约 9.7 km；公开数据未区分 NDB 与 DVOR/DME，两者有源保护区半径同为 500 米。",
+      "provenance": {
+        "referencePoint": "OpenStreetMap node/8142881665",
+        "retrievedAt": "2026-09-16",
+        "clusteredNodes": 1
+      }
+    },
+    {
+      "id": "FZ-REG-WAY-1435152277",
+      "name": "绥化气象雷达周边管制空域",
+      "clause": "ELECTROMAGNETIC",
+      "sector": "RESEARCH",
+      "sectorLabel": "科研",
+      "geometry": null,
+      "facilityType": "WEATHER_RADAR_STATION",
+      "geometryStatus": "PERIMETER_NOT_PUBLICLY_PUBLISHED",
+      "enforcement": "REGISTERED_REVIEW_REQUIRED",
+      "referencePoint": {
+        "coordinate": [
+          126.97447,
+          46.59105
+        ],
+        "source": "OpenStreetMap way/1435152277"
+      },
+      "authority": "气象主管机构 / 空中交通管理机构",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "operator": "绥化市气象局",
+      "note": "本系统按已公开名称与运营单位认定该设施为天气雷达站，登记其已核验位置，但不把 GB 31223—2014 的探测环境保护区当作飞行管制空域几何：该标准保护的是雷达探测环境，周边管制空域范围由空中交通管理机构依《无人驾驶航空器飞行管理暂行条例》第十九条另行确定并按城市公布。",
+      "reviewAction": "待该雷达站周边管制空域范围由设区的市级以上人民政府公布后补全几何；在此之前，本系统不以 GB 31223 的保护半径推算禁飞范围。",
+      "citation": "GB 31223—2014《气象探测环境保护规范 天气雷达站》第 4.2、4.3 条",
+      "provenance": {
+        "referencePoint": "OpenStreetMap way/1435152277",
+        "retrievedAt": "2026-09-16",
+        "identificationBasis": "要素名称含\"雷达\"且带 operator 标签"
+      }
+    },
+    {
+      "id": "FZ-REG-WAY-153246747",
+      "name": "九·一八历史博物馆",
+      "clause": "HERITAGE",
+      "sector": "GOVERNMENT",
+      "sectorLabel": "政务",
+      "geometry": null,
+      "facilityType": "重要革命纪念地",
+      "geometryStatus": "AREA_EXTENT_REQUIRES_LOCAL_PUBLICATION",
+      "enforcement": "REGISTERED_REVIEW_REQUIRED",
+      "referencePoint": {
+        "coordinate": [
+          123.4615,
+          41.8342
+        ],
+        "source": "OpenStreetMap way/153246747"
+      },
+      "authority": "空中交通管理机构 / 文物主管部门",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "note": "\"周边一定范围\"没有全国统一定量标准，本系统只登记已公开定位，待地方公布范围后再生成几何。",
+      "provenance": {
+        "referencePoint": "OpenStreetMap way/153246747",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-REG-WAY-760963004",
+      "name": "侵华日军第七三一部队罪证陈列馆",
+      "clause": "HERITAGE",
+      "sector": "GOVERNMENT",
+      "sectorLabel": "政务",
+      "geometry": null,
+      "facilityType": "重要革命纪念地",
+      "geometryStatus": "AREA_EXTENT_REQUIRES_LOCAL_PUBLICATION",
+      "enforcement": "REGISTERED_REVIEW_REQUIRED",
+      "referencePoint": {
+        "coordinate": [
+          126.63318,
+          45.60699
+        ],
+        "source": "OpenStreetMap way/760963004"
+      },
+      "authority": "空中交通管理机构 / 文物主管部门",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "note": "\"周边一定范围\"没有全国统一定量标准，本系统只登记已公开定位，待地方公布范围后再生成几何。",
+      "provenance": {
+        "referencePoint": "OpenStreetMap way/760963004",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-REG-WAY-516404384",
+      "name": "辽沈战役纪念馆",
+      "clause": "HERITAGE",
+      "sector": "GOVERNMENT",
+      "sectorLabel": "政务",
+      "geometry": null,
+      "facilityType": "重要革命纪念地",
+      "geometryStatus": "AREA_EXTENT_REQUIRES_LOCAL_PUBLICATION",
+      "enforcement": "REGISTERED_REVIEW_REQUIRED",
+      "referencePoint": {
+        "coordinate": [
+          121.14347,
+          41.12914
+        ],
+        "source": "OpenStreetMap way/516404384"
+      },
+      "authority": "空中交通管理机构 / 文物主管部门",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "note": "\"周边一定范围\"没有全国统一定量标准，本系统只登记已公开定位，待地方公布范围后再生成几何。",
+      "provenance": {
+        "referencePoint": "OpenStreetMap way/516404384",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-REG-WAY-1217039852",
+      "name": "抗美援朝纪念馆",
+      "clause": "HERITAGE",
+      "sector": "GOVERNMENT",
+      "sectorLabel": "政务",
+      "geometry": null,
+      "facilityType": "重要革命纪念地",
+      "geometryStatus": "AREA_EXTENT_REQUIRES_LOCAL_PUBLICATION",
+      "enforcement": "REGISTERED_REVIEW_REQUIRED",
+      "referencePoint": {
+        "coordinate": [
+          124.35975,
+          40.11744
+        ],
+        "source": "OpenStreetMap way/1217039852"
+      },
+      "authority": "空中交通管理机构 / 文物主管部门",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "note": "\"周边一定范围\"没有全国统一定量标准，本系统只登记已公开定位，待地方公布范围后再生成几何。",
+      "provenance": {
+        "referencePoint": "OpenStreetMap way/1217039852",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-REG-WAY-516279956",
+      "name": "四平战役纪念馆",
+      "clause": "HERITAGE",
+      "sector": "GOVERNMENT",
+      "sectorLabel": "政务",
+      "geometry": null,
+      "facilityType": "重要革命纪念地",
+      "geometryStatus": "AREA_EXTENT_REQUIRES_LOCAL_PUBLICATION",
+      "enforcement": "REGISTERED_REVIEW_REQUIRED",
+      "referencePoint": {
+        "coordinate": [
+          124.35411,
+          43.17233
+        ],
+        "source": "OpenStreetMap way/516279956"
+      },
+      "authority": "空中交通管理机构 / 文物主管部门",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "note": "\"周边一定范围\"没有全国统一定量标准，本系统只登记已公开定位，待地方公布范围后再生成几何。",
+      "provenance": {
+        "referencePoint": "OpenStreetMap way/516279956",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-REG-NODE-2421358101",
+      "name": "旅顺日俄监狱旧址博物馆",
+      "clause": "HERITAGE",
+      "sector": "GOVERNMENT",
+      "sectorLabel": "政务",
+      "geometry": null,
+      "facilityType": "重要不可移动文物",
+      "geometryStatus": "AREA_EXTENT_REQUIRES_LOCAL_PUBLICATION",
+      "enforcement": "REGISTERED_REVIEW_REQUIRED",
+      "referencePoint": {
+        "coordinate": [
+          121.25994,
+          38.82458
+        ],
+        "source": "OpenStreetMap node/2421358101"
+      },
+      "authority": "空中交通管理机构 / 文物主管部门",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "note": "\"周边一定范围\"没有全国统一定量标准，本系统只登记已公开定位，待地方公布范围后再生成几何。",
+      "provenance": {
+        "referencePoint": "OpenStreetMap node/2421358101",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-REG-WAY-1315296538",
+      "name": "平顶山惨案史实陈列馆",
+      "clause": "HERITAGE",
+      "sector": "GOVERNMENT",
+      "sectorLabel": "政务",
+      "geometry": null,
+      "facilityType": "重要革命纪念地",
+      "geometryStatus": "AREA_EXTENT_REQUIRES_LOCAL_PUBLICATION",
+      "enforcement": "REGISTERED_REVIEW_REQUIRED",
+      "referencePoint": {
+        "coordinate": [
+          123.92013,
+          41.83185
+        ],
+        "source": "OpenStreetMap way/1315296538"
+      },
+      "authority": "空中交通管理机构 / 文物主管部门",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "note": "\"周边一定范围\"没有全国统一定量标准，本系统只登记已公开定位，待地方公布范围后再生成几何。",
+      "provenance": {
+        "referencePoint": "OpenStreetMap way/1315296538",
+        "retrievedAt": "2026-09-16"
+      }
+    },
+    {
+      "id": "FZ-REG-WAY-227337999",
+      "name": "东北沦陷史陈列馆",
+      "clause": "HERITAGE",
+      "sector": "GOVERNMENT",
+      "sectorLabel": "政务",
+      "geometry": null,
+      "facilityType": "重要不可移动文物",
+      "geometryStatus": "AREA_EXTENT_REQUIRES_LOCAL_PUBLICATION",
+      "enforcement": "REGISTERED_REVIEW_REQUIRED",
+      "referencePoint": {
+        "coordinate": [
+          125.34492,
+          43.90404
+        ],
+        "source": "OpenStreetMap way/227337999"
+      },
+      "authority": "空中交通管理机构 / 文物主管部门",
+      "publication": "由设区的市级以上人民政府公布，民用航空管理部门发布航行情报",
+      "note": "\"周边一定范围\"没有全国统一定量标准，本系统只登记已公开定位，待地方公布范围后再生成几何。",
+      "provenance": {
+        "referencePoint": "OpenStreetMap way/227337999",
+        "retrievedAt": "2026-09-16"
+      }
+    }
+  ]
+}

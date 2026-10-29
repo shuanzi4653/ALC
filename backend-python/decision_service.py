@@ -1,4 +1,3 @@
-"""Local decision records and deterministic replay. No publication or packaging."""
 import hashlib
 import json
 import os
@@ -14,35 +13,53 @@ from contextlib import contextmanager
 from weather.engine import WeatherWorld, REGIONS, MODEL_VERSION, SCENARIOS
 from weather.geometry import BOUNDARY_VERSION
 from planning.router import evaluate, verify_candidate, OPEN, ALGORITHM_VERSION
+import workspace as workspace_ctx
 
 ROOT = Path(__file__).resolve().parent.parent
 VERSION = (ROOT / 'VERSION').read_text().strip()
 DB = Path(os.environ.get('TIANCHUANG_DECISION_DB', ROOT / '.run' / 'decisions.sqlite3'))
 LOCK = threading.RLock()
+SCHEMA_VERSION = 2
 ENGINE_FINGERPRINT = hashlib.sha256(b''.join((Path(__file__).parent / p).read_bytes() for p in
     ('weather/engine.py', 'weather/geometry.py', 'planning/router.py', 'decision_service.py'))).hexdigest()[:20]
 
+def _migrate(db):
+    version = db.execute('PRAGMA user_version').fetchone()[0]
+    if version >= SCHEMA_VERSION:
+        return
+    columns = {row[1] for row in db.execute('PRAGMA table_info(records)')}
+    if 'workspace' in columns:
+        db.execute(f'PRAGMA user_version = {SCHEMA_VERSION}')
+        return
+    db.execute("CREATE TABLE IF NOT EXISTS records_v2 ("
+               "id TEXT NOT NULL, workspace TEXT NOT NULL DEFAULT '', "
+               "created TEXT NOT NULL, body TEXT NOT NULL, PRIMARY KEY (workspace, id))")
+    db.execute("INSERT OR IGNORE INTO records_v2 (id, workspace, created, body) "
+               "SELECT id, '', created, body FROM records")
+    db.execute('DROP TABLE records')
+    db.execute('ALTER TABLE records_v2 RENAME TO records')
+    db.execute(f'PRAGMA user_version = {SCHEMA_VERSION}')
 
 @contextmanager
 def connection():
     DB.parent.mkdir(parents=True, exist_ok=True)
     db = sqlite3.connect(DB, timeout=10)
-    db.execute('CREATE TABLE IF NOT EXISTS records (id TEXT PRIMARY KEY, created TEXT NOT NULL, body TEXT NOT NULL)')
+    db.execute('CREATE TABLE IF NOT EXISTS records (id TEXT NOT NULL, workspace TEXT NOT NULL DEFAULT \'\', '
+               'created TEXT NOT NULL, body TEXT NOT NULL, PRIMARY KEY (workspace, id))')
     db.execute('CREATE TABLE IF NOT EXISTS origins (id TEXT PRIMARY KEY, origin TEXT NOT NULL)')
     db.execute('CREATE TABLE IF NOT EXISTS explanations (id TEXT PRIMARY KEY, decision_id TEXT NOT NULL, body TEXT NOT NULL)')
+    _migrate(db)
     try:
         with db:
             yield db
     finally:
         db.close()
 
-
 def valid_origin(value):
     parsed = datetime.fromisoformat(value)
     if parsed.tzinfo is None or parsed.utcoffset() is None:
         raise ValueError('时间原点必须包含时区')
     return parsed.isoformat()
-
 
 def scenario_origin(scenario, seed):
     with LOCK, connection() as db:
@@ -54,11 +71,9 @@ def scenario_origin(scenario, seed):
         db.execute('INSERT INTO origins VALUES (?,?)', (key, value))
         return value
 
-
 @lru_cache(maxsize=24)
 def world_for(scenario, seed, origin, uncertainty=True):
     return WeatherWorld(seed, scenario, origin, uncertainty)
-
 
 def frame(scenario, seed, minute, region_id=None, origin=None, uncertainty=True, buffer_m=500):
     origin = valid_origin(origin or scenario_origin(scenario, seed))
@@ -69,7 +84,6 @@ def frame(scenario, seed, minute, region_id=None, origin=None, uncertainty=True,
                    'scenarioId': f'{scenario}:{seed}:{origin}', 'revision': 1,
                    'regions': [{'id': key, **value} for key, value in REGIONS.items()]})
     return result
-
 
 def assess(request):
     start = time.perf_counter()
@@ -91,7 +105,6 @@ def assess(request):
                  'engineFingerprint': ENGINE_FINGERPRINT, 'plannerBudgetSeconds': planner_budget}
     interrupted = any(c['reason'] == 'PLANNER_TIMEOUT' for c in candidates)
     if interrupted:
-        # A runtime timeout is not a deterministic property of the input. Never pin retries to it.
         canonical['executionAttempt'] = uuid.uuid4().hex
     identity = hashlib.sha256(json.dumps(canonical, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
     current = frame(scenario, seed, task['departureMinute'], task['regionId'], origin, canonical['uncertainty'], task['bufferM'])
@@ -112,32 +125,33 @@ def assess(request):
               'evaluationComplete': not interrupted,
               'latencyMs': round((time.perf_counter() - start) * 1000),
               'createdAt': datetime.now(timezone.utc).isoformat()}
-    # Content address refers to INPUT and model identity; never overwrite a prior record.
+    ws = workspace_ctx.current()
     with LOCK, connection() as db:
-        db.execute('INSERT OR IGNORE INTO records VALUES (?,?,?)',
-                   (identity, result['createdAt'], json.dumps(result, ensure_ascii=False, allow_nan=False)))
-        return json.loads(db.execute('SELECT body FROM records WHERE id=?', (identity,)).fetchone()[0])
+        db.execute('INSERT OR IGNORE INTO records (id, workspace, created, body) VALUES (?,?,?,?)',
+                   (identity, ws, result['createdAt'], json.dumps(result, ensure_ascii=False, allow_nan=False)))
+        return json.loads(db.execute('SELECT body FROM records WHERE id=? AND workspace=?',
+                                     (identity, ws)).fetchone()[0])
 
-
-def get_record(identity):
+def get_record(identity, workspace=None):
     if len(identity) != 64 or any(c not in '0123456789abcdef' for c in identity):
         raise KeyError('Unknown decision')
+    ws = workspace if workspace is not None else workspace_ctx.current()
     with connection() as db:
-        row = db.execute('SELECT body FROM records WHERE id=?', (identity,)).fetchone()
+        row = db.execute('SELECT body FROM records WHERE id=? AND workspace=?', (identity, ws)).fetchone()
     if not row:
         raise KeyError('Unknown decision')
     return json.loads(row[0])
 
-
-def history():
+def history(workspace=None):
+    ws = workspace if workspace is not None else workspace_ctx.current()
     with connection() as db:
-        rows = db.execute('SELECT body FROM records ORDER BY created DESC LIMIT 30').fetchall()
+        rows = db.execute('SELECT body FROM records WHERE workspace=? ORDER BY created DESC LIMIT 30',
+                          (ws,)).fetchall()
     result = []
     for row in rows:
         r = json.loads(row[0])
         result.append({k: r[k] for k in ('decisionId', 'createdAt', 'scenario', 'seed', 'status', 'task')})
     return result
-
 
 def save_explanation(result):
     body = json.dumps(result, ensure_ascii=False, sort_keys=True, allow_nan=False)
@@ -145,7 +159,6 @@ def save_explanation(result):
     with LOCK, connection() as db:
         db.execute('INSERT OR IGNORE INTO explanations VALUES (?,?,?)', (identity, result['decisionId'], body))
     return identity
-
 
 def replay(identity):
     recorded = get_record(identity)

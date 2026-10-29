@@ -1,0 +1,50 @@
+{
+  "schemaVersion": "1.3",
+  "disclaimer": "以下参数仅用于本项目模拟调度，不构成现实运行许可或机型认证性能。",
+  "CAR": {
+    "speedKmh": 180,
+    "cruiseLayersAglM": [350, 500],
+    "minCruiseAglM": 350,
+    "maxCruiseAglM": 600,
+    "maxClimbMps": 3,
+    "maxDescentMps": 3,
+    "minTurnRadiusM": 900,
+    "padSeparationMinutes": 4
+  },
+  "DELIVERY": {
+    "speedKmh": 45,
+    "cruiseLayersAglM": [80, 160],
+    "minCruiseAglM": 80,
+    "maxCruiseAglM": 200,
+    "maxClimbMps": 3,
+    "maxDescentMps": 3,
+    "minTurnRadiusM": 120,
+    "padSeparationMinutes": 2
+  },
+  "separation": {
+    "horizontalM": 250,
+    "verticalM": 60,
+    "maxExtraMinutes": 120,
+    "groundWaitStepMinutes": 5
+  },
+  "operations": {
+    "maxFlightMinutes": {"CAR": 300, "DELIVERY": 40},
+    "riskCeilingAglM": 620,
+    "staticAirspace": {
+      "airportFootprintPolicy": "APPROVAL_REQUIRED",
+      "note": "APPROVAL_REQUIRED 按《无人驾驶航空器飞行管理暂行条例》第十九条：机场区域属管制空域，进入须经空中交通管理机构批准，系统按班次登记穿越需求而不硬性关闭航线。PROHIBITED 为严格口径，把机场净空巡视检查区域视为一律禁止进入，会关闭大量班次。核设施等本就 PROHIBITED 的区域不受此开关影响，始终参与硬性绕行。"
+    },
+    "crossingZone": {"cellM": 15000, "capacity": 2, "windowMinutes": 1.5},
+    "delivery": {
+      "nodesPerCity": 12,
+      "corridorsPerCity": 6,
+      "serviceRadiusM": 6000,
+      "energyPercentPerKm": 3.5,
+      "energyPercentPerClimb100m": 1.2,
+      "energyReservePercent": 25,
+      "orderTimeoutMinutes": 45,
+      "chargeMinutes": 12,
+      "inspectionMinutes": 4
+    }
+  }
+}

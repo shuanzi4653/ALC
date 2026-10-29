@@ -66,6 +66,40 @@ def test_invalid_cases_are_rejected():
     assert checked == len(load_fixture()["invalidCases"])
 
 
+def test_absent_optional_factor_abstains_instead_of_failing():
+    """真实源形状：open-meteo 不发布雷暴字段，thunderProb 恒为 None，其余齐全。
+
+    回归判据（0.9.25）：修复前这会抛 ValueError，与 Java 侧同因，
+    使监测轮永久以 INVALID_INPUT 失败、/api/health/ready 恒为 503。
+    """
+    spec = rules.load_spec()
+    snapshot = {"windSpeed": 2.27, "windGust": 4.6, "precipMmh": 0.0,
+                "visibilityM": 8760.0, "thunderProb": None, "tempC": 15.6}
+    result = rules.evaluate(snapshot, spec)
+    assert result["hard_ban"] is False
+    # 缺席的可选要素不产出 check（扣不了分），但要被点名，界面才能如实说「源不提供」。
+    assert all(c["factor"] != "雷暴概率" for c in result["checks"])
+    assert result["unavailable_optional"] == ["雷暴概率"]
+    assert any(c["factor"] == "平均风速" for c in result["checks"])
+
+
+def test_absent_required_factor_still_rejects_the_round():
+    """必需要素缺席＝本该有却没有，本轮不可信——不能被上一条放松。"""
+    spec = rules.load_spec()
+    with pytest.raises(ValueError):
+        rules.evaluate({"windSpeed": None, "windGust": 5, "precipMmh": 0,
+                        "visibilityM": 20000, "thunderProb": 0, "tempC": 20}, spec)
+
+
+def test_optional_factor_still_scores_when_present():
+    """可选要素一旦取得值，就必须照常参与计分——弃权只针对缺席，不是永久豁免。"""
+    spec = rules.load_spec()
+    result = rules.evaluate({"windSpeed": 2.0, "windGust": 4.0, "precipMmh": 0.0,
+                             "visibilityM": 20000.0, "thunderProb": 0.7, "tempC": 20.0}, spec)
+    assert any(c["factor"] == "雷暴概率" and c["banned"] for c in result["checks"])
+    assert result["hard_ban"] is True
+
+
 def test_fallback_output_contract():
     """降级研判输出必须带 source=fallback 的语义字段，且等级与规则一致。"""
     from track2_agent import _fallback

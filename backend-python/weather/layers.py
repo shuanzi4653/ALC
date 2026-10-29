@@ -1,8 +1,6 @@
-"""Compatibility DTOs: a live point is not a regional weather field."""
 from datetime import datetime, timedelta
 import math
 from .engine import WeatherWorld
-
 
 def from_dashboard(dash):
     snapshot = dash['current']['snapshot']

@@ -1,8 +1,3 @@
-"""An evidence-selecting agent. LLM cannot change geometry or authorize a route.
-
-All displayed statements are retrieved from immutable evidence, so an unavailable
-or ungrounded model does not leak an invented number into the user response.
-"""
 import json
 import time
 import httpx
@@ -11,30 +6,23 @@ from decision_service import get_record, save_explanation
 
 LAST_CALL = {'status': 'NOT_CALLED', 'source': None, 'latencyMs': None}
 
-
 def get_task_context(record):
     return [e for e in record['evidence'] if e['id'] in ('task', 'source')]
-
 
 def get_weather_evidence(record):
     return [e for e in record['evidence'] if e['title'] == '气象限制']
 
-
 def compare_departures(record):
     return [e for e in record['evidence'] if e['id'].startswith('candidate-')]
-
 
 def get_route_decision(record):
     return [e for e in record['evidence'] if e['id'] == 'decision']
 
-
 def get_rule_reference(record):
     return [e for e in record['evidence'] if e['id'] == 'constraints']
 
-
 TOOLS = {f.__name__: f for f in (get_task_context, get_weather_evidence, compare_departures,
                                 get_route_decision, get_rule_reference)}
-
 
 def error_code(exc):
     if isinstance(exc, httpx.TimeoutException):
@@ -46,12 +34,10 @@ def error_code(exc):
         return 'NETWORK_ERROR'
     return 'INVALID_RESPONSE'
 
-
 def explain(decision_id, question, cfg):
     started = time.perf_counter()
     record = get_record(decision_id)
     evidence, trace = [], []
-    # Deterministic tool execution provides the evidence substrate even offline.
     for name, tool in TOOLS.items():
         values = tool(record)
         evidence.extend(values)

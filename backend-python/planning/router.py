@@ -10,7 +10,6 @@ from weather.engine import REGIONS
 ALGORITHM_VERSION = 'temporal-visibility-2'
 OPEN = {'DIRECT', 'DETOUR', 'WAIT'}
 
-
 def validate_task(task):
     if task.get('regionId') not in REGIONS:
         raise ValueError('请选择东北三省任务区域')
@@ -27,10 +26,8 @@ def validate_task(task):
         if not isinstance(v, (int, float)) or not math.isfinite(v) or not low <= v <= high:
             raise ValueError(f'{key}不在有效范围内')
 
-
 def classify_extra(seconds):
     return 'CLOSED' if seconds > 3600 + 1e-7 else 'DETOUR'
-
 
 def evaluate(world, task, deadline_seconds=2.0, mode='dynamic'):
     validate_task(task)
@@ -54,7 +51,6 @@ def evaluate(world, task, deadline_seconds=2.0, mode='dynamic'):
         return [closed('ENDURANCE_EXCEEDED')]
     if base + direct_minutes + task['workMinutes'] > horizon:
         return [closed('FORECAST_HORIZON' if task['latestArrivalMinute'] > base + 180 else 'DEADLINE_EXCEEDED')]
-    # Candidate graph from multiple forecast times. Restricted to local task vicinity.
     nodes = [start, goal]
     minx, miny, maxx, maxy = LineString([start, goal]).buffer(28000).bounds
     for minute in ((base,) if mode == 'static' else (base, base + 20, base + 40, base + 60)):
@@ -64,7 +60,6 @@ def evaluate(world, task, deadline_seconds=2.0, mode='dynamic'):
                 if minx <= p[0] <= maxx and miny <= p[1] <= maxy and allowed.covers(Point(p)):
                     if all(math.dist(p, old) > 1000 for old in nodes):
                         nodes.append(p)
-    # Additional boundary-safe lateral alternatives for concave polygons.
     dx, dy = goal[0] - start[0], goal[1] - start[1]
     length = max(1, math.hypot(dx, dy))
     for side in (-1, 1):
@@ -98,7 +93,6 @@ def evaluate(world, task, deadline_seconds=2.0, mode='dynamic'):
         start_time = base if mode == 'static' else depart
         if Point(start).intersects(world.swept(start_time, start_time, rid, task['bufferM'])):
             return closed('START_RESTRICTED', depart=depart)
-        # Time-expanded states: upward rounding makes any implicit delay explicit and checked.
         queue = [(depart + direct_minutes, depart, 0, [0], [depart])]
         visited = set()
         while queue:
@@ -149,7 +143,6 @@ def evaluate(world, task, deadline_seconds=2.0, mode='dynamic'):
     waiting = search(base + 20, 0)
     candidates.append(waiting)
     return candidates
-
 
 def verify_candidate(world, task, candidate):
     if candidate['status'] not in OPEN:

@@ -12,7 +12,7 @@ with httpx.Client(base_url='http://127.0.0.1:8085',trust_env=False,timeout=20) a
     assert version.json()['version']==(ROOT/'VERSION').read_text().strip()
     network=client.get('/api/traffic/network');network.raise_for_status();network=network.json()
     assert len(network['cities'])==36 and len(network['routes'])==161
-    for scenario in ('moving','clear','unknown'):
+    for scenario in ('live','clear','unknown'):
         start=time.perf_counter()
         for attempt in range(30):
             response=client.get('/api/traffic/session',params=dict(seed=42,scenario=scenario))
@@ -26,13 +26,16 @@ with httpx.Client(base_url='http://127.0.0.1:8085',trust_env=False,timeout=20) a
         assert len({f['id'] for f in data['flights']})==1614
         if scenario=='unknown': assert not data['stats']['accepted']
         else: assert data['stats']['accepted']>0
-        if scenario=='moving': assert data['stats']['detours']>0
         repeat=client.get('/api/traffic/session',params=dict(seed=42,scenario=scenario)).json()
         assert data==repeat
         frames=[client.get('/api/traffic/weather',params=dict(seed=42,scenario=scenario,minute=t,cityId='1-01')).json() for t in (30,31)]
         assert all(f['minute']==t for f,t in zip(frames,(30,31)))
-        if scenario=='moving':assert frames[0]['cells']!=frames[1]['cells']
-        if scenario=='unknown':assert not frames[0]['winds'] and not frames[0]['available']
+        # No scenario synthesises weather now: `live` reads the real snapshot,
+        # `clear` claims nothing adverse, `unknown` reports the feed down. The
+        # payload has to say which of those it is rather than inventing a source.
+        assert frames[0]['dataType'] in ('MODEL_ESTIMATE','PROVIDER_CURRENT_ESTIMATE_OR_OBSERVATION_UNVERIFIED','NO_WEATHER_CLAIMED')
+        assert frames[0]['provider'] in ('OPEN_METEO','QWEATHER','NONE')
+        if scenario=='unknown': assert frames[0]['cells']==[] and not frames[0]['available']
         results.append(dict(scenario=scenario,sessionId=data['sessionId'],fingerprint=data['fingerprint'],stats=data['stats'],roundTripSeconds=round(time.perf_counter()-start,3)))
     assert client.get('/api/traffic/session?seed=-1').status_code==422
     assert client.get('/api/traffic/weather?cityId=missing').status_code==422

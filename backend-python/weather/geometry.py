@@ -1,4 +1,3 @@
-"""All geometric predicates use metres in a local azimuthal projection."""
 import hashlib
 import json
 from functools import lru_cache
@@ -15,14 +14,11 @@ FEATURES = json.loads(BOUNDARY_FILE.read_text(encoding='utf-8'))['features']
 FORWARD = Transformer.from_crs('EPSG:4326', '+proj=aeqd +lat_0=45 +lon_0=126 +datum=WGS84 +units=m', always_xy=True)
 INVERSE = Transformer.from_crs(FORWARD.target_crs, 'EPSG:4326', always_xy=True)
 
-
 def project(point):
     return FORWARD.transform(*point)
 
-
 def unproject(point):
     return list(INVERSE.transform(*point))
-
 
 @lru_cache(maxsize=8)
 def boundary(region=None):
@@ -32,10 +28,26 @@ def boundary(region=None):
         raise ValueError('Unknown region')
     return unary_union(geoms)
 
-
 def geojson(geom):
     return mapping(transform(INVERSE.transform, geom))
 
+@lru_cache(maxsize=1)
+def province_feature_collection():
+    return {
+        'type': 'FeatureCollection',
+        'features': [
+            {
+                'type': 'Feature',
+                'properties': {
+                    'name': feature['properties']['name'],
+                    'adcode': feature['properties'].get('adcode'),
+                    'level': 'province',
+                },
+                'geometry': feature['geometry'],
+            }
+            for feature in FEATURES
+        ],
+    }
 
 def inside(point, region=None):
     return boundary(region).covers(Point(project(point)))
