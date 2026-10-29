@@ -1,0 +1,72 @@
+{
+  "version": "metar-v1",
+  "createdAt": "2026-10-19",
+  "source": "https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py",
+  "reportType": 3,
+  "stations": {
+    "ZYTX": {
+      "name": "沈阳桃仙",
+      "lat": 41.6398,
+      "lon": 123.4833,
+      "elev": 60.0
+    },
+    "ZYCC": {
+      "name": "长春龙嘉",
+      "lat": 43.9962,
+      "lon": 125.6853,
+      "elev": 215.0
+    },
+    "ZYHB": {
+      "name": "哈尔滨太平",
+      "lat": 45.6234,
+      "lon": 126.25,
+      "elev": 139.0
+    }
+  },
+  "years": [
+    2019,
+    2025
+  ],
+  "rows": 183493,
+  "perStation": {
+    "ZYTX": 61171,
+    "ZYCC": 61160,
+    "ZYHB": 61162
+  },
+  "missing": {
+    "visM": 0,
+    "gustMs": 0,
+    "windMs": 0,
+    "tempC": 0,
+    "dewC": 0,
+    "cloudBaseM": 1,
+    "qnhHpa": 0
+  },
+  "missingRate": {
+    "visM": 0.0,
+    "gustMs": 0.0,
+    "windMs": 0.0,
+    "tempC": 0.0,
+    "dewC": 0.0,
+    "cloudBaseM": 0.0,
+    "qnhHpa": 0.0
+  },
+  "gustSource": {
+    "OBSERVED": 4712,
+    "FALLBACK_WIND": 178781
+  },
+  "cloudSource": {
+    "OBSERVED": 55801,
+    "CLEAR_SENTINEL": 127691
+  },
+  "units": {
+    "visM": "m",
+    "gustMs": "m/s",
+    "windMs": "m/s",
+    "tempC": "C",
+    "dewC": "C",
+    "cloudBaseM": "m",
+    "qnhHpa": "hPa"
+  },
+  "sha256": "2c7c9730bab06fd1e8bff1cf119670bc473d00185a8d202f38258ab9bfa1079c"
+}

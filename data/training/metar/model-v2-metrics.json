@@ -1,0 +1,1564 @@
+{
+  "version": "v2",
+  "createdAt": "2026-10-19T02:33:18Z",
+  "task": "低空可飞性概率（低能见度 / 强阵风），未来 3 小时",
+  "labelSource": "METAR 实测观测（ZYTX / ZYCC / ZYHB），Iowa State ASOS archive",
+  "dataset": {
+    "rows": 183406,
+    "sha256": "2c7c9730bab06fd1e8bff1cf119670bc473d00185a8d202f38258ab9bfa1079c",
+    "stations": [
+      "ZYTX",
+      "ZYCC",
+      "ZYHB"
+    ],
+    "years": "2019-2025"
+  },
+  "split": {
+    "train": "<=2023-12-31",
+    "val": "2024",
+    "test": ">=2025-01-01",
+    "note": "按时间切分，不随机打乱"
+  },
+  "features": [
+    "visM",
+    "gustMs",
+    "windMs",
+    "wdirSin",
+    "wdirCos",
+    "tempC",
+    "dewC",
+    "dewSpread",
+    "cloudBaseM",
+    "qnhHpa",
+    "visMin3h",
+    "visMin6h",
+    "gustMax3h",
+    "windChange3h",
+    "qnhTendency3h",
+    "visChange3h",
+    "tempTendency3h",
+    "spreadTendency3h",
+    "stationCode",
+    "hourSin",
+    "hourCos",
+    "month",
+    "miss_vis",
+    "miss_gust",
+    "miss_cloud",
+    "miss_temp"
+  ],
+  "defaults": {
+    "visM": 9994.0,
+    "gustMs": 3.0,
+    "windMs": 3.0,
+    "wdirSin": -0.342,
+    "wdirCos": -0.5,
+    "tempC": 10.0,
+    "dewC": -1.0,
+    "dewSpread": 6.0,
+    "cloudBaseM": 5000.0,
+    "qnhHpa": 1014.9,
+    "visMin3h": 9994.0,
+    "visMin6h": 9994.0,
+    "gustMax3h": 4.0,
+    "windChange3h": 0.0,
+    "qnhTendency3h": 0.0,
+    "visChange3h": 0.0,
+    "tempTendency3h": 0.0,
+    "spreadTendency3h": 0.0,
+    "stationCode": 1.0,
+    "hourSin": 0.0,
+    "hourCos": -0.0,
+    "month": 7.0,
+    "miss_vis": 0.0,
+    "miss_gust": 0.0,
+    "miss_cloud": 0.0,
+    "miss_temp": 0.0
+  },
+  "models": {
+    "vis": {
+      "path": "ml-v2-vis.json",
+      "bytes": 636538
+    },
+    "vis3k": {
+      "path": "ml-v2-vis3k.json",
+      "bytes": 1282473
+    },
+    "gust": {
+      "path": "ml-v2-gust.json",
+      "bytes": 1198906
+    }
+  },
+  "targets": {
+    "vis": {
+      "title": "低能见度 <1000 m",
+      "threshold": 1000.0,
+      "model": {
+        "n": 26193,
+        "positives": 202,
+        "positiveRate": 0.0077,
+        "hits": 94,
+        "misses": 108,
+        "falseAlarms": 164,
+        "correctNegatives": 25827,
+        "TS": 0.2568,
+        "POD": 0.4653,
+        "FAR": 0.6357,
+        "Brier": 0.006,
+        "brierSkillVsClimatology": 0.2179,
+        "operatingThreshold": 0.23,
+        "atThreshold05": {
+          "n": 26193,
+          "positives": 202,
+          "positiveRate": 0.0077,
+          "hits": 52,
+          "misses": 150,
+          "falseAlarms": 42,
+          "correctNegatives": 25949,
+          "TS": 0.2131,
+          "POD": 0.2574,
+          "FAR": 0.4468,
+          "Brier": 0.006,
+          "brierSkillVsClimatology": 0.2179
+        },
+        "tsChosenOn": "validation set (max TS), applied unchanged to test"
+      },
+      "baselines": {
+        "persistence": {
+          "n": 26193,
+          "positives": 202,
+          "positiveRate": 0.0077,
+          "hits": 66,
+          "misses": 136,
+          "falseAlarms": 44,
+          "correctNegatives": 25947,
+          "TS": 0.2683,
+          "POD": 0.3267,
+          "FAR": 0.4,
+          "Brier": 0.0069,
+          "brierSkillVsClimatology": 0.1006
+        },
+        "openMeteo": {
+          "n": 26193,
+          "positives": 202,
+          "positiveRate": 0.0077,
+          "hits": 16,
+          "misses": 186,
+          "falseAlarms": 313,
+          "correctNegatives": 25678,
+          "TS": 0.0311,
+          "POD": 0.0792,
+          "FAR": 0.9514,
+          "Brier": 0.0191,
+          "brierSkillVsClimatology": -1.4897
+        },
+        "thresholdRule": {
+          "n": 26193,
+          "positives": 202,
+          "positiveRate": 0.0077,
+          "hits": 43,
+          "misses": 159,
+          "falseAlarms": 16,
+          "correctNegatives": 25975,
+          "TS": 0.1972,
+          "POD": 0.2129,
+          "FAR": 0.2712,
+          "Brier": 0.0067,
+          "brierSkillVsClimatology": 0.1267
+        }
+      },
+      "climatology": {
+        "rate": 0.0121,
+        "brier": 0.00767
+      },
+      "auc": 0.9528,
+      "aucRaw": 0.9549,
+      "reliability": [
+        {
+          "bin": [
+            0.0,
+            0.1
+          ],
+          "n": 25696,
+          "predicted": 0.0028,
+          "observed": 0.0031
+        },
+        {
+          "bin": [
+            0.1,
+            0.2
+          ],
+          "n": 230,
+          "predicted": 0.1445,
+          "observed": 0.113
+        },
+        {
+          "bin": [
+            0.2,
+            0.3
+          ],
+          "n": 11,
+          "predicted": 0.2272,
+          "observed": 0.2727
+        },
+        {
+          "bin": [
+            0.3,
+            0.4
+          ],
+          "n": 124,
+          "predicted": 0.3134,
+          "observed": 0.2177
+        },
+        {
+          "bin": [
+            0.4,
+            0.5
+          ],
+          "n": 38,
+          "predicted": 0.4423,
+          "observed": 0.3947
+        },
+        {
+          "bin": [
+            0.5,
+            0.6
+          ],
+          "n": 27,
+          "predicted": 0.5,
+          "observed": 0.4444
+        },
+        {
+          "bin": [
+            0.6,
+            0.7
+          ],
+          "n": 41,
+          "predicted": 0.6519,
+          "observed": 0.561
+        },
+        {
+          "bin": [
+            0.7,
+            0.8
+          ],
+          "n": 7,
+          "predicted": 0.7178,
+          "observed": 0.5714
+        },
+        {
+          "bin": [
+            0.8,
+            0.9
+          ],
+          "n": 3,
+          "predicted": 0.8889,
+          "observed": 0.3333
+        },
+        {
+          "bin": [
+            0.9,
+            1.0
+          ],
+          "n": 16,
+          "predicted": 0.9257,
+          "observed": 0.75
+        }
+      ],
+      "leadTime": {
+        "n": 10,
+        "medianMin": 120,
+        "p25Min": 60,
+        "p75Min": 120
+      },
+      "sizes": {
+        "train": 130939,
+        "val": 26274,
+        "test": 26193,
+        "positives": {
+          "train": 1583,
+          "val": 290,
+          "test": 202
+        }
+      },
+      "valBrier": 0.00629,
+      "failures": [
+        {
+          "type": "FP",
+          "station": "ZYTX",
+          "timeUtc": "2025-01-05T01:00:00Z",
+          "p": 0.6667,
+          "observed": 0,
+          "visM": 997.8,
+          "gustMs": 3.0,
+          "dewSpread": 1.0,
+          "visMin3h": 997.8,
+          "gustMax3h": 4.0
+        },
+        {
+          "type": "FP",
+          "station": "ZYTX",
+          "timeUtc": "2025-01-26T14:00:00Z",
+          "p": 0.5,
+          "observed": 0,
+          "visM": 1303.6,
+          "gustMs": 3.0,
+          "dewSpread": 1.0,
+          "visMin3h": 1593.3,
+          "gustMax3h": 2.0
+        },
+        {
+          "type": "FP",
+          "station": "ZYTX",
+          "timeUtc": "2025-01-26T15:00:00Z",
+          "p": 0.6522,
+          "observed": 0,
+          "visM": 1303.6,
+          "gustMs": 3.0,
+          "dewSpread": 1.0,
+          "visMin3h": 1303.6,
+          "gustMax3h": 3.0
+        },
+        {
+          "type": "FP",
+          "station": "ZYTX",
+          "timeUtc": "2025-01-27T06:00:00Z",
+          "p": 0.6667,
+          "observed": 0,
+          "visM": 997.8,
+          "gustMs": 3.0,
+          "dewSpread": 2.0,
+          "visMin3h": 692.0,
+          "gustMax3h": 4.0
+        },
+        {
+          "type": "FP",
+          "station": "ZYTX",
+          "timeUtc": "2025-01-27T07:00:00Z",
+          "p": 0.5,
+          "observed": 0,
+          "visM": 1207.0,
+          "gustMs": 4.0,
+          "dewSpread": 2.0,
+          "visMin3h": 692.0,
+          "gustMax3h": 4.0
+        },
+        {
+          "type": "FP",
+          "station": "ZYTX",
+          "timeUtc": "2025-08-25T23:00:00Z",
+          "p": 0.5,
+          "observed": 0,
+          "visM": 96.6,
+          "gustMs": 1.0,
+          "dewSpread": 0.0,
+          "visMin3h": 193.1,
+          "gustMax3h": 1.0
+        },
+        {
+          "type": "FP",
+          "station": "ZYTX",
+          "timeUtc": "2025-08-28T21:00:00Z",
+          "p": 0.5,
+          "observed": 0,
+          "visM": 498.9,
+          "gustMs": 1.0,
+          "dewSpread": 0.0,
+          "visMin3h": 1400.1,
+          "gustMax3h": 2.0
+        },
+        {
+          "type": "FP",
+          "station": "ZYTX",
+          "timeUtc": "2025-08-28T22:00:00Z",
+          "p": 0.5,
+          "observed": 0,
+          "visM": 1496.7,
+          "gustMs": 1.0,
+          "dewSpread": 0.0,
+          "visMin3h": 498.9,
+          "gustMax3h": 2.0
+        },
+        {
+          "type": "FP",
+          "station": "ZYTX",
+          "timeUtc": "2025-10-11T21:00:00Z",
+          "p": 0.6522,
+          "observed": 0,
+          "visM": 692.0,
+          "gustMs": 2.0,
+          "dewSpread": 0.0,
+          "visMin3h": 193.1,
+          "gustMax3h": 1.0
+        },
+        {
+          "type": "FP",
+          "station": "ZYTX",
+          "timeUtc": "2025-10-15T00:00:00Z",
+          "p": 0.8889,
+          "observed": 0,
+          "visM": 498.9,
+          "gustMs": 2.0,
+          "dewSpread": 0.0,
+          "visMin3h": 305.8,
+          "gustMax3h": 2.0
+        },
+        {
+          "type": "FN",
+          "station": "ZYTX",
+          "timeUtc": "2025-01-04T21:00:00Z",
+          "p": 0.0016,
+          "observed": 1,
+          "visM": 9994.0,
+          "gustMs": 2.0,
+          "dewSpread": 4.0,
+          "visMin3h": 9994.0,
+          "gustMax3h": 2.0
+        },
+        {
+          "type": "FN",
+          "station": "ZYTX",
+          "timeUtc": "2025-01-04T22:00:00Z",
+          "p": 0.0016,
+          "observed": 1,
+          "visM": 9994.0,
+          "gustMs": 1.0,
+          "dewSpread": 3.0,
+          "visMin3h": 9994.0,
+          "gustMax3h": 2.0
+        },
+        {
+          "type": "FN",
+          "station": "ZYTX",
+          "timeUtc": "2025-01-04T23:00:00Z",
+          "p": 0.0267,
+          "observed": 1,
+          "visM": 6002.9,
+          "gustMs": 3.0,
+          "dewSpread": 4.0,
+          "visMin3h": 9994.0,
+          "gustMax3h": 2.0
+        },
+        {
+          "type": "FN",
+          "station": "ZYTX",
+          "timeUtc": "2025-01-05T00:00:00Z",
+          "p": 0.3077,
+          "observed": 1,
+          "visM": 997.8,
+          "gustMs": 4.0,
+          "dewSpread": 1.0,
+          "visMin3h": 6002.9,
+          "gustMax3h": 3.0
+        },
+        {
+          "type": "FN",
+          "station": "ZYTX",
+          "timeUtc": "2025-01-27T01:00:00Z",
+          "p": 0.3478,
+          "observed": 1,
+          "visM": 1593.3,
+          "gustMs": 4.0,
+          "dewSpread": 3.0,
+          "visMin3h": 1303.6,
+          "gustMax3h": 5.0
+        },
+        {
+          "type": "FN",
+          "station": "ZYTX",
+          "timeUtc": "2025-01-27T02:00:00Z",
+          "p": 0.3077,
+          "observed": 1,
+          "visM": 1593.3,
+          "gustMs": 4.0,
+          "dewSpread": 2.0,
+          "visMin3h": 1303.6,
+          "gustMax3h": 5.0
+        },
+        {
+          "type": "FN",
+          "station": "ZYTX",
+          "timeUtc": "2025-01-27T03:00:00Z",
+          "p": 0.4423,
+          "observed": 1,
+          "visM": 1207.0,
+          "gustMs": 4.0,
+          "dewSpread": 3.0,
+          "visMin3h": 1303.6,
+          "gustMax3h": 5.0
+        },
+        {
+          "type": "FN",
+          "station": "ZYTX",
+          "timeUtc": "2025-02-11T13:00:00Z",
+          "p": 0.0003,
+          "observed": 1,
+          "visM": 9994.0,
+          "gustMs": 5.0,
+          "dewSpread": 5.0,
+          "visMin3h": 9994.0,
+          "gustMax3h": 4.0
+        },
+        {
+          "type": "FN",
+          "station": "ZYTX",
+          "timeUtc": "2025-02-11T14:00:00Z",
+          "p": 0.0003,
+          "observed": 1,
+          "visM": 9994.0,
+          "gustMs": 6.0,
+          "dewSpread": 6.0,
+          "visMin3h": 9994.0,
+          "gustMax3h": 5.0
+        },
+        {
+          "type": "FN",
+          "station": "ZYTX",
+          "timeUtc": "2025-02-11T15:00:00Z",
+          "p": 0.0003,
+          "observed": 1,
+          "visM": 9994.0,
+          "gustMs": 3.0,
+          "dewSpread": 5.0,
+          "visMin3h": 9994.0,
+          "gustMax3h": 6.0
+        }
+      ],
+      "exportParity": {
+        "checked": 202,
+        "maxAbsDiff": 0.0,
+        "tolerance": 1e-06,
+        "note": "对照取未舍入概率；输入先压成 float32（与 sklearn 树模型同口径），超过 1e-6 说明导出走样"
+      }
+    },
+    "vis3k": {
+      "title": "低能见度 <3000 m",
+      "threshold": 3000.0,
+      "model": {
+        "n": 26193,
+        "positives": 1657,
+        "positiveRate": 0.0633,
+        "hits": 1117,
+        "misses": 540,
+        "falseAlarms": 606,
+        "correctNegatives": 23930,
+        "TS": 0.4936,
+        "POD": 0.6741,
+        "FAR": 0.3517,
+        "Brier": 0.0298,
+        "brierSkillVsClimatology": 0.5053,
+        "operatingThreshold": 0.3,
+        "atThreshold05": {
+          "n": 26193,
+          "positives": 1657,
+          "positiveRate": 0.0633,
+          "hits": 919,
+          "misses": 738,
+          "falseAlarms": 220,
+          "correctNegatives": 24316,
+          "TS": 0.4896,
+          "POD": 0.5546,
+          "FAR": 0.1932,
+          "Brier": 0.0298,
+          "brierSkillVsClimatology": 0.5053
+        },
+        "tsChosenOn": "validation set (max TS), applied unchanged to test"
+      },
+      "baselines": {
+        "persistence": {
+          "n": 26193,
+          "positives": 1657,
+          "positiveRate": 0.0633,
+          "hits": 919,
+          "misses": 738,
+          "falseAlarms": 236,
+          "correctNegatives": 24300,
+          "TS": 0.4855,
+          "POD": 0.5546,
+          "FAR": 0.2043,
+          "Brier": 0.0372,
+          "brierSkillVsClimatology": 0.3825
+        },
+        "openMeteo": {
+          "n": 26193,
+          "positives": 1657,
+          "positiveRate": 0.0633,
+          "hits": 193,
+          "misses": 1464,
+          "falseAlarms": 339,
+          "correctNegatives": 24197,
+          "TS": 0.0967,
+          "POD": 0.1165,
+          "FAR": 0.6372,
+          "Brier": 0.0688,
+          "brierSkillVsClimatology": -0.1421
+        },
+        "thresholdRule": {
+          "n": 26193,
+          "positives": 1657,
+          "positiveRate": 0.0633,
+          "hits": 56,
+          "misses": 1601,
+          "falseAlarms": 3,
+          "correctNegatives": 24533,
+          "TS": 0.0337,
+          "POD": 0.0338,
+          "FAR": 0.0508,
+          "Brier": 0.0612,
+          "brierSkillVsClimatology": -0.0159
+        }
+      },
+      "climatology": {
+        "rate": 0.0946,
+        "brier": 0.06024
+      },
+      "auc": 0.947,
+      "aucRaw": 0.9476,
+      "reliability": [
+        {
+          "bin": [
+            0.0,
+            0.1
+          ],
+          "n": 23013,
+          "predicted": 0.0127,
+          "observed": 0.0132
+        },
+        {
+          "bin": [
+            0.1,
+            0.2
+          ],
+          "n": 811,
+          "predicted": 0.1622,
+          "observed": 0.1307
+        },
+        {
+          "bin": [
+            0.2,
+            0.3
+          ],
+          "n": 646,
+          "predicted": 0.2495,
+          "observed": 0.2028
+        },
+        {
+          "bin": [
+            0.3,
+            0.4
+          ],
+          "n": 0,
+          "predicted": null,
+          "observed": null
+        },
+        {
+          "bin": [
+            0.4,
+            0.5
+          ],
+          "n": 584,
+          "predicted": 0.4223,
+          "observed": 0.339
+        },
+        {
+          "bin": [
+            0.5,
+            0.6
+          ],
+          "n": 58,
+          "predicted": 0.5,
+          "observed": 0.4483
+        },
+        {
+          "bin": [
+            0.6,
+            0.7
+          ],
+          "n": 167,
+          "predicted": 0.6264,
+          "observed": 0.6707
+        },
+        {
+          "bin": [
+            0.7,
+            0.8
+          ],
+          "n": 376,
+          "predicted": 0.7463,
+          "observed": 0.7473
+        },
+        {
+          "bin": [
+            0.8,
+            0.9
+          ],
+          "n": 119,
+          "predicted": 0.842,
+          "observed": 0.8571
+        },
+        {
+          "bin": [
+            0.9,
+            1.0
+          ],
+          "n": 419,
+          "predicted": 0.9704,
+          "observed": 0.9499
+        }
+      ],
+      "leadTime": {
+        "n": 62,
+        "medianMin": 60,
+        "p25Min": 60,
+        "p75Min": 180
+      },
+      "sizes": {
+        "train": 130939,
+        "val": 26274,
+        "test": 26193,
+        "positives": {
+          "train": 12383,
+          "val": 1829,
+          "test": 1657
+        }
+      },
+      "valBrier": 0.03084,
+      "failures": [
+        {
+          "type": "FP",
+          "station": "ZYTX",
+          "timeUtc": "2025-01-05T08:00:00Z",
+          "p": 0.7412,
+          "observed": 0,
+          "visM": 2494.5,
+          "gustMs": 3.0,
+          "dewSpread": 5.0,
+          "visMin3h": 1995.6,
+          "gustMax3h": 4.0
+        },
+        {
+          "type": "FP",
+          "station": "ZYTX",
+          "timeUtc": "2025-01-23T01:00:00Z",
+          "p": 0.7412,
+          "observed": 0,
+          "visM": 2993.4,
+          "gustMs": 2.0,
+          "dewSpread": 4.0,
+          "visMin3h": 2993.4,
+          "gustMax3h": 4.0
+        },
+        {
+          "type": "FP",
+          "station": "ZYTX",
+          "timeUtc": "2025-01-27T22:00:00Z",
+          "p": 0.7949,
+          "observed": 0,
+          "visM": 2993.4,
+          "gustMs": 4.0,
+          "dewSpread": 2.0,
+          "visMin3h": 2993.4,
+          "gustMax3h": 4.0
+        },
+        {
+          "type": "FP",
+          "station": "ZYTX",
+          "timeUtc": "2025-01-28T05:00:00Z",
+          "p": 0.6531,
+          "observed": 0,
+          "visM": 2993.4,
+          "gustMs": 5.0,
+          "dewSpread": 4.0,
+          "visMin3h": 4007.3,
+          "gustMax3h": 6.0
+        },
+        {
+          "type": "FP",
+          "station": "ZYTX",
+          "timeUtc": "2025-01-29T00:00:00Z",
+          "p": 0.9508,
+          "observed": 0,
+          "visM": 2993.4,
+          "gustMs": 2.0,
+          "dewSpread": 2.0,
+          "visMin3h": 2993.4,
+          "gustMax3h": 2.0
+        },
+        {
+          "type": "FP",
+          "station": "ZYTX",
+          "timeUtc": "2025-02-01T02:00:00Z",
+          "p": 0.7412,
+          "observed": 0,
+          "visM": 2800.3,
+          "gustMs": 4.0,
+          "dewSpread": 4.0,
+          "visMin3h": 2494.5,
+          "gustMax3h": 3.0
+        },
+        {
+          "type": "FP",
+          "station": "ZYTX",
+          "timeUtc": "2025-02-01T14:00:00Z",
+          "p": 0.6118,
+          "observed": 0,
+          "visM": 4007.3,
+          "gustMs": 1.0,
+          "dewSpread": 2.0,
+          "visMin3h": 4007.3,
+          "gustMax3h": 1.0
+        },
+        {
+          "type": "FP",
+          "station": "ZYTX",
+          "timeUtc": "2025-02-01T16:00:00Z",
+          "p": 0.7412,
+          "observed": 0,
+          "visM": 3492.3,
+          "gustMs": 0.0,
+          "dewSpread": 2.0,
+          "visMin3h": 4007.3,
+          "gustMax3h": 2.0
+        },
+        {
+          "type": "FP",
+          "station": "ZYTX",
+          "timeUtc": "2025-02-01T17:00:00Z",
+          "p": 0.7412,
+          "observed": 0,
+          "visM": 3492.3,
+          "gustMs": 1.0,
+          "dewSpread": 2.0,
+          "visMin3h": 3492.3,
+          "gustMax3h": 2.0
+        },
+        {
+          "type": "FP",
+          "station": "ZYTX",
+          "timeUtc": "2025-02-01T18:00:00Z",
+          "p": 0.7412,
+          "observed": 0,
+          "visM": 3492.3,
+          "gustMs": 0.0,
+          "dewSpread": 2.0,
+          "visMin3h": 3492.3,
+          "gustMax3h": 2.0
+        },
+        {
+          "type": "FN",
+          "station": "ZYTX",
+          "timeUtc": "2025-01-04T21:00:00Z",
+          "p": 0.073,
+          "observed": 1,
+          "visM": 9994.0,
+          "gustMs": 2.0,
+          "dewSpread": 4.0,
+          "visMin3h": 9994.0,
+          "gustMax3h": 2.0
+        },
+        {
+          "type": "FN",
+          "station": "ZYTX",
+          "timeUtc": "2025-01-04T22:00:00Z",
+          "p": 0.073,
+          "observed": 1,
+          "visM": 9994.0,
+          "gustMs": 1.0,
+          "dewSpread": 3.0,
+          "visMin3h": 9994.0,
+          "gustMax3h": 2.0
+        },
+        {
+          "type": "FN",
+          "station": "ZYTX",
+          "timeUtc": "2025-01-04T23:00:00Z",
+          "p": 0.1838,
+          "observed": 1,
+          "visM": 6002.9,
+          "gustMs": 3.0,
+          "dewSpread": 4.0,
+          "visMin3h": 9994.0,
+          "gustMax3h": 2.0
+        },
+        {
+          "type": "FN",
+          "station": "ZYTX",
+          "timeUtc": "2025-01-05T07:00:00Z",
+          "p": 0.4516,
+          "observed": 1,
+          "visM": 2993.4,
+          "gustMs": 4.0,
+          "dewSpread": 6.0,
+          "visMin3h": 1995.6,
+          "gustMax3h": 3.0
+        },
+        {
+          "type": "FN",
+          "station": "ZYTX",
+          "timeUtc": "2025-01-05T21:00:00Z",
+          "p": 0.0314,
+          "observed": 1,
+          "visM": 7000.6,
+          "gustMs": 1.0,
+          "dewSpread": 2.0,
+          "visMin3h": 7000.6,
+          "gustMax3h": 1.0
+        },
+        {
+          "type": "FN",
+          "station": "ZYTX",
+          "timeUtc": "2025-01-05T22:00:00Z",
+          "p": 0.1469,
+          "observed": 1,
+          "visM": 5005.1,
+          "gustMs": 2.0,
+          "dewSpread": 2.0,
+          "visMin3h": 7000.6,
+          "gustMax3h": 1.0
+        },
+        {
+          "type": "FN",
+          "station": "ZYTX",
+          "timeUtc": "2025-01-05T23:00:00Z",
+          "p": 0.2238,
+          "observed": 1,
+          "visM": 5005.1,
+          "gustMs": 2.0,
+          "dewSpread": 2.0,
+          "visMin3h": 5005.1,
+          "gustMax3h": 2.0
+        },
+        {
+          "type": "FN",
+          "station": "ZYTX",
+          "timeUtc": "2025-01-22T20:00:00Z",
+          "p": 0.0314,
+          "observed": 1,
+          "visM": 7000.6,
+          "gustMs": 1.0,
+          "dewSpread": 3.0,
+          "visMin3h": 7000.6,
+          "gustMax3h": 1.0
+        },
+        {
+          "type": "FN",
+          "station": "ZYTX",
+          "timeUtc": "2025-01-22T21:00:00Z",
+          "p": 0.0294,
+          "observed": 1,
+          "visM": 7000.6,
+          "gustMs": 2.0,
+          "dewSpread": 3.0,
+          "visMin3h": 7000.6,
+          "gustMax3h": 1.0
+        },
+        {
+          "type": "FN",
+          "station": "ZYTX",
+          "timeUtc": "2025-01-22T22:00:00Z",
+          "p": 0.0214,
+          "observed": 1,
+          "visM": 7000.6,
+          "gustMs": 0.0,
+          "dewSpread": 3.0,
+          "visMin3h": 7000.6,
+          "gustMax3h": 2.0
+        }
+      ],
+      "exportParity": {
+        "checked": 202,
+        "maxAbsDiff": 0.0,
+        "tolerance": 1e-06,
+        "note": "对照取未舍入概率；输入先压成 float32（与 sklearn 树模型同口径），超过 1e-6 说明导出走样"
+      }
+    },
+    "gust": {
+      "title": "强阵风 >10 m/s",
+      "threshold": 10.0,
+      "model": {
+        "n": 26193,
+        "positives": 917,
+        "positiveRate": 0.035,
+        "hits": 409,
+        "misses": 508,
+        "falseAlarms": 520,
+        "correctNegatives": 24756,
+        "TS": 0.2846,
+        "POD": 0.446,
+        "FAR": 0.5597,
+        "Brier": 0.0254,
+        "brierSkillVsClimatology": 0.2508,
+        "operatingThreshold": 0.21,
+        "atThreshold05": {
+          "n": 26193,
+          "positives": 917,
+          "positiveRate": 0.035,
+          "hits": 188,
+          "misses": 729,
+          "falseAlarms": 124,
+          "correctNegatives": 25152,
+          "TS": 0.1806,
+          "POD": 0.205,
+          "FAR": 0.3974,
+          "Brier": 0.0254,
+          "brierSkillVsClimatology": 0.2508
+        },
+        "tsChosenOn": "validation set (max TS), applied unchanged to test"
+      },
+      "baselines": {
+        "persistence": {
+          "n": 26193,
+          "positives": 917,
+          "positiveRate": 0.035,
+          "hits": 209,
+          "misses": 708,
+          "falseAlarms": 206,
+          "correctNegatives": 25070,
+          "TS": 0.1861,
+          "POD": 0.2279,
+          "FAR": 0.4964,
+          "Brier": 0.0349,
+          "brierSkillVsClimatology": -0.0295
+        },
+        "openMeteo": {
+          "n": 26193,
+          "positives": 917,
+          "positiveRate": 0.035,
+          "hits": 715,
+          "misses": 202,
+          "falseAlarms": 3046,
+          "correctNegatives": 22230,
+          "TS": 0.1804,
+          "POD": 0.7797,
+          "FAR": 0.8099,
+          "Brier": 0.124,
+          "brierSkillVsClimatology": -2.6577
+        },
+        "thresholdRule": {
+          "n": 26193,
+          "positives": 917,
+          "positiveRate": 0.035,
+          "hits": 209,
+          "misses": 708,
+          "falseAlarms": 206,
+          "correctNegatives": 25070,
+          "TS": 0.1861,
+          "POD": 0.2279,
+          "FAR": 0.4964,
+          "Brier": 0.0349,
+          "brierSkillVsClimatology": -0.0295
+        }
+      },
+      "climatology": {
+        "rate": 0.0458,
+        "brier": 0.0339
+      },
+      "auc": 0.9358,
+      "aucRaw": 0.9361,
+      "reliability": [
+        {
+          "bin": [
+            0.0,
+            0.1
+          ],
+          "n": 24021,
+          "predicted": 0.0098,
+          "observed": 0.0114
+        },
+        {
+          "bin": [
+            0.1,
+            0.2
+          ],
+          "n": 1036,
+          "predicted": 0.1482,
+          "observed": 0.1766
+        },
+        {
+          "bin": [
+            0.2,
+            0.3
+          ],
+          "n": 531,
+          "predicted": 0.2461,
+          "observed": 0.2844
+        },
+        {
+          "bin": [
+            0.3,
+            0.4
+          ],
+          "n": 166,
+          "predicted": 0.338,
+          "observed": 0.3554
+        },
+        {
+          "bin": [
+            0.4,
+            0.5
+          ],
+          "n": 127,
+          "predicted": 0.4636,
+          "observed": 0.4882
+        },
+        {
+          "bin": [
+            0.5,
+            0.6
+          ],
+          "n": 92,
+          "predicted": 0.5275,
+          "observed": 0.5435
+        },
+        {
+          "bin": [
+            0.6,
+            0.7
+          ],
+          "n": 123,
+          "predicted": 0.6493,
+          "observed": 0.5122
+        },
+        {
+          "bin": [
+            0.7,
+            0.8
+          ],
+          "n": 0,
+          "predicted": null,
+          "observed": null
+        },
+        {
+          "bin": [
+            0.8,
+            0.9
+          ],
+          "n": 57,
+          "predicted": 0.8577,
+          "observed": 0.7544
+        },
+        {
+          "bin": [
+            0.9,
+            1.0
+          ],
+          "n": 40,
+          "predicted": 0.9664,
+          "observed": 0.8
+        }
+      ],
+      "leadTime": {
+        "n": 56,
+        "medianMin": 60,
+        "p25Min": 60,
+        "p75Min": 120
+      },
+      "sizes": {
+        "train": 130939,
+        "val": 26274,
+        "test": 26193,
+        "positives": {
+          "train": 6000,
+          "val": 806,
+          "test": 917
+        }
+      },
+      "valBrier": 0.02075,
+      "failures": [
+        {
+          "type": "FP",
+          "station": "ZYTX",
+          "timeUtc": "2025-03-10T02:00:00Z",
+          "p": 0.6496,
+          "observed": 0,
+          "visM": 7998.4,
+          "gustMs": 14.0,
+          "dewSpread": 13.0,
+          "visMin3h": 5005.1,
+          "gustMax3h": 7.0
+        },
+        {
+          "type": "FP",
+          "station": "ZYTX",
+          "timeUtc": "2025-03-10T03:00:00Z",
+          "p": 0.6496,
+          "observed": 0,
+          "visM": 9994.0,
+          "gustMs": 9.0,
+          "dewSpread": 14.0,
+          "visMin3h": 6002.9,
+          "gustMax3h": 14.0
+        },
+        {
+          "type": "FP",
+          "station": "ZYTX",
+          "timeUtc": "2025-03-10T04:00:00Z",
+          "p": 0.6496,
+          "observed": 0,
+          "visM": 9994.0,
+          "gustMs": 9.0,
+          "dewSpread": 15.0,
+          "visMin3h": 7000.6,
+          "gustMax3h": 14.0
+        },
+        {
+          "type": "FP",
+          "station": "ZYTX",
+          "timeUtc": "2025-03-10T05:00:00Z",
+          "p": 0.6496,
+          "observed": 0,
+          "visM": 9994.0,
+          "gustMs": 10.0,
+          "dewSpread": 15.0,
+          "visMin3h": 7998.4,
+          "gustMax3h": 14.0
+        },
+        {
+          "type": "FP",
+          "station": "ZYTX",
+          "timeUtc": "2025-03-11T03:00:00Z",
+          "p": 0.5275,
+          "observed": 0,
+          "visM": 7998.4,
+          "gustMs": 8.0,
+          "dewSpread": 10.0,
+          "visMin3h": 7000.6,
+          "gustMax3h": 8.0
+        },
+        {
+          "type": "FP",
+          "station": "ZYTX",
+          "timeUtc": "2025-03-24T00:00:00Z",
+          "p": 0.8478,
+          "observed": 0,
+          "visM": 9994.0,
+          "gustMs": 13.0,
+          "dewSpread": 13.0,
+          "visMin3h": 9994.0,
+          "gustMax3h": 14.0
+        },
+        {
+          "type": "FP",
+          "station": "ZYTX",
+          "timeUtc": "2025-03-24T01:00:00Z",
+          "p": 0.6496,
+          "observed": 0,
+          "visM": 9994.0,
+          "gustMs": 8.0,
+          "dewSpread": 17.0,
+          "visMin3h": 9994.0,
+          "gustMax3h": 14.0
+        },
+        {
+          "type": "FP",
+          "station": "ZYTX",
+          "timeUtc": "2025-04-04T04:00:00Z",
+          "p": 0.9655,
+          "observed": 0,
+          "visM": 9994.0,
+          "gustMs": 16.0,
+          "dewSpread": 18.0,
+          "visMin3h": 9994.0,
+          "gustMax3h": 10.0
+        },
+        {
+          "type": "FP",
+          "station": "ZYTX",
+          "timeUtc": "2025-04-04T05:00:00Z",
+          "p": 0.6496,
+          "observed": 0,
+          "visM": 9994.0,
+          "gustMs": 9.0,
+          "dewSpread": 18.0,
+          "visMin3h": 9994.0,
+          "gustMax3h": 16.0
+        },
+        {
+          "type": "FP",
+          "station": "ZYTX",
+          "timeUtc": "2025-04-07T03:00:00Z",
+          "p": 0.5275,
+          "observed": 0,
+          "visM": 9994.0,
+          "gustMs": 7.0,
+          "dewSpread": 17.0,
+          "visMin3h": 9994.0,
+          "gustMax3h": 6.0
+        },
+        {
+          "type": "FN",
+          "station": "ZYTX",
+          "timeUtc": "2025-01-14T06:00:00Z",
+          "p": 0.0078,
+          "observed": 1,
+          "visM": 9994.0,
+          "gustMs": 5.0,
+          "dewSpread": 13.0,
+          "visMin3h": 9994.0,
+          "gustMax3h": 5.0
+        },
+        {
+          "type": "FN",
+          "station": "ZYTX",
+          "timeUtc": "2025-01-14T07:00:00Z",
+          "p": 0.0252,
+          "observed": 1,
+          "visM": 9994.0,
+          "gustMs": 5.0,
+          "dewSpread": 13.0,
+          "visMin3h": 9994.0,
+          "gustMax3h": 5.0
+        },
+        {
+          "type": "FN",
+          "station": "ZYTX",
+          "timeUtc": "2025-01-14T08:00:00Z",
+          "p": 0.0191,
+          "observed": 1,
+          "visM": 9994.0,
+          "gustMs": 5.0,
+          "dewSpread": 14.0,
+          "visMin3h": 9994.0,
+          "gustMax3h": 5.0
+        },
+        {
+          "type": "FN",
+          "station": "ZYTX",
+          "timeUtc": "2025-01-14T13:00:00Z",
+          "p": 0.0113,
+          "observed": 1,
+          "visM": 9994.0,
+          "gustMs": 5.0,
+          "dewSpread": 15.0,
+          "visMin3h": 9994.0,
+          "gustMax3h": 6.0
+        },
+        {
+          "type": "FN",
+          "station": "ZYTX",
+          "timeUtc": "2025-01-14T14:00:00Z",
+          "p": 0.0387,
+          "observed": 1,
+          "visM": 9994.0,
+          "gustMs": 6.0,
+          "dewSpread": 14.0,
+          "visMin3h": 9994.0,
+          "gustMax3h": 6.0
+        },
+        {
+          "type": "FN",
+          "station": "ZYTX",
+          "timeUtc": "2025-01-14T15:00:00Z",
+          "p": 0.0576,
+          "observed": 1,
+          "visM": 9994.0,
+          "gustMs": 7.0,
+          "dewSpread": 13.0,
+          "visMin3h": 9994.0,
+          "gustMax3h": 6.0
+        },
+        {
+          "type": "FN",
+          "station": "ZYTX",
+          "timeUtc": "2025-01-27T15:00:00Z",
+          "p": 0.002,
+          "observed": 1,
+          "visM": 2993.4,
+          "gustMs": 4.0,
+          "dewSpread": 3.0,
+          "visMin3h": 1995.6,
+          "gustMax3h": 3.0
+        },
+        {
+          "type": "FN",
+          "station": "ZYTX",
+          "timeUtc": "2025-01-27T16:00:00Z",
+          "p": 0.0252,
+          "observed": 1,
+          "visM": 2993.4,
+          "gustMs": 5.0,
+          "dewSpread": 2.0,
+          "visMin3h": 1995.6,
+          "gustMax3h": 4.0
+        },
+        {
+          "type": "FN",
+          "station": "ZYTX",
+          "timeUtc": "2025-01-27T17:00:00Z",
+          "p": 0.0387,
+          "observed": 1,
+          "visM": 2993.4,
+          "gustMs": 6.0,
+          "dewSpread": 3.0,
+          "visMin3h": 1995.6,
+          "gustMax3h": 5.0
+        },
+        {
+          "type": "FN",
+          "station": "ZYTX",
+          "timeUtc": "2025-02-11T03:00:00Z",
+          "p": 0.0576,
+          "observed": 1,
+          "visM": 9994.0,
+          "gustMs": 5.0,
+          "dewSpread": 9.0,
+          "visMin3h": 9994.0,
+          "gustMax3h": 5.0
+        }
+      ],
+      "exportParity": {
+        "checked": 202,
+        "maxAbsDiff": 0.0,
+        "tolerance": 1e-06,
+        "note": "对照取未舍入概率；输入先压成 float32（与 sklearn 树模型同口径），超过 1e-6 说明导出走样"
+      }
+    }
+  },
+  "omProbability": {
+    "vis": {
+      "var": "vis",
+      "bins": [
+        0,
+        200,
+        500,
+        800,
+        1000,
+        1500,
+        2000,
+        3000,
+        5000,
+        8000,
+        10000,
+        15000,
+        24000,
+        99999
+      ],
+      "freq": [
+        0.1554,
+        0.0503,
+        0.0032,
+        0.0169,
+        0.0078,
+        0.0212,
+        0.0254,
+        0.0359,
+        0.0231,
+        0.0125,
+        0.01,
+        0.0062,
+        0.0044
+      ],
+      "n": [
+        592,
+        537,
+        313,
+        178,
+        256,
+        189,
+        315,
+        724,
+        1646,
+        957,
+        1693,
+        4336,
+        87221
+      ],
+      "threshold": 1000.0,
+      "op": "lt"
+    },
+    "vis3k": {
+      "var": "vis",
+      "bins": [
+        0,
+        200,
+        500,
+        800,
+        1000,
+        1500,
+        2000,
+        3000,
+        5000,
+        8000,
+        10000,
+        15000,
+        24000,
+        99999
+      ],
+      "freq": [
+        0.6182,
+        0.4078,
+        0.278,
+        0.2809,
+        0.3125,
+        0.2698,
+        0.2635,
+        0.2417,
+        0.1695,
+        0.117,
+        0.1187,
+        0.0899,
+        0.0365
+      ],
+      "n": [
+        592,
+        537,
+        313,
+        178,
+        256,
+        189,
+        315,
+        724,
+        1646,
+        957,
+        1693,
+        4336,
+        87221
+      ],
+      "threshold": 3000.0,
+      "op": "lt"
+    },
+    "gust": {
+      "var": "gust",
+      "bins": [
+        0,
+        2,
+        4,
+        6,
+        8,
+        10,
+        12,
+        15,
+        20,
+        25,
+        999
+      ],
+      "freq": [
+        0.0003,
+        0.0001,
+        0.0004,
+        0.0011,
+        0.0038,
+        0.0202,
+        0.1118,
+        0.4512,
+        0.8784,
+        null
+      ],
+      "n": [
+        3032,
+        29699,
+        38160,
+        33125,
+        23694,
+        14994,
+        10697,
+        3557,
+        255,
+        0
+      ],
+      "threshold": 10.0,
+      "op": "gt"
+    }
+  },
+  "baselineNote": "基线 openMeteo 取 historical-forecast-api 的逐时值（不带起报时刻），是近似基线，不是同一起报时次的业务预报"
+}

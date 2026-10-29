@@ -71,7 +71,9 @@ backend-python/simulator.py.retired
 # 误创建的空文件（文件名本身是说明文字）
 本目录索引*
 
-# 训练原始数据（42 MB，可由 data/training 脚本重新下载；指标与标签仍入库）
-data/training/metar/
+# 训练原始数据（42 MB，可由脚本重新下载）
+# 只忽略 csv 原始序列，指标与清单 json 必须入库 —— 它们是材料数字的唯一依据
+data/training/metar/*.csv
+data/training/metar/raw/
 data/training/annotate-cache/
 data/training/raw/
