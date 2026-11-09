@@ -1,0 +1,36 @@
+#!/bin/sh
+# 每次提交后同步到 GitHub(origin) 与 Gitee(gitee)。
+# 纪律：任何失败都不阻断提交（退出码恒 0），只写日志，交给人看。
+# 关闭方式：git config --unset core.hooksPath，或设置环境变量 AIC_SKIP_SYNC=1。
+
+[ "$AIC_SKIP_SYNC" = "1" ] && exit 0
+
+REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+cd "$REPO_ROOT" || exit 0
+
+mkdir -p .run 2>/dev/null
+LOG=".run/git-sync.log"
+BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+SHA=$(git rev-parse --short HEAD 2>/dev/null)
+
+printf '=== %s  commit %s  branch %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$SHA" "$BRANCH" >> "$LOG"
+
+for remote in origin gitee; do
+    if ! git remote get-url "$remote" >/dev/null 2>&1; then
+        printf '[skip] %s: 未配置\n' "$remote" >> "$LOG"
+        continue
+    fi
+    # 首次推送 gitee 需要 -u，之后普通 push 即可；失败重试一次（本机 schannel/代理偶发 502）
+    if git push "$remote" "HEAD:$BRANCH" >> "$LOG" 2>&1; then
+        printf '[ ok ] %s -> %s\n' "$remote" "$BRANCH" >> "$LOG"
+    else
+        sleep 2
+        if git push "$remote" "HEAD:$BRANCH" >> "$LOG" 2>&1; then
+            printf '[ ok ] %s -> %s (重试成功)\n' "$remote" "$BRANCH" >> "$LOG"
+        else
+            printf '[FAIL] %s -> %s  见上两行 git 输出\n' "$remote" "$BRANCH" >> "$LOG"
+        fi
+    fi
+done
+
+exit 0
