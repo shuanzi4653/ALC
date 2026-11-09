@@ -37,10 +37,20 @@ foreach ($remote in @("origin", "gitee")) {
     $url = (git remote get-url $remote 2>$null)
     if (-not $url) { Write-Host "SKIP: $remote (not configured)"; continue }
     $ok = $false
-    for ($i = 1; $i -le 2; $i++) {
-        git push $remote "HEAD:$branch" 2>&1 | Out-Null
-        if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+    git push $remote "HEAD:$branch" 2>&1 | Out-Null
+    if ($LASTEXITCODE -eq 0) { $ok = $true }
+    if (-not $ok) {
+        # local http proxy makes github CONNECT fail with 502; retry without proxy
+        Write-Host "RETRY: $remote without proxy"
         Start-Sleep -Seconds 2
+        $saved = @{}
+        foreach ($k in @("https_proxy", "HTTPS_PROXY", "http_proxy", "HTTP_PROXY")) {
+            $saved[$k] = [Environment]::GetEnvironmentVariable($k)
+            [Environment]::SetEnvironmentVariable($k, $null)
+        }
+        git push $remote "HEAD:$branch" 2>&1 | Out-Null
+        if ($LASTEXITCODE -eq 0) { $ok = $true }
+        foreach ($k in $saved.Keys) { [Environment]::SetEnvironmentVariable($k, $saved[$k]) }
     }
     if ($ok) { Write-Host "PUSH OK: $remote ($sha -> $branch)" } else { Write-Host "PUSH FAIL: $remote"; $failed += $remote }
 }

@@ -34,8 +34,10 @@ for remote in origin gitee; do
         printf '[ ok ] %s -> %s\n' "$remote" "$BRANCH" >> "$LOG"
     else
         sleep 2
-        if git push "$remote" "HEAD:$BRANCH" >> "$LOG" 2>&1; then
-            printf '[ ok ] %s -> %s (重试成功)\n' "$remote" "$BRANCH" >> "$LOG"
+        # 本机常挂 http 代理（127.0.0.1:50xxx），对 github 会 CONNECT 502；第二次绕开代理重试
+        if env -u https_proxy -u HTTPS_PROXY -u http_proxy -u HTTP_PROXY \
+             git push "$remote" "HEAD:$BRANCH" >> "$LOG" 2>&1; then
+            printf '[ ok ] %s -> %s (绕代理重试成功)\n' "$remote" "$BRANCH" >> "$LOG"
         else
             printf '[FAIL] %s -> %s  下次发版或手动 sync.bat 再补\n' "$remote" "$BRANCH" >> "$LOG"
         fi
