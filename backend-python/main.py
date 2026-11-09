@@ -424,6 +424,12 @@ def traffic_v2_overview(seed: int = Query(42),
     from traffic import v2 as traffic_v2
     return traffic_v2.overview(seed=seed, scenario=scenario, case_id=case or None, minute=minute)
 
+@app.get('/traffic/v2/national')
+def traffic_v2_national():
+    """全国层聚合（七 大区 + 省级三态）。只读缓存，不做全网推理。"""
+    from traffic import national as traffic_national
+    return traffic_national.national()
+
 @app.get('/traffic/v2/corridors')
 def traffic_v2_corridors(limit: int = Query(53, ge=1, le=300),
                          mode: str = Query('CAR', pattern='^(CAR|DELIVERY)$'),
