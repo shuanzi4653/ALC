@@ -26,7 +26,8 @@
 
 项目已收口在 **V1.0.0 正式版**（2026-10-28 上线，2026-10-29 17:20 最后一次构建），
 **51 天内发了 62 个版本号**，代码 932 文件 / 19.5 MB / 约 10.6 万行有效代码（另 8.7 万行文档），云端 660 MB 常驻运行 12.5 天无重启。
-**但本机 `Desktop\ALC` 现在是 0 字节空目录** —— 2026-11-01 已整体归档到 `G:\…天窗智巡（AIC 智慧气象 · AIC-2026-41989115）\`，G 盘当前未挂载。
+**本机工作副本已于 2026-11-09 13:29 从 GitHub 恢复**（HEAD 由 `b177b9d` 起，包结构完整），并已建立 **GitHub 公开 + Gitee 私有** 双远端备份（见 §7）。
+此后 `Desktop\ALC` 原为空目录，是 2026-11-01 整体归档到 `G:\…天窗智巡（AIC 智慧气象 · AIC-2026-41989115）\` 所致；G 盘仍未挂载，那 1.0 GB 归档（含 `.run` 缓存与截图）仍是未回收的资产。
 下一轮开工**第一步是恢复工作副本**（见 §6）。
 
 ---
@@ -216,7 +217,7 @@
 
 | # | 项 | 现状 | 风险 |
 |---|---|---|---|
-| 1 | **本机无工作副本** | `Desktop\ALC` 0 字节；G 盘未挂载 | 阻断级，必须先恢复 |
+| 1 | ~~本机无工作副本~~ | **已解决（11-09 13:29）**：从 GitHub 恢复，包结构完整；G 盘 1.0 GB 归档仍未回取 | — |
 | 2 | 1366×768 整站缩放 | `.hstage` `transform: scale(0.5028)`，最小字 9.5 px（渲染 ≈4.8 px） | 评委席常见分辨率，**F-10 仍开着** |
 | 3 | 材料硬数字会漂 | 同构建跨天重建，A 组 2613→2402、改判 3044→3030 | 材料必须同会话录屏抄数，或改用稳定组（0 / −100% / 2848 / 8 班 320 min / 0.1%） |
 | 4 | `.run/traffic` 无界 | 8 计划已 200 MB，同代次不设上限 | 长期运行膨胀；`_fingerprint()` 哈希全部字节 ⇒ 改一行注释全量重建 |
@@ -235,15 +236,22 @@
 
 ---
 
-## 7. 恢复工作副本（三步）
+## 7. 工作副本与双远端（2026-11-09 已落地）
 
-1. **取代码**（G 盘在就优先用归档，与线上逐字节一致）：
-   `robocopy "G:\项目与竞赛归档\天窗智巡（AIC 智慧气象 · AIC-2026-41989115）\ALC" "C:\Users\12921\Desktop\ALC" /E`
-   　G 盘不可用时退到 GitHub：`git clone https://github.com/shuanzi4653/ALC.git`（HEAD `b177b9d`，932 文件 / 19.5 MB，**不含** `.run` 缓存与 6 GB 截图）
-2. **还记忆**：
-   `robocopy "C:\Users\12921\.workbuddy\archive\ALC-2026-11-01" "C:\Users\12921\Desktop\ALC\.workbuddy" /E`
-3. **先读五份**：`G:\…\交接说明.md` → `docs/NAMING.md` §7 → `docs/V1.0.0-正式版与代码整理.md` → `changelog/CHANGELOG.md` 版本总览 → `docs/云端部署与运维说明.md`
-   然后：重建 `backend-python\.venv` → `npm ci`（先删 `node_modules`，否则被 safe-delete 拦）→ `start.bat` 自检 → **构建只走 `.run\build_manual.ps1`**，不要直接 `mvnw package`。
+| 项 | 状态 |
+|---|---|
+| 工作副本 | 已从 GitHub 恢复到 `Desktop\ALC`，包结构完整（937 个跟踪文件，`VERSION` = 1.0.0） |
+| `origin` | `https://github.com/shuanzi4653/ALC` · **公开** |
+| `gitee` | `git@gitee.com:shuanzi4653/aic-tianchuang` · **私有**（匿名访问 403 即生效判据） |
+| 自动同步 | `core.hooksPath=.githooks`，`post-commit` 每次提交推两个远端，日志 `.run/git-sync.log` |
+| 手动同步 | 双击 `sync.bat` 或 `scripts\sync-remotes.ps1` |
+| 机制文档 | `docs/远端同步与备份.md` |
+
+**仍待补**（G 盘插上后）：`G:\…\ALC` 那 1.0 GB 归档里的 `.run` 缓存（200 MB 计划缓存）与 6 GB 截图；
+另外 `backend-python\.venv`、`frontend\node_modules` 属本机可再生产物，未入任何远端。
+
+下一步开工前照读五份：`docs/NAMING.md` §7 → `docs/V1.0.0-正式版与代码整理.md` → `changelog/CHANGELOG.md` 版本总览 → `docs/云端部署与运维说明.md` → `docs/远端同步与备份.md`。
+构建只走 `.run\build_manual.ps1`，不要直接 `mvnw package`。
 
 ---
 
