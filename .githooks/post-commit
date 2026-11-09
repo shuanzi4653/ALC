@@ -1,26 +1,35 @@
 #!/bin/sh
-# 每次提交后同步到 GitHub(origin) 与 Gitee(gitee)。
-# 纪律：任何失败都不阻断提交（退出码恒 0），只写日志，交给人看。
-# 关闭方式：git config --unset core.hooksPath，或设置环境变量 AIC_SKIP_SYNC=1。
+# 只在「版本号发生变化」时同步 GitHub(origin) 与 Gitee(gitee)。
+# 判据：仓库根 VERSION 在 HEAD 与 HEAD~1 之间是否不同。
+# 平时提交（改文档、修 bug、调样式）一律不推远端 —— 只在发版那一刻统一提交一次。
+# 任何失败都不阻断提交（退出码恒 0），结果写 .run/git-sync.log。
+# 手动补推：双击 sync.bat，或 AIC_FORCE_SYNC=1 git commit ...（强制本次推送）。
 
 [ "$AIC_SKIP_SYNC" = "1" ] && exit 0
 
 REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
 cd "$REPO_ROOT" || exit 0
 
+CUR_VER=$(git show HEAD:VERSION 2>/dev/null | tr -d '[:space:]')
+[ -z "$CUR_VER" ] && exit 0
+PREV_VER=$(git show HEAD~1:VERSION 2>/dev/null | tr -d '[:space:]')
+
+if [ "$CUR_VER" = "$PREV_VER" ] && [ "$AIC_FORCE_SYNC" != "1" ]; then
+    exit 0
+fi
+
 mkdir -p .run 2>/dev/null
 LOG=".run/git-sync.log"
 BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
 SHA=$(git rev-parse --short HEAD 2>/dev/null)
 
-printf '=== %s  commit %s  branch %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$SHA" "$BRANCH" >> "$LOG"
+printf '=== %s  发版同步  V%s  commit %s  %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$CUR_VER" "$SHA" "$BRANCH" >> "$LOG"
 
 for remote in origin gitee; do
     if ! git remote get-url "$remote" >/dev/null 2>&1; then
         printf '[skip] %s: 未配置\n' "$remote" >> "$LOG"
         continue
     fi
-    # 首次推送 gitee 需要 -u，之后普通 push 即可；失败重试一次（本机 schannel/代理偶发 502）
     if git push "$remote" "HEAD:$BRANCH" >> "$LOG" 2>&1; then
         printf '[ ok ] %s -> %s\n' "$remote" "$BRANCH" >> "$LOG"
     else
@@ -28,7 +37,7 @@ for remote in origin gitee; do
         if git push "$remote" "HEAD:$BRANCH" >> "$LOG" 2>&1; then
             printf '[ ok ] %s -> %s (重试成功)\n' "$remote" "$BRANCH" >> "$LOG"
         else
-            printf '[FAIL] %s -> %s  见上两行 git 输出\n' "$remote" "$BRANCH" >> "$LOG"
+            printf '[FAIL] %s -> %s  下次发版或手动 sync.bat 再补\n' "$remote" "$BRANCH" >> "$LOG"
         fi
     fi
 done
