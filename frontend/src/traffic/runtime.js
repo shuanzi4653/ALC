@@ -1882,6 +1882,7 @@ export const TIMELINE_SPAN_MINUTES=480
 
 export const SECTION_CAN_DO=Object.freeze({
   home:['看哪条走廊最差（点结论条）','把时间轴拖到 T+3h 看风险变化','按 Ctrl+K 搜班次或走廊'],
+  national:['按大区筛一遍省级单元','看哪几个省是运行态','切回首页看东北三省的实时结论'],
   overview:['点地图上的载具看单班航迹','切换图层看雷达与风险区','导出本轮快照'],
   briefing:['挑一个班次看放行许可报文','按状态筛选待放行','跳到走廊剖面看判据'],
   schedule:['按城市或班次号搜索','翻页看全量台账','点行选中后看单班处置'],
@@ -1942,7 +1943,7 @@ export const CALIBER_LEDGER=Object.freeze([
 ])
 
 export const SECTION_NAMES=Object.freeze({
-  home:'运行首页',overview:'运行总览',briefing:'民航情报',schedule:'调度台账',
+  home:'运行首页',overview:'运行总览',national:'全国视图',briefing:'民航情报',schedule:'调度台账',
   alerts:'事件处置台',weather:'气象监测',mechanism:'算法机理',reference:'口径与来源',
   assistant:'大模型取证',history:'运行日志',
   profile:'走廊剖面',card:'推演',counterfactual:'反事实对照',ledger:'分歧台账',
@@ -3522,7 +3523,9 @@ export const ENTRY_LABELS = Object.freeze({
 
 const NAV_SPEC = [
   { key: 'situation', no: 1, label: '态势', subtitle: '未来 6 小时，哪片天不能飞',
-    subs: ['home', 'overview', 'weather'] },
+    // V1.0.1：全国视图**不新开入口**（W-21b 的 8 个入口是产品决定），
+    // 挂在「运行总览」这个入口下，作为它的一个 tab：全国 → 东北全域。
+    subs: ['home', { key: 'overview', members: ['overview', 'national'] }, 'weather'] },
   { key: 'corridor', no: 2, label: '走廊', subtitle: '这条走廊几点能飞，凭什么',
     subs: ['profile', 'briefing'] },
   { key: 'dispatch', no: 3, label: '处置', subtitle: 'AI 与规则谁说了算',
@@ -3546,6 +3549,7 @@ const NAV_SPEC = [
  */
 export const SECTION_HINTS = Object.freeze({
   home: '一屏结论：现在哪片天不能飞',
+  national: '七个大区、34 个省级单元：哪里在跑、哪里还没接入',
   overview: '按城市与走廊铺开的全域态势',
   weather: '逐站观测、派生风险区与数据来源',
   profile: '沿走廊逐公里的不可飞概率剖面',
@@ -3584,7 +3588,8 @@ export const HIDDEN_SECTIONS = Object.freeze(new Set(['mechanism', 'counterfactu
 // 会返回 `'intel'` 这个**不存在的 section**，直接刷新或别人给的链接就落不到页面。
 // "少一维就静默共享那一维"在这里的形态是："少一个键就静默变成首页"。
 export const SECTION_HASHES = Object.freeze({
-  home: 'situation/home', overview: 'situation/overview', weather: 'situation/weather',
+  home: 'situation/home', national: 'situation/national',
+  overview: 'situation/overview', weather: 'situation/weather',
   profile: 'corridor/profile', briefing: 'corridor/briefing',
   alerts: 'dispatch/console', schedule: 'dispatch/ledger', assistant: 'dispatch/evidence',
   card: 'model/card', reference: 'model/reference', mechanism: 'model/mechanism',
@@ -3686,7 +3691,19 @@ export function visibleSubs(group) {
  */
 export function isOfflineMode() {
   try {
-    return new URLSearchParams(window.location.search).get('offline') === '1'
+    const query = new URLSearchParams(window.location.search)
+    // `?demo=1` 是给答辩现场用的别名：会场断外网时用它一键进入同一套离线行为，
+    // 不必让操作者在地址栏里记 `offline=1` 这种内部参数名。
+    return query.get('offline') === '1' || query.get('demo') === '1'
+  } catch (_) {
+    return false
+  }
+}
+
+/** 演示模式（答辩现场一键离线）。与 `offline=1` 同效，但可以单独用来挂提示条。 */
+export function isDemoMode() {
+  try {
+    return new URLSearchParams(window.location.search).get('demo') === '1'
   } catch (_) {
     return false
   }

@@ -19,10 +19,12 @@ import {
 
 const ENTRIES = NAV_GROUPS.flatMap((group) => group.subs.map((sub) => ({ ...sub, group })))
 
-test('导航入口是 8 个（W-21b 的目标），而视图仍是 14 个', () => {
+test('导航入口是 8 个（W-21b 的目标），而视图仍是 15 个', () => {
   assert.equal(navEntryCount(), 8,
     `入口数变成 ${navEntryCount()}：新增页面必须挂进已有入口或明确新增一个入口，不允许回到"一页一个按钮"`)
-  assert.equal(Object.keys(SECTION_NAMES).length, 14, '视图总数不该被改（折叠的是导航，不是功能）')
+  // V1.0.1：14 → 15，新增「全国视图」；**入口数不变**才是重点 —— 它是挂在
+  // 「运行总览」入口下的 tab，不是第 9 个按钮。
+  assert.equal(Object.keys(SECTION_NAMES).length, 15, '视图总数不该被改（折叠的是导航，不是功能）')
 })
 
 test('每个视图恰好属于一个入口，且入口的锚点必须在自己的 members 里', () => {

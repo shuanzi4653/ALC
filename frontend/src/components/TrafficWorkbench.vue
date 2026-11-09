@@ -7,10 +7,12 @@ import TrafficScene from './CityTrafficMap.vue'
 import DispatchBoard from './traffic/DispatchBoard.vue'
 import WeatherSourceSwitch from './traffic/WeatherSourceSwitch.vue'
 import HomeStage from './traffic/HomeStage.vue'
+import NationalPanel from './traffic/NationalPanel.vue'
 import CommandPalette from './traffic/CommandPalette.vue'
 import {relayRadarTiles} from '../traffic/radarRelay.js'
-import {atTime,trajectoryOf,flightState,flightPhase,profile,effectiveFlights,filterLedgerRows,reasonNames,actionNames,modeNames,relativeClock,operationalTime,executionTimes,staticCrossingSummary,staticZoneSummary,closureBreakdown,dispositionSummary,delaySpread,clearanceLines,clearanceStatusName,weatherChannelState,weatherChannelLabel,WEATHER_MODE_MEASURED,normalizeWeatherMode,weatherModeIsVirtual,planChannelMismatch,weatherBucket,buildNote,algorithmIdentity,algorithmIdentityTitle,SECTION_NAMES,DENSITY_TIERS,NAV_GROUPS,visibleSubs,entryOf,entryTabs,isOfflineMode,navGroup,groupOfSection,defaultSub,densityTier,densityPolicy,drillTarget,MAP_LAYERS,lowVisibilityRuleBlock,buildProgressView,radarRelayReady,SECTION_CAN_DO,sectionHash,sectionFromHash,SECTION_HASHES} from '../traffic/runtime.js'
+import {atTime,trajectoryOf,flightState,flightPhase,profile,effectiveFlights,filterLedgerRows,reasonNames,actionNames,modeNames,relativeClock,operationalTime,executionTimes,staticCrossingSummary,staticZoneSummary,closureBreakdown,dispositionSummary,delaySpread,clearanceLines,clearanceStatusName,weatherChannelState,weatherChannelLabel,WEATHER_MODE_MEASURED,normalizeWeatherMode,weatherModeIsVirtual,planChannelMismatch,weatherBucket,buildNote,algorithmIdentity,algorithmIdentityTitle,SECTION_NAMES,DENSITY_TIERS,NAV_GROUPS,visibleSubs,entryOf,entryTabs,isOfflineMode,navGroup,groupOfSection,defaultSub,densityTier,densityPolicy,drillTarget,MAP_LAYERS,lowVisibilityRuleBlock,buildProgressView,radarRelayReady,SECTION_CAN_DO,sectionHash,sectionFromHash,SECTION_HASHES,isDemoMode} from '../traffic/runtime.js'
 const activeSection=ref('home'),settings=ref(false),operations=ref([]),operationsReady=ref(false),commandBusy=ref(false),mapExpanded=ref(false),fullscreen=ref(false)
+const demoMode=isDemoMode()
 const workbench=ref(null)
 const sections=SECTION_NAMES
 const activeGroup=computed(()=>navGroup(groupOfSection(activeSection.value)))
@@ -568,6 +570,9 @@ onUnmounted(()=>{
 </script>
 <template>
 <main ref="workbench" class="traffic-workbench" :class="{'home-mode':activeSection==='home','map-expanded':mapExpanded&&activeSection==='overview','is-fullscreen':fullscreen,'overview-mode':activeSection==='overview','page-mode':activeSection!=='overview'}">
+  <p class="wb-demo-bar" v-if="demoMode" data-demo-bar>
+    演示模式（<code>?demo=1</code>）：底图与雷达瓦片不再外取，气象以本帧快照为准；页面上的“实时”字样本次不成立。
+  </p>
   <header class="wb-top" data-workbench-top>
     <span class="wb-brand"><b>天窗智巡</b><em>低空航路气象风险裁决</em></span>
     <span class="wb-scope" data-scope-label>{{ cityName }}</span>
@@ -617,6 +622,9 @@ onUnmounted(()=>{
     @weather-mode-change="onWeatherModeChange" @toggle-play="playing=!playing"
     @toggle-layer="toggleHomeLayer" @open-settings="settings=!settings"
     @export="download" @toggle-fullscreen="toggleFullscreen" @open-corridor="onOpenCorridor"/>
+  <section class="traffic-main" v-if="activeSection==='national'">
+    <NationalPanel/>
+  </section>
   <section class="traffic-main" v-if="activeSection==='overview'">
     <div class="traffic-map-panel"><div class="traffic-map-heading"><div><h2>{{city?cityName:'全域运行总览'}} <small>{{city?'城区配送网络':'东北三省城市网络'}}</small></h2><span>{{clock(minute)}} · {{city?'配送起降点与航路交汇':'在导航栏选择运行区域，或直接点地图上的城市'}}</span></div><div><button v-if="city" @click="locateDelivery" :disabled="!ready">定位配送航班</button> <button @click="scene?.reset()">复位视角</button> <button @click="mapExpanded=!mapExpanded">{{mapExpanded?'退出专注':'地图专注'}}</button></div></div><div class="traffic-layer-row"><div class="traffic-layer-toggles"><label v-for="layer in layerRows" :key="layer.key" :title="layer.title"><input type="checkbox" :checked="homeLayers[layer.key]" @change="toggleLayerRow(layer.key)"><i :class="layer.rowDot"></i>{{layer.label}}</label>                    <span class="traffic-ribbon-count" v-if="overviewRibbon.length" data-overview-ribbon>
             走廊带 {{ overviewRibbon.length }} 条
@@ -663,6 +671,9 @@ onUnmounted(()=>{
 </div>
 </template>
 <style scoped>
+.wb-demo-bar{margin:0;padding:6px 12px;font-size:var(--alc-fs-aux);color:var(--alc-watch);
+  background:rgba(250,173,20,.10);border-bottom:1px solid rgba(250,173,20,.35);line-height:1.5}
+.wb-demo-bar code{font-family:ui-monospace,Consolas,monospace;color:var(--alc-text)}
 .operations-nav{display:flex;align-items:center;gap:6px;padding:8px;background:#0e2131;border:1px solid #294354;border-radius:9px;margin:12px 0}.operations-nav button{border:0!important;background:transparent!important;padding:10px 15px!important;font-size:13px!important}.operations-nav button.active{background:#24566e!important;color:#c6f4ff!important}.operations-nav select{max-width:210px;min-width:0;flex:0 1 auto}.traffic-workbench .traffic-header{margin-bottom:12px}.traffic-workbench .traffic-summary{margin-bottom:9px}.traffic-workbench .traffic-summary>div{padding:6px 14px}.traffic-workbench .traffic-summary strong{font-size:21px;line-height:1.35}.traffic-workbench .traffic-summary span{font-size:12px}.traffic-workbench .traffic-main{grid-template-columns:minmax(0,1fr) 300px}.traffic-workbench .traffic-table-scroll{max-height:calc(100vh - 390px);min-height:300px}.traffic-workbench .traffic-map-heading{padding:12px 14px}@media(max-width:1000px){.operations-nav{flex-wrap:wrap}.operations-nav .nav-fill{margin-left:0;width:100%;order:3}.operations-nav select{margin-left:0}.operations-nav .nav-map-status{max-width:none}.traffic-workbench .traffic-main{grid-template-columns:minmax(0,1fr)}}@media(max-width:700px){.traffic-workbench .traffic-main{grid-template-columns:1fr}.operations-nav button{font-size:12px!important;padding:8px!important}}
 .traffic-workbench{display:flex;flex-direction:column;height:100%;overflow-y:auto;overflow-x:hidden;padding:14px 20px 18px;background:
   radial-gradient(1400px 620px at 50% -14%,rgba(38,108,205,.20),transparent 62%),

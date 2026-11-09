@@ -339,7 +339,7 @@ test('every KPI that can be drilled actually lands on a section that exists',()=
   // 剩下的仍然自洽。写死清单则会在删掉一个分节时立刻变红。
   const SECTIONS=Object.keys(SECTION_NAMES)
   assert.deepEqual(SECTIONS,
-    ['home','overview','briefing','schedule','alerts','weather','mechanism','reference','assistant','history',
+    ['home','overview','national','briefing','schedule','alerts','weather','mechanism','reference','assistant','history',
      'profile','card','counterfactual','ledger'],
     '分节清单变了：新增/删除分节必须同时改这里、drillTarget 的落点、NAV_GROUPS 的归组、与 docs/NAMING.md §1')
   // 0.11.1（Beta）新增四项（手册 §10）：走廊剖面 / 模型卡 / 反事实对照 / 分歧台账。

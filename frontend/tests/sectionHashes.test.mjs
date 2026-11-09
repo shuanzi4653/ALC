@@ -23,10 +23,11 @@ import {
 /** 可导航的 section：`SECTION_NAMES` 去掉隐藏页。 */
 const NAVIGABLE = Object.keys(SECTION_NAMES).filter(key => !HIDDEN_SECTIONS.has(key))
 
-test('可导航页恰好 11 个，且每个都有 hash（少一个就静默变首页）', () => {
+test('可导航页恰好 12 个，且每个都有 hash（少一个就静默变首页）', () => {
   // 0.11.22：13 → 11，因为复盘对照与分歧台账并入推演（进 HIDDEN_SECTIONS）。
+  // V1.0.1：11 → 12，新增「全国视图」（situation/national）。
   // 判据本身没变：每一个**可导航**页都必须有 hash，否则深链静默回首页。
-  assert.equal(NAVIGABLE.length, 11, `可导航页数量变了：${NAVIGABLE.join(' / ')}`)
+  assert.equal(NAVIGABLE.length, 12, `可导航页数量变了：${NAVIGABLE.join(' / ')}`)
   for (const key of NAVIGABLE) {
     assert.ok(
       SECTION_HASHES[key],
