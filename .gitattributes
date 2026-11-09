@@ -1,2 +1,9 @@
 # Markdown documentation uses two trailing spaces for intentional hard line breaks.
 *.md whitespace=-trailing-space,-blank-at-eof
+
+# 钩子与 shell 脚本必须是 LF：CRLF 会让 shebang 变成 /bin/sh\r，Linux/CI 直接执行失败。
+.githooks/* text eol=lf
+*.sh        text eol=lf
+
+# Windows 批处理必须是 CRLF：LF 的 .bat 在某些环境下会被 cmd 逐行误解析。
+*.bat       text eol=crlf
