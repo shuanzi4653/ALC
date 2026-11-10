@@ -741,6 +741,9 @@ def payload(level: str = 'nation', ident: Optional[str] = None,
         for station in _airports().get('stationRows') or []:
             if station.get('city'):
                 airport_by_city.setdefault(station['city'], station)
+        for node in body.get('nodes') or []:
+            if model_probs and node['name'] in model_probs:
+                node['pLowVis'] = model_probs[node['name']]
         return {**body,
                 'minute': minute,
                 'radar': {'available': bool(radar.get('available')),

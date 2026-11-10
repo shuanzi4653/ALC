@@ -29,7 +29,7 @@ const playing=ref(false)
 const speed=ref(1)                    // 分钟/秒：0.25≈15×、1=60×、5=300×
 const radarOn=ref(true)
 const fogOn=ref(true)
-const terrainOn=ref(true)
+const terrainOn=ref(false)
 const tilt=ref(false)
 const virtualMode=ref(false)
 const density=ref('full')
@@ -293,6 +293,19 @@ const profilePoints=computed(()=>{
     .map(([fx,fy])=>`${(x0+fx*w).toFixed(1)},${fy}`).join(' ')
 })
 
+// 右下的气象行：用当前层级已下发的节点（全国 319 → 大区 → 省 → 市自动收窄）
+const wxRows=computed(()=>{
+  const rows=(data.value?.nodes||[]).filter(n=>n.weather).map(n=>({
+    name:n.name, short:shortName(n.name), rank:n.rank||3, capital:!!n.capital,
+    temp:n.weather.tempC, wind:n.weather.windMps, vis:n.weather.visM, low:!!n.weather.low,
+    p:n.pLowVis==null?null:n.pLowVis,
+  }))
+  rows.sort((a,b)=>((b.p??-1)-(a.p??-1))||((b.low?1:0)-(a.low?1:0))||a.rank-b.rank)
+  return rows.slice(0,level.value==='nation'?40:60)
+})
+const wxTotal=computed(()=>(data.value?.nodes||[]).filter(n=>n.weather).length)
+function pBand(p){return p==null?'':(p>=0.6?'bad':(p>=0.35?'warn':(p>=0.15?'watch':'')))}
+
 const profileText=computed(()=>{
   const prof=corridorProfile.value
   if(!prof) return ''
@@ -417,7 +430,8 @@ onUnmounted(()=>{
     <!-- ================= 台账 / 情报：与原生页共用同一份组件 ================= -->
     <div class="nrn-table" v-show="view==='ledger'">
       <NationBriefing view="ledger" :payload="data" :flights="flights"
-                      :minute="minute" :density="density"/>
+                      :minute="minute" :density="density" :selected-id="selectedId"
+                      @select="pickFlight"/>
     </div>
     <div class="nrn-table" v-show="view==='intel'">
       <NationBriefing view="intel" :payload="data" :density="density"/>
@@ -451,62 +465,71 @@ onUnmounted(()=>{
         <div :class="{alarm:total.hold>0}"><b>{{ total.hold||0 }}</b><span>暂缓</span></div>
       </div>
 
-      <template v-if="rollup.level==='nation'">
-        <h3>各大区<small>点区块下钻</small></h3>
-        <div class="nrn-block" v-for="region in rollup.regions" :key="region.id">
-          <button class="nrn-block-hd" @click="go('region',region.id,region.name)">
+      <!-- 上：区块。全国只列大区，点进去才换成省；再往里换城市 —— 一层只放一层 -->
+      <div class="nrn-blocks">
+        <template v-if="rollup.level==='nation'">
+          <h3>各大区<small>点区块下钻</small></h3>
+          <button class="nrn-region" v-for="region in rollup.regions" :key="region.id"
+                  @click="go('region',region.id,region.name)">
             <b>{{ region.name }}</b>
-            <span>{{ region.total.cities }} 市 · {{ region.total.corridors }} 条 · 在飞 {{ region.total.airborne }}</span>
-            <em v-if="region.total.blocked">停飞 {{ region.total.blocked }}</em>
+            <span>{{ region.total.cities }} 市 · {{ region.total.corridors }} 条</span>
+            <em :class="{warn:region.total.airborne>0}">在飞 {{ region.total.airborne }}</em>
+            <em class="sub" v-if="region.total.blocked">停飞 {{ region.total.blocked }}</em>
           </button>
-          <!-- 省一级也做成按钮：整块可点，键盘也能走 -->
-          <button class="nrn-prov" v-for="p in region.provinces" :key="p.name"
-                  @click="go('province',p.name,p.name)">
-            <b>{{ shortName(p.name) }}</b>
-            <span>{{ p.cities }} 市 · {{ p.corridors }} 条</span>
-            <em :class="{warn:airOf(p.name,p.airborne)>0}">在飞 {{ airOf(p.name,p.airborne) }}</em>
-          </button>
-        </div>
-      </template>
+        </template>
 
-      <template v-else-if="rollup.level==='region'">
-        <h3>本区省份<small>点省下钻</small></h3>
-        <div class="nrn-block" v-for="p in rollup.provinces" :key="p.name">
-          <button class="nrn-block-hd" @click="go('province',p.name,p.name)">
+        <template v-else-if="rollup.level==='region'">
+          <h3>本区省份<small>点省下钻</small></h3>
+          <button class="nrn-region" v-for="p in rollup.provinces" :key="p.name"
+                  @click="go('province',p.name,p.name)">
             <b>{{ p.name }}</b>
             <span>{{ p.cities }} 市 · 机场 {{ p.airports }} · {{ p.corridors }} 条</span>
-            <em :class="{warn:p.blocked>0}">{{ p.blocked?'停飞 '+p.blocked:'在飞 '+p.airborne }}</em>
+            <em :class="{warn:airOf(p.name,p.airborne)>0}">在飞 {{ airOf(p.name,p.airborne) }}</em>
+            <em class="sub" v-if="p.blocked">停飞 {{ p.blocked }}</em>
           </button>
-        </div>
-      </template>
+        </template>
 
-      <template v-else-if="rollup.level==='province'">
-        <h3>本省城市<small>{{ (rollup.cities||[]).length }} 个节点</small></h3>
-        <ul class="nrn-city-list">
-          <li v-for="city in rollup.cities" :key="city.name" @click="go('city',city.name,city.name)">
+        <template v-else-if="rollup.level==='province'">
+          <h3>本省城市<small>{{ (rollup.cities||[]).length }} 个节点</small></h3>
+          <button class="nrn-city" v-for="city in rollup.cities" :key="city.name"
+                  @click="go('city',city.name,city.name)">
             <b>{{ shortName(city.name) }}<i :class="['tag',city.hasAirport?'good':'quiet']">{{ city.hasAirport?city.airport:'无机场' }}</i></b>
             <span>{{ city.feedTarget?('接驳 → '+shortName(city.feedTarget)):'' }} {{ city.corridors }} 条</span>
             <em :class="{warn:airOfCity(city.name,city.airborne)>0}">在飞 {{ airOfCity(city.name,city.airborne) }}</em>
-          </li>
-        </ul>
-      </template>
+          </button>
+        </template>
 
-      <template v-else>
-        <h3>城市节点<small>{{ data.city?.name }}</small></h3>
-        <div class="nrn-city-detail">
-          <p><span>省</span><b>{{ data.city?.province }}</b></p>
-          <p><span>机场</span><b>{{ data.city?.airport||'无（有专用接驳）' }}</b></p>
-          <p><span>航线</span><b>{{ data.city?.links }} 条</b></p>
-          <p><span>在飞</span><b>{{ data.city?.airborne }}</b></p>
-          <p><span>相邻</span><b>{{ (data.city?.neighbours||[]).map(shortName).join('、') }}</b></p>
-        </div>
-      </template>
-
-      <div class="nrn-border-card" v-if="(border.excludedCities||[]).length&&level==='nation'">
-        <h4>边境 {{ border.excludeKm }} km 内退出通航</h4>
-        <p>{{ (border.excludedCities||[]).map(c=>shortName(c.name)+' '+c.distanceKm+'km').join('、') }}</p>
-        <small>城市与航线一并删除；口径为“到境外距离”，不是到省界或海岸线。</small>
+        <template v-else>
+          <h3>城市节点<small>{{ data.city?.name }}</small></h3>
+          <div class="nrn-city-detail">
+            <p><span>省</span><b>{{ data.city?.province }}</b></p>
+            <p><span>机场</span><b>{{ data.city?.airport||'无（有专用接驳）' }}</b></p>
+            <p><span>航线</span><b>{{ data.city?.links }} 条</b></p>
+            <p><span>在飞</span><b>{{ data.city?.airborne }}</b></p>
+            <p><span>相邻</span><b>{{ (data.city?.neighbours||[]).map(shortName).join('、') }}</b></p>
+          </div>
+        </template>
       </div>
+
+      <!-- 下：气象。跟着上面的粒度走：全国看重点城市，进区看该区各市，进省看本省各市 -->
+      <div class="nrn-wx" data-nation-weather>
+        <h4>气象实况 <small>{{ wxRows.length }} / {{ wxTotal }} 城 · 按模型概率排序</small></h4>
+        <ul>
+          <li v-for="row in wxRows" :key="row.name" :class="{bad:row.low}">
+            <b>{{ row.short }}</b>
+            <em :class="pBand(row.p)">{{ row.p==null?'—':(row.p*100).toFixed(0)+'%' }}</em>
+            <span>{{ row.temp==null?'—':row.temp+'°' }}</span>
+            <span>{{ row.wind==null?'—':row.wind+' m/s' }}</span>
+            <span>{{ visText(row.vis) }}</span>
+          </li>
+          <li v-if="!wxRows.length" class="empty">本级暂无逐市气象</li>
+        </ul>
+      </div>
+
+      <details class="nrn-border-card" v-if="(border.excludedCities||[]).length&&level==='nation'">
+        <summary>边境 {{ border.excludeKm }} km 内 {{ (border.excludedCities||[]).length }} 城已退出通航</summary>
+        <p>{{ (border.excludedCities||[]).map(c=>shortName(c.name)+' '+c.distanceKm+'km').join('、') }}</p>
+      </details>
     </aside>
   </div>
 
@@ -649,7 +672,7 @@ onUnmounted(()=>{
 .nrn-tabs em{font-style:normal;opacity:.75;margin-left:4px;font-size:11px}
 .nrn-tabs em.bad{color:#ffb38a}
 
-.nrn-body{display:grid;grid-template-columns:minmax(0,1fr) 292px;gap:10px;min-height:0;flex:1;align-items:stretch}
+.nrn-body{display:grid;grid-template-columns:minmax(0,1fr) clamp(320px,28vw,440px);gap:10px;min-height:0;flex:1;align-items:stretch}
 .nrn-body.no-map{grid-template-columns:minmax(0,1fr) 292px}
 
 .nrn-map{position:relative;display:flex;flex-direction:column;min-height:0;gap:6px;min-width:0}
@@ -674,9 +697,41 @@ onUnmounted(()=>{
 .nrn-legend i.bad{background:rgba(226,92,74,.75)}
 .nrn-legend .virt{color:#ffcf7a}
 
-.nrn-side{display:flex;flex-direction:column;gap:8px;overflow:auto;padding-right:2px;min-height:0}
-/* 侧栏是滚动列表，不是弹性布局：子项一旦被 flex 压缩，块里的省行就被裁掉了 */
+.nrn-side{display:flex;flex-direction:column;gap:8px;min-height:0;padding-right:2px}
 .nrn-side>*{flex:0 0 auto}
+.nrn-blocks{display:flex;flex-direction:column;gap:5px;overflow:auto;min-height:0;flex:1 1 auto}
+.nrn-blocks h3{margin:0 0 2px;font-size:11.5px;color:#a9cde2}
+.nrn-blocks h3 small{margin-left:6px;font-size:10px;color:#6f92a8;font-weight:400}
+/* 一级一个按钮：全国=大区，进区=省，进省=市 */
+.nrn-region,.nrn-city{display:grid;grid-template-columns:auto 1fr auto;gap:0 8px;width:100%;text-align:left;
+  background:rgba(16,40,56,.75);border:1px solid rgba(60,100,130,.4);border-radius:6px;padding:5px 8px;
+  color:#cfe6f5;cursor:pointer;font-size:12px;align-items:baseline}
+.nrn-region b{grid-column:1}
+.nrn-region span{grid-column:2;text-align:right;font-size:10.5px;color:#7d9cb3}
+.nrn-region em{grid-column:3;font-size:10.5px;color:#8fb2c8;white-space:nowrap}
+.nrn-region em.sub{display:none}
+.nrn-region:hover,.nrn-city:hover{background:rgba(34,86,112,.8);border-color:#3f8ba8}
+.nrn-region b,.nrn-city b{font-weight:600}
+.nrn-region span,.nrn-city span{grid-column:1;font-size:10.5px;color:#7d9cb3}
+.nrn-region em,.nrn-city em{grid-row:1;grid-column:2;font-style:normal;font-size:10.5px;color:#8fb2c8}
+.nrn-region em.warn,.nrn-city em.warn{color:#8ef0ff}
+.nrn-region em.sub{grid-row:2;color:#ffb38a}
+/* 气象面板：占满剩余高度，自己滚 */
+.nrn-wx{flex:0 1 auto;min-height:132px;max-height:36%;display:flex;flex-direction:column;
+  border:1px solid rgba(60,100,130,.4);border-radius:8px;background:rgba(10,26,38,.6);padding:6px 8px}
+.nrn-wx h4{margin:0 0 4px;font-size:11.5px;color:#a9cde2;display:flex;gap:6px;align-items:baseline}
+.nrn-wx h4 small{font-size:10px;color:#6f92a8;font-weight:400}
+.nrn-wx ul{list-style:none;margin:0;padding:0;overflow:auto;flex:1;display:flex;flex-direction:column;gap:2px}
+.nrn-wx li{display:grid;grid-template-columns:1fr 40px 38px 52px 58px;gap:4px;font-size:10.5px;
+  padding:2px 5px;border-radius:4px;background:rgba(14,34,48,.75);color:#a8c6d8;white-space:nowrap}
+.nrn-wx li.bad{outline:1px solid rgba(226,75,74,.45)}
+.nrn-wx li b{color:#d9eefb;font-weight:500;overflow:hidden;text-overflow:ellipsis}
+.nrn-wx li em{font-style:normal;text-align:right;font-variant-numeric:tabular-nums;color:#8fb2c8}
+.nrn-wx li em.watch{color:#cfe6b0}
+.nrn-wx li em.warn{color:#ffd479}
+.nrn-wx li em.bad{color:#ff8f6b}
+.nrn-wx li span{text-align:right;font-variant-numeric:tabular-nums}
+.nrn-wx li.empty{grid-template-columns:1fr;color:#6f92a8;text-align:center}
 .nrn-total{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;background:rgba(12,32,46,.8);
   border:1px solid rgba(70,110,140,.4);border-radius:8px;padding:7px 6px}
 .nrn-total div{text-align:center}
@@ -725,8 +780,9 @@ onUnmounted(()=>{
 .nrn-city-detail p{margin:0;display:grid;grid-template-columns:48px 1fr;gap:6px}
 .nrn-city-detail span{color:#7d9cb3}
 .nrn-city-detail b{font-weight:500;color:#d9eefb}
-.nrn-border-card{border:1px solid rgba(200,120,80,.35);border-radius:8px;padding:7px 9px;background:rgba(60,28,16,.35)}
-.nrn-border-card h4{margin:0 0 4px;font-size:11.5px;color:#ffc0a0}
+.nrn-border-card{border:1px solid rgba(200,120,80,.35);border-radius:7px;padding:4px 8px;background:rgba(60,28,16,.35)}
+.nrn-border-card summary{font-size:11px;color:#ffc0a0;cursor:pointer;list-style:none}
+.nrn-border-card summary::-webkit-details-marker{display:none}
 .nrn-border-card p{margin:0;font-size:10.5px;color:#e8b9a2;line-height:1.6}
 .nrn-border-card small{color:#a98a7a;font-size:10px}
 
@@ -838,7 +894,7 @@ onUnmounted(()=>{
   .nrn-side{max-height:none}
 }
 @media(max-width:1180px){
-  .nrn-body{grid-template-columns:minmax(0,1fr) 250px}
+  .nrn-body{grid-template-columns:minmax(0,1fr) 280px}
   .nrn-detail .cols{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media(max-width:760px){

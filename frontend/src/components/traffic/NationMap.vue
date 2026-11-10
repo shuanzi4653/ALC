@@ -99,7 +99,7 @@ function tilesFor(template,minZoom,maxZoom){
 }
 const terrainTiles=computed(()=>{
   if(!props.terrainOn) return []
-  return tilesFor('https://tiles.openfreemap.org/natural_earth/ne2sr/{z}/{x}/{y}.png',3,3)
+  return tilesFor('https://tiles.openfreemap.org/natural_earth/ne2sr/{z}/{x}/{y}.png',5,5)
 })
 const radarTiles=computed(()=>{
   if(!props.radarOn) return []
@@ -365,7 +365,7 @@ function clickNode(node){
 
     <g :transform="`translate(${pan.x} ${pan.y}) scale(${zoom})`">
       <!-- 1 地形：真实晕渲瓦片（墨卡托，与投影一致） -->
-      <g v-if="terrainTiles.length" class="nmap-terrain">
+      <g v-if="terrainTiles.length" class="nmap-terrain" :clip-path="'url(#nmap-china-clip)'">
         <image v-for="t in terrainTiles" :key="'t'+t.key" :x="t.x" :y="t.y"
                :width="t.size" :height="t.size" :href="t.href"
                preserveAspectRatio="none"/>
@@ -500,7 +500,7 @@ function clickNode(node){
 .nmap svg{display:block;width:100%;height:100%;cursor:grab;transition:transform .45s ease}
 .nmap svg.dragging{cursor:grabbing;transition:none}
 .nmap.tilt svg{transform:perspective(1150px) rotateX(39deg) scale(1.2) translateY(3%);transform-origin:50% 82%}
-.nmap-terrain{opacity:.20;filter:grayscale(1) brightness(.62) contrast(1.25)}
+.nmap-terrain{opacity:.13;filter:grayscale(1) brightness(.75) contrast(1.1)}
 .nmap-terrain image{mix-blend-mode:screen}
 .nmap .clickable{cursor:pointer}
 .nmap path.hit{filter:drop-shadow(0 0 2px rgba(255,206,90,.55))}

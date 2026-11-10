@@ -76,6 +76,17 @@ def _startup_warm():
                     'measured', actor='startup-warm', reason='预热结束，复原为实测')
         except Exception:  # noqa: BLE001
             log.exception('startup warm: 复原通道失败')
+        # 全国层预热：雷达帧、绕飞表、逐市实况（current+hourly）、模型概率都带 TTL，
+        # 不预热的话第一次打开全国页要等 20 秒（实测），预热后第一次就命中缓存。
+        try:
+            from traffic import nation as traffic_nation
+            body = traffic_nation.payload('nation', None, 60)
+            log.info('startup warm: 全国层 %s 城 / %s 条 / 在飞 %s',
+                     body.get('summary', {}).get('cities'),
+                     body.get('summary', {}).get('corridors'),
+                     len(body.get('flights') or []))
+        except Exception:  # noqa: BLE001
+            log.exception('startup warm: 全国层预热失败（不影响服务启动）')
 
     threading.Thread(target=worker, name='startup-warm', daemon=True).start()
 

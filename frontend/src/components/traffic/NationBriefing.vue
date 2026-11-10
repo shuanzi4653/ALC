@@ -13,7 +13,9 @@ const props=defineProps({
   minute:{type:Number,default:60},
   density:{type:String,default:'full'},
   selfFetch:{type:Boolean,default:false},
+  selectedId:{type:String,default:''},
 })
+const emit=defineEmits(['select'])
 
 const local=ref(null)
 const localMinute=ref(props.minute)
@@ -95,7 +97,8 @@ function clock(m){
             <th>高度 / 许可</th><th>风险 / 裁决</th><th>限制</th>
           </tr></thead>
           <tbody>
-            <tr v-for="f in rows.slice(0,limit)" :key="f.id">
+            <tr v-for="f in rows.slice(0,limit)" :key="f.id"
+                :class="{sel:f.id===selectedId}" @click="emit('select',f)">
               <td><b>{{ f.callsign }}</b><small>{{ f.id }}</small><small>{{ f.kindLabel||'省内' }}</small></td>
               <td>{{ f.fromName }} → {{ f.toName }}<small>{{ f.corridor }}</small></td>
               <td><small>申请 {{ f.requestAt }}</small><small>计划 {{ f.planAt }}</small><small>实际 {{ f.actualAt||'—' }}</small></td>
@@ -193,8 +196,10 @@ function clock(m){
 .nb-hd p{margin:3px 0 0;font-size:11px;color:#7d9cb3}
 .nb-weather h4{margin:2px 0 4px;font-size:12px;color:#a9cde2}
 .nb-weather h4 small{margin-left:6px;font-size:10.5px;color:#7d9cb3;font-weight:400}
-.nb-weather ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:3px;max-height:130px;overflow:auto}
-.nb-weather li{display:flex;gap:6px;align-items:baseline;font-size:11px;padding:3px 6px;border-radius:5px;background:rgba(12,32,46,.6)}
+.nb-weather ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(186px,1fr));gap:3px;max-height:128px;overflow:auto}
+.nb-weather li{display:flex;gap:6px;align-items:baseline;font-size:11px;padding:3px 6px;border-radius:5px;
+  background:rgba(12,32,46,.6);white-space:nowrap;overflow:hidden}
+.nb-weather li b{flex:0 0 auto}
 .nb-weather li.bad{outline:1px solid rgba(226,75,74,.5)}
 .nb-weather span{color:#8fb2c8}
 .nb-scroll{overflow:auto;min-height:0;flex:1;border:1px solid rgba(70,110,140,.3);border-radius:8px}
@@ -204,6 +209,7 @@ th{position:sticky;top:0;background:#0f2a3c;color:#8fb2c8;font-weight:500;text-a
 td{padding:5px 8px;border-bottom:1px solid rgba(50,80,100,.25);color:#cfe6f5;vertical-align:top}
 td small{display:block;font-size:10px;color:#7d9cb3}
 tbody tr:hover td{background:rgba(30,70,95,.35)}
+tbody tr.sel td{background:rgba(40,110,140,.35)}
 tr.future td{color:#9dbccf;opacity:.85}
 td.bad{color:#ffa08a}
 td.empty{text-align:center;color:#6f92a8;padding:18px}
