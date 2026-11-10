@@ -1,6 +1,6 @@
 {
  "source": "aviationweather.gov stationinfo（机场/报文站总表，按省 bbox 逐省获取，仅 country=CN）",
- "generatedAt": "2026-11-10T09:01:08Z",
+ "generatedAt": "2026-11-10T10:53:59Z",
  "maxLinkKm": 60.0,
  "stations": 62,
  "airportCities": [

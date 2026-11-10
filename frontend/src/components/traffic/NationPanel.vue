@@ -166,7 +166,7 @@ const showCityLabels=computed(()=>nodes.value.length>0&&nodes.value.length<=30)
 // 标注避让：机场城市优先，同一块地方只留一个名字，避免珠三角那种糊成一坨
 const labels=computed(()=>{
   if(!showCityLabels.value) return []
-  const ordered=[...nodes.value].sort((a,b)=>(b.hasAirport?1:0)-(a.hasAirport?1:0))
+  const ordered=[...nodes.value].sort((a,b)=>(a.rank||3)-(b.rank||3))
   const placed=[]
   for(const node of ordered){
     if(placed.some(p=>Math.abs(p.y-node.y)<11&&Math.abs(p.x-node.x)<52)) continue
@@ -299,12 +299,13 @@ onMounted(load)
         <!-- 节点：圆点一律同尺寸同色；机场城市加一圈细环（航图里的机场符号） -->
         <g class="nrn-nodes">
           <g v-for="node in visibleNodes" :key="'n'+node.name">
-            <circle :cx="node.x" :cy="node.y" :r="node.hasAirport?2.6:1.7"
-                    :fill="node.hasAirport?'#eaf6ff':'rgba(214,236,255,.55)'"
-                    :stroke="node.hasAirport?'rgba(8,20,32,.85)':'none'" stroke-width="0.6"/>
-            <circle v-if="node.hasAirport" :cx="node.x" :cy="node.y" r="4.3"
-                    fill="none" stroke="rgba(126,206,255,.50)" stroke-width="0.85"/>
-            <title>{{ node.name }}{{ node.hasAirport?' · 机场 '+node.airport:' · 无机场（有专用接驳航线）' }}</title>
+            <!-- 三级节点：省会/首府最大 + 浅色环；机场城市中点；一般节点小点 -->
+            <circle :cx="node.x" :cy="node.y" :r="node.rank===1?3.1:(node.rank===2?2.2:1.45)"
+                    :fill="node.rank===3?'rgba(214,236,255,.5)':'#eaf6ff'"
+                    :stroke="node.rank===3?'none':'rgba(8,20,32,.85)'" stroke-width="0.55"/>
+            <circle v-if="node.capital" :cx="node.x" :cy="node.y" r="5.6"
+                    fill="none" stroke="rgba(186,218,255,.40)" stroke-width="0.9"/>
+            <title>{{ node.name }}{{ node.capital?' · 省会/首府':'' }}{{ node.hasAirport?' · 机场 '+node.airport:' · 无机场（有专用接驳航线）' }}</title>
           </g>
         </g>
 
@@ -315,15 +316,16 @@ onMounted(load)
         </g>
 
         <g v-for="point in stations" :key="point.code">
-          <circle :cx="point.x" :cy="point.y" :r="point.low?3.2:2.2"
-                  :fill="point.source==='MODEL'?'none':(point.low?'#e24b4a':'#4dd0e1')"
+          <!-- 观测站用空心小环，和实心的城市节点分开，避免两种圆点混为一谈 -->
+          <circle :cx="point.x" :cy="point.y" :r="point.low?3.0:2.0"
+                  fill="none"
                   :stroke="point.source==='MODEL'?'#e0a83a':(point.low?'#e24b4a':'#4dd0e1')"
-                  :stroke-width="point.source==='MODEL'?1.4:0.7"/>
+                  :stroke-width="point.low?1.3:0.9"/>
           <title>{{ point.city }} · {{ point.source==='MODEL'?'模型实况':'METAR '+point.code }} · 能见 {{ visText(point.vis,point.visLower) }}</title>
         </g>
       </svg>
       <p class="nrn-note">
-        一条弧线＝一条航线（同色同宽，不分类型）；白点为城市节点，机场城市多一圈细环；全国层只标机场城市，省/市层标出全部节点<template v-if="level==='nation'">；右下小图为南海诸岛</template>。
+        一条弧线＝一条航线（同色同宽，不分类型）；节点三级：省会/首府（大点＋浅环）＞机场城市（中点）＞一般城市（小点）<template v-if="level==='nation'">；右下小图为南海诸岛</template>。
         定位：飞行汽车分担城市间出行，跨省长距离仍靠飞机与火车。
         <span v-if="hovered">指向：{{ hovered }}</span>
       </p>

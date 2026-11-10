@@ -77,6 +77,7 @@ def api(params: Dict[str, str], cache: Path, use_cache: bool) -> Dict[str, Any]:
 def load_city_rows(use_cache: bool) -> List[Dict[str, Any]]:
     rows = json.loads(curl(CITIES_URL, CACHE / 'cities.json', use_cache))
     out: List[Dict[str, Any]] = []
+    seen: set = set()      # 直辖市的"市辖区"和"县"会映射成同一个市名，必须去重
     for row in rows:
         code = row.get('provinceCode')
         if code not in SCOPE:
@@ -87,6 +88,9 @@ def load_city_rows(use_cache: bool) -> List[Dict[str, Any]]:
             name = province
         elif '直辖县级' in name:       # 兵团/省直辖县级单位：不是地级市，跳过
             continue
+        if (province, name) in seen:
+            continue
+        seen.add((province, name))
         out.append({'name': name, 'province': province, 'region': region,
                     'adcode': row['code']})
     return out

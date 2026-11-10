@@ -46,6 +46,9 @@ FORWARD = Transformer.from_crs('EPSG:4326', PROJ, always_xy=True)
 INVERSE = Transformer.from_crs(PROJ, 'EPSG:4326', always_xy=True)
 
 CROSS_MAX = 2
+# 手工指定的跨海通道：渤海海峡（大连—烟台）。轮渡/短途摆渡是现实存在的通道，
+# 直飞约 170 km，比绕行山海关近得多；A* 在陆地并集里算不出来，按"海上航段"如实标 SEA。
+MANUAL_LINKS = (('大连市', '烟台市'),)
 SIMPLIFY_M = 6000.0
 MAX_POINTS = 24
 
@@ -152,14 +155,15 @@ def plan_edges(cities: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
     edges: Dict[frozenset, Dict[str, Any]] = {}
 
-    def add(a: str, b: str, *, feed: bool = False, cross: bool = False) -> None:
+    def add(a: str, b: str, *, feed: bool = False, cross: bool = False, sea: bool = False) -> None:
         if a == b:
             return
         key = frozenset((a, b))
         edge = edges.get(key)
         if edge is None:
-            edge = {'a': a, 'b': b, 'feed': False, 'cross': False}
+            edge = {'a': a, 'b': b, 'feed': False, 'cross': False, 'sea': False}
             edges[key] = edge
+        edge['sea'] = edge['sea'] or sea
         # 标记叠加：同一条线既可能是接驳、也可能是跨省，不互相覆盖（否则"无机场市必须有接驳"会被抹掉）
         edge['feed'] = edge['feed'] or feed
         edge['cross'] = edge['cross'] or cross
@@ -192,6 +196,10 @@ def plan_edges(cities: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         if nearest is not None:
             add(nearest[1], nearest[2], cross=True)
 
+    # ③b 手工跨海通道（大连—烟台）：只补这一条，不参与 MST 计算
+    for a, b in MANUAL_LINKS:
+        add(a, b, cross=True, sea=True)
+
     # ④ 收口：任何"一条跨省通道都没有"的省，补一条到最近邻省的通道（连通性优先）
     have_cross = set()
     for edge in edges.values():
@@ -217,7 +225,7 @@ def plan_edges(cities: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         # `feed` 标志仍为 true，判据与界面都读标志，不靠 kind 猜。
         kind = 'CROSS' if edge['cross'] else ('AIRPORT_FEED' if edge['feed'] else 'INTRA')
         rows.append({'from': edge['a'], 'to': edge['b'], 'kind': kind,
-                     'feed': edge['feed'], 'cross': edge['cross'],
+                     'feed': edge['feed'], 'cross': edge['cross'], 'sea': edge['sea'],
                      'fromProvince': a['province'], 'toProvince': b['province'],
                      'lengthKm': round(haversine((a['lon'], a['lat']), (b['lon'], b['lat'])), 1)})
     rows.sort(key=lambda row: (row['kind'], row['from'], row['to']))
@@ -265,12 +273,18 @@ def main() -> int:
     index = {city['name']: city for city in cities}
     corridors = []
     for order, edge in enumerate(edges, start=1):
-        geo = build_geometry(edge, index, allowed)
+        if edge.get('sea'):
+            # 跨海段：直线就是真值（海上没有省界可绕），不要拿陆地 A* 的失败去标 fallback
+            a, b = index[edge['from']], index[edge['to']]
+            geo = {'path': [[a['lon'], a['lat']], [b['lon'], b['lat']]], 'geometry': 'SEA'}
+        else:
+            geo = build_geometry(edge, index, allowed)
         corridors.append({
             'id': f'NC-{order:04d}',
             'fromName': edge['from'], 'toName': edge['to'],
             'fromProvince': edge['fromProvince'], 'toProvince': edge['toProvince'],
             'kind': edge['kind'], 'feed': edge['feed'], 'cross': edge['cross'],
+            'sea': edge.get('sea', False),
             'lengthKm': edge['lengthKm'],
             'fromLonLat': [index[edge['from']]['lon'], index[edge['from']]['lat']],
             'toLonLat': [index[edge['to']]['lon'], index[edge['to']]['lat']],

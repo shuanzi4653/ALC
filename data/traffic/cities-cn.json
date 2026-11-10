@@ -1,9 +1,9 @@
 {
  "source": "行政区划 modood/Administrative-divisions-of-China（民政部年度区划整理）；坐标 Wikidata P625（WGS84）",
  "scope": "全国 30 个省级单元（不含台湾、西藏、港澳）",
- "generatedAt": "2026-11-10T09:00:08Z",
- "count": 331,
- "resolved": 331,
+ "generatedAt": "2026-11-10T10:53:04Z",
+ "count": 330,
+ "resolved": 330,
  "missing": [],
  "suspect": [],
  "provinces": {
@@ -2462,16 +2462,6 @@
    "province": "重庆市",
    "region": "southwest",
    "adcode": "5001",
-   "lon": 106.5069,
-   "lat": 29.55,
-   "coordSource": "WIKIDATA",
-   "qid": "Q11725"
-  },
-  {
-   "name": "重庆市",
-   "province": "重庆市",
-   "region": "southwest",
-   "adcode": "5002",
    "lon": 106.5069,
    "lat": 29.55,
    "coordSource": "WIKIDATA",

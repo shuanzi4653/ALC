@@ -37,6 +37,19 @@ REGION_ORDER = ('north', 'northeast', 'east', 'central', 'southwest', 'northwest
 REGION_LABEL = {'north': '华北', 'northeast': '东北', 'east': '华东',
                 'central': '中南', 'southwest': '西南', 'northwest': '西北'}
 KIND_LABEL = {'INTRA': '省内', 'AIRPORT_FEED': '机场接驳', 'CROSS': '跨省'}
+
+# 省级行政中心（省会/首府/直辖市）。地图上给它们大一号的点 + 一圈浅色环，
+# 用来在 331 个节点里一眼认出"省级中心"。
+CAPITALS = {
+    '北京市': '北京市', '天津市': '天津市', '河北省': '石家庄市', '山西省': '太原市',
+    '内蒙古自治区': '呼和浩特市', '辽宁省': '沈阳市', '吉林省': '长春市', '黑龙江省': '哈尔滨市',
+    '上海市': '上海市', '江苏省': '南京市', '浙江省': '杭州市', '安徽省': '合肥市',
+    '福建省': '福州市', '江西省': '南昌市', '山东省': '济南市', '河南省': '郑州市',
+    '湖北省': '武汉市', '湖南省': '长沙市', '广东省': '广州市', '广西壮族自治区': '南宁市',
+    '海南省': '海口市', '重庆市': '重庆市', '四川省': '成都市', '贵州省': '贵阳市',
+    '云南省': '昆明市', '陕西省': '西安市', '甘肃省': '兰州市', '青海省': '西宁市',
+    '宁夏回族自治区': '银川市', '新疆维吾尔自治区': '乌鲁木齐市',
+}
 EXCLUDED = ('台湾省', '西藏自治区', '香港特别行政区', '澳门特别行政区')
 
 
@@ -66,6 +79,9 @@ def _city_rows() -> List[Dict[str, Any]]:
         row['airport'] = airport_by_city.get(row['name'])
         row['hasAirport'] = row['airport'] is not None
         row['regionLabel'] = REGION_LABEL.get(row.get('region') or '', '')
+        row['capital'] = CAPITALS.get(row['province']) == row['name']
+        # 层级：1=省会/首府（大点+浅环）2=机场城市（中点）3=一般节点（小点）
+        row['rank'] = 1 if row['capital'] else (2 if row['hasAirport'] else 3)
     return rows
 
 
@@ -152,6 +168,7 @@ def _province_rows() -> List[Dict[str, Any]]:
             'regionLabel': cities[0].get('regionLabel'),
             'cities': len(cities),
             'airports': sum(1 for item in cities if item['hasAirport']),
+            'capitals': sum(1 for item in cities if item.get('capital')),
             'stations': live.get(province, 0),
             'modelStations': model.get(province, 0),
             'stationSource': 'METAR' if live.get(province) else ('MODEL' if model.get(province) else 'NONE'),
@@ -217,6 +234,7 @@ def _slice_corridors(provinces: set, city: Optional[str] = None) -> List[Dict[st
             'fromProvince': row['fromProvince'], 'toProvince': row['toProvince'],
             'kind': row['kind'], 'kindLabel': KIND_LABEL.get(row['kind'], row['kind']),
             'feed': bool(row.get('feed')), 'cross': bool(row.get('cross')),
+            'sea': bool(row.get('sea')),
             'lengthKm': row['lengthKm'], 'geometry': row['geometry'],
             'fromLonLat': row['fromLonLat'], 'toLonLat': row['toLonLat'],
         }
@@ -236,7 +254,8 @@ def _slice_nodes(provinces: set, city: Optional[str] = None) -> List[Dict[str, A
             continue
         out.append({'name': row['name'], 'province': row['province'],
                     'lon': row['lon'], 'lat': row['lat'],
-                    'hasAirport': row['hasAirport'], 'airport': row.get('airport')})
+                    'hasAirport': row['hasAirport'], 'airport': row.get('airport'),
+                    'capital': row.get('capital', False), 'rank': row.get('rank', 3)})
     return out
 
 
@@ -385,7 +404,8 @@ def payload(level: str = 'nation', ident: Optional[str] = None) -> Dict[str, Any
                 'city': detail,
                 'nodes': [{'name': row['name'], 'province': row['province'], 'lon': row['lon'],
                            'lat': row['lat'], 'hasAirport': row['hasAirport'],
-                           'airport': row.get('airport')} for row in node_rows],
+                           'airport': row.get('airport'), 'capital': row.get('capital', False),
+                           'rank': row.get('rank', 3)} for row in node_rows],
                 'corridors': corridors,
                 'stationPoints': [point for point in stations if point['name'] == city['province']],
                 'view': {'bbox': _points_bbox([(row['lon'], row['lat']) for row in node_rows])},
