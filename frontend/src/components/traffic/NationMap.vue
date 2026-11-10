@@ -164,6 +164,10 @@ function toPath(geometry,projectFn){
       const [x,y]=put(ring[i][0],ring[i][1])
       d+=(i?'L':'M')+x.toFixed(1)+' '+y.toFixed(1)
     }
+    // 必须显式闭合：SVG 的 fill 会自动封口，但 stroke 不会。
+    // 少了这一条，省界、回波环、雾区、南海小图四处都会缺最后一条边 ——
+    // 省界被邻省盖住看不出来，回波环本来就小，缺一条边就完全不成形。
+    d+='Z'
   }
   return d
 }

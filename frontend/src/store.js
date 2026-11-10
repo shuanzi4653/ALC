@@ -10,6 +10,10 @@ export const store = reactive({
   },
   wsConnected: false,
   nationPulse: null,
+  // 全局作用域：全国 → 大区 → 省 → 市。
+  // 五个入口的九个视图都读这里，不再各自判断"现在看哪一级"。
+  // 初值从地址栏取，刷新与分享链接都能还原同屏。
+  scope: { level: 'nation', id: '', label: '全国' },
   connectionState: 'connecting',
   configStatus: { qweatherReady: false, mode: '-', note: '' },
   alertFlash: null,

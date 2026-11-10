@@ -441,8 +441,44 @@ def alerts(corridors: List[Dict[str, Any]], flights: List[Dict[str, Any]],
                 'action': '留在地面等待下一个时隙；风险回落后自动恢复',
                 'status': '待处置', 'auto': False, 'flightId': flight['id'],
             })
+    # 聚合：同一类事件在同一省里合成一条，卡内列影响清单。
+    # 不聚合的话，50 条走廊同时绕飞就是 50 张内容雷同的卡 ——
+    # 之前处置页"8 张卡一模一样"就是这么来的（逐走廊生成、字段全取模板）。
+    # 聚合键用 (成因, 省)：跨省的事件各自留在本省，这样切到大区/省时看到的是本级的事。
+    merged: Dict[tuple, Dict[str, Any]] = {}
+    for item in out:
+        key = (item['code'], item.get('province') or '')
+        slot = merged.get(key)
+        if slot is None:
+            merged[key] = {
+                **item,
+                'id': f"EV-{item['code']}-{item.get('province') or '全国'}",
+                'count': 1,
+                'places': [item['place']],
+                'memberIds': [item['id']],
+            }
+        else:
+            slot['count'] += 1
+            if item['place'] not in slot['places'] and len(slot['places']) < 20:
+                slot['places'].append(item['place'])
+            slot['memberIds'].append(item['id'])
+            if item['severity'] == 'bad':
+                slot['severity'] = 'bad'
+            # 多人待处置的，状态要跟着最严重的那个走
+            if not item.get('auto'):
+                slot['auto'] = False
+    out = []
+    for slot in merged.values():
+        count = slot['count']
+        if count > 1:
+            head = '、'.join(slot['places'][:3])
+            more = f" 等 {count} 处" if count > 3 else ''
+            slot['place'] = f"{slot.get('province') or '全国'} · {count} 处"
+            slot['detail'] = f"{slot['detail']}；同类共 {count} 处（{head}{more}）"
+        out.append(slot)
+
     order = {'bad': 0, 'warn': 1, 'quiet': 2}
-    out.sort(key=lambda item: (order.get(item['severity'], 3), item['kind']))
+    out.sort(key=lambda item: (order.get(item['severity'], 3), -item.get('count', 1), item['kind']))
     return out
 
 

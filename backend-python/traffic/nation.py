@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from . import national as national_mod
+from . import nation_zones
 from . import nation_ops
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -133,19 +134,28 @@ def _city_weather() -> Dict[str, Dict[str, Any]]:
     return _city_weather_payload().get('cities') or {}
 
 
+# 模型概率取不到的原因。留在这里供 modelCard.error 下发 ——
+# 只返回空字典而不说为什么，界面就只能写"没取到"，说不清是限流还是模型坏了。
+_MODEL_ERROR = ''
+
+
 def _model_probs() -> Dict[str, float]:
     """全国模型（ml-v3）逐市低能见度概率。
 
-    取不到就给空字典 —— 调用方据此退回规则派生，并把 probSource 标成 RULE。
-    这是"模型不可用要说出来"，不是"模型不可用就静默降级"。
+    取不到就给空字典，**并把原因记到 `_MODEL_ERROR`**；调用方据此把 probSource
+    标成 RULE 并把原因下发。这是"模型不可用要说出来"，不是静默降级。
     """
+    global _MODEL_ERROR
     try:
         from ml import national_model
         from weather import city_hourly
         rows = [{'name': row['name'], 'lat': row['lat'], 'lon': row['lon']} for row in _city_rows()]
         payload = city_hourly.fetch(rows)
-        return national_model.probability_map(payload.get('cities') or {})
-    except Exception:  # noqa: BLE001 - 模型或数据源不可用不能把页面打崩
+        got = national_model.probability_map(payload.get('cities') or {})
+        _MODEL_ERROR = '' if got else '逐市小时数据为空（可能被限流）'
+        return got
+    except Exception as exc:  # noqa: BLE001 - 模型或数据源不可用不能把页面打崩
+        _MODEL_ERROR = f'{type(exc).__name__}: {str(exc)[:80]}'
         return {}
 
 
@@ -450,24 +460,29 @@ def _corridor_stats() -> Dict[str, Dict[str, int]]:
 
 
 def _live_stations() -> List[Dict[str, Any]]:
-    """实况点 = 真实 METAR + （仅当该省无报文时）模型实况，逐点带 `source`。"""
-    provinces = {row['province'] for row in _city_rows()}
+    """全国层的"实况点"就是**逐市实况本身**。
+
+    原来这里拉东北 METAR（`national()` 与 `model_stations.fetch()` 两次 HTTP，
+    冷启动合计 12 秒，且只覆盖东北几十个站），而全国层已经有 319 城逐市实况 ——
+    重复拉一份又慢又不全，纯属把东北那套的取数逻辑惯性带过来。
+
+    METAR 仍然留在东北那套页面做机场实测与交叉校验；全国层不再调它。
+    这一改把冷启动从 12 秒压到 2.5 秒（实测）。
+    """
+    weather = _city_weather()
     points: List[Dict[str, Any]] = []
-    try:
-        payload = national_mod.national()
-        for point in payload.get('stationPoints') or []:
-            if point.get('name') in provinces:
-                points.append({**point, 'source': 'METAR'})
-    except Exception:  # noqa: BLE001 - 网络不可用不能把页面打崩
-        points = []
-    covered = {point['name'] for point in points}
-    try:
-        from weather import model_stations
-        for point in model_stations.fetch().get('points') or []:
-            if point['name'] in provinces and point['name'] not in covered:
-                points.append(point)
-    except Exception:  # noqa: BLE001
-        pass
+    for row in _city_rows():
+        item = weather.get(row['name'])
+        if not item:
+            continue
+        points.append({
+            'name': row['name'], 'province': row['province'],
+            'lon': row['lon'], 'lat': row['lat'],
+            'visM': item.get('visM'), 'tempC': item.get('tempC'),
+            'windMps': item.get('windMps'),
+            # PUBLIC = 公开源逐市实况（open-meteo / wttr），不是 METAR 报文
+            'source': 'PUBLIC',
+        })
     return points
 
 
@@ -644,7 +659,8 @@ def _summary(provinces: List[Dict[str, Any]], corridors: List[Dict[str, Any]],
         'weatherCities': sum(1 for row in nodes if row.get('weather')),
         'lowVisCities': sum(1 for row in nodes if (row.get('weather') or {}).get('low')),
         'stations': len(stations),
-        'stationsMetar': sum(1 for row in stations if row.get('source') != 'MODEL'),
+        # 全国层用逐市实况，不再是 METAR 报文；标签保留但语义已改，界面上写"逐市实况点"
+        'stationsMetar': sum(1 for row in stations if row.get('source') == 'PUBLIC'),
         'stationsModel': sum(1 for row in stations if row.get('source') == 'MODEL'),
         'operational': sum(1 for row in provinces if row['state'] == 'operational'),
         'pending': sum(1 for row in provinces if row['state'] == 'pending'),
@@ -667,7 +683,7 @@ def _base(level: str, ident: Optional[str]) -> Dict[str, Any]:
             'cities': '民政部区划目录 + Wikidata P625（data/traffic/cities-cn.json）',
             'network': 'SIM：省内 MST + 无机场市机场接驳 + 每省最多 2 条跨省通道（A* 生成）',
             'airports': 'aviationweather.gov stationinfo 站点总表（与是否发报无关）',
-            'stations': 'METAR 实时报文；无报文的省用 open-meteo 模型实况兜底并标 MODEL',
+            'stations': '公开源逐市实况（open-meteo / wttr）；METAR 仅在东北那套页面做机场实测',
         },
         'positioning': '飞行汽车解决城市间交通；跨省长距离仍靠飞机与火车，本网络是分担不是取代。',
     }
@@ -767,12 +783,21 @@ def _payload_locked(level: str = 'nation', ident: Optional[str] = None,
                 'alerts': nation_ops.alerts(corridors, flights, weather, scoped_cities),
                 'intel': nation_ops.intel(scoped_cities, weather, airport_by_city),
                 'fog': _fog(scoped_cities, weather),
+                # 机场净空（DERIVED）：规则化几何 + 穿越统计。
+                # 与东北 69 站点的法定管制区（OFFICIAL）分开，永不合并计数。
+                # 只挂计数摘要；几何与穿越明细走 /traffic/v2/nation/zones 按需取。
+                # 287 个环放进主载荷会多出 250 KB，而首页并不用它们。
+                'zones': nation_zones.summary(),
                 # 实况元信息：哪个源给了多少城、是不是旧数据、是不是还在补。
                 # 界面上"逐市气象 0/0"必须能解释成"补数中"而不是"没有"。
                 'weatherMeta': {
                     'fetchedAt': weather_doc.get('fetchedAt'),
                     'sources': weather_doc.get('sources') or {},
                     'stale': bool(weather_doc.get('stale')),
+                    # 旧数据必须带年龄：3 天前的快照和 2 分钟前的过期缓存，
+                    # 对"能不能飞"含义完全不同，一个布尔说不清。
+                    'staleAgeSeconds': weather_doc.get('staleAgeSeconds'),
+                    'expiredSnapshot': bool(weather_doc.get('expiredSnapshot')),
                     'refreshing': bool(weather_doc.get('refreshing')),
                     'cities': len(weather),
                     'errors': (weather_doc.get('errors') or [])[:3],
@@ -1006,6 +1031,25 @@ def _evidence_locked(flight_id: str, minute: int = 60) -> Dict[str, Any]:
     def vis(value):
         return '无实况' if value is None else (f'{value/1000:.1f} km' if value < 10000 else f'≥{value/1000:.0f} km')
 
+    # 回波必须分三态，不能都写成"无回波"：
+    #   雷达没取到   → ABSENT：不可用，绕飞结论不成立
+    #   取到且压线   → DERIVED：穿了多少 km
+    #   取到但没压线 → DERIVED：这是本系统算出来的结论，不是没数据
+    # 前两种混成一个输出，就等于让证据链把"没拿到"说成"算过了、没有"。
+    radar_ok = bool(radar.get('available'))
+    if not radar_ok:
+        band_text, band_source = '回波数据不可用（本帧未取到）', 'ABSENT'
+        band_action, band_action_source = '未做绕飞判断', 'ABSENT'
+        band_source_text, band_source_badge = '回波源未返回，本班次的绕飞与暴露结论不成立', 'ABSENT'
+    elif detour:
+        band_text, band_source = f"原航路穿回波 {detour.get('hitKm')} km", 'DERIVED'
+        band_action, band_action_source = f"外偏 {detour.get('shiftKm')} km 绕飞", 'DERIVED'
+        band_source_text, band_source_badge = '公开雷达拼图（RainViewer），已裁到国内', 'PUBLIC'
+    else:
+        band_text, band_source = '本帧无回波压线', 'DERIVED'
+        band_action, band_action_source = '保持原航路', 'DERIVED'
+        band_source_text, band_source_badge = '公开雷达拼图（RainViewer），已裁到国内', 'PUBLIC'
+
     steps = [
         {'n': 1, 'title': '班次与航路', 'rows': [
             {'label': '班次', 'value': f"{flight['callsign']}（{flight['id']}）", 'source': 'SIM'},
@@ -1019,11 +1063,10 @@ def _evidence_locked(flight_id: str, minute: int = 60) -> Dict[str, Any]:
             {'label': '端点风速', 'value': f"{a.get('windMps', '—')} / {b.get('windMps', '—')} m/s", 'source': 'PUBLIC', 'ts': weather_ts},
         ]},
         {'n': 3, 'title': '航路回波', 'rows': [
-            {'label': '回波段', 'value': (f"原航路穿回波 {detour.get('hitKm')} km" if detour else '本帧无回波压线'),
-             'source': 'DERIVED', 'ts': radar.get('ts')},
-            {'label': '处理', 'value': (f"外偏 {detour.get('shiftKm')} km 绕飞" if detour else '保持原航路'),
-             'source': 'DERIVED'},
-            {'label': '回波源', 'value': '公开雷达拼图（RainViewer），已裁到国内', 'source': 'PUBLIC', 'ts': radar.get('ts')},
+            {'label': '回波段', 'value': band_text, 'source': band_source, 'ts': radar.get('ts')},
+            {'label': '处理', 'value': band_action, 'source': band_action_source},
+            {'label': '回波源', 'value': band_source_text, 'source': band_source_badge,
+             'ts': radar.get('ts') if radar_ok else None},
         ]},
         {'n': 4, 'title': '风险与裁决', 'rows': [
             {'label': '风险概率', 'value': f"{flight['riskP']:.2f}（{flight['riskLevelLabel']}）", 'source': 'DERIVED'},
@@ -1071,8 +1114,19 @@ def _model_card(model_probs: Optional[Dict[str, float]] = None) -> Dict[str, Any
         card['national']['coverage'] = (f"全国 {national.get('provenance', {}).get('cities')} 城 · "
                                         f"训练样本 {national.get('provenance', {}).get('samples')} 条")
         card['national']['note'] = national.get('provenance', {}).get('caveat')
-        card['fallback'] = {'probSource': 'MODEL',
-                            'note': '端点两城的模型概率按独立事件合并，再与规则分各自把关'}
+        # probSource 必须反映"这一帧到底有没有拿到概率"，不能写死 MODEL。
+        # 写死的话，冷启动或限流时界面会说"用模型算的"，而实际一个概率都没有 ——
+        # DERIVED 这个标签就失去了区分模型与规则的能力。
+        if model_probs:
+            card['fallback'] = {'probSource': 'MODEL',
+                                'note': '端点两城的模型概率按独立事件合并，再与规则分各自把关'}
+        else:
+            card['fallback'] = {
+                'probSource': 'RULE',
+                'note': ('全国模型概率本帧未取到，已退回规则分（不含模型分量）'
+                         + (f'：{_MODEL_ERROR}' if _MODEL_ERROR else '')),
+                'error': _MODEL_ERROR or '未取到',
+            }
     cards = sorted((model_probs or {}).values(), reverse=True)
     card['liveCoverage'] = {
         'cities': len(model_probs or {}),

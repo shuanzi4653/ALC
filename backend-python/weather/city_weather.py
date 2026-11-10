@@ -46,6 +46,23 @@ WTTR_INTERVAL = 1.15
 
 CACHE_FILE = Path(__file__).resolve().parent.parent.parent / 'data' / 'cache' / 'city-weather.json'
 
+# 旧数据的年龄硬线：超过这个时长就不再交出快照。
+# 3 天前的实况和 2 分钟前的过期缓存，对"能不能飞"是两件完全不同的事，
+# 只给一个 stale=True 的布尔，等于让界面替数据把关。
+STALE_HARD_LIMIT_SECONDS = 6 * 3600.0
+
+
+def stale_age_seconds(fetched_at: Any) -> float | None:
+    """快照年龄（秒）。时间格式不认识就返回 None（当作不可判定）。"""
+    try:
+        text = str(fetched_at or '').replace('Z', '+00:00')
+        stamp = datetime.fromisoformat(text)
+        if stamp.tzinfo is None:
+            stamp = stamp.replace(tzinfo=timezone.utc)
+        return max(0.0, (datetime.now(timezone.utc) - stamp).total_seconds())
+    except Exception:  # noqa: BLE001 - 格式不认识就是不可判定，不猜
+        return None
+
 _state: Dict[str, Any] = {'value': None, 'expires': 0.0, 'refreshing': False}
 _lock = threading.Lock()
 
@@ -190,10 +207,21 @@ def _do_refresh(rows: List[Tuple[str, float, float]], key: str) -> Dict[str, Any
     if not merged:
         fallback = _load_disk(key)
         if fallback:
-            out = dict(fallback, stale=True, errors=errors)
+            age = stale_age_seconds(fallback.get('fetchedAt'))
+            if age is None or age <= STALE_HARD_LIMIT_SECONDS:
+                out = dict(fallback, stale=True, staleAgeSeconds=age, errors=errors)
+                with _lock:
+                    _state.update({'value': out, 'expires': time.monotonic() + STALE_RETRY})
+                return out
+            # 快照太旧：不再交出。宁可如实说"没有"，也不让 3 天前的数字上屏。
             with _lock:
-                _state.update({'value': out, 'expires': time.monotonic() + STALE_RETRY})
-            return out
+                _state.update({'value': {'available': False, 'cities': {}, 'key': key,
+                                         'stale': False, 'expiredSnapshot': True,
+                                         'expiredAgeSeconds': age,
+                                         'errors': errors + ['磁盘快照超过 6 小时，已作废'],
+                                         'fetchedAt': None},
+                               'expires': time.monotonic() + STALE_RETRY})
+            return _state['value']
     sources: Dict[str, int] = {}
     for item in merged.values():
         sources[item['source']] = sources.get(item['source'], 0) + 1

@@ -469,6 +469,15 @@ def traffic_v2_nation(level: str = Query('nation', pattern='^(nation|region|prov
     return payload
 
 
+@app.get('/traffic/v2/nation/zones')
+def traffic_v2_nation_zones(policy: str = Query('APPROVAL_REQUIRED')):
+    """机场净空几何与穿越明细（DERIVED）。主载荷只放计数，几何在这里按需取。"""
+    from traffic import nation_zones
+    body = nation_zones.payload(policy)
+    body['crossings'] = nation_zones.crossings('v1', policy)
+    return body
+
+
 @app.get('/traffic/v2/nation/pulse')
 def traffic_v2_nation_pulse():
     """全国层状态心跳：雷达帧 / 实况时刻 / 模型版本。由网关 WS 定时广播。"""

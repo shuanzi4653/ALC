@@ -59,11 +59,15 @@ test('W-33：导航里不许同时出现「处置台」与「预警中心」', (
   const alertsEntry = entryOf('alerts')
   assert.equal(alertsEntry.key, 'alerts')
   assert.equal(SECTION_NAMES.alerts, '事件处置台',
-    '这一页的标题本来就是「事件处置台」，导航里必须同名')
-  assert.equal(alertsEntry.label, '事件处置台', '入口名必须与页面同名')
-  // 全站只留两个「上位词」入口名（检验结论 / 复盘对照）
-  // 0.11.22：复盘对照并入推演 ⇒ 只剩一个上位词入口名。
-  assert.deepEqual(Object.keys(ENTRY_LABELS).sort(), ['card'])
+    '这一页的标题本来就是「事件处置台」')
+  // V1.0.2 改判据：入口名**不能**再用成员名。
+  // 原来入口叫「事件处置台」，与页内第一个成员同名；而入口按钮靠 entryKey 永远高亮，
+  // 于是屏幕上并排出现「事件处置台（亮）」和「调度台账（亮）」，
+  // 读者判定"前者没暗下去"。入口装三个视图，就该用上位词「处置」。
+  // 页面标题仍是「事件处置台」——名字没丢，只是不再挂在入口上。
+  assert.equal(alertsEntry.label, '处置', '多成员入口要用组名，不能挂成员名')
+  // 上位词入口名：处置（alerts）+ 推演（card）
+  assert.deepEqual(Object.keys(ENTRY_LABELS).sort(), ['alerts', 'card'])
   // 入口名不得与它自己成员的视图名重复
   const tabLabels = entryTabs('alerts').map((t) => t.label)
   // 0.11.10：tab 条里**不许再出现与入口同名的项**。原来这里断言 tabLabels[0]

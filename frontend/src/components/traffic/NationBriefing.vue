@@ -1,10 +1,10 @@
 <script setup>
-import {computed,onMounted,ref,watch} from 'vue'
+import {computed,onMounted,onUnmounted,ref,watch} from 'vue'
 import {requestJson} from '../../api.js'
 
 // 全国台账 / 全国情报：**同一份表，两个入口**。
 //   ① 全国航线网页里的「台账」「情报」两个视图；
-//   ② 1.0.0 原生的「调度台账」「民航情报」页（选"全国"范围时）。
+//   ② 1.0.0 原生的「调度台账」「运行情报」页（选"全国"范围时）。
 // 所以它既能吃父组件已经拿到的 payload（不重复请求），也能自己拉（独立成页时）。
 const props=defineProps({
   view:{type:String,default:'ledger'},          // ledger | intel
@@ -22,18 +22,58 @@ const localMinute=ref(props.minute)
 const loading=ref(false)
 const error=ref('')
 
-async function load(){
+// 请求纪律（V1.0.2）：
+//  ① 同一分钟不重取 —— 切 tab 回来、页面重渲染都不该再打一次 479 KB；
+//  ② 拖滑杆防抖 300 ms、只在停下来后发一次，且取消上一次在途请求；
+//  ③ 超过 3 秒在界面上报秒数，而不是让"正在加载"无限转。
+let inflight=null
+let debounceTimer=null
+let lastKey=''
+const elapsed=ref(0)
+let tickTimer=null
+
+function keyOf(minute){return `nation|${Math.round(minute)}`}
+
+async function load(cached){
+  const key=keyOf(localMinute.value)
+  if(!cached&&key===lastKey&&local.value){return}
+  if(inflight){try{inflight.abort()}catch(_){}}
+  const controller=typeof AbortController!=='undefined'?new AbortController():null
+  inflight=controller
   loading.value=true
   error.value=''
+  elapsed.value=0
+  if(tickTimer) clearInterval(tickTimer)
+  tickTimer=setInterval(()=>{elapsed.value+=1},1000)
   try{
-    local.value=await requestJson(
+    const body=await requestJson(
       `/api/traffic/v2/nation?level=nation&minute=${Math.round(localMinute.value)}`,
-      {timeoutMs:45000})
-  }catch(e){error.value=e.message||String(e)}
-  finally{loading.value=false}
+      {timeoutMs:45000,signal:controller?.signal})
+    if(controller&&controller.signal.aborted) return
+    local.value=body
+    lastKey=key
+  }catch(e){
+    if(controller&&controller.signal.aborted) return
+    error.value=e.message||String(e)
+  }finally{
+    if(!controller||!controller.signal.aborted){
+      loading.value=false
+      if(tickTimer){clearInterval(tickTimer);tickTimer=null}
+    }
+  }
 }
+
 onMounted(()=>{if(props.selfFetch) load()})
-watch(localMinute,()=>{if(props.selfFetch) load()})
+watch(localMinute,()=>{
+  if(!props.selfFetch) return
+  if(debounceTimer) clearTimeout(debounceTimer)
+  debounceTimer=setTimeout(()=>load(),300)
+})
+onUnmounted(()=>{
+  if(debounceTimer) clearTimeout(debounceTimer)
+  if(tickTimer) clearInterval(tickTimer)
+  if(inflight){try{inflight.abort()}catch(_){}}
+})
 
 const data=computed(()=>props.payload||local.value)
 const rows=computed(()=>props.payload?props.flights:(local.value?.flights||[]))
@@ -62,9 +102,12 @@ function visText(vis){
 }
 function shortName(name){return (name||'').replace(/(市|地区|盟|自治州)$/,'')}
 function clock(m){
-  const base=8*60+Math.round(m||0)
-  const t=((base%1440)+1440)%1440
-  return `${String(Math.floor(t/60)).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`
+  // 同 NationPanel：跨零点加 +Nd，否则 00:40 分不清是哪一天。
+  const raw=8*60+Math.round(m||0)
+  const day=Math.floor(raw/1440)
+  const t=((raw%1440)+1440)%1440
+  const hhmm=`${String(Math.floor(t/60)).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`
+  return day>0?`${hhmm} +${day}d`:hhmm
 }
 </script>
 
@@ -80,7 +123,7 @@ function clock(m){
     <span class="nb-note">交通为模拟（SIM）；气象与雷达为公开源实况。</span>
   </div>
 
-  <p class="nb-state" v-if="loading">正在加载全国数据…</p>
+  <p class="nb-state" v-if="loading">正在加载全国数据…{{ elapsed>2?`（已用 ${elapsed} 秒）`:'' }}</p>
   <p class="nb-state bad" v-else-if="error">加载失败：{{ error }}<button @click="load">重试</button></p>
 
   <template v-else-if="data">
@@ -127,7 +170,7 @@ function clock(m){
       </div>
     </div>
 
-    <!-- ============ 民航情报 ============ -->
+    <!-- ============ 空域情报（机场实况 + 逐市实况） ============ -->
     <div class="nb-table" v-else>
       <div class="nb-model" v-if="modelTest" data-model-card>
         <b>低能见度模型 {{ model.nationalModel.version }}</b>

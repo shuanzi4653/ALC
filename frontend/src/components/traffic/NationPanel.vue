@@ -4,6 +4,7 @@ import {requestJson} from '../../api.js'
 import {store} from '../../store.js'
 import NationMap from './NationMap.vue'
 import NationBriefing from './NationBriefing.vue'
+import {parseScope,scopeKey} from '../../traffic/scope.js'
 
 // 全国运行台：态势 / 台账 / 情报 / 处置 四个视图共用同一份 `payload`。
 //
@@ -11,13 +12,23 @@ import NationBriefing from './NationBriefing.vue'
 //   ① **数字按块写**：每级、每省、每市都显示自己的航线/在飞/异常，总数单独在顶部；
 //   ② **班次是对象**：图上点哪一架，台账就选哪一架，详情里就是这一架的许可与剖面；
 //   ③ **逐级重新请求**：下钻与返回都清空上一屏，内存里不留整棵树。
-const props=defineProps({compact:{type:Boolean,default:false}})
+const props=defineProps({
+  compact:{type:Boolean,default:false},
+  // 当前作用域（`nation` / `region:north` / `province:河北省` / `city:石家庄市`）。
+  // NationPanel 仍是下钻的执行者，但"现在在哪一级"不再由它独占 ——
+  // 气象、台账、处置、取证读的是同一份 store.scope。
+  scopeKey:{type:String,default:'nation'},
+  // 从导航进入时先落哪个视图：气象/走廊看 map，处置看 alerts，取证看 ledger。
+  // 目的是让左侧导航与页内视图一致，避免"点处置却停在态势图"。
+  initialView:{type:String,default:'map'},
+})
+const emit=defineEmits(['scope-change'])
 
 const level=ref('nation')
 const ident=ref('')
 const trail=ref([{level:'nation',id:'',label:'全国'}])
 const data=ref(null)
-const view=ref('map')
+const view=ref(props.initialView||'map')
 const error=ref(''),loading=ref(false)
 const busy=ref('')
 const evidence=ref(null)
@@ -52,6 +63,9 @@ const total=computed(()=>({...(rollup.value.total||{}),...live.value}))
 const radarMeta=computed(()=>data.value?.radar||{})
 const border=computed(()=>data.value?.border||{})
 const fog=computed(()=>data.value?.fog||{available:false,counts:{},bands:{},cities:[]})
+// 机场净空（DERIVED）。与 border 的 OFFICIAL 管制区分开显示：
+// 两套几何一个是官方公布、一个是规则化生成，混在一起说会被追问依据。
+const zones=computed(()=>data.value?.zones||{available:false,counts:{},rows:[]})
 
 // 回波范围：三档环一起算，定位按钮按它飞过去
 const radarBBox=computed(()=>{
@@ -116,9 +130,14 @@ const selectedFlight=computed(()=>flights.value.find(f=>f.id===selectedId.value)
 const selectedLine=computed(()=>(data.value?.corridors||[]).find(c=>c.id===selectedCorridor.value)||null)
 
 function clock(m){
-  const base=8*60+Math.round(m||0)
-  const t=((base%1440)+1440)%1440
-  return `${String(Math.floor(t/60)).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`
+  // 跨零点要能分清今天/明天：时间轴上界 1440 分钟、从 08:00 起算，
+  // 走到 m=960 就过 24:00，于是 m=1000 与 m=40 都落在 00:40。
+  // 只给 HH:MM 的话，界面无法回答"这是几点"。
+  const raw=8*60+Math.round(m||0)
+  const day=Math.floor(raw/1440)
+  const t=((raw%1440)+1440)%1440
+  const hhmm=`${String(Math.floor(t/60)).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`
+  return day>0?`${hhmm} +${day}d`:hhmm
 }
 function shortName(name){
   // 省级与市级共用一个规则：先剥自治区/特区/省，再剥市/地区/盟/自治州。
@@ -177,7 +196,17 @@ function go(nextLevel,nextId,nextLabel){
     if(cut>=0) trail.value=trail.value.slice(0,cut)
     trail.value=[...trail.value,{level:nextLevel,id:nextId||'',label:nextLabel||nextId}]
   }
+  emitScope()
   load()
+}
+
+// 把当前作用域广播出去：外部据此写 store 与地址栏，其它视图跟着切。
+function emitScope(){
+  const last=trail.value[trail.value.length-1]||{level:'nation',id:'',label:'全国'}
+  emit('scope-change',{
+    level:level.value,id:ident.value,label:last.label||ident.value||'全国',
+    trail:trail.value.map(item=>({...item})),
+  })
 }
 function back(){
   if(trail.value.length<=1) return
@@ -185,6 +214,7 @@ function back(){
   trail.value=trail.value.slice(0,-1)
   level.value=next.level
   ident.value=next.id
+  emitScope()
   load()
 }
 function drill(nextLevel,nextId,label){
@@ -324,6 +354,18 @@ const wxTotal=computed(()=>(data.value?.nodes||[]).filter(n=>n.weather).length)
 const weatherMeta=computed(()=>data.value?.weatherMeta||{})
 const wxRefreshing=computed(()=>!!weatherMeta.value.refreshing)
 const wxStale=computed(()=>!!weatherMeta.value.stale)
+// 旧数据要能回答"旧到什么程度"。只有 stale 布尔时，3 天前的快照和
+// 2 分钟前的过期缓存显示完全一样，读者无法判断能不能采信。
+const wxAgeText=computed(()=>{
+  const ts=weatherMeta.value.fetchedAt
+  if(!ts) return ''
+  const diff=Date.now()-Date.parse(ts)
+  if(!Number.isFinite(diff)) return ''
+  const mins=Math.max(0,Math.round(diff/60000))
+  if(mins<1) return '刚刚'
+  if(mins<60) return `${mins} 分钟前`
+  return `${(mins/60).toFixed(1)} 小时前`
+})
 const wxSourceText=computed(()=>{
   const src=weatherMeta.value.sources||{}
   const parts=[]
@@ -336,6 +378,9 @@ function pBand(p){return p==null?'':(p>=0.6?'bad':(p>=0.35?'warn':(p>=0.15?'watc
 const profileText=computed(()=>{
   const prof=corridorProfile.value
   if(!prof) return ''
+  // 雷达没取到时，所有采样点都会判成"无回波"——那是缺失，不是结论。
+  // 不区分的话，这一行会写出"全线无回波"，等于替不确定的天气背了书。
+  if(!data.value?.radar?.available) return '回波数据不可用（本帧未取到），此处不给出"全线无回波"结论'
   return prof.segments.filter(s=>s.band)
     .map(s=>`${s.from}–${s.to} km ${BAND_LABEL[s.band]}`).join(' · ')||'全线无回波'
 })
@@ -366,7 +411,27 @@ watch(()=>store.nationPulse,(value)=>{
   if(value.changed&&Date.now()-fetchAt>20000) load()
 })
 
+// 外部改作用域（命令面板输地名、其它视图联动、地址栏还原）时跟着走。
+// 比较 level+id 而不是比字符串：自己 emit 出去的那一次，本地已经改过了，
+// 这里会比较出"相同"而直接返回 —— 不会重复发一次请求。
+watch(()=>props.initialView,(next)=>{
+  if(next&&next!==view.value) view.value=next
+})
+
+let scopeReady=false
+watch(()=>props.scopeKey,(key)=>{
+  const next=parseScope(key)
+  if(next.level===level.value&&next.id===ident.value) return
+  level.value=next.level
+  ident.value=next.id
+  trail.value=(next.level==='nation')
+    ?[{level:'nation',id:'',label:'全国'}]
+    :[{level:'nation',id:'',label:'全国'},{level:next.level,id:next.id,label:next.label}]
+  if(scopeReady) load()
+},{immediate:true})
+
 onMounted(()=>{
+  scopeReady=true
   measureViewport()
   window.addEventListener('resize',measureViewport)
   load()
@@ -459,6 +524,8 @@ onUnmounted(()=>{
         <span>停飞航线 {{ border.blockedCorridors||0 }} 条<template v-if="(border.blockedNames||[]).length">（{{ (border.blockedNames||[]).slice(0,3).join('、') }}{{ (border.blockedNames||[]).length>3?' 等':'' }}）</template></span>
         <span>已改线 {{ border.reroutedCorridors||0 }} 条</span>
         <span v-if="fog.available">低能见度 {{ fog.counts.cities }} 城（&lt;1.5 km {{ fog.counts.BAN }} 城）</span>
+        <span v-if="zones.available" title="规则化生成，非官方公布；与东北 69 站点法定管制区分开计数">
+          净空 {{ zones.counts.airports }} 机场 · 覆盖 {{ ((zones.counts.coverageRatio||0)*100).toFixed(2) }}%</span>
         <span class="diag" v-if="showDiag">视口 {{ viewport.w }}×{{ viewport.h }} · 根容器 {{ viewport.root }}px</span>
         <span class="push" :class="{on:store.wsConnected}" :title="store.wsConnected?'雷达/实况/模型任一变化由服务端推送':'未连上推送，仅按需拉取'">
           {{ store.wsConnected?('推送 · '+pushAge+'s 前'):'未连推送' }}</span>
@@ -563,8 +630,8 @@ onUnmounted(()=>{
       <!-- 下：气象。跟着上面的粒度走：全国看重点城市，进区看该区各市，进省看本省各市 -->
       <div class="nrn-wx" data-nation-weather>
         <h4>气象实况
-          <small v-if="wxTotal">{{ wxTotal }} 城<template v-if="wxSourceText"> · {{ wxSourceText }}</template><template v-if="wxStale"> · 旧数据</template></small>
-          <small v-else>{{ wxRefreshing?'补数中…（后台抓取多源实况）':'暂无实况' }}</small>
+          <small v-if="wxTotal">{{ wxTotal }} 城<template v-if="wxSourceText"> · {{ wxSourceText }}</template><template v-if="wxStale"> · 旧数据<template v-if="wxAgeText">（{{ wxAgeText }}）</template></template><template v-else-if="wxAgeText"> · {{ wxAgeText }}</template></small>
+          <small v-else>{{ wxRefreshing?'补数中…（后台抓取多源实况）':(weatherMeta.expiredSnapshot?'快照超过 6 小时已作废，等重新抓取':'暂无实况') }}</small>
         </h4>
         <ul>
           <li v-for="row in wxRows" :key="row.name" :class="{bad:row.low}">

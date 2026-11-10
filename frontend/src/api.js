@@ -41,7 +41,13 @@ export async function requestJson(path, options = {}) {
   const timeoutMs = options.timeoutMs ?? 25_000
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
-  const { timeoutMs: _ignored, ...fetchOptions } = options
+  const { timeoutMs: _ignored, signal: externalSignal, ...fetchOptions } = options
+  // 外部取消也接到内建 controller 上：切页或换参数时能真的掐掉在途请求，
+  // 而不是让它跑完再丢弃结果（拖滑杆时这能省掉一长串排队）。
+  if (externalSignal) {
+    if (externalSignal.aborted) controller.abort()
+    else externalSignal.addEventListener('abort', () => controller.abort(), { once: true })
+  }
   const method = String(fetchOptions.method || 'GET').toUpperCase()
   const headers = new Headers(fetchOptions.headers || {})
   headers.set('X-ALC-Workspace', workspaceId())
@@ -61,7 +67,10 @@ export async function requestJson(path, options = {}) {
     if (body === null) throw new ApiError('服务返回了无法识别的内容', response.status, 'INVALID_RESPONSE', false)
     return body
   } catch (error) {
-    if (error?.name === 'AbortError') throw new ApiError('请求超时，请稍后重试', 0, 'TIMEOUT', true)
+    if (error?.name === 'AbortError') {
+      if (externalSignal?.aborted) throw new ApiError('请求已取消', 0, 'ABORTED', false)
+      throw new ApiError('请求超时，请稍后重试', 0, 'TIMEOUT', true)
+    }
     if (error instanceof ApiError) throw error
     throw new ApiError('无法连接服务，请检查系统是否已启动', 0, 'NETWORK_ERROR', true)
   } finally {
