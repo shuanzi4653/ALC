@@ -71,3 +71,12 @@ security:
 # 仅前端开发联调时设置；正式发布保持为空，使用 JAR 内静态资源。
 frontend:
   external-path: ""
+
+# 边缘节点（V1.0.1 /api/edge/*）。默认关闭：关掉时接口一律 503，不构成既有契约变更。
+edge:
+  enabled: false
+  # 节点上报签名密钥；留空则不校验签名，服务端在响应里标 sigVerified=false（不假装验过）。
+  hmac-secret: "${EDGE_HMAC_SECRET:}"
+  # 补传环形上限与复盘窗口
+  ring-limit: 500
+  report-window-minutes: 240

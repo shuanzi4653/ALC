@@ -964,6 +964,89 @@ def radar_tiles_relay(req: RadarRelayRequest):
         raise HTTPException(422, str(exc)) from exc
     return weather_control.ingest_relay(frame)
 
+# --------------------------------------------------------------- 边缘节点（V1.0.1）
+# 只做记录与值守，不做放行判定。`edge.enabled=false` 时除 /health 外一律 503，
+# 不构成既有契约变更。口径见 docs/V1.0.1-边缘节点-预留接口清单.md。
+
+import edge_service as _edge
+
+def _edge_guard():
+    if not _edge.enabled():
+        raise HTTPException(503, 'edge 接口未启用（config/application.yml 的 edge.enabled 为 false）')
+    return _edge
+
+def _edge_body(payload: dict) -> dict:
+    if not isinstance(payload, dict):
+        raise HTTPException(422, '请求体必须是 JSON 对象')
+    return payload
+
+@app.get('/api/edge/health')
+def edge_health():
+    return _edge.health()
+
+@app.get('/api/edge/params')
+def edge_params():
+    return _edge_guard().params()
+
+@app.get('/api/edge/frames')
+def edge_frames(since: str | None = Query(None),
+                stations: str | None = Query(None),
+                limit: int = Query(7, ge=1, le=24)):
+    try:
+        return _edge_guard().frames(since=since, stations=stations, limit=limit)
+    except Exception as exc:  # noqa: BLE001 - 取帧失败要说清楚，不能悄悄返回空帧
+        raise HTTPException(503, f'取帧失败：{exc}') from exc
+
+@app.get('/api/edge/time')
+def edge_time():
+    return _edge_guard().time_payload()
+
+@app.get('/api/edge/sites')
+def edge_sites():
+    return _edge_guard().sites()
+
+@app.get('/api/edge/nodes')
+def edge_nodes():
+    return _edge_guard().nodes()
+
+@app.get('/api/edge/nodes/{node}')
+def edge_node_detail(node: str, limit: int = Query(60, ge=1, le=500)):
+    payload = _edge_guard().node_detail(node, limit=limit)
+    if payload.get('status') == 'NOT_FOUND':
+        raise HTTPException(404, f'节点未注册：{node}')
+    return payload
+
+@app.get('/api/edge/backfill')
+def edge_backfill(node: str | None = Query(None),
+                  windowMinutes: int | None = Query(None, ge=1, le=1440)):
+    return _edge_guard().backfill(node=node, window_minutes=windowMinutes)
+
+@app.post('/api/edge/register')
+async def edge_register(request: Request):
+    return _edge_guard().register(_edge_body(await request.json()))
+
+@app.post('/api/edge/report')
+async def edge_report(request: Request):
+    payload = _edge_guard().report(_edge_body(await request.json()))
+    if payload.get('status') == 'FORBIDDEN':
+        raise HTTPException(403, '节点未注册，先调用 /api/edge/register')
+    if payload.get('status') == 'INVALID':
+        raise HTTPException(422, payload.get('reason') or '上报字段不合法')
+    return payload
+
+@app.post('/api/edge/report/batch')
+async def edge_report_batch(request: Request):
+    return _edge_guard().report_batch(_edge_body(await request.json()))
+
+@app.post('/api/edge/heartbeat')
+async def edge_heartbeat(request: Request):
+    payload = _edge_guard().heartbeat(_edge_body(await request.json()))
+    if payload.get('status') == 'FORBIDDEN':
+        raise HTTPException(403, '节点未注册，先调用 /api/edge/register')
+    if payload.get('status') == 'INVALID':
+        raise HTTPException(422, payload.get('reason') or '心跳字段不合法')
+    return payload
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="127.0.0.1", port=8600)
