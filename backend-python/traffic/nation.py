@@ -260,12 +260,20 @@ def _slice_corridors(provinces: set, city: Optional[str] = None) -> List[Dict[st
 
 def _node(row: Dict[str, Any], weather: Dict[str, Dict[str, Any]],
           external: bool = False) -> Dict[str, Any]:
+    raw = weather.get(row['name'])
+    # 节点上只带"屏上要用的四个数"，源与时间戳放 summary，别在 330 个节点里重复 330 遍
+    slim = None
+    if raw:
+        slim = {'tempC': None if raw.get('tempC') is None else round(raw['tempC'], 1),
+                'windMps': raw.get('windMps'),
+                'visM': None if raw.get('visM') is None else int(round(raw['visM'] / 100.0) * 100),
+                'low': bool(raw.get('low'))}
     return {'name': row['name'], 'province': row['province'],
             'lon': row['lon'], 'lat': row['lat'],
             'hasAirport': row['hasAirport'], 'airport': row.get('airport'),
             'capital': row.get('capital', False), 'rank': row.get('rank', 3),
             'external': external,
-            'weather': weather.get(row['name'])}
+            'weather': slim}
 
 
 def _slice_nodes(provinces: set, city: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -317,6 +325,7 @@ def _summary(provinces: List[Dict[str, Any]], corridors: List[Dict[str, Any]],
         'feedCities': sum(1 for row in local if not row['hasAirport']),
         'corridors': len(corridors),
         'byKind': by_kind,
+        'weatherSource': 'open-meteo current（公开、免密钥，逐市）',
         'weatherCities': sum(1 for row in nodes if row.get('weather')),
         'lowVisCities': sum(1 for row in nodes if (row.get('weather') or {}).get('low')),
         'stations': len(stations),

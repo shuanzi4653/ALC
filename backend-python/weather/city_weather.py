@@ -82,10 +82,15 @@ def fetch(points: Iterable[Tuple[str, float, float]], force: bool = False) -> Di
     errors: List[str] = []
     for start in range(0, len(rows), BATCH):
         chunk = rows[start:start + BATCH]
-        try:
-            merged.update(_fetch_batch(chunk))
-        except Exception as exc:  # noqa: BLE001 - 单批失败不该拖垮整屏
-            errors.append(f'batch {start // BATCH}: {str(exc)[:80]}')
+        for attempt in range(3):          # 公开接口会限流：单批失败退避重试，别整屏缺一块
+            try:
+                merged.update(_fetch_batch(chunk))
+                break
+            except Exception as exc:  # noqa: BLE001 - 单批失败不该拖垮整屏
+                if attempt == 2:
+                    errors.append(f'batch {start // BATCH}: {str(exc)[:80]}')
+                else:
+                    time.sleep(0.8 * (attempt + 1))
     value = {
         'available': bool(merged),
         'source': 'open-meteo current（公开、免密钥，逐市）',
@@ -96,5 +101,7 @@ def fetch(points: Iterable[Tuple[str, float, float]], force: bool = False) -> Di
     }
     with _lock:
         if merged:
-            _cache.update({'value': value, 'expires': now + TTL_SECONDS})
+            # 缺城市时只缓存 60 s，下一次请求会补；齐了才按 10 分钟缓存
+            ttl = TTL_SECONDS if len(merged) >= len(rows) else 60.0
+            _cache.update({'value': value, 'expires': now + ttl})
     return value

@@ -145,5 +145,5 @@ def test_city_nodes_carry_per_city_weather():
     weather = [node['weather'] for node in payload['nodes'] if node.get('weather')]
     assert len(weather) >= len(payload['nodes']) * 0.8, '逐市气象覆盖率过低'
     for item in weather:
-        assert 'tempC' in item and 'visM' in item and 'windMps' in item
-        assert item.get('source') == 'OPEN_METEO'
+        assert 'tempC' in item and 'visM' in item and 'windMps' in item and 'low' in item
+    assert payload['summary']['weatherSource'].startswith('open-meteo')
