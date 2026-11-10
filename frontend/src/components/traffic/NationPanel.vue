@@ -84,10 +84,18 @@ async function loadEvidence(){
 }
 function clearEvidence(){evidence.value=null;evidenceErr.value=''}
 
+// 立体与平面是两套渲染，但"定位/复位"对用户是同一个动作：按当前模式找对那个组件。
+function activeMap(){
+  return mapRef.value||null
+}
 function locateLayer(kind){
   followId.value=''
   const box=kind==='radar'?radarBBox.value:(data.value?.fog?.bbox||null)
-  if(box) mapRef.value?.fitBounds(box)
+  if(box) activeMap()?.fitBounds?.(box)
+}
+function resetMap(){
+  followId.value=''
+  activeMap()?.resetView?.()
 }
 const alerts=computed(()=>data.value?.alerts||[])
 const intel=computed(()=>data.value?.intel||[])
@@ -147,7 +155,7 @@ async function load(){
     live.value={...(data.value?.traffic||{})}
     byProvince.value={}
     byCity.value={}
-    mapRef.value?.resetView?.()
+    resetMap()
   }catch(e){error.value=e.message||String(e)}
   finally{loading.value=false}
 }
@@ -325,7 +333,9 @@ const pushAge=ref(0)
 watch(()=>store.nationPulse,(value)=>{
   if(!value) return
   pushAge.value=0
-  if(value.changed) load()
+  // 心跳只说明"某个源变了"，不代表要立刻重拉整份载荷：
+  // 限流期间实况时刻会抖，5 秒一次全量重取会把页面拖住。这里设最小间隔。
+  if(value.changed&&Date.now()-fetchAt>20000) load()
 })
 
 onMounted(()=>{
@@ -395,9 +405,14 @@ onUnmounted(()=>{
         </select>
         <button :disabled="!radarBBox" @click="locateLayer('radar')">定位回波</button>
         <button :disabled="!fog.bbox" @click="locateLayer('fog')">定位雾区</button>
-        <button @click="followId='';mapRef?.resetView()">复位</button>
+        <button @click="resetMap()">复位</button>
       </div>
 
+      <!-- 立体＝SVG 倾斜视图。
+           试过用 maplibre 起真三维（俯角/旋转/高程瓦片），但那套在这台机器上
+           会把浏览器主线程拖死（两次实测 Edge 完全无响应，连扩展都断），
+           所以退回不依赖 WebGL 的透视倾斜：轻、稳、切页不卡。
+           代价是没有真高程起伏，文案里如实说明。 -->
       <div class="nrn-canvas">
       <NationMap ref="mapRef" :data="data" :flights="flights" :minute="minute"
                  :radar-on="radarOn" :fog-on="fogOn" :terrain-on="terrainOn" :tilt="tilt"

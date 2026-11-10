@@ -107,6 +107,26 @@ public class PythonClient {
                 .body(resp.body());
     }
 
+    /**
+     * 原样转发二进制响应（高程瓦片用）。
+     * 走 ofString 会把 PNG 变成乱码字符串，必须用 ofByteArray。
+     */
+    public org.springframework.http.ResponseEntity<byte[]> rawBytes(String path) throws Exception {
+        HttpRequest req = builder(path).timeout(Duration.ofSeconds(30)).GET().build();
+        HttpResponse<byte[]> resp = http.send(req, HttpResponse.BodyHandlers.ofByteArray());
+        // 只有成功才允许长缓存。失败响应一旦被浏览器缓存住，
+        // 地图会一直拿着一份"错误内容"当瓦片用（实测：500 被缓存 7 天，地形永远出不来）。
+        var builder = org.springframework.http.ResponseEntity.status(resp.statusCode())
+                .header("Content-Type", resp.headers().firstValue("content-type").orElse("application/octet-stream"))
+                .header("Access-Control-Allow-Origin", "*");
+        if (resp.statusCode() / 100 == 2) {
+            builder.header("Cache-Control", "public, max-age=604800");
+        } else {
+            builder.header("Cache-Control", "no-store");
+        }
+        return builder.body(resp.body());
+    }
+
     public org.springframework.http.ResponseEntity<?> decisionRequest(String path, Map<String, Object> body) throws Exception {
         HttpRequest.Builder requestBuilder = builder(path).timeout(Duration.ofSeconds(30));
         if (body == null) requestBuilder.GET();

@@ -125,7 +125,12 @@ def fetch(rows: List[Dict[str, Any]], force: bool = False) -> Dict[str, Any]:
             payload = response.json()
             bodies = payload if isinstance(payload, list) else [payload]
         except Exception as exc:  # noqa: BLE001 - 单批失败不该让整屏没数据
+            status = getattr(getattr(exc, 'response', None), 'status_code', None)
             errors.append(f'batch {start // BATCH}: {str(exc)[:80]}')
+            if status == 429:
+                # 限流期间剩下的批次也一定失败，别把一次点击拖成 6 次超时
+                errors.append('429 限流：剩余批次跳过，本次模型概率不可用（规则派生兜底）')
+                break
             continue
         for city, body in zip(chunk, bodies):
             features = _features(city, body.get('hourly') or {}, body.get('elevation'))
@@ -140,5 +145,5 @@ def fetch(rows: List[Dict[str, Any]], force: bool = False) -> Dict[str, Any]:
         'elapsedMs': int((time.time() - started) * 1000),
     }
     with _lock:
-        _cache.update({'value': value, 'expires': now + (TTL_SECONDS if out else 60.0)})
+        _cache.update({'value': value, 'expires': now + (TTL_SECONDS if out else 300.0)})
     return value

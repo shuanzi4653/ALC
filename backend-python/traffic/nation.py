@@ -21,6 +21,7 @@
 from __future__ import annotations
 
 import json
+import threading
 from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
@@ -668,7 +669,7 @@ def _base(level: str, ident: Optional[str]) -> Dict[str, Any]:
     }
 
 
-def flights_payload(level: str = 'nation', ident: Optional[str] = None,
+def _flights_payload_locked(level: str = 'nation', ident: Optional[str] = None,
                     minute: int = 0) -> Dict[str, Any]:
     """只回航班与统计：时间轴每拖一次都要刷新，不能把整份网络重算一遍。"""
     minute = max(0, min(1440, int(minute or 0)))
@@ -713,7 +714,7 @@ def flights_payload(level: str = 'nation', ident: Optional[str] = None,
     }
 
 
-def payload(level: str = 'nation', ident: Optional[str] = None,
+def _payload_locked(level: str = 'nation', ident: Optional[str] = None,
             minute: int = 0) -> Dict[str, Any]:
     provinces = _province_rows()
     stations = _live_stations()
@@ -1089,3 +1090,19 @@ def pulse() -> Dict[str, Any]:
         'modelVersion': version,
         'cities': len(_city_rows()),
     }
+
+
+# shapely / GEOS 不是线程安全的：网关预热的线程和第一个真实请求撞在一起时，
+# 两边同时进 make_valid / buffer，会直接把进程打成段错误（实测 exit 139）。
+# 所以对外入口串行化 —— 命中 lru_cache 时这一步只是拿一次锁，代价可以忽略。
+_NATION_LOCK = threading.RLock()
+
+
+def payload(level: str = 'nation', ident: Optional[str] = None, minute: int = 60):
+    with _NATION_LOCK:
+        return _payload_locked(level, ident, minute)
+
+
+def flights_payload(level: str = 'nation', ident: Optional[str] = None, minute: int = 60):
+    with _NATION_LOCK:
+        return _flights_payload_locked(level, ident, minute)

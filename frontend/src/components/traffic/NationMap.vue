@@ -108,6 +108,35 @@ const radarTiles=computed(()=>{
   return tilesFor(t,6,6)
 })
 
+// —— 回波环：按屏幕尺寸分流 ——
+// 这里踩过一个坑：强回波是按 0.14° 网格聚出来的，最小的环只有 0.17°×0.39°，
+// 在国家级缩放下不足 2×4 px。这种尺寸再按 0.9 px 描边，描边宽度已经接近环本身，
+// 画出来就是一个**空心小方框**——地图上看着像贴了个红标签，完全不像回波。
+// 所以分两路：屏幕上够大的环才描边（等值线），小到看不出形状的直接填实。
+const radarRings=computed(()=>{
+  if(!props.radarOn) return []
+  const bands=props.data?.radar?.bands||{}
+  const out=[]
+  for(const level of ['CONVECTIVE','STRONG']){
+    for(const ring of bands[level]||[]){
+      if(!ring||ring.length<3) continue
+      let minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9
+      for(const [lon,lat] of ring){
+        const [x,y]=project(lon,lat)
+        if(x<minX)minX=x; if(x>maxX)maxX=x
+        if(y<minY)minY=y; if(y>maxY)maxY=y
+      }
+      const size=Math.max(maxX-minX,maxY-minY)
+      out.push({
+        level,
+        d:toPath({type:'Polygon',coordinates:[ring]},project),
+        small:size<15,
+      })
+    }
+  }
+  return out
+})
+
 // —— 雾区 ——
 // 面是后端按城市能见度外扩合并出来的（DERIVED），点才是实测；所以面画得很淡，
 // 城市本身仍由节点的红圈标注，两者不混。
@@ -377,12 +406,20 @@ function clickNode(node){
                :width="t.size" :height="t.size" :href="t.href"
                preserveAspectRatio="none"/>
       </g>
-      <!-- 分档描边：瓦片给"像不像"，描边给"哪一档"，两者都要 -->
-      <g v-if="radarOn" fill="none" :clip-path="'url(#nmap-china-clip)'">
-        <path v-for="(ring,i) in (data?.radar?.bands?.STRONG||[])" :key="'s'+i"
-              :d="toPath({type:'Polygon',coordinates:[ring]})"
-              :stroke="virtualMode?'rgba(255,150,110,.95)':'rgba(255,120,90,.75)'"
-              :stroke-width="virtualMode?2.2:.9"/>
+      <!-- 分档：屏幕上一眼能看出形状的环画等值线（外淡内实），小到只剩几个像素的直接填实 -->
+      <g v-if="radarRings.length" :clip-path="'url(#nmap-china-clip)'">
+        <template v-for="(ring,index) in radarRings" :key="'rr'+index">
+          <path v-if="ring.small" :d="ring.d" stroke="none"
+                :fill="ring.level==='STRONG'?'rgba(238,72,60,.58)':'rgba(245,190,60,.42)'"/>
+          <template v-else>
+            <path :d="ring.d" fill="none"
+                  :stroke="ring.level==='STRONG'?'rgba(255,120,90,.30)':'rgba(245,190,60,.24)'"
+                  :stroke-width="virtualMode?5:3.4"/>
+            <path :d="ring.d" fill="none"
+                  :stroke="ring.level==='STRONG'?'rgba(255,150,110,.85)':'rgba(255,214,120,.70)'"
+                  :stroke-width="virtualMode?1.8:1.1"/>
+          </template>
+        </template>
       </g>
 
       <!-- 2.5 雾区：低能见度面（DERIVED） -->

@@ -54,6 +54,11 @@ from weather.engine import REGIONS, SCENARIOS
 
 app = FastAPI(title="天窗智巡 Python 智能服务", version=decision_service.VERSION)
 
+# 高程瓦片代理：三维地形要的 raster-dem 瓦片必须带 CORS 头，
+# 公开的 terrarium 源不带，只能由服务端代取并缓存。
+import terrain_tiles as _terrain_tiles  # noqa: E402
+app.include_router(_terrain_tiles.router)
+
 def _startup_warm():
     import threading
 
@@ -76,17 +81,24 @@ def _startup_warm():
                     'measured', actor='startup-warm', reason='预热结束，复原为实测')
         except Exception:  # noqa: BLE001
             log.exception('startup warm: 复原通道失败')
-        # 全国层预热：雷达帧、绕飞表、逐市实况（current+hourly）、模型概率都带 TTL，
-        # 不预热的话第一次打开全国页要等 20 秒（实测），预热后第一次就命中缓存。
-        try:
-            from traffic import nation as traffic_nation
-            body = traffic_nation.payload('nation', None, 60)
-            log.info('startup warm: 全国层 %s 城 / %s 条 / 在飞 %s',
-                     body.get('summary', {}).get('cities'),
-                     body.get('summary', {}).get('corridors'),
-                     len(body.get('flights') or []))
-        except Exception:  # noqa: BLE001
-            log.exception('startup warm: 全国层预热失败（不影响服务启动）')
+        # 全国层预热：雷达帧、绕飞表、逐市实况、模型概率都要联网，冷缓存约 50 秒。
+        # 这段**不能**放在启动流程里同步跑 —— 页面一打开就会发请求，两边同时进 shapely
+        # 的 make_valid / buffer，进程直接段错误（实测 exit 139）。改成延时后台线程，
+        # 与真实请求之间由 nation 模块的串行锁隔开。
+        def _warm_nation() -> None:
+            time.sleep(6)
+            try:
+                from traffic import nation as traffic_nation
+                body = traffic_nation.payload('nation', None, 60)
+                log.info('startup warm: 全国层 %s 城 / %s 条 / 在飞 %s',
+                         body.get('summary', {}).get('cities'),
+                         body.get('summary', {}).get('corridors'),
+                         len(body.get('flights') or []))
+            except Exception:  # noqa: BLE001
+                log.exception('startup warm: 全国层预热失败（不影响服务启动）')
+
+        import threading as _threading
+        _threading.Thread(target=_warm_nation, name='warm-nation', daemon=True).start()
 
     threading.Thread(target=worker, name='startup-warm', daemon=True).start()
 
