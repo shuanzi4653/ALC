@@ -91,7 +91,7 @@ function clock(m){
         <p>申请、计划、实际分列；每行是一架独立班次。数据时刻 {{ clock(localMinute) }}。</p>
       </div>
       <div class="nb-scroll">
-        <table>
+        <table class="ledger">
           <thead><tr>
             <th>班次 / 机型</th><th>起讫与航线</th><th>申请 / 计划 / 实际</th>
             <th>高度 / 许可</th><th>风险 / 裁决</th><th>限制</th>
@@ -99,9 +99,9 @@ function clock(m){
           <tbody>
             <tr v-for="f in rows.slice(0,limit)" :key="f.id"
                 :class="{sel:f.id===selectedId}" @click="emit('select',f)">
-              <td><b>{{ f.callsign }}</b><small>{{ f.id }}</small><small>{{ f.kindLabel||'省内' }}</small></td>
-              <td>{{ f.fromName }} → {{ f.toName }}<small>{{ f.corridor }}</small></td>
-              <td><small>申请 {{ f.requestAt }}</small><small>计划 {{ f.planAt }}</small><small>实际 {{ f.actualAt||'—' }}</small></td>
+              <td><b>{{ f.callsign }}</b><small>{{ f.id }} · {{ f.kindLabel||'省内' }}</small></td>
+              <td><span class="leg">{{ f.fromName }} → {{ f.toName }}</span><small>{{ f.corridor }}</small></td>
+              <td class="times"><small>申请 {{ f.requestAt }}</small><small>计划 {{ f.planAt }}</small><small>实际 {{ f.actualAt||'—' }}</small></td>
               <td><small>{{ f.altM }} m AGL</small><small>{{ f.clearance?.statusLabel }}</small></td>
               <td>
                 <span class="risk" :class="f.riskLevel">{{ f.riskLevelLabel }} {{ f.riskP.toFixed(2) }}</span>
@@ -204,6 +204,19 @@ function clock(m){
 .nb-weather span{color:#8fb2c8}
 .nb-scroll{overflow:auto;min-height:0;flex:1;border:1px solid rgba(70,110,140,.3);border-radius:8px}
 table{width:100%;border-collapse:collapse;font-size:11.5px}
+/* 台账：列宽定死，否则"起讫与航线"会把后面几列挤到看不见；表格本身不横向滚 */
+table.ledger{table-layout:fixed}
+table.ledger th:nth-child(1),table.ledger td:nth-child(1){width:15%}
+table.ledger th:nth-child(2),table.ledger td:nth-child(2){width:27%}
+table.ledger th:nth-child(3),table.ledger td:nth-child(3){width:24%}
+table.ledger th:nth-child(4),table.ledger td:nth-child(4){width:12%}
+table.ledger th:nth-child(5),table.ledger td:nth-child(5){width:13%}
+table.ledger th:nth-child(6),table.ledger td:nth-child(6){width:9%}
+table.ledger td{overflow:hidden}
+table.ledger .leg{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 三个时刻并排：竖排会把每条班次撑成三行，106 条就要滚很长 */
+td.times{white-space:nowrap}
+td.times small{display:inline;margin-right:7px;font-size:10px}
 th{position:sticky;top:0;background:#0f2a3c;color:#8fb2c8;font-weight:500;text-align:left;
   padding:6px 8px;border-bottom:1px solid rgba(70,110,140,.4);white-space:nowrap;font-size:11px}
 td{padding:5px 8px;border-bottom:1px solid rgba(50,80,100,.25);color:#cfe6f5;vertical-align:top}

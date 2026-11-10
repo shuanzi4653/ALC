@@ -88,7 +88,7 @@ function tilesFor(template,minZoom,maxZoom){
   const y1=Math.floor((Math.PI-merc(latB))/(2*Math.PI)*n)
   for(let x=x0;x<=x1;x++) for(let y=y0;y<=y1;y++){
     if(y<0||y>=n) continue
-    if(out.length>160) return out
+    if(out.length>64) return out
     const lon=((x/n)*360-180)
     const latTop=Math.atan(Math.sinh(Math.PI*(1-2*y/n)))*180/Math.PI
     const [px,py]=project(lon,latTop)
@@ -105,7 +105,7 @@ const radarTiles=computed(()=>{
   if(!props.radarOn) return []
   const t=props.data?.radar?.tiles
   if(!t) return []
-  return tilesFor(t,6,6)
+  return tilesFor(t,4,5)
 })
 
 // —— 回波环：按屏幕尺寸分流 ——
@@ -203,10 +203,12 @@ const chinaClipD=computed(()=>{
 // —— 南海诸岛小图 ——
 // 主图按大陆取框，南海诸岛（曾母暗沙到北纬 4°）会被裁在外面；按国内地图惯例放右下角小图。
 // 小图自己一套墨卡托投影，和主图同源，只是范围不同。
-const INSET={x:786,y:428,w:196,h:196,lon0:105.5,lon1:124.5,lat0:3.2,lat1:24.8}
+const INSET={x:8,y:99999,w:120,h:120,lon0:105.5,lon1:124.5,lat0:3.2,lat1:24.8}
+// 右下角、位于浮层监视条之上：这块小图只证明版图完整，不承载业务，
+// 所以能做小就做小，别占主图的注意力。
 const insetBox=computed(()=>({...INSET,
-  x:Math.max(8,Math.min(INSET.x,VIEW.w-INSET.w-8)),
-  y:Math.max(8,Math.min(INSET.y,VIEW.h-INSET.h-8))}))
+  x:Math.max(8,VIEW.w-INSET.w-10),
+  y:Math.max(8,VIEW.h-INSET.h-96)}))
 const insetProj=computed(()=>{
   const b=insetBox.value
   const w=rad(b.lon1)-rad(b.lon0)
@@ -270,7 +272,15 @@ const corridors=computed(()=>(props.data?.corridors||[]).map(row=>{
 }))
 
 // —— 节点与建筑 ——
-function shortName(name){return (name||'').replace(/(市|地区|盟|自治州|回族自治区|维吾尔自治区)$/,'')}
+function shortName(name){
+  // 省级与市级共用一个规则：先剥自治区/特区/省，再剥市/地区/盟/自治州。
+  // 两处（地图标签、右栏列表）必须一致，否则同一个省在图上叫"新疆"、在右栏叫"新疆维吾尔自治区"。
+  return (name||'')
+    .replace(/维吾尔自治区$/,'').replace(/壮族自治区$/,'').replace(/回族自治区$/,'')
+    .replace(/特别行政区$/,'').replace(/自治区$/,'').replace(/省$/,'')
+    .replace(/(市|地区|盟|自治州|自治县)$/,'')
+    .replace(/(朝鲜族|蒙古族|藏族|苗族|侗族|彝族|哈尼族|壮族|傣族|白族|土家族|布依族|傈僳族|景颇族|羌族|回族|维吾尔族)$/,'')
+}
 const nodes=computed(()=>(props.data?.nodes||[]).map(node=>{
   const [x,y]=project(node.lon,node.lat)
   return {...node,x,y,short:shortName(node.name),
@@ -542,7 +552,7 @@ function clickNode(node){
 .nmap .clickable{cursor:pointer}
 .nmap path.hit{filter:drop-shadow(0 0 2px rgba(255,206,90,.55))}
 .nmap path.virt-alarm{filter:drop-shadow(0 0 4px rgba(255,90,60,.85))}
-.nmap .inset-lbl{font-size:8.5px;fill:rgba(170,205,230,.85)}
+.nmap .inset-lbl{font-size:7.5px;fill:rgba(170,205,230,.85)}
 .nmap .prov{font-size:9px;letter-spacing:.6px;fill:rgba(158,196,224,.72);pointer-events:none}
 .nmap .city{font-size:8.6px;fill:#dceefb;paint-order:stroke;stroke:rgba(4,12,20,.85);stroke-width:2.4px;pointer-events:none}
 </style>

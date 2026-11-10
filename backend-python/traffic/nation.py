@@ -113,14 +113,18 @@ def _city_rows() -> List[Dict[str, Any]]:
 
 
 def _city_weather_payload() -> Dict[str, Any]:
-    """逐市气象（open-meteo 公开接口，免密钥）。取不到的城市就是没有，不补零。
+    """逐市气象（多源：open-meteo 批量为主，wttr.in 补缺）。取不到的城市就是没有，不补零。
 
-    返回**整份载荷**（含 fetchedAt），取证要引用"这份实况是什么时候取的"；
+    返回**整份载荷**（含 fetchedAt 与 sources）；取证要引用"这份实况是什么时候取的"；
     只拿 cities 的调用走 `_city_weather()`。
+
+    顺序有讲究：备源补数是**按顺序**补前 80 个，所以这里把省会、机场城市排前面 ——
+    真要限流时，先保证"能起降的城市"有实况。
     """
     try:
         from weather import city_weather
-        return city_weather.fetch([(row['name'], row['lat'], row['lon']) for row in _city_rows()])
+        rows = sorted(_city_rows(), key=lambda row: (row.get('rank', 3), row['name']))
+        return city_weather.fetch([(row['name'], row['lat'], row['lon']) for row in rows])
     except Exception:  # noqa: BLE001 - 气象源不可用不能把页面打崩
         return {}
 
@@ -730,7 +734,8 @@ def _payload_locked(level: str = 'nation', ident: Optional[str] = None,
             got = table.get(row['id'])
             if got:
                 row['detour'] = got          # 前端用它画绕飞后的实际航迹
-        weather = _city_weather()
+        weather_doc = _city_weather_payload()
+        weather = weather_doc.get('cities') or {}
         model_probs = _model_probs()
         flights = nation_ops.flight_objects(corridors, minute, table, weather, model_probs)
         hit = sum(1 for row in corridors if row.get('detour'))
@@ -762,6 +767,16 @@ def _payload_locked(level: str = 'nation', ident: Optional[str] = None,
                 'alerts': nation_ops.alerts(corridors, flights, weather, scoped_cities),
                 'intel': nation_ops.intel(scoped_cities, weather, airport_by_city),
                 'fog': _fog(scoped_cities, weather),
+                # 实况元信息：哪个源给了多少城、是不是旧数据、是不是还在补。
+                # 界面上"逐市气象 0/0"必须能解释成"补数中"而不是"没有"。
+                'weatherMeta': {
+                    'fetchedAt': weather_doc.get('fetchedAt'),
+                    'sources': weather_doc.get('sources') or {},
+                    'stale': bool(weather_doc.get('stale')),
+                    'refreshing': bool(weather_doc.get('refreshing')),
+                    'cities': len(weather),
+                    'errors': (weather_doc.get('errors') or [])[:3],
+                },
                 'modelCard': _model_card(model_probs),
                 'counterfactual': nation_ops.counterfactual(flights),
                 'border': {**nation_ops.border_monitor(
@@ -947,7 +962,7 @@ def _totals(blocks: List[Dict[str, Any]], flights: List[Dict[str, Any]],
     }
 
 
-def evidence(flight_id: str, minute: int = 60) -> Dict[str, Any]:
+def _evidence_locked(flight_id: str, minute: int = 60) -> Dict[str, Any]:
     """全国班次的取证链：**每一行都带来源**，没有来源的行不许写。
 
     设计上刻意不依赖"班次属于哪个层级"：班次 id 里已经带走廊号（`NC-0310#-1`），
@@ -1067,7 +1082,7 @@ def _model_card(model_probs: Optional[Dict[str, float]] = None) -> Dict[str, Any
     return card
 
 
-def pulse() -> Dict[str, Any]:
+def _pulse_locked() -> Dict[str, Any]:
     """状态心跳：只回"有没有东西变了"，不回整份数据。
 
     推送的意义不是把 500 KB 反复塞给前端，而是让屏幕**不用轮询也知道**雷达换帧了、
@@ -1106,3 +1121,14 @@ def payload(level: str = 'nation', ident: Optional[str] = None, minute: int = 60
 def flights_payload(level: str = 'nation', ident: Optional[str] = None, minute: int = 60):
     with _NATION_LOCK:
         return _flights_payload_locked(level, ident, minute)
+
+
+def pulse() -> Dict[str, Any]:
+    """心跳同样要串行：它内部要算雷达环数（shapely），和主请求并发就会崩进程。"""
+    with _NATION_LOCK:
+        return _pulse_locked()
+
+
+def evidence(flight_id: str, minute: int = 60) -> Dict[str, Any]:
+    with _NATION_LOCK:
+        return _evidence_locked(flight_id, minute)

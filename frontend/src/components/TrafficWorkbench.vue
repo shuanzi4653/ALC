@@ -390,6 +390,9 @@ const mapStatusText=computed(()=>{
   return status.buildings?`地图：已载入 · ${status.buildings} 个建筑要素`:'地图：已载入'
 })
 const progressView=computed(()=>buildProgressView(session.value))
+// 全国范围的三个视图（全国台、全国情报、全国台账）都不参与东北建场
+const nationScopeView=computed(()=>activeSection.value==='national'
+  ||(scope.value==='nation'&&(activeSection.value==='briefing'||activeSection.value==='schedule')))
 const buildProgress=computed(()=>progressView.value.percent)
 const buildLabel=computed(()=>{
   if(buildProgress.value===null)return '正在调度 · 排队中'
@@ -676,7 +679,9 @@ onUnmounted(()=>{
   <CommandPalette :open="paletteOpen" :groups="NAV_GROUPS" :routes="paletteRoutes" :flights="paletteFlights"
                   @close="paletteOpen=false" @run="onPaletteRun"/>
 </main>
-<div class="traffic-build-strip" v-if="busy" role="status" aria-live="polite" data-build-strip>
+<!-- 建场进度条只属于东北那套（会按气象重建计划）；全国网是 SIM，不参与建场，
+     全国页上挂着一条 0% 的进度条只会让人以为卡死了。 -->
+<div class="traffic-build-strip" v-if="busy && !nationScopeView" role="status" aria-live="polite" data-build-strip>
   <div class="tbs-track" :class="{pending:buildProgress===null}" role="progressbar"
        :aria-valuenow="buildProgress===null?undefined:buildProgress"
        :aria-valuetext="buildProgress===null?'暂无数值进度，等待前面的计划完成':undefined"

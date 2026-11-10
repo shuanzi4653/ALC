@@ -120,7 +120,15 @@ function clock(m){
   const t=((base%1440)+1440)%1440
   return `${String(Math.floor(t/60)).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`
 }
-function shortName(name){return (name||'').replace(/(市|地区|盟|自治州)$/,'')}
+function shortName(name){
+  // 省级与市级共用一个规则：先剥自治区/特区/省，再剥市/地区/盟/自治州。
+  // 两处（地图标签、右栏列表）必须一致，否则同一个省在图上叫"新疆"、在右栏叫"新疆维吾尔自治区"。
+  return (name||'')
+    .replace(/维吾尔自治区$/,'').replace(/壮族自治区$/,'').replace(/回族自治区$/,'')
+    .replace(/特别行政区$/,'').replace(/自治区$/,'').replace(/省$/,'')
+    .replace(/(市|地区|盟|自治州|自治县)$/,'')
+    .replace(/(朝鲜族|蒙古族|藏族|苗族|侗族|彝族|哈尼族|壮族|傣族|白族|土家族|布依族|傈僳族|景颇族|羌族|回族|维吾尔族)$/,'')
+}
 
 async function loadFlights(){
   const now=Date.now()
@@ -312,6 +320,17 @@ const wxRows=computed(()=>{
   return rows.slice(0,level.value==='nation'?40:60)
 })
 const wxTotal=computed(()=>(data.value?.nodes||[]).filter(n=>n.weather).length)
+// 实况从哪来、是不是旧的、是不是还在补 —— "0/0" 必须能解释成"补数中"而不是"没有"
+const weatherMeta=computed(()=>data.value?.weatherMeta||{})
+const wxRefreshing=computed(()=>!!weatherMeta.value.refreshing)
+const wxStale=computed(()=>!!weatherMeta.value.stale)
+const wxSourceText=computed(()=>{
+  const src=weatherMeta.value.sources||{}
+  const parts=[]
+  if(src.OPEN_METEO) parts.push(`open-meteo ${src.OPEN_METEO}`)
+  if(src.WTTR) parts.push(`wttr ${src.WTTR}`)
+  return parts.join(' + ')
+})
 function pBand(p){return p==null?'':(p>=0.6?'bad':(p>=0.35?'warn':(p>=0.15?'watch':'')))}
 
 const profileText=computed(()=>{
@@ -330,6 +349,15 @@ function visText(vis){
 // 推送：网关每 5 秒广播一条心跳，只有"雷达换帧 / 实况更新 / 模型换版"才算变化。
 // 变化时重取本级数据；没变化就什么都不做 —— 屏幕空闲时不再定时轮询整份载荷。
 const pushAge=ref(0)
+const viewport=ref({w:0,h:0,root:0})
+// 只在 ?diag=1 时显示尺寸诊断，平时不占地方
+const showDiag=typeof location!=='undefined'&&/[?&]diag=1/.test(location.search)
+function measureViewport(){
+  viewport.value={
+    w:window.innerWidth,h:window.innerHeight,
+    root:Math.round(document.querySelector('.traffic-workbench')?.clientWidth||0),
+  }
+}
 watch(()=>store.nationPulse,(value)=>{
   if(!value) return
   pushAge.value=0
@@ -339,11 +367,14 @@ watch(()=>store.nationPulse,(value)=>{
 })
 
 onMounted(()=>{
+  measureViewport()
+  window.addEventListener('resize',measureViewport)
   load()
   // 推送计时用独立定时器：不能和推演播放共用一个变量，否则一开播就把计时器顶掉
   pushTimer=setInterval(()=>{pushAge.value+=1},1000)
 })
 onUnmounted(()=>{
+  window.removeEventListener('resize',measureViewport)
   if(timer) clearInterval(timer)
   if(pushTimer) clearInterval(pushTimer)
 })
@@ -428,6 +459,7 @@ onUnmounted(()=>{
         <span>停飞航线 {{ border.blockedCorridors||0 }} 条<template v-if="(border.blockedNames||[]).length">（{{ (border.blockedNames||[]).slice(0,3).join('、') }}{{ (border.blockedNames||[]).length>3?' 等':'' }}）</template></span>
         <span>已改线 {{ border.reroutedCorridors||0 }} 条</span>
         <span v-if="fog.available">低能见度 {{ fog.counts.cities }} 城（&lt;1.5 km {{ fog.counts.BAN }} 城）</span>
+        <span class="diag" v-if="showDiag">视口 {{ viewport.w }}×{{ viewport.h }} · 根容器 {{ viewport.root }}px</span>
         <span class="push" :class="{on:store.wsConnected}" :title="store.wsConnected?'雷达/实况/模型任一变化由服务端推送':'未连上推送，仅按需拉取'">
           {{ store.wsConnected?('推送 · '+pushAge+'s 前'):'未连推送' }}</span>
         <span class="quiet">{{ border.note }}</span>
@@ -485,6 +517,7 @@ onUnmounted(()=>{
         <template v-if="rollup.level==='nation'">
           <h3>各大区<small>点区块下钻</small></h3>
           <button class="nrn-region" v-for="region in rollup.regions" :key="region.id"
+                  :title="`${region.name}：${region.total.corridors} 条航线（含跨省航线在本区计入，故各区之和大于全国 ${total.corridors} 条）`"
                   @click="go('region',region.id,region.name)">
             <b>{{ region.name }}</b>
             <span>{{ region.total.cities }} 市 · {{ region.total.corridors }} 条</span>
@@ -496,6 +529,7 @@ onUnmounted(()=>{
         <template v-else-if="rollup.level==='region'">
           <h3>本区省份<small>点省下钻</small></h3>
           <button class="nrn-region" v-for="p in rollup.provinces" :key="p.name"
+                  :title="`${p.name}：${p.corridors} 条航线（跨省航线在两端省份各计一次）`"
                   @click="go('province',p.name,p.name)">
             <b>{{ p.name }}</b>
             <span>{{ p.cities }} 市 · 机场 {{ p.airports }} · {{ p.corridors }} 条</span>
@@ -528,7 +562,10 @@ onUnmounted(()=>{
 
       <!-- 下：气象。跟着上面的粒度走：全国看重点城市，进区看该区各市，进省看本省各市 -->
       <div class="nrn-wx" data-nation-weather>
-        <h4>气象实况 <small>{{ wxRows.length }} / {{ wxTotal }} 城 · 按模型概率排序</small></h4>
+        <h4>气象实况
+          <small v-if="wxTotal">{{ wxTotal }} 城<template v-if="wxSourceText"> · {{ wxSourceText }}</template><template v-if="wxStale"> · 旧数据</template></small>
+          <small v-else>{{ wxRefreshing?'补数中…（后台抓取多源实况）':'暂无实况' }}</small>
+        </h4>
         <ul>
           <li v-for="row in wxRows" :key="row.name" :class="{bad:row.low}">
             <b>{{ row.short }}</b>
@@ -537,7 +574,8 @@ onUnmounted(()=>{
             <span>{{ row.wind==null?'—':row.wind+' m/s' }}</span>
             <span>{{ visText(row.vis) }}</span>
           </li>
-          <li v-if="!wxRows.length" class="empty">本级暂无逐市气象</li>
+          <li v-if="!wxRows.length" class="empty">
+            {{ wxRefreshing?'实况补数中，约 1 分钟刷新后可见':'本级暂无逐市气象' }}</li>
         </ul>
       </div>
 
@@ -687,11 +725,17 @@ onUnmounted(()=>{
 .nrn-tabs em{font-style:normal;opacity:.75;margin-left:4px;font-size:11px}
 .nrn-tabs em.bad{color:#ffb38a}
 
-.nrn-body{display:grid;grid-template-columns:minmax(0,1fr) clamp(320px,28vw,440px);gap:10px;min-height:0;flex:1;align-items:stretch}
-.nrn-body.no-map{grid-template-columns:minmax(0,1fr) 292px}
+.nrn-body{display:grid;gap:10px;min-height:0;flex:1;align-items:stretch;
+  /* 右栏固定 560：再宽就只是把数字拉到离名字很远的地方；剩下的宽度给地图，
+     地图多出来的部分会被 svg 居中留白，但总比"地图一条缝、右栏一大片"好看。 */
+  grid-template-columns:minmax(0,1fr) 560px}
+.nrn-body>.nrn-map{min-width:0;overflow:hidden}
+.nrn-body>.nrn-side{min-width:0}
+.nrn-body.no-map{grid-template-columns:minmax(0,1fr) 360px}
 
-.nrn-map{position:relative;display:flex;flex-direction:column;min-height:0;gap:6px;min-width:0}
-.nrn-canvas{position:relative;flex:1;min-height:240px;border-radius:10px;overflow:hidden;border:1px solid rgba(70,110,140,.3)}
+.nrn-map{position:relative;display:flex;flex-direction:column;min-height:0;gap:6px;min-width:0;width:auto}
+.nrn-canvas{position:relative;flex:1;min-height:240px;border-radius:10px;overflow:hidden;
+  border:1px solid rgba(70,110,140,.3)}
 .nrn-tools{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:12px}
 .nrn-tools button,.nrn-tools select{background:#10283a;border:1px solid #2b4c62;color:#a9cde2;border-radius:5px;padding:4px 9px;font-size:11.5px;cursor:pointer}
 .nrn-tools button.on{background:#1d5670;border-color:#3f8ba8;color:#c8f0ff}
@@ -699,13 +743,17 @@ onUnmounted(()=>{
 .nrn-tools input[type=range]{flex:1;min-width:90px}
 .nrn-tools .clock{font-variant-numeric:tabular-nums;color:#bfe9ff;font-size:12px}
 
-.nrn-monitor{margin:0;padding:6px 9px;border:1px solid rgba(80,130,160,.35);border-radius:7px;
-  background:rgba(12,30,44,.72);font-size:11px;color:#8fb2c8;display:flex;flex-wrap:wrap;gap:4px 12px}
+.nrn-monitor{position:absolute;left:8px;right:8px;bottom:28px;z-index:4;
+  padding:5px 9px;border:1px solid rgba(80,130,160,.35);border-radius:7px;
+  background:rgba(10,26,38,.9);font-size:11px;color:#8fb2c8;
+  display:flex;flex-wrap:wrap;gap:3px 12px;pointer-events:none}
 .nrn-monitor strong{color:#ffd08a;font-weight:600}
 .nrn-monitor .quiet{color:#6f92a8}
 .nrn-monitor .push{color:#7d9cb3}
 .nrn-monitor .push.on{color:#7fe0bb}
-.nrn-legend{margin:0;font-size:10.5px;color:#6f92a8;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.nrn-legend{position:absolute;left:8px;right:8px;bottom:5px;z-index:4;margin:0;
+  font-size:10.5px;color:#8fb2c8;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  background:rgba(8,18,28,.86);border-radius:6px;padding:2px 8px;pointer-events:none}
 .nrn-legend i{display:inline-block;width:14px;height:2px;background:rgba(126,206,255,.62);margin-right:4px;vertical-align:middle}
 .nrn-legend i.dot{width:6px;height:6px;border-radius:50%;background:#eaf6ff}
 .nrn-legend i.warn{background:rgba(255,206,90,.9)}
@@ -737,7 +785,7 @@ onUnmounted(()=>{
 .nrn-wx h4{margin:0 0 4px;font-size:11.5px;color:#a9cde2;display:flex;gap:6px;align-items:baseline}
 .nrn-wx h4 small{font-size:10px;color:#6f92a8;font-weight:400}
 .nrn-wx ul{list-style:none;margin:0;padding:0;overflow:auto;flex:1;display:flex;flex-direction:column;gap:2px}
-.nrn-wx li{display:grid;grid-template-columns:1fr 40px 38px 52px 58px;gap:4px;font-size:10.5px;
+.nrn-wx li{display:grid;grid-template-columns:minmax(68px,1fr) 44px 40px 52px 62px;gap:5px;font-size:10.5px;
   padding:2px 5px;border-radius:4px;background:rgba(14,34,48,.75);color:#a8c6d8;white-space:nowrap}
 .nrn-wx li.bad{outline:1px solid rgba(226,75,74,.45)}
 .nrn-wx li b{color:#d9eefb;font-weight:500;overflow:hidden;text-overflow:ellipsis}
@@ -908,13 +956,28 @@ onUnmounted(()=>{
   .nrn-detail{max-height:44vh;overflow:auto}
   .nrn-side{max-height:none}
 }
+@media(max-width:1400px){
+  .nrn-body{grid-template-columns:minmax(0,1fr) 400px}
+  .nrn-tools{gap:4px}
+  .nrn-tools button,.nrn-tools select{font-size:10.5px;padding:2px 6px}
+  .nrn-tools input[type=range]{min-width:80px}
+  .nrn-total b{font-size:15px}
+  .nrn-total span{font-size:10px}
+}
 @media(max-width:1180px){
-  .nrn-body{grid-template-columns:minmax(0,1fr) 280px}
+  .nrn-body{grid-template-columns:minmax(0,1fr) 320px}
   .nrn-detail .cols{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:900px){
+  .nrn-body{grid-template-columns:1fr;min-height:0;overflow:auto}
+  .nrn-canvas{min-height:320px;max-height:52vh}
+  .nrn-side{max-height:none;flex-direction:row;gap:10px;align-items:flex-start}
+  .nrn-blocks,.nrn-wx{flex:1 1 0;min-width:0}
+  .nrn-wx{max-height:34vh}
 }
 @media(max-width:760px){
   .nrn-body{grid-template-columns:1fr;min-height:0}
-  .nrn-side{max-height:190px}
+  .nrn-side{max-height:190px;flex-direction:column}
   .nrn-canvas{min-height:200px}
 }
 </style>

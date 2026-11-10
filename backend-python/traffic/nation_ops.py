@@ -155,8 +155,15 @@ def _clearance(row: Dict[str, Any], sched: Dict[str, float], depart: float,
 
 
 def _clock(minute: float) -> str:
+    """分钟数 → HH:MM，**按北京时间（UTC+8）**。
+
+    时间轴本身是"当日第几分钟"，界面顶部把它显示成本地时刻（09:00 = minute 60）。
+    这里必须跟着加 8 小时，否则同一屏上会出现"数据时刻 09:00、班次 22:24"两个基准，
+    评审一眼就能看出对不上。
+    """
     total = int(round(minute)) % 1440
-    return f'{total // 60:02d}:{total % 60:02d}'
+    local = (total + 8 * 60) % 1440
+    return f'{local // 60:02d}:{local % 60:02d}'
 
 
 def flight_objects(corridors: Iterable[Dict[str, Any]], minute: int,
