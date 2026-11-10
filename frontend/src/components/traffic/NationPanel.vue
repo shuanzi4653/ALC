@@ -2,6 +2,7 @@
 import {computed,onMounted,onUnmounted,ref,watch} from 'vue'
 import {requestJson} from '../../api.js'
 import NationMap from './NationMap.vue'
+import NationBriefing from './NationBriefing.vue'
 
 // 全国运行台：态势 / 台账 / 情报 / 处置 四个视图共用同一份 `payload`。
 //
@@ -394,73 +395,13 @@ onUnmounted(()=>{if(timer) clearInterval(timer)})
       </p>
     </div>
 
-    <!-- ================= 台账 ================= -->
+    <!-- ================= 台账 / 情报：与原生页共用同一份组件 ================= -->
     <div class="nrn-table" v-show="view==='ledger'">
-      <div class="nrn-table-hd">
-        <h3>全国班次台账 <small>{{ flights.length }} 架在飞 · {{ upcoming.length }} 班待起飞</small></h3>
-        <p>申请、计划、实际分列；每行都是一架独立班次，点行即在详情里打开它。</p>
-      </div>
-      <div class="nrn-scroll">
-        <table>
-          <thead><tr>
-            <th>班次 / 机型</th><th>起讫与航线</th><th>申请 / 计划 / 实际</th>
-            <th>高度 / 许可</th><th>风险 / 裁决</th><th>限制</th>
-          </tr></thead>
-          <tbody>
-            <tr v-for="f in ledgerRows" :key="f.id" :class="{sel:f.id===selectedId}" @click="pickFlight(f)">
-              <td><b>{{ f.callsign }}</b><small>{{ f.id }}</small><small>{{ f.kindLabel||'省内' }}</small></td>
-              <td>{{ f.fromName }} → {{ f.toName }}<small>{{ f.corridor }}</small></td>
-              <td><small>申请 {{ f.requestAt }}</small><small>计划 {{ f.planAt }}</small><small>实际 {{ f.actualAt||'—' }}</small></td>
-              <td><small>{{ f.altM }} m AGL</small><small>{{ f.clearance?.statusLabel }}</small></td>
-              <td><span class="risk" :class="f.riskLevel">{{ f.riskLevelLabel }} {{ f.riskP.toFixed(2) }}</span><small>{{ f.decisionLabel }}</small></td>
-              <td>{{ (f.alerts||[]).map(a=>a.label).join(' / ')||'—' }}</td>
-            </tr>
-            <tr v-for="f in upcomingRows" :key="'u'+f.id" class="future">
-              <td><b>{{ f.id.split('#')[0] }}</b><small>待起飞</small></td>
-              <td>{{ f.fromName }} → {{ f.toName }}</td>
-              <td><small>计划 {{ f.departAt }}</small><small>到达 {{ f.arriveAt }}</small></td>
-              <td><small>{{ f.speedKmh }} km/h</small></td>
-              <td><small>{{ f.waitMin }} 分钟后</small></td>
-              <td>—</td>
-            </tr>
-            <tr v-if="!ledgerRows.length&&!upcomingRows.length"><td colspan="6" class="empty">本级暂无班次</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <NationBriefing view="ledger" :payload="data" :flights="flights"
+                      :minute="minute" :density="density"/>
     </div>
-
-    <!-- ================= 情报 ================= -->
     <div class="nrn-table" v-show="view==='intel'">
-      <div class="nrn-table-hd">
-        <h3>机场情报 <small>{{ intel.length }} 个机场城市</small></h3>
-        <p>实况来自公开源（METAR / open-meteo）；“放行建议”是按能见度门槛算的规则派生值，不是官方结论。</p>
-      </div>
-      <div class="nrn-scroll">
-        <table>
-          <thead><tr><th>机场</th><th>城市</th><th>能见度</th><th>风</th><th>温度</th><th>建议</th></tr></thead>
-          <tbody>
-            <tr v-for="row in intelRows" :key="row.city+row.icao">
-              <td><b>{{ row.icao||'—' }}</b><small>{{ row.station||'—' }}</small></td>
-              <td>{{ row.city }}<small>{{ row.province }}</small></td>
-              <td :class="{bad:row.low}">{{ visText(row.visM) }}</td>
-              <td>{{ row.windMps==null?'—':row.windMps+' m/s' }}</td>
-              <td>{{ row.tempC==null?'—':row.tempC+' °C' }}</td>
-              <td><span class="tag" :class="row.tone">{{ row.status }}</span></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="nrn-weather">
-        <h3>逐市实况 <small>{{ summary.weatherCities }} 城</small></h3>
-        <ul>
-          <li v-for="row in weatherRows" :key="row.name" :class="{bad:row.low}">
-            <b>{{ row.short }}</b>
-            <span>{{ row.temp==null?'—':row.temp+'°C' }}</span>
-            <span>{{ row.wind==null?'—':row.wind+' m/s' }}</span>
-            <span>{{ visText(row.vis) }}</span>
-          </li>
-        </ul>
-      </div>
+      <NationBriefing view="intel" :payload="data" :density="density"/>
     </div>
 
     <!-- ================= 处置 ================= -->
@@ -850,6 +791,31 @@ onUnmounted(()=>{if(timer) clearInterval(timer)})
 .nrn-state.bad{color:#ffa08a}
 .nrn-state button{margin-left:8px;background:#17394d;border:1px solid #2e6b85;color:#bfe9ff;border-radius:5px;padding:2px 8px;cursor:pointer}
 
+/* 1366×768 是评委席最常见的分辨率（实测项目里记过这一条）。
+ * 这一档只做两件事：**把小字抬到 11px 地板**，再靠收紧内边距把高度省回来 ——
+ * 抬字号会把一屏撑破，所以必须同时压缩 padding，否则地图会被挤没。 */
+@media(max-width:1500px){
+  .nrn-monitor,.nrn-legend,.nrn-sub{font-size:11px}
+  .nrn-total span,.nrn-block-hd span,.nrn-prov span,.nrn-city-list span{font-size:11px}
+  .nrn-total b{font-size:14px}
+  .nrn-block-hd b,.nrn-prov b,.nrn-city-list b{font-size:11.5px}
+  .nrn-block-hd em,.nrn-prov em,.nrn-city-list em{font-size:11px}
+  .nrn-tools{gap:5px}
+  .nrn-tools button,.nrn-tools select{font-size:11px;padding:3px 7px}
+  .nrn-tabs button{font-size:11.5px;padding:4px 10px}
+  .nrn-detail p,.nrn-detail p>b{font-size:11px}
+  .nrn-detail header b{font-size:12.5px}
+  .nrn-side h3{font-size:11.5px}
+  .tag{font-size:10.5px}
+  .nrn-table td small{font-size:10.5px}
+  .ev-step p{font-size:10.5px}
+}
+/* 768 高的屏：把详情区限高并允许内部滚动，别让地图被压没 */
+@media(max-height:820px){
+  .nrn-canvas{min-height:220px}
+  .nrn-detail{max-height:44vh;overflow:auto}
+  .nrn-side{max-height:none}
+}
 @media(max-width:1180px){
   .nrn-body{grid-template-columns:minmax(0,1fr) 250px}
   .nrn-detail .cols{grid-template-columns:repeat(2,minmax(0,1fr))}

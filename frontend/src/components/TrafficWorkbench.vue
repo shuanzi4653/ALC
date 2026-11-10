@@ -8,10 +8,11 @@ import DispatchBoard from './traffic/DispatchBoard.vue'
 import WeatherSourceSwitch from './traffic/WeatherSourceSwitch.vue'
 import HomeStage from './traffic/HomeStage.vue'
 import NationPanel from './traffic/NationPanel.vue'
+import NationBriefing from './traffic/NationBriefing.vue'
 import CommandPalette from './traffic/CommandPalette.vue'
 import {relayRadarTiles} from '../traffic/radarRelay.js'
 import {atTime,trajectoryOf,flightState,flightPhase,profile,effectiveFlights,filterLedgerRows,reasonNames,actionNames,modeNames,relativeClock,operationalTime,executionTimes,staticCrossingSummary,staticZoneSummary,closureBreakdown,dispositionSummary,delaySpread,clearanceLines,clearanceStatusName,weatherChannelState,weatherChannelLabel,WEATHER_MODE_MEASURED,normalizeWeatherMode,weatherModeIsVirtual,planChannelMismatch,weatherBucket,buildNote,algorithmIdentity,algorithmIdentityTitle,SECTION_NAMES,DENSITY_TIERS,NAV_GROUPS,visibleSubs,entryOf,entryTabs,isOfflineMode,navGroup,groupOfSection,defaultSub,densityTier,densityPolicy,drillTarget,MAP_LAYERS,lowVisibilityRuleBlock,buildProgressView,radarRelayReady,SECTION_CAN_DO,sectionHash,sectionFromHash,SECTION_HASHES,isDemoMode} from '../traffic/runtime.js'
-const activeSection=ref('home'),settings=ref(false),operations=ref([]),operationsReady=ref(false),commandBusy=ref(false),mapExpanded=ref(false),fullscreen=ref(false)
+const activeSection=ref('home'),scope=ref('nation'),settings=ref(false),operations=ref([]),operationsReady=ref(false),commandBusy=ref(false),mapExpanded=ref(false),fullscreen=ref(false)
 const demoMode=isDemoMode()
 const workbench=ref(null)
 const sections=SECTION_NAMES
@@ -636,9 +637,25 @@ onUnmounted(()=>{
   </section>
   <DispatchBoard v-show="activeSection==='overview'" :flights="boardFlights" :minute="minute" :selected-id="selectedId" :settings="deliverySettings" :plan-revision="session?.planRevision||''" :ready="ready" :preview-count="4" @select="chooseFlight" @follow="followFlight" @toggle-hold="commandFlight"/>
   <section class="traffic-playback" v-show="activeSection==='overview'"><button class="primary" :disabled="!ready||session?.scenario==='unknown'" @click="playing=!playing">{{playing?'Ⅱ 暂停':'▶ 推演'}}</button><strong>{{clock(minute)}}</strong><input aria-label="运行推演时间" type="range" min="0" :max="playbackMax" step="0.1" v-model.number="minute" :disabled="!ready"><span>{{playbackMaxLabel}}</span><select aria-label="推演速度" v-model.number="speed"><option :value=".25">15 倍速</option><option :value="1">60 倍速</option><option :value="5">300 倍速</option></select><span class="playback-note">{{ready?delayNote:'前 3 小时发班 · 后续观察至 8 小时（若长航线越界，窗口按最晚到达自动放宽）'}}</span></section>
-  <OperationsConsole v-if="!['home','overview','schedule','national'].includes(activeSection)" :corridor-focus="corridorFocus" :corridor-pair="corridorPair" :view="activeSection" :session="session" :network="network" :flights="scoped" :weather="weather" :selected="selected" :minute="minute" :city-name="cityName" :operations="operations" :density="density" :focus="drillFocus" :weather-mode="weatherMode" :weather-mode-status="weatherModeStatus" :alert-flights="scoped" :event-focus="eventFocus" :ai-reviewed="aiReviewed" @select-flight="chooseFlight" @weather-mode-change="onWeatherModeChange" @locate-event="locateEvent" @ai-reviewed="onAiReviewed" @open-section="activeSection=$event" @seek="minute=$event" :max-minute="playbackMax"/>
-  <section class="traffic-table-panel" v-show="activeSection==='schedule'"><div class="traffic-table-heading"><div><h2>{{cityName}}调度台账 <small>{{filtered.length}} 条</small><small v-if="caseMode" class="case-scope-hint" data-case-scope>班次状态来自实时推演，与回放案例的观测不对应</small></h2><p>申请、计划和实际事件分列；未来班次不会提前显示“实际放行”。</p></div><div><input aria-label="搜索城市或班次" placeholder="搜索城市 / 班次编号" v-model="search"><select aria-label="筛选运行状态" v-model="status"><option value="ALL">全部状态</option><option v-for="(name,key) in stateNames" :value="key" :key="key">{{name}}</option></select></div></div><details class="density-fold table-fold" :open="densityPolicy(density).ledger" data-density="ledger"><summary>台账表体 <span>共 {{filtered.length}} 条</span></summary><div class="traffic-table-scroll"><table><thead><tr><th>呼号 / 机型</th><th>起降点与任务</th><th>运行阶段</th><th>申请 / 计划 / 实际</th><th>高度与资源</th><th>限制与处理</th></tr></thead><tbody><tr v-for="f in rows" :key="f.id" :class="{selected:f.id===selectedId}" @click="chooseFlight(f)"><td><button class="flight-link" @click.stop="chooseFlight(f)"><span :class="f.mode==='CAR'?'cyan':'amber'">{{modeNames[f.mode]}}</span><small>{{f.id}}</small></button></td><td>{{f.name}}<small>{{f.fromPad}} → {{f.toPad}} · {{f.mode==='CAR'?(f.payload??'—')+' 位模拟乘客':(f.orderStatus||'待分配')+' · '+(f.payload??'—')+' 份订单'}}</small></td><td><span class="flight-state" :class="flightState(f,minute)">{{rowPhase(f)}}</span><small>{{stateNames[flightState(f,minute)]}}</small></td><td><small>申请 {{clock(f.requestedDepartureMinute)}}</small><small>计划 {{f.plannedReleaseAt?clock(f.departureMinute):'—'}}</small><small>实际 {{rowActual(f).actualReleaseAt?clock(f.departureMinute):'—'}}</small></td><td><small>{{f.maxAltitudeM??'—'}} m AGL</small><small>{{f.separationAction==='NONE'?'未分配':actionNames[f.separationAction]}}</small></td><td>{{reasonNames[f.reason]||f.reason}}<small>{{clearanceStatusName(f.clearanceStatus)}}</small></td></tr><tr v-if="!rows.length"><td colspan="6" class="traffic-no-results">{{busy?'正在生成并复核运行计划…':'当前筛选无班次'}}</td></tr></tbody></table></div></details><div class="traffic-pagination"><span>每页 20 条 · 同一快照、目录与算法指纹可复现</span><button @click="page--" :disabled="page<=1">上一页</button><b>{{page}} / {{Math.max(1,Math.ceil(filtered.length/20))}}</b><button @click="page++" :disabled="page*20>=filtered.length">下一页</button></div></section>
-  </div>  </div>        <div class="nav-tour" v-if="tourStep>=0&&activeSection!=='national'" role="dialog" aria-modal="false" data-nav-tour
+  <OperationsConsole v-if="!['home','overview','schedule','national'].includes(activeSection)&&!(activeSection==='briefing'&&scope==='nation')" :corridor-focus="corridorFocus" :corridor-pair="corridorPair" :view="activeSection" :session="session" :network="network" :flights="scoped" :weather="weather" :selected="selected" :minute="minute" :city-name="cityName" :operations="operations" :density="density" :focus="drillFocus" :weather-mode="weatherMode" :weather-mode-status="weatherModeStatus" :alert-flights="scoped" :event-focus="eventFocus" :ai-reviewed="aiReviewed" @select-flight="chooseFlight" @weather-mode-change="onWeatherModeChange" @locate-event="locateEvent" @ai-reviewed="onAiReviewed" @open-section="activeSection=$event" @seek="minute=$event" :max-minute="playbackMax"/>
+  <!-- 全国范围：民航情报 / 调度台账接的是全国数据；切回东北就是 1.0.0 原页 -->
+  <section class="traffic-page scope-page" v-if="scope==='nation'&&(activeSection==='briefing'||activeSection==='schedule')">
+    <div class="scope-bar" data-scope-bar>
+      <b>{{ activeSection==='briefing'?'民航情报':'调度台账' }}</b>
+      <button :class="{on:scope==='nation'}" @click="scope='nation'">全国</button>
+      <button :class="{on:scope==='ne'}" @click="scope='ne'">东北</button>
+      <span class="scope-note">{{ scope==='nation'?'全国 319 市 · 气象与雷达为公开源实况，交通为模拟':'东北三省 · 1.0.0 原页' }}</span>
+    </div>
+    <NationBriefing :view="activeSection==='briefing'?'intel':'ledger'" self-fetch/>
+  </section>
+  <section class="traffic-table-panel" v-show="activeSection==='schedule'&&scope==='ne'"><div class="traffic-table-heading"><div><h2>{{cityName}}调度台账 <small>{{filtered.length}} 条</small><small v-if="caseMode" class="case-scope-hint" data-case-scope>班次状态来自实时推演，与回放案例的观测不对应</small></h2><p>申请、计划和实际事件分列；未来班次不会提前显示“实际放行”。</p></div><div><input aria-label="搜索城市或班次" placeholder="搜索城市 / 班次编号" v-model="search"><select aria-label="筛选运行状态" v-model="status"><option value="ALL">全部状态</option><option v-for="(name,key) in stateNames" :value="key" :key="key">{{name}}</option></select></div></div><details class="density-fold table-fold" :open="densityPolicy(density).ledger" data-density="ledger"><summary>台账表体 <span>共 {{filtered.length}} 条</span></summary><div class="traffic-table-scroll"><table><thead><tr><th>呼号 / 机型</th><th>起降点与任务</th><th>运行阶段</th><th>申请 / 计划 / 实际</th><th>高度与资源</th><th>限制与处理</th></tr></thead><tbody><tr v-for="f in rows" :key="f.id" :class="{selected:f.id===selectedId}" @click="chooseFlight(f)"><td><button class="flight-link" @click.stop="chooseFlight(f)"><span :class="f.mode==='CAR'?'cyan':'amber'">{{modeNames[f.mode]}}</span><small>{{f.id}}</small></button></td><td>{{f.name}}<small>{{f.fromPad}} → {{f.toPad}} · {{f.mode==='CAR'?(f.payload??'—')+' 位模拟乘客':(f.orderStatus||'待分配')+' · '+(f.payload??'—')+' 份订单'}}</small></td><td><span class="flight-state" :class="flightState(f,minute)">{{rowPhase(f)}}</span><small>{{stateNames[flightState(f,minute)]}}</small></td><td><small>申请 {{clock(f.requestedDepartureMinute)}}</small><small>计划 {{f.plannedReleaseAt?clock(f.departureMinute):'—'}}</small><small>实际 {{rowActual(f).actualReleaseAt?clock(f.departureMinute):'—'}}</small></td><td><small>{{f.maxAltitudeM??'—'}} m AGL</small><small>{{f.separationAction==='NONE'?'未分配':actionNames[f.separationAction]}}</small></td><td>{{reasonNames[f.reason]||f.reason}}<small>{{clearanceStatusName(f.clearanceStatus)}}</small></td></tr><tr v-if="!rows.length"><td colspan="6" class="traffic-no-results">{{busy?'正在生成并复核运行计划…':'当前筛选无班次'}}</td></tr></tbody></table></div></details><div class="traffic-pagination"><span>每页 20 条 · 同一快照、目录与算法指纹可复现</span><button @click="page--" :disabled="page<=1">上一页</button><b>{{page}} / {{Math.max(1,Math.ceil(filtered.length/20))}}</b><button @click="page++" :disabled="page*20>=filtered.length">下一页</button></div></section>
+  </div>  </div>        <div class="scope-bar floating" v-if="scope==='ne'&&(activeSection==='briefing'||activeSection==='schedule')" data-scope-bar-ne>
+    <b>{{ activeSection==='briefing'?'民航情报':'调度台账' }}</b>
+    <button :class="{on:scope==='nation'}" @click="scope='nation'">全国</button>
+    <button :class="{on:scope==='ne'}" @click="scope='ne'">东北</button>
+    <span class="scope-note">东北三省 · 1.0.0 原页</span>
+  </div>
+  <div class="nav-tour" v-if="tourStep>=0&&activeSection!=='national'" role="dialog" aria-modal="false" data-nav-tour
        :data-step="tourStep+1">
     <div class="nav-tour-card">
       <b>第 {{ tourStep+1 }} / {{ TOUR_STEPS.length }} 步 · {{ TOUR_STEPS[tourStep].label }}</b>
@@ -674,6 +691,16 @@ onUnmounted(()=>{
 .traffic-page{display:flex;flex-direction:column;padding:14px 20px 16px;min-height:0}
 /* 全国台是一屏运行台，不是一段可滚的长文：占满可视高度，内部各自滚动 */
 .traffic-page.national-page{padding:10px 16px 12px;min-height:0;height:calc(100vh - 168px)}
+/* 全国范围的民航情报 / 调度台账：和全国台同样的"一屏"高度 */
+.traffic-page.scope-page{padding:10px 16px 12px;min-height:0;height:calc(100vh - 168px)}
+.scope-bar{display:flex;align-items:center;gap:8px;padding:0 2px 8px;font-size:12px;color:#82a6bd}
+.scope-bar b{font-size:13px;color:#eaf6ff;font-weight:600}
+.scope-bar button{background:#10283a;border:1px solid #2b4c62;color:#a9cde2;border-radius:5px;padding:3px 11px;font-size:11.5px;cursor:pointer}
+.scope-bar button.on{background:#1d5670;border-color:#3f8ba8;color:#c8f0ff}
+.scope-bar .scope-note{margin-left:auto;font-size:11px;color:#6f92a8}
+.scope-bar.floating{position:fixed;left:50%;transform:translateX(-50%);top:64px;z-index:40;
+  background:rgba(10,26,38,.92);border:1px solid rgba(70,110,140,.5);border-radius:8px;
+  padding:5px 10px;box-shadow:0 6px 18px rgba(0,0,0,.35)}
 .wb-demo-bar{margin:0;padding:6px 12px;font-size:var(--alc-fs-aux);color:var(--alc-watch);
   background:rgba(250,173,20,.10);border-bottom:1px solid rgba(250,173,20,.35);line-height:1.5}
 .wb-demo-bar code{font-family:ui-monospace,Consolas,monospace;color:var(--alc-text)}
