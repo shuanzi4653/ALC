@@ -646,7 +646,10 @@ onUnmounted(()=>{
       <button :class="{on:scope==='ne'}" @click="scope='ne'">东北</button>
       <span class="scope-note">{{ scope==='nation'?'全国 319 市 · 气象与雷达为公开源实况，交通为模拟':'东北三省 · 1.0.0 原页' }}</span>
     </div>
-    <NationBriefing :view="activeSection==='briefing'?'intel':'ledger'" self-fetch/>
+    <!-- 给组件一个确定高度的槽位：它内部靠 flex:1 让表体滚动，父级不给高度就不滚 -->
+    <div class="scope-body">
+      <NationBriefing :view="activeSection==='briefing'?'intel':'ledger'" self-fetch/>
+    </div>
   </section>
   <section class="traffic-table-panel" v-show="activeSection==='schedule'&&scope==='ne'"><div class="traffic-table-heading"><div><h2>{{cityName}}调度台账 <small>{{filtered.length}} 条</small><small v-if="caseMode" class="case-scope-hint" data-case-scope>班次状态来自实时推演，与回放案例的观测不对应</small></h2><p>申请、计划和实际事件分列；未来班次不会提前显示“实际放行”。</p></div><div><input aria-label="搜索城市或班次" placeholder="搜索城市 / 班次编号" v-model="search"><select aria-label="筛选运行状态" v-model="status"><option value="ALL">全部状态</option><option v-for="(name,key) in stateNames" :value="key" :key="key">{{name}}</option></select></div></div><details class="density-fold table-fold" :open="densityPolicy(density).ledger" data-density="ledger"><summary>台账表体 <span>共 {{filtered.length}} 条</span></summary><div class="traffic-table-scroll"><table><thead><tr><th>呼号 / 机型</th><th>起降点与任务</th><th>运行阶段</th><th>申请 / 计划 / 实际</th><th>高度与资源</th><th>限制与处理</th></tr></thead><tbody><tr v-for="f in rows" :key="f.id" :class="{selected:f.id===selectedId}" @click="chooseFlight(f)"><td><button class="flight-link" @click.stop="chooseFlight(f)"><span :class="f.mode==='CAR'?'cyan':'amber'">{{modeNames[f.mode]}}</span><small>{{f.id}}</small></button></td><td>{{f.name}}<small>{{f.fromPad}} → {{f.toPad}} · {{f.mode==='CAR'?(f.payload??'—')+' 位模拟乘客':(f.orderStatus||'待分配')+' · '+(f.payload??'—')+' 份订单'}}</small></td><td><span class="flight-state" :class="flightState(f,minute)">{{rowPhase(f)}}</span><small>{{stateNames[flightState(f,minute)]}}</small></td><td><small>申请 {{clock(f.requestedDepartureMinute)}}</small><small>计划 {{f.plannedReleaseAt?clock(f.departureMinute):'—'}}</small><small>实际 {{rowActual(f).actualReleaseAt?clock(f.departureMinute):'—'}}</small></td><td><small>{{f.maxAltitudeM??'—'}} m AGL</small><small>{{f.separationAction==='NONE'?'未分配':actionNames[f.separationAction]}}</small></td><td>{{reasonNames[f.reason]||f.reason}}<small>{{clearanceStatusName(f.clearanceStatus)}}</small></td></tr><tr v-if="!rows.length"><td colspan="6" class="traffic-no-results">{{busy?'正在生成并复核运行计划…':'当前筛选无班次'}}</td></tr></tbody></table></div></details><div class="traffic-pagination"><span>每页 20 条 · 同一快照、目录与算法指纹可复现</span><button @click="page--" :disabled="page<=1">上一页</button><b>{{page}} / {{Math.max(1,Math.ceil(filtered.length/20))}}</b><button @click="page++" :disabled="page*20>=filtered.length">下一页</button></div></section>
   </div>  </div>        <div class="scope-bar floating" v-if="scope==='ne'&&(activeSection==='briefing'||activeSection==='schedule')" data-scope-bar-ne>
@@ -693,6 +696,7 @@ onUnmounted(()=>{
 .traffic-page.national-page{padding:10px 16px 12px;min-height:0;height:calc(100vh - 168px)}
 /* 全国范围的民航情报 / 调度台账：和全国台同样的"一屏"高度 */
 .traffic-page.scope-page{padding:10px 16px 12px;min-height:0;height:calc(100vh - 168px)}
+.scope-body{flex:1;min-height:0;display:flex;flex-direction:column}
 .scope-bar{display:flex;align-items:center;gap:8px;padding:0 2px 8px;font-size:12px;color:#82a6bd}
 .scope-bar b{font-size:13px;color:#eaf6ff;font-weight:600}
 .scope-bar button{background:#10283a;border:1px solid #2b4c62;color:#a9cde2;border-radius:5px;padding:3px 11px;font-size:11.5px;cursor:pointer}
