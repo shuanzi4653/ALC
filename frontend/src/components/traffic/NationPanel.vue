@@ -20,7 +20,6 @@ const error=ref(''),loading=ref(false)
 const hovered=ref(null)
 
 const KIND_NAME={INTRA:'省内',AIRPORT_FEED:'机场接驳',CROSS:'跨省通道'}
-const EXCLUDED=new Set(['台湾省','西藏自治区','香港特别行政区','澳门特别行政区'])
 
 const VIEW={w:1000,h:640}
 const SOUTH_CHINA_SEA={lon0:108,lon1:125,lat0:2,lat1:25}   // 南海诸岛单独画，不撑大主图
@@ -44,23 +43,65 @@ function project(lon,lat){
   return [p.ox+(lon-p.v.lon0)*p.cos*p.scale, p.oy+(p.v.lat1-lat)*p.scale]
 }
 
-// 底图：全国省级单元都画（保持原色），台湾/西藏不参与网络，单独标注。
+// 底图：35 个要素全画 —— 34 个省级单元 + 南海诸岛界线（adchar=JD，name 为空）。
+// 纪律（2026-11-10 用户要求）：
+//   ① 台湾、西藏等**所有省级单元一律实线**，不做虚线、不做"未未纳入"特殊标注；
+//   ② 九段线必须画出来，南海诸岛不能缺 —— 这是地图完整性，不能省。
+function toPath(geometry, projectFn){
+  const polygons=geometry.type==='Polygon'?[geometry.coordinates]
+    :(geometry.type==='MultiPolygon'?geometry.coordinates:[])
+  let d=''
+  for(const poly of polygons) for(const ring of poly){
+    for(let i=0;i<ring.length;i++){
+      const [x,y]=projectFn(ring[i][0],ring[i][1])
+      d+=(i?'L':'M')+x.toFixed(1)+' '+y.toFixed(1)
+    }
+  }
+  return d
+}
+
 const shapes=computed(()=>{
   const rows=[]
   for(const feature of china.features||[]){
-    const name=(feature.properties||{}).name
-    if(!name) continue
-    const geo=feature.geometry||{}
-    const polys=geo.type==='Polygon'?[geo.coordinates]:(geo.type==='MultiPolygon'?geo.coordinates:[])
-    let d=''
-    for(const poly of polys) for(const ring of poly){
-      for(let i=0;i<ring.length;i++){
-        const [x,y]=project(ring[i][0],ring[i][1])
-        d+=(i?'L':'M')+x.toFixed(1)+' '+y.toFixed(1)
-      }
-    }
-    if(d) rows.push({name,d,excluded:EXCLUDED.has(name)})
+    const props=feature.properties||{}
+    const name=props.name||''
+    const boundary=props.adchar==='JD'
+    if(!name&&!boundary) continue
+    const d=toPath(feature.geometry||{},project)
+    if(!d) continue
+    rows.push({key:name||'jd', name:name||'南海诸岛界线', boundary, d})
   }
+  // 界线最后画，压在所有省界之上
+  rows.sort((a,b)=>(a.boundary?1:0)-(b.boundary?1:0))
+  return rows
+})
+
+// 南海诸岛小图（inset）：主图按大陆取框，南海诸岛按惯例放在右下角小图里，
+// 这样既不把大陆压成一条缝，也不会漏掉南海。
+const INSET={x:786,y:428,w:196,h:196,lon0:105.5,lon1:124.5,lat0:3.2,lat1:24.8}
+const insetProj=computed(()=>{
+  const cos=Math.cos(((INSET.lat0+INSET.lat1)/2)*Math.PI/180)
+  const w=(INSET.lon1-INSET.lon0)*cos,h=INSET.lat1-INSET.lat0
+  const scale=Math.min(INSET.w/w,INSET.h/h)
+  return {cos,scale,ox:INSET.x+(INSET.w-w*scale)/2,oy:INSET.y+(INSET.h-h*scale)/2}
+})
+function projectInset(lon,lat){
+  const p=insetProj.value
+  return [p.ox+(lon-INSET.lon0)*p.cos*p.scale, p.oy+(INSET.lat1-lat)*p.scale]
+}
+const insetShapes=computed(()=>{
+  if(level.value!=='nation') return []
+  const rows=[]
+  for(const feature of china.features||[]){
+    const props=feature.properties||{}
+    const name=props.name||''
+    const boundary=props.adchar==='JD'
+    if(!name&&!boundary) continue
+    const d=toPath(feature.geometry||{},projectInset)
+    if(!d) continue
+    rows.push({key:name||'jd',boundary,d})
+  }
+  rows.sort((a,b)=>(a.boundary?1:0)-(b.boundary?1:0))
   return rows
 })
 
@@ -176,16 +217,30 @@ onMounted(load)
         <rect x="0" y="0" :width="VIEW.w" :height="VIEW.h" fill="url(#nrn-grid)"/>
 
         <g>
-          <path v-for="shape in shapes" :key="shape.name" :d="shape.d"
-                fill="rgba(96,132,170,.10)"
-                :stroke="hovered===shape.name?'#7fd4ff':'rgba(120,165,205,.40)'"
+          <path v-for="shape in shapes" :key="shape.key" :d="shape.d"
+                :fill="shape.boundary?'rgba(150,200,235,.55)':'rgba(96,132,170,.10)'"
+                :stroke="shape.boundary?'none':(hovered===shape.name?'#7fd4ff':'rgba(120,165,205,.40)')"
                 :stroke-width="hovered===shape.name?1.2:0.8"
-                :stroke-dasharray="shape.excluded?'5 4':null"
-                :class="{live:activeNames.has(shape.name)}"
+                :class="{live:!shape.boundary && activeNames.has(shape.name)}"
                 @mouseenter="hovered=shape.name" @mouseleave="hovered=null"
-                @click="activeNames.has(shape.name) && level!=='province' && level!=='city' && go('province',shape.name,shape.name)">
-            <title>{{ shape.name }}{{ shape.excluded?' · 未纳入（不通航）':(activeNames.has(shape.name)?' · 点击下钻':' · 不在本级范围') }}</title>
+                @click="!shape.boundary && activeNames.has(shape.name) && level!=='province' && level!=='city' && go('province',shape.name,shape.name)">
+            <title>{{ shape.name }}{{ shape.boundary?' · 南海诸岛界线':(activeNames.has(shape.name)?' · 点击下钻':' · 不在本级范围') }}</title>
           </path>
+        </g>
+
+        <!-- 南海诸岛小图：全国层才显示，保证"地图完整" -->
+        <g v-if="level==='nation'" class="nrn-inset">
+          <clipPath id="nrn-inset-clip">
+            <rect :x="INSET.x" :y="INSET.y" :width="INSET.w" :height="INSET.h" rx="4"/>
+          </clipPath>
+          <rect :x="INSET.x" :y="INSET.y" :width="INSET.w" :height="INSET.h" rx="4"
+                fill="rgba(8,18,30,.55)" stroke="rgba(120,165,205,.45)" stroke-width="0.8"/>
+          <g :clip-path="'url(#nrn-inset-clip)'">
+            <path v-for="shape in insetShapes" :key="'i'+shape.key" :d="shape.d"
+                  :fill="shape.boundary?'rgba(150,200,235,.55)':'rgba(96,132,170,.12)'"
+                  :stroke="shape.boundary?'none':'rgba(120,165,205,.40)'" stroke-width="0.6"/>
+          </g>
+          <text :x="INSET.x+8" :y="INSET.y+INSET.h-8" class="nrn-inset-lbl">南海诸岛</text>
         </g>
 
         <g v-for="line in corridors" :key="line.id">
@@ -212,7 +267,7 @@ onMounted(load)
         </g>
       </svg>
       <p class="nrn-note">
-        实心点＝机场城市，空心小点＝无机场市（都有一条接驳航线连到最近的机场城市）；虚线省界＝未纳入网络（台湾、西藏）。
+        实心点＝机场城市，空心小点＝无机场市（都有一条接驳航线连到最近的机场城市）<template v-if="level==='nation'">；右下小图为南海诸岛</template>。
         定位：飞行汽车分担城市间出行，跨省长距离仍靠飞机与火车。
         <span v-if="hovered">指向：{{ hovered }}</span>
       </p>
@@ -309,6 +364,7 @@ onMounted(load)
 .nrn-map svg{display:block;width:100%;height:100%;flex:1;min-height:0}
 .nrn-map svg path.live{cursor:pointer}
 .nrn-lbl{font-size:9px;fill:rgba(200,225,245,.7);pointer-events:none}
+.nrn-inset-lbl{font-size:9px;fill:rgba(190,215,235,.75);pointer-events:none}
 .nrn-note{margin:0;padding:6px 10px;font-size:12px;color:var(--alc-text-mute);border-top:1px solid var(--alc-line)}
 .nrn-side{display:grid;grid-template-rows:minmax(0,1fr) minmax(0,.7fr);gap:10px;min-height:0}
 .nrn-card{border:1px solid var(--alc-line);border-radius:10px;background:var(--alc-bg-1);padding:10px 12px;min-height:0;overflow:auto}
