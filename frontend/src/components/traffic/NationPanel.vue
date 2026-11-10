@@ -29,6 +29,7 @@ const virtualMode=ref(false)
 const density=ref('full')
 const selectedId=ref('')
 const selectedCorridor=ref('')
+const followId=ref('')
 
 const flights=ref([])
 const live=ref({corridors:0,airborne:0,delayed:0,hold:0,blocked:0,lowVisCities:0})
@@ -92,6 +93,7 @@ async function load(){
   data.value=null
   selectedId.value=''
   selectedCorridor.value=''
+  followId.value=''
   flights.value=[]
   try{
     data.value=await requestJson(
@@ -142,10 +144,18 @@ function togglePlay(){
 }
 watch(speed,()=>{ if(playing.value){togglePlay();togglePlay()} })
 
-function pickFlight(flight){selectedId.value=flight.id;selectedCorridor.value=''}
+function pickFlight(flight){
+  if(selectedId.value!==flight.id) followId.value=''
+  selectedId.value=flight.id
+  selectedCorridor.value=''
+}
+function toggleFollow(){
+  followId.value=followId.value===selectedId.value?'':selectedId.value
+}
 function pickCorridor(line){
   selectedCorridor.value=line.id
   selectedId.value=''
+  followId.value=''
 }
 function locate(){ if(selectedFlight.value) minute.value=selectedFlight.value.departMinute; playing.value=false }
 
@@ -172,6 +182,79 @@ const weatherRows=computed(()=>{
 // 不该跟着分钟乱跳。所以按省/市名去 byProvince/byCity 里取，取不到就退回快照值。
 function airOf(name,fallback){const row=byProvince.value[name];return row?row.airborne:(fallback||0)}
 function airOfCity(name,fallback){const row=byCity.value[name];return row?row.airborne:(fallback||0)}
+
+// —— 走廊逐公里剖面 ——
+// 为什么要"逐公里"而不是一个总数：一条 120 km 的航路，回波可能只压住中间 15 km，
+// 说"穿回波"会让人以为整条都不能飞；逐段标出来，才知道是哪一段、多长。
+const BAND_LABEL={STRONG:'强回波（45 dBZ 以上）',CONVECTIVE:'对流回波（35–45）',WEAK:'弱回波（15–35）','':'无回波'}
+const BAND_COLOR={STRONG:'rgba(238,72,60,.55)',CONVECTIVE:'rgba(245,190,60,.45)',WEAK:'rgba(40,190,110,.30)','':'transparent'}
+
+function haversine(a,b){
+  const R=6371,rad=Math.PI/180
+  const dLat=(b[1]-a[1])*rad,dLon=(b[0]-a[0])*rad
+  const h=Math.sin(dLat/2)**2+Math.cos(a[1]*rad)*Math.cos(b[1]*rad)*Math.sin(dLon/2)**2
+  return 2*R*Math.asin(Math.min(1,Math.sqrt(h)))
+}
+function ringHit(ring,lon,lat){
+  let inside=false
+  for(let i=0,j=ring.length-1;i<ring.length;j=i++){
+    const xi=ring[i][0],yi=ring[i][1],xj=ring[j][0],yj=ring[j][1]
+    if(((yi>lat)!==(yj>lat))&&(lon<(xj-xi)*(lat-yi)/((yj-yi)||1e-9)+xi)) inside=!inside
+  }
+  return inside
+}
+function bandAt(lon,lat){
+  const bands=data.value?.radar?.bands||{}
+  for(const name of ['STRONG','CONVECTIVE','WEAK']){
+    for(const ring of bands[name]||[]){ if(ringHit(ring,lon,lat)) return name }
+  }
+  return ''
+}
+const corridorProfile=computed(()=>{
+  const line=selectedLine.value
+  if(!line) return null
+  const path=(line.path&&line.path.length>1)?line.path:[line.fromLonLat,line.toLonLat]
+  const legs=[]
+  let total=0
+  for(let i=0;i<path.length-1;i++){
+    const len=haversine(path[i],path[i+1])
+    legs.push({a:path[i],b:path[i+1],len,start:total})
+    total+=len
+  }
+  if(!legs.length||total<=0) return null
+  const count=Math.min(72,Math.max(16,Math.round(total/6)))
+  const samples=[]
+  for(let k=0;k<=count;k++){
+    const target=total*k/count
+    const leg=legs.find(item=>target<=item.start+item.len)||legs[legs.length-1]
+    const t=leg.len?(target-leg.start)/leg.len:0
+    const lon=leg.a[0]+(leg.b[0]-leg.a[0])*t
+    const lat=leg.a[1]+(leg.b[1]-leg.a[1])*t
+    samples.push({km:Math.round(target),lon,lat,band:bandAt(lon,lat)})
+  }
+  const segments=[]
+  for(const sample of samples){
+    const last=segments[segments.length-1]
+    if(last&&last.band===sample.band) last.to=sample.km
+    else segments.push({band:sample.band,from:sample.km,to:sample.km})
+  }
+  return {totalKm:Math.round(total),segments}
+})
+// 剖面里的计划高度包线：15% 爬升 / 70% 巡航 / 15% 下降
+const profilePoints=computed(()=>{
+  const prof=corridorProfile.value
+  if(!prof) return ''
+  const x0=8,w=304,yGround=68,yTop=14
+  return [[0,yGround],[0.15,yTop],[0.85,yTop],[1,yGround]]
+    .map(([fx,fy])=>`${(x0+fx*w).toFixed(1)},${fy}`).join(' ')
+})
+
+const profileText=computed(()=>{
+  const prof=corridorProfile.value
+  if(!prof) return ''
+  return prof.segments.filter(s=>s.band)
+    .map(s=>`${s.from}–${s.to} km ${BAND_LABEL[s.band]}`).join(' · ')||'全线无回波'
+})
 
 function visText(vis){
   if(vis==null) return '—'
@@ -236,7 +319,7 @@ onUnmounted(()=>{if(timer) clearInterval(timer)})
           <option value="slim">精简</option>
           <option value="min">极简</option>
         </select>
-        <button @click="mapRef?.resetView()">复位</button>
+        <button @click="followId='';mapRef?.resetView()">复位</button>
       </div>
 
       <div class="nrn-canvas">
@@ -244,6 +327,7 @@ onUnmounted(()=>{if(timer) clearInterval(timer)})
                  :radar-on="radarOn" :terrain-on="terrainOn" :tilt="tilt"
                  :density="density" :virtual-mode="virtualMode"
                  :selected-id="selectedId" :selected-corridor="selectedCorridor"
+                 :follow-id="followId"
                  @drill="drill" @select-flight="pickFlight" @select-corridor="pickCorridor"/>
       </div>
 
@@ -427,6 +511,8 @@ onUnmounted(()=>{if(timer) clearInterval(timer)})
         <b>{{ selectedFlight.callsign }}</b>
         <code>{{ selectedFlight.id }}</code>
         <span class="tag" :class="selectedFlight.riskLevel==='HIGH'?'bad':(selectedFlight.riskLevel==='MEDIUM'?'warn':'good')">{{ selectedFlight.decisionLabel }}</span>
+        <button class="follow" :class="{on:followId===selectedFlight.id}" @click="toggleFollow">
+          {{ followId===selectedFlight.id?'取消跟随':'跟随此班次' }}</button>
         <button @click="selectedId=''">收起</button>
       </header>
       <div class="cols">
@@ -490,9 +576,23 @@ onUnmounted(()=>{if(timer) clearInterval(timer)})
           <p><span>高度带</span><b>600–1100 m AGL</b></p>
           <p><span>班次</span><b>{{ flights.filter(f=>f.corridor===selectedLine.id).length }} 架在飞</b></p>
         </div>
-        <div class="prof" v-if="selectedLine.detour">
-          <h4>改航示意</h4>
-          <p class="quiet">琥珀色航迹＝按法线外偏后的实际航路；原航路穿回波 {{ selectedLine.detour.hitKm }} km。</p>
+        <div class="prof span2" v-if="corridorProfile">
+          <h4>逐公里剖面 <small>{{ corridorProfile.totalKm }} km · {{ corridorProfile.segments.length }} 段 · 采样步长约 6 km</small></h4>
+          <svg viewBox="0 0 320 92" preserveAspectRatio="none" role="img" aria-label="走廊逐公里回波剖面">
+            <rect x="8" y="6" width="304" height="62" fill="rgba(8,22,34,.7)" stroke="rgba(70,110,140,.35)"/>
+            <rect v-for="(seg,i) in corridorProfile.segments" :key="'sg'+i"
+                  :x="8+304*seg.from/corridorProfile.totalKm"
+                  :width="Math.max(1,304*(seg.to-seg.from)/corridorProfile.totalKm)"
+                  y="6" height="62" :fill="BAND_COLOR[seg.band]"/>
+            <polyline :points="profilePoints" fill="none" stroke="#59dffc" stroke-width="1.4"/>
+            <text x="10" y="82" fill="#7d9cb3" font-size="7.5">0 km · {{ selectedLine.fromName }}</text>
+            <text x="310" y="82" fill="#7d9cb3" font-size="7.5" text-anchor="end">{{ corridorProfile.totalKm }} km · {{ selectedLine.toName }}</text>
+            <text x="10" y="14" fill="#7d9cb3" font-size="7.5">1100 m</text>
+          </svg>
+          <p class="quiet">{{ profileText }}</p>
+          <p class="quiet" v-if="selectedLine.detour">
+            琥珀色航迹＝按法线外偏 {{ selectedLine.detour.shiftKm }} km 后的实际航路；原航路穿回波 {{ selectedLine.detour.hitKm }} km。
+          </p>
         </div>
       </div>
     </template>
@@ -640,6 +740,8 @@ onUnmounted(()=>{if(timer) clearInterval(timer)})
 .nrn-detail header{display:flex;align-items:center;gap:9px;font-size:12.5px;padding-bottom:6px;border-bottom:1px solid rgba(70,110,140,.3)}
 .nrn-detail header b{color:#eaf6ff;font-size:13px}
 .nrn-detail header code{font-size:10.5px;color:#7fb6d6}
+.nrn-detail header button.follow{color:#8ef0ff;border-color:#2e6b85}
+.nrn-detail header button.follow.on{background:#1d5670;color:#d6f6ff}
 .nrn-detail header button{margin-left:auto;background:none;border:1px solid #2c4a60;color:#9dbccf;border-radius:5px;padding:2px 9px;font-size:11px;cursor:pointer}
 .nrn-detail .cols{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;padding-top:7px}
 .nrn-detail h4{margin:0 0 4px;font-size:11px;color:#8fb2c8;font-weight:600}
@@ -647,7 +749,9 @@ onUnmounted(()=>{if(timer) clearInterval(timer)})
 .nrn-detail p{margin:2px 0;display:grid;grid-template-columns:52px 1fr;gap:6px;font-size:11px}
 .nrn-detail p>span{color:#7493a8}
 .nrn-detail p>b{font-weight:400;color:#d9eefb}
-.nrn-detail .prof svg{width:100%;height:78px}
+.nrn-detail .prof svg{width:100%;height:88px}
+.nrn-detail .prof.span2{grid-column:span 2}
+@media(max-width:1180px){.nrn-detail .prof.span2{grid-column:span 2}}
 .nrn-detail .mini{margin-top:5px;background:#17394d;border:1px solid #2e6b85;color:#bfe9ff;border-radius:5px;padding:3px 8px;font-size:10.5px;cursor:pointer}
 .nrn-detail .quiet{display:block;color:#7d9cb3;font-size:10.5px;line-height:1.6}
 

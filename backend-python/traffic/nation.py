@@ -135,12 +135,70 @@ def _radar() -> Dict[str, Any]:
         return {'available': False, 'error': str(exc)[:80], 'bands': {}, 'counts': {}}
 
 
-def _radar_polygons(radar: Dict[str, Any]):
+@lru_cache(maxsize=2)
+def _china_mask():
+    """国界并集（34 个省级单元），用来把回波裁到国内。跟建网工具用的是同一份区划。
+
+    区划数据里有自相交的环（天津—河北那段著名的 `side location conflict`），
+    直接 union 会抛拓扑异常，所以每个省先 make_valid 再并。
+    """
+    from shapely import make_valid
+    from shapely.ops import unary_union
+    shapes = []
+    for geometry in _province_shapes().values():
+        try:
+            fixed = make_valid(geometry)
+            if not fixed.is_empty:
+                shapes.append(fixed)
+        except Exception:  # noqa: BLE001
+            continue
+    return unary_union(shapes) if shapes else None
+
+
+@lru_cache(maxsize=2)
+def _radar_clipped(radar_ts: str) -> Dict[str, Any]:
+    """回波只保留**国内**部分。
+
+    为什么在数据层裁，而不是只在前端裁像素：一条发给前端的境外回波，
+    既白占字节，也会被绕飞算法当成"要躲的东西"，等于在本国航路上按外国天气改航。
+    裁完再算，逻辑和显示才对得上。
+    """
+    radar = _radar()
+    mask = _china_mask()
+    bands = (radar.get('bands') or {})
+    if mask is None or not bands:
+        return bands
+    from shapely.geometry import Polygon
+    out: Dict[str, List[List[List[float]]]] = {}
+    for band, rings in bands.items():
+        kept: List[List[List[float]]] = []
+        for ring in rings or []:
+            try:
+                poly = Polygon(ring)
+                if not poly.is_valid or poly.area <= 0:
+                    continue
+                piece = poly.intersection(mask)
+                if piece.is_empty:
+                    continue
+                parts = getattr(piece, 'geoms', [piece])
+                for part in parts:
+                    if part.is_empty or part.area < 0.02:
+                        continue
+                    coords = [[round(x, 3), round(y, 3)] for x, y in part.exterior.coords]
+                    if len(coords) >= 4:
+                        kept.append(coords)
+            except Exception:  # noqa: BLE001
+                continue
+        out[band] = kept[:45]
+    return out
+
+
+def _radar_polygons(bands: Dict[str, Any]):
     from shapely.geometry import Polygon
     from shapely.ops import unary_union
     shapes = []
     for band in ('CONVECTIVE', 'STRONG'):
-        for ring in (radar.get('bands') or {}).get(band) or []:
+        for ring in (bands or {}).get(band) or []:
             try:
                 poly = Polygon(ring)
                 if poly.is_valid and poly.area > 0:
@@ -192,7 +250,7 @@ def _detour_table(radar_ts: str) -> Dict[str, Dict[str, Any]]:
     """按雷达帧缓存绕飞结果：一帧 10 分钟，不用每个请求重算 514 条。"""
     from shapely.ops import transform as shp_transform
     radar = _radar()
-    avoid = _radar_polygons(radar)
+    avoid = _radar_polygons(_radar_clipped(radar.get('ts') or 'none'))
     if avoid is None:
         return {}
     # 回波多边形是经纬度，航路要投影到米制平面才能判交、才能算法线侧移
@@ -544,8 +602,9 @@ def payload(level: str = 'nation', ident: Optional[str] = None,
                 'radar': {'available': bool(radar.get('available')),
                           'ts': radar.get('ts'),
                           'source': radar.get('source'),
-                          'counts': radar.get('counts') or {},
-                          'bands': radar.get('bands') or {},
+                          'counts': {band: len(rings) for band, rings
+                                     in _radar_clipped(radar.get('ts') or 'none').items()},
+                          'bands': _radar_clipped(radar.get('ts') or 'none'),
                           'coverage': radar.get('coverage'),
                           # 瓦片直链：前端按墨卡托贴图，边界比矢量多边形更像真实回波
                           'tiles': radar.get('tiles_url')},

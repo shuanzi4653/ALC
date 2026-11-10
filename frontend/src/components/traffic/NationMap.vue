@@ -1,5 +1,5 @@
 <script setup>
-import {computed,onMounted,onUnmounted,reactive,ref} from 'vue'
+import {computed,onMounted,onUnmounted,reactive,ref,watch} from 'vue'
 import china from '../../assets/china.json'
 
 // 全国航线图（墨卡托）。
@@ -20,6 +20,7 @@ const props=defineProps({
   selectedId:{type:String,default:''},
   selectedCorridor:{type:String,default:''},
   virtualMode:{type:Boolean,default:false},
+  followId:{type:String,default:''},
 })
 const emit=defineEmits(['drill','select-flight','select-corridor','hover-node'])
 
@@ -136,6 +137,21 @@ const shapes=computed(()=>{
   }
   rows.sort((a,b)=>(a.boundary?1:0)-(b.boundary?1:0))
   return rows
+})
+
+// 雷达裁剪：回波只画**国内**。RainViewer 是整幅瓦片，邻国回波会跟着贴进来，
+// 评审看到"境外有回波、国内航线在躲"会问为什么管到国外去。
+// 裁的是国界多边形（34 个省级单元并起来），台湾、港澳、海南都在里面；
+// 九段线是线状要素，不参与裁剪面积。
+const chinaClipD=computed(()=>{
+  const parts=[]
+  for(const f of china.features||[]){
+    const p=f.properties||{}
+    if(!p.name||p.adchar==='JD') continue
+    const d=toPath(f.geometry||{},project)
+    if(d) parts.push(d)
+  }
+  return parts.join(' ')
 })
 
 // —— 南海诸岛小图 ——
@@ -277,6 +293,21 @@ function onUp(){dragging.value=false;dragStart=null}
 function resetView(){zoom.value=1;pan.value={x:0,y:0}}
 defineExpose({resetView})
 
+// —— 跟随航班 ——
+// 1.0.0 的"跟随"是相机跟着这一架走。这里没有相机，就把这一架钉在屏幕中心：
+// 时间轴每刷新一次（flights 换引用）重新居中一次，所以它看起来是"停在中间、地图在动"。
+function centerOn(lon,lat,scale){
+  const [x,y]=project(lon,lat)
+  const z=scale||zoom.value
+  zoom.value=z
+  pan.value={x:VIEW.w/2-x*z, y:VIEW.h/2-y*z}
+}
+watch([()=>props.followId,()=>props.flights],()=>{
+  if(!props.followId) return
+  const flight=(props.flights||[]).find(item=>item.id===props.followId)
+  if(flight) centerOn(flight.lon,flight.lat,Math.max(2.2,zoom.value))
+})
+
 function clickShape(shape){
   if(moved||shape.boundary||!shape.live) return
   emit('drill','province',shape.name,shape.name)
@@ -298,6 +329,7 @@ function clickNode(node){
         <stop offset="100%" stop-color="rgba(38,86,120,.25)"/>
       </linearGradient>
       <filter id="glow"><feGaussianBlur stdDeviation="1.6"/></filter>
+      <clipPath id="nmap-china-clip"><path :d="chinaClipD"/></clipPath>
     </defs>
 
     <g :transform="`translate(${pan.x} ${pan.y}) scale(${zoom})`">
@@ -308,14 +340,14 @@ function clickNode(node){
                preserveAspectRatio="none"/>
       </g>
 
-      <!-- 2 雷达：原始瓦片，边界就是像素边界 -->
-      <g v-if="radarTiles.length" :opacity="virtualMode?1:.92">
+      <!-- 2 雷达：原始瓦片，边界就是像素边界；**按国界裁掉境外回波** -->
+      <g v-if="radarTiles.length" :opacity="virtualMode?1:.92" :clip-path="'url(#nmap-china-clip)'">
         <image v-for="t in radarTiles" :key="'r'+t.key" :x="t.x" :y="t.y"
                :width="t.size" :height="t.size" :href="t.href"
                preserveAspectRatio="none"/>
       </g>
       <!-- 分档描边：瓦片给"像不像"，描边给"哪一档"，两者都要 -->
-      <g v-if="radarOn" fill="none">
+      <g v-if="radarOn" fill="none" :clip-path="'url(#nmap-china-clip)'">
         <path v-for="(ring,i) in (data?.radar?.bands?.STRONG||[])" :key="'s'+i"
               :d="toPath({type:'Polygon',coordinates:[ring]})"
               :stroke="virtualMode?'rgba(255,150,110,.95)':'rgba(255,120,90,.75)'"
