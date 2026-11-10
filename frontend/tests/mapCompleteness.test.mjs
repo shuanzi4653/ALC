@@ -42,15 +42,22 @@ test('底图包含南海诸岛界线（adchar=JD），且一直画到北纬 5° 
   assert.ok(minLon >= 105 && maxLon <= 125, `界线经度 ${minLon}–${maxLon} 超出南海范围`)
 })
 
+// 地图拆成 NationPanel（外壳）+ NationMap（渲染）之后，护栏要两个文件一起读：
+// 只看外壳会漏掉真正画图的那份，等于护栏自己先把门打开了。
+const mapSource = () => read('src/components/traffic/NationPanel.vue') + '\n' + read('src/components/traffic/NationMap.vue')
+
 test('省级单元一律实线：面板里不许给省界加虚线', () => {
-  const source = read('src/components/traffic/NationPanel.vue')
+  const source = mapSource()
   assert.ok(!/stroke-dasharray/.test(source), '主图/小图里出现了 stroke-dasharray —— 省界被画成虚线了')
   assert.ok(!/未纳入（不通航）|未通航/.test(source), '仍在单独标注"未通航"省份')
-  assert.ok(!/excluded/.test(source), '仍保留 excluded 特殊样式分支')
+  // 判定按渲染层算：NationPanel 里的 border.excludedCities 是"边境退出通航"的数据，
+  // 不是给省界套特殊样式，所以这一条只查画图的那个文件。
+  const renderer = read('src/components/traffic/NationMap.vue')
+  assert.ok(!/excluded/.test(renderer), '渲染层仍保留 excluded 特殊样式分支')
 })
 
 test('全国层有南海诸岛小图，且经纬范围覆盖南海', () => {
-  const source = read('src/components/traffic/NationPanel.vue')
+  const source = mapSource()
   assert.ok(/INSET=\{x:/.test(source), '缺少南海诸岛小图（inset）定义')
   assert.ok(/insetShapes/.test(source), '缺少小图要素计算')
   assert.ok(/level==='nation'/.test(source), '小图应在全国层显示')

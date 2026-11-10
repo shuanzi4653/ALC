@@ -231,6 +231,9 @@ def fetch(force: bool = False) -> Dict[str, Any]:
         'zoom': TILE_ZOOM,
         'gridDeg': GRID_DEG,
         'tiles': {'asked': len(tiles), 'fetched': fetched},
+        # 瓦片直链（墨卡托，透明底，只有回波）：前端按贴图铺，边界是原始像素，
+        # 比"聚网格再并多边形"锐利得多 —— 这是回波边界糊的根因。
+        'tiles_url': f"{frame['host']}{frame['path']}/256/{{z}}/{{x}}/{{y}}/4/1_1.png",
         'cells': total_cells,
         'bands': bands,
         'counts': {band: len(rings) for band, rings in bands.items()},

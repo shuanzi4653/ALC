@@ -622,7 +622,7 @@ onUnmounted(()=>{
     @weather-mode-change="onWeatherModeChange" @toggle-play="playing=!playing"
     @toggle-layer="toggleHomeLayer" @open-settings="settings=!settings"
     @export="download" @toggle-fullscreen="toggleFullscreen" @open-corridor="onOpenCorridor"/>
-  <section class="traffic-page" v-if="activeSection==='national'">
+  <section class="traffic-page national-page" v-if="activeSection==='national'">
     <NationPanel/>
   </section>
   <section class="traffic-main" v-if="activeSection==='overview'">
@@ -672,6 +672,8 @@ onUnmounted(()=>{
 </template>
 <style scoped>
 .traffic-page{display:flex;flex-direction:column;padding:14px 20px 16px;min-height:0}
+/* 全国台是一屏运行台，不是一段可滚的长文：占满可视高度，内部各自滚动 */
+.traffic-page.national-page{padding:10px 16px 12px;min-height:0;height:calc(100vh - 168px)}
 .wb-demo-bar{margin:0;padding:6px 12px;font-size:var(--alc-fs-aux);color:var(--alc-watch);
   background:rgba(250,173,20,.10);border-bottom:1px solid rgba(250,173,20,.35);line-height:1.5}
 .wb-demo-bar code{font-family:ui-monospace,Consolas,monospace;color:var(--alc-text)}

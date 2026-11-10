@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from . import national as national_mod
+from . import nation_ops
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -91,7 +92,11 @@ def _airports() -> Dict[str, Any]:
 
 @lru_cache(maxsize=1)
 def _city_rows() -> List[Dict[str, Any]]:
-    rows = [row for row in _cities_doc()['cities'] if row.get('lon') is not None]
+    # 纳入范围**以路网节点为准**：边境 50 km 内退出的城市在建网时已连同航线一起删除，
+    # 这里再按节点名单过一遍，避免"城市还在、航线没了"的半拉子状态。
+    allowed = {row['name'] for row in _network().get('nodes') or []}
+    rows = [row for row in _cities_doc()['cities']
+            if row.get('lon') is not None and (not allowed or row['name'] in allowed)]
     airport_by_city: Dict[str, str] = {}
     for station in _airports().get('stationRows') or []:
         if station.get('city'):
@@ -177,7 +182,9 @@ def _detour_for(path: List[List[float]], avoid) -> Optional[Dict[str, Any]]:
     _, shifted = best
     coords = [list(to_ll.transform(x, y)) for x, y in shifted.coords]
     return {'path': [[round(lon, 4), round(lat, 4)] for lon, lat in coords],
-            'shiftKm': round(best[0] / 1000.0, 1)}
+            'shiftKm': round(best[0] / 1000.0, 1),
+            # 原航路落在回波里的长度（公里）：反事实要拿它算"不绕飞会暴露多久"
+            'hitKm': round(hit.length / 1000.0, 1)}
 
 
 @lru_cache(maxsize=2)
@@ -197,55 +204,6 @@ def _detour_table(radar_ts: str) -> Dict[str, Dict[str, Any]]:
         if got:
             table[row['id']] = got
     return table
-
-
-def _flights(corridors: List[Dict[str, Any]], minute: int,
-             detours: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """按走廊排班，给出 `minute` 时刻在飞的飞行汽车。
-
-    排班是**确定性**的：走廊 id 的哈希决定发车间隔与相位，同一分钟刷新多少次都一样，
-    所以时间轴可以来回拖，不会出现"每次刷新车队全变"的假象。
-    """
-    out: List[Dict[str, Any]] = []
-    for row in corridors:
-        if row.get('borderBlocked'):
-            continue          # 边境管制带走不通又不让绕的，直接不放飞（界面记"待批"）
-        seed = abs(hash(row['id'])) % 9973
-        headway = 150 + seed % 120          # 2.5–4.5 h 一班
-        phase = seed % headway
-        speed = 200.0 if row.get('cross') else 180.0
-        duration = max(12.0, (row.get('lengthKm') or 100.0) / speed * 60.0)
-        elapsed = (minute - phase) % headway
-        if elapsed > duration:
-            continue
-        progress = elapsed / duration
-        path = row.get('path') or [row['fromLonLat'], row['toLonLat']]
-        if len(path) < 2:
-            continue
-        # 沿折线按进度取点
-        seg = max(1, len(path) - 1)
-        pos = progress * seg
-        idx = min(seg - 1, int(pos))
-        frac = pos - idx
-        lon = path[idx][0] + (path[idx + 1][0] - path[idx][0]) * frac
-        lat = path[idx][1] + (path[idx + 1][1] - path[idx][1]) * frac
-        detour = detours.get(row['id'])
-        late = 0
-        if detour:
-            late = int(6 + detour['shiftKm'] / 6.0)
-        out.append({
-            'id': f"{row['id']}-{int(headway)}",
-            'corridor': row['id'],
-            'fromName': row['fromName'], 'toName': row['toName'],
-            'lon': round(lon, 4), 'lat': round(lat, 4),
-            'progress': round(progress, 3),
-            'altM': int(600 + 500 * (1 - abs(progress - 0.5) * 2)),
-            'speedKmh': int(speed),
-            'status': 'DELAYED' if detour else 'ON_TIME',
-            'delayMin': late,
-            'detourKm': detour['shiftKm'] if detour else 0.0,
-        })
-    return out
 
 
 @lru_cache(maxsize=2)
@@ -484,6 +442,10 @@ def _summary(provinces: List[Dict[str, Any]], corridors: List[Dict[str, Any]],
         'stationsModel': sum(1 for row in stations if row.get('source') == 'MODEL'),
         'operational': sum(1 for row in provinces if row['state'] == 'operational'),
         'pending': sum(1 for row in provinces if row['state'] == 'pending'),
+        # 边境退出通航：城市与航线一并删除，这里把被删的城市名与距离摊开，
+        # 材料里要能一条条对上，不能只说"已处理"。
+        'borderExcludeKm': _network().get('borderExcludeKm'),
+        'borderExcludedCities': [row['name'] for row in _network().get('borderExcluded') or []],
     }
 
 
@@ -525,13 +487,26 @@ def flights_payload(level: str = 'nation', ident: Optional[str] = None,
                 corridors = _slice_corridors({city['province']}, city=ident)
     else:
         corridors = _slice_corridors(set(provinces))
-    flights = _flights(corridors, minute, table)
+    flights = nation_ops.flight_objects(corridors, minute, table, _city_weather())
+    by_province: Dict[str, Dict[str, int]] = {}
+    by_city: Dict[str, Dict[str, int]] = {}
+    for flight in flights:
+        for table_, key in ((by_province, flight['fromProvince']), (by_city, flight['fromName'])):
+            bucket = table_.setdefault(key, {'airborne': 0, 'delayed': 0, 'hold': 0})
+            bucket['airborne'] += 1
+            if flight['status'] == 'DELAYED':
+                bucket['delayed'] += 1
+            if flight['decision'] == 'HOLD':
+                bucket['hold'] += 1
     return {
         'status': 'OK', 'level': level, 'id': ident, 'minute': minute,
         'radarTs': radar.get('ts'),
         'flights': flights,
+        'byProvince': by_province,
+        'byCity': by_city,
         'traffic': {'corridors': len(corridors), 'airborne': len(flights),
                     'delayed': sum(1 for row in flights if row['status'] == 'DELAYED'),
+                    'hold': sum(1 for row in flights if row['decision'] == 'HOLD'),
                     'blocked': sum(1 for row in corridors if row.get('borderBlocked')),
                     'radarHitCorridors': sum(1 for row in corridors if table.get(row['id']))},
     }
@@ -547,16 +522,23 @@ def payload(level: str = 'nation', ident: Optional[str] = None,
     table = _detour_table(radar.get('ts') or 'none') if radar.get('available') else {}
     minute = max(0, min(1440, int(minute or 0)))
 
-    def attach(body: Dict[str, Any], corridors: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def attach(body: Dict[str, Any], corridors: List[Dict[str, Any]],
+               cities: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
         for row in corridors:
             got = table.get(row['id'])
             if got:
                 row['detour'] = got          # 前端用它画绕飞后的实际航迹
-        flights = _flights(corridors, minute, table)
+        weather = _city_weather()
+        flights = nation_ops.flight_objects(corridors, minute, table, weather)
         hit = sum(1 for row in corridors if row.get('detour'))
         delayed = sum(1 for row in flights if row['status'] == 'DELAYED')
         blocked = sum(1 for row in corridors if row.get('borderBlocked'))
         border_hit = sum(1 for row in corridors if row.get('borderDetour'))
+        scoped_cities = cities if cities is not None else _city_rows()
+        airport_by_city: Dict[str, Dict[str, Any]] = {}
+        for station in _airports().get('stationRows') or []:
+            if station.get('city'):
+                airport_by_city.setdefault(station['city'], station)
         return {**body,
                 'minute': minute,
                 'radar': {'available': bool(radar.get('available')),
@@ -564,16 +546,29 @@ def payload(level: str = 'nation', ident: Optional[str] = None,
                           'source': radar.get('source'),
                           'counts': radar.get('counts') or {},
                           'bands': radar.get('bands') or {},
-                          'coverage': radar.get('coverage')},
+                          'coverage': radar.get('coverage'),
+                          # 瓦片直链：前端按墨卡托贴图，边界比矢量多边形更像真实回波
+                          'tiles': radar.get('tiles_url')},
+                'clearanceNote': '许可要素由本班次已写定的计划字段组装，不重新计算；标“待批”的班次不进入在飞序列。',
                 'flights': flights,
+                'upcoming': nation_ops.upcoming(corridors, minute)[:90],
+                'alerts': nation_ops.alerts(corridors, flights, weather, scoped_cities),
+                'intel': nation_ops.intel(scoped_cities, weather, airport_by_city),
+                'border': {**nation_ops.border_monitor(corridors, flights),
+                           'excludeKm': _network().get('borderExcludeKm'),
+                           'excludedCities': _network().get('borderExcluded') or []},
                 'traffic': {'corridors': len(corridors), 'airborne': len(flights),
                             'delayed': delayed, 'radarHitCorridors': hit,
                             'blocked': blocked, 'borderDetourCorridors': border_hit,
+                            'hold': sum(1 for row in flights if row['decision'] == 'HOLD'),
+                            'lowVisCities': sum(1 for row in scoped_cities
+                                                if (weather.get(row['name']) or {}).get('low')),
                             'detourShiftKm': round(sum(r['shiftKm'] for r in table.values()), 1)}}
 
     if level in ('nation', 'north'):
         corridors = _slice_corridors(set(names))
         nodes = _slice_nodes(set(names))
+        scoped_cities = _city_rows()
         regions = []
         for key in REGION_ORDER:
             rows = [row for row in provinces if row['region'] == key]
@@ -589,10 +584,32 @@ def payload(level: str = 'nation', ident: Optional[str] = None,
                 'operational': sum(1 for row in rows if row['state'] == 'operational'),
                 'pending': sum(1 for row in rows if row['state'] == 'pending'),
             })
-        return attach({**base, 'level': 'nation', 'regions': regions, 'provinces': provinces,
+        body = attach({**base, 'level': 'nation', 'regions': regions, 'provinces': provinces,
                        'nodes': nodes, 'corridors': corridors, 'stationPoints': stations,
                        'view': {'bbox': _scope_bbox(names)},
-                       'summary': _summary(provinces, corridors, nodes, stations)}, corridors)
+                       'summary': _summary(provinces, corridors, nodes, stations)}, corridors, scoped_cities)
+        blocks = nation_ops.province_blocks(provinces, corridors, body['flights'])
+        by_province = {row['name']: row for row in blocks}
+        region_rows = []
+        for key in REGION_ORDER:
+            members = [row for row in provinces if row['region'] == key]
+            if not members:
+                continue
+            names = {row['name'] for row in members}
+            # 每个大区自己那一份航线：跨区通道会同时出现在两个区里，这是"本区涉及"，
+            # 不是重复计数 —— 全国合计那一行仍然回原始列表数。
+            scoped = [row for row in corridors
+                      if row['fromProvince'] in names or row['toProvince'] in names]
+            sub = [by_province[row['name']] for row in members if row['name'] in by_province]
+            region_rows.append({'id': key, 'name': REGION_LABEL[key],
+                                'total': _totals(sub, body['flights'], scoped),
+                                'provinces': sub})
+        body['rollup'] = {
+            'level': 'nation',
+            'total': _totals(blocks, body['flights'], corridors),
+            'regions': region_rows,
+        }
+        return body
 
     if level == 'region':
         key = ident if ident in REGION_ORDER else REGION_ORDER[0]
@@ -600,12 +617,17 @@ def payload(level: str = 'nation', ident: Optional[str] = None,
         scoped = {row['name'] for row in rows}
         corridors = _slice_corridors(scoped)
         nodes = _slice_nodes(scoped)
+        scoped_cities = [row for row in _city_rows() if row['province'] in scoped]
         scoped_stations = [point for point in stations if point['name'] in scoped]
-        return attach({**base, 'region': {'id': key, 'name': REGION_LABEL[key]},
+        body = attach({**base, 'region': {'id': key, 'name': REGION_LABEL[key]},
                        'regions': [], 'provinces': rows, 'nodes': nodes,
                        'corridors': corridors, 'stationPoints': scoped_stations,
                        'view': {'bbox': _scope_bbox(list(scoped))},
-                       'summary': _summary(rows, corridors, nodes, scoped_stations)}, corridors)
+                       'summary': _summary(rows, corridors, nodes, scoped_stations)}, corridors, scoped_cities)
+        blocks = nation_ops.province_blocks(rows, corridors, body['flights'])
+        body['rollup'] = {'level': 'region', 'total': _totals(blocks, body['flights'], corridors),
+                          'provinces': blocks}
+        return body
 
     if level == 'province':
         row = next((item for item in provinces if item['name'] == ident), None)
@@ -616,32 +638,38 @@ def payload(level: str = 'nation', ident: Optional[str] = None,
         cities = _cities_by_province().get(ident) or []
         corridors = _slice_corridors({ident})
         nodes = _slice_nodes({ident}) + _external_nodes(corridors, {ident})
-        city_rows = []
-        for city in cities:
-            links = [item for item in _corridor_rows()
-                     if city['name'] in (item['fromName'], item['toName'])]
-            city_rows.append({
-                'name': city['name'], 'lon': city['lon'], 'lat': city['lat'],
-                'airport': city.get('airport'), 'hasAirport': city['hasAirport'],
-                'links': len(links),
-                'feedTarget': None if city['hasAirport'] else next(
-                    (item['toName'] if item['fromName'] == city['name'] else item['fromName']
-                     for item in links if item.get('feed')), None),
-            })
-        city_rows.sort(key=lambda item: (not item['hasAirport'], -item['links'], item['name']))
+        city_blocks = nation_ops.city_blocks(ident, cities, corridors, [])
+        for item in city_blocks:
+            item['feedTarget'] = None
+        # 接驳目标：无机场城市那条 AIRPORT_FEED 的另一端
+        for item in city_blocks:
+            for link in corridors:
+                if link.get('feed') and item['name'] in (link['fromName'], link['toName']):
+                    item['feedTarget'] = (link['toName'] if link['fromName'] == item['name']
+                                          else link['fromName'])
+                    break
+        scoped_cities = cities
         scoped_stations = [point for point in stations if point['name'] == ident]
-        return attach({**base, 'region': {'id': row['region'], 'name': REGION_LABEL[row['region']]},
+        body = attach({**base, 'region': {'id': row['region'], 'name': REGION_LABEL[row['region']]},
                        'regions': [], 'provinces': [row], 'province': row,
-                       'cities': city_rows, 'nodes': nodes, 'corridors': corridors,
+                       'cities': city_blocks, 'nodes': nodes, 'corridors': corridors,
                        'stationPoints': scoped_stations,
                        'view': {'bbox': _points_bbox([(n['lon'], n['lat']) for n in nodes])},
-                       'summary': _summary([row], corridors, nodes, scoped_stations)}, corridors)
+                       'summary': _summary([row], corridors, nodes, scoped_stations)}, corridors, scoped_cities)
+        blocks = nation_ops.city_blocks(ident, cities, corridors, body['flights'])
+        for item, source in zip(blocks, city_blocks):
+            item['feedTarget'] = source.get('feedTarget')
+        body['rollup'] = {'level': 'province',
+                          'total': _totals(nation_ops.province_blocks([row], corridors, body['flights']),
+                                           body['flights'], corridors),
+                          'cities': blocks}
+        return body
 
     if level == 'city':
         city = next((item for item in _city_rows() if item['name'] == ident), None)
         if city is None:
             return {'status': 'NOT_FOUND', 'level': level, 'id': ident,
-                    'note': '纳入范围内没有这个城市'}
+                    'note': '纳入范围内没有这个城市（边境 50 km 内的城市已整体退出通航）'}
         row = next((item for item in provinces if item['name'] == city['province']), None)
         corridors = _slice_corridors({city['province']}, city=ident)
         feed = [item for item in corridors if item.get('feed')]
@@ -660,17 +688,48 @@ def payload(level: str = 'nation', ident: Optional[str] = None,
                            else (feed[0]['fromName'] if feed else None)),
             'neighbours': neighbours,
         }
-        body = {**base, 'regions': [], 'provinces': [row] if row else [], 'province': row,
-                # 市层只画"自己 + 直接相邻"的节点，视野也收到这几个点上：
-                # 否则整省会挤成一团，3 条航线看不出连到谁。
-                'city': detail,
-                'nodes': [_node(row, _city_weather(),
-                                external=row['province'] != city['province']) for row in node_rows],
-                'corridors': corridors,
-                'stationPoints': [point for point in stations if point['name'] == city['province']],
-                'view': {'bbox': _points_bbox([(row['lon'], row['lat']) for row in node_rows])},
-                'summary': _summary([row] if row else [], corridors, [city], [])}
-        return attach(body, corridors)
+        body = attach({**base, 'regions': [], 'provinces': [row] if row else [], 'province': row,
+                       # 市层只画"自己 + 直接相邻"的节点，视野也收到这几个点上：
+                       # 否则整省会挤成一团，3 条航线看不出连到谁。
+                       'city': detail,
+                       'nodes': [_node(row, _city_weather(),
+                                       external=row['province'] != city['province']) for row in node_rows],
+                       'corridors': corridors,
+                       'stationPoints': [point for point in stations if point['name'] == city['province']],
+                       'view': {'bbox': _points_bbox([(row['lon'], row['lat']) for row in node_rows])},
+                       'summary': _summary([row] if row else [], corridors, [city], [])},
+                      corridors, [city])
+        one = nation_ops.city_blocks(city['province'], [city], corridors, body['flights'])
+        body['rollup'] = {'level': 'city',
+                          'total': _totals(nation_ops.province_blocks([row] if row else [], corridors,
+                                                                      body['flights']),
+                                           body['flights'], corridors),
+                          'cities': one}
+        body['city'] = {**detail, 'airborne': one[0]['airborne'] if one else 0,
+                        'delayed': one[0]['delayed'] if one else 0}
+        return body
 
     return {'status': 'INVALID', 'level': level,
             'note': 'level 只能是 nation / region / province / city'}
+
+
+def _totals(blocks: List[Dict[str, Any]], flights: List[Dict[str, Any]],
+            corridors: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """一个块自己的合计。
+
+    **航线数不能把各省的块加起来**：一条跨省航线会同时出现在两个省里，
+    累加就把 492 条算成 582 条（实测差 90）。所以航线/停飞/绕飞三项一律回原始列表数，
+    只有"城市/在飞/异常"这类按归属唯一计的才相加。
+    """
+    return {
+        'provinces': len({b.get('name') for b in blocks if b.get('region') is not None}) if blocks else 0,
+        'cities': sum(int(b.get('cities') or 0) for b in blocks),
+        'airports': sum(int(b.get('airports') or 0) for b in blocks),
+        'corridors': len(corridors),
+        'blocked': sum(1 for row in corridors if row.get('borderBlocked')),
+        'detour': sum(1 for row in corridors if row.get('detour')),
+        'airborne': sum(int(b.get('airborne') or 0) for b in blocks),
+        'delayed': sum(int(b.get('delayed') or 0) for b in blocks),
+        'hold': sum(int(b.get('hold') or 0) for b in blocks),
+        'lowVisCities': sum(int(b.get('lowVisCities') or 0) for b in blocks),
+    }

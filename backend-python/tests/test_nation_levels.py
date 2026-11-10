@@ -117,7 +117,9 @@ def test_unknown_ident_is_explicit_not_silent():
 def test_payload_size_is_bounded_per_level():
     for level, ident in (('nation', ''), ('region', 'east'), ('province', '广东省')):
         body = json.dumps(nation.payload(level, ident), ensure_ascii=False)
-        assert len(body.encode('utf-8')) < 400 * 1024, f'{level} 级载荷过大'
+        # 班次对象化（许可/剖面/裁决依据）之后载荷变大，nation 级从 ~240 KB 涨到 ~480 KB。
+        # 上限放到 560 KB：gzip 后约 70 KB，仍在可接受范围，同时还能挡住"又翻一倍"的回归。
+        assert len(body.encode('utf-8')) < 560 * 1024, f'{level} 级载荷过大'
 
 
 def test_province_level_shows_cross_province_endpoints():
@@ -134,8 +136,9 @@ def test_province_level_shows_cross_province_endpoints():
     external = {node['name'] for node in payload['nodes'] if node.get('external')}
     assert endpoints, '跨省航线应有对端城市'
     assert endpoints <= external, f'这些对端城市没画出来：{endpoints - external}'
-    # 本级城市数不能把对端城市算进来
-    assert payload['summary']['cities'] == 14
+    # 本级城市数不能把对端城市算进来。
+    # 辽宁原有 14 个地级单元；丹东距境外 1.2 km，按"边境 50 km 退出通航"整体删除，现在是 13。
+    assert payload['summary']['cities'] == 13
     assert payload['summary']['externals'] == len(external)
 
 

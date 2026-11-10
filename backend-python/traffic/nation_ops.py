@@ -1,0 +1,431 @@
+# -*- coding: utf-8 -*-
+"""全国层的**运行对象**：班次、分级汇总、机场情报、事件、AI 链。
+
+为什么单独一层
+--------------
+`nation.py` 是"路网与几何"（节点、航线、回波、绕飞），回答"哪里能飞"。
+本模块是"运行与裁决"，回答"这一班几点走、凭什么、出问题谁处置"。
+
+口径纪律
+--------
+- 班次、许可、事件**全部为 SIM**（模拟交通），与 `data/traffic` 的路网同源；
+  不冒充真实航班，也不进 1.0.0 的东北运行计划。
+- 气象是**真实公开实况**（open-meteo / METAR），风险概率是由实况按本文件阈值
+  算出来的**规则派生值**（`DERIVED`），不是训练模型输出 —— 界面上必须这么写。
+- 班次 id 用 `crc32` 而不是 `hash()`：后者每个进程随机加盐，重启后同一班次会换号。
+"""
+from __future__ import annotations
+
+import zlib
+from typing import Any, Dict, Iterable, List, Optional, Tuple
+
+# 风险阈值（与东北层 1.0.0 的低能见度口径同族，但这里是规则派生，不是 ml 模型）
+VIS_BANDS = ((1500.0, 0.72), (3000.0, 0.45), (5000.0, 0.22))
+WIND_HIGH = 12.0
+RISK_HOLD = 0.75
+RISK_WATCH = 0.35
+CRUISE_M = (600, 1100)
+
+DECISION_LABEL = {'RELEASE': '直飞放行', 'DETOUR': '绕飞放行', 'HOLD': '暂不放行'}
+LEVEL_LABEL = {'HIGH': '高', 'MEDIUM': '中', 'LOW': '低'}
+CLEARANCE_LABEL = {'RELEASED': '已放行', 'PENDING': '待批', 'SUSPENDED': '已暂停'}
+
+
+def _seed(corridor_id: str) -> int:
+    return zlib.crc32(corridor_id.encode('utf-8')) % 9973
+
+
+def schedule(row: Dict[str, Any]) -> Dict[str, float]:
+    """一条航线的排班参数。确定性：同一条航线永远同一个间隔与相位。"""
+    seed = _seed(row['id'])
+    headway = 150 + seed % 120                       # 2.5–4.5 h 一班
+    speed = 200.0 if row.get('cross') else 180.0
+    duration = max(12.0, (row.get('lengthKm') or 100.0) / speed * 60.0)
+    return {'headway': float(headway), 'phase': float(seed % headway),
+            'speed': speed, 'duration': duration}
+
+
+def altitude_profile(duration: float, cruise: int, samples: int = 9) -> List[List[float]]:
+    """高度剖面：15% 爬升、70% 巡航、15% 下降。时间单位分钟，高度单位米 AGL。"""
+    out: List[List[float]] = []
+    for index in range(samples):
+        t = duration * index / (samples - 1)
+        ratio = index / (samples - 1)
+        if ratio <= 0.15:
+            alt = cruise * (ratio / 0.15)
+        elif ratio >= 0.85:
+            alt = cruise * ((1 - ratio) / 0.15)
+        else:
+            alt = cruise
+        out.append([round(t, 1), int(alt)])
+    return out
+
+
+def _risk(row: Dict[str, Any], weather: Dict[str, Dict[str, Any]],
+          detour: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """规则派生的风险概率 + 依据。**不是训练模型**，界面标 DERIVED。"""
+    a = weather.get(row['fromName']) or {}
+    b = weather.get(row['toName']) or {}
+    vis_values = [v.get('visM') for v in (a, b) if v.get('visM') is not None]
+    winds = [v.get('windMps') for v in (a, b) if v.get('windMps') is not None]
+    vis = min(vis_values) if vis_values else None
+    wind = max(winds) if winds else None
+
+    risk = 0.05
+    drivers: List[str] = []
+    if vis is not None:
+        for threshold, value in VIS_BANDS:
+            if vis < threshold:
+                risk = max(risk, value)
+                drivers.append(f'端点能见度 {vis/1000:.1f} km')
+                break
+    else:
+        drivers.append('端点无实况（能见度按未知处理）')
+        risk = max(risk, 0.2)
+    if wind is not None and wind >= WIND_HIGH:
+        risk = min(0.95, risk + 0.12)
+        drivers.append(f'端点风速 {wind:.1f} m/s')
+    if detour:
+        risk = min(0.95, risk + 0.18)
+        drivers.append(f"航路穿回波，绕飞 {detour.get('shiftKm', 0)} km")
+    risk = round(min(0.95, max(0.0, risk)), 3)
+    level = 'HIGH' if risk >= RISK_HOLD else ('MEDIUM' if risk >= RISK_WATCH else 'LOW')
+    if detour:
+        decision = 'DETOUR'
+    elif risk >= RISK_HOLD:
+        decision = 'HOLD'
+    else:
+        decision = 'RELEASE'
+    return {'riskP': risk, 'riskLevel': level, 'riskLevelLabel': LEVEL_LABEL[level],
+            'decision': decision, 'decisionLabel': DECISION_LABEL[decision],
+            'drivers': drivers, 'visM': vis, 'windMps': wind}
+
+
+def _clearance(row: Dict[str, Any], sched: Dict[str, float], depart: float,
+               arrive: float, risk: Dict[str, Any], detour: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    band_low = CRUISE_M[0]
+    band_high = CRUISE_M[1]
+    if risk['decision'] == 'HOLD':
+        status = 'PENDING'
+    elif risk['decision'] == 'DETOUR':
+        status = 'RELEASED'
+    else:
+        status = 'RELEASED'
+    conditions = []
+    if risk.get('visM') is not None:
+        vis_km = risk['visM'] / 1000.0
+        conditions.append(f'端点能见度实况 {vis_km:.1f} km（门槛 3 km）' if vis_km < 10
+                          else '端点能见度 ≥ 10 km')
+    conditions.append('侧风 ≤ 12 m/s')
+    if detour:
+        conditions.append(f"按绕飞航路执行（外偏 {detour.get('shiftKm', 0)} km）")
+    if row.get('borderDetour'):
+        conditions.append('已按边境带改线')
+    return {
+        'status': status, 'statusLabel': CLEARANCE_LABEL[status],
+        'route': f"{row['fromName']} → {row['toName']}",
+        'corridor': row['id'],
+        'altitudeBand': f'{band_low}–{band_high} m AGL（按航向分层）',
+        'timeWindow': f'{_clock(depart)}–{_clock(arrive)}',
+        'conditions': conditions,
+    }
+
+
+def _clock(minute: float) -> str:
+    total = int(round(minute)) % 1440
+    return f'{total // 60:02d}:{total % 60:02d}'
+
+
+def flight_objects(corridors: Iterable[Dict[str, Any]], minute: int,
+                   detours: Dict[str, Dict[str, Any]],
+                   weather: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """某一分钟在飞的班次对象。
+
+    **每架一个独立对象**：有自己的编号、起降城市、计划时刻、许可、风险、裁决与高度剖面，
+    前端点哪一架就是哪一架，不再是一堆无名的点。
+    """
+    out: List[Dict[str, Any]] = []
+    for row in corridors:
+        if row.get('borderBlocked'):
+            continue
+        sched = schedule(row)
+        headway, phase = sched['headway'], sched['phase']
+        duration = sched['duration']
+        elapsed = (minute - phase) % headway
+        if elapsed > duration:
+            continue
+        progress = elapsed / duration
+        path = row.get('path') or [row['fromLonLat'], row['toLonLat']]
+        if len(path) < 2:
+            continue
+        detour = detours.get(row['id'])
+        # 绕飞航迹是真的在飞的那条，位置也跟着它走
+        if detour and detour.get('path'):
+            path = detour['path']
+        seg = max(1, len(path) - 1)
+        pos = progress * seg
+        idx = min(seg - 1, int(pos))
+        frac = pos - idx
+        lon = path[idx][0] + (path[idx + 1][0] - path[idx][0]) * frac
+        lat = path[idx][1] + (path[idx + 1][1] - path[idx][1]) * frac
+        ahead = path[min(seg, idx + 1)]
+        heading = 0.0
+        if ahead and (ahead[0] != lon or ahead[1] != lat):
+            import math as _math
+            heading = _math.degrees(_math.atan2(ahead[1] - lat, ahead[0] - lon))
+
+        late = int(6 + detour['shiftKm'] / 6.0) if detour else 0
+        depart = minute - elapsed
+        arrive = depart + duration + late
+        cruise = CRUISE_M[0] + int(min(1.0, (row.get('lengthKm') or 100) / 260.0) * (CRUISE_M[1] - CRUISE_M[0]))
+        risk = _risk(row, weather, detour)
+        slot = int((minute - phase) // headway)
+        callsign = f"TC{row['id'].split('-')[-1]}{slot % 10}"
+
+        alerts: List[Dict[str, str]] = []
+        if detour:
+            alerts.append({'code': 'ECHO_DETOUR', 'label': '绕飞回波', 'tone': 'warn'})
+        if risk['riskLevel'] == 'HIGH':
+            alerts.append({'code': 'LOW_VIS', 'label': '低能见度', 'tone': 'bad'})
+        if row.get('borderDetour'):
+            alerts.append({'code': 'BORDER_REROUTE', 'label': '边境改线', 'tone': 'quiet'})
+        if late:
+            alerts.append({'code': 'DELAY', 'label': f'延误 {late} min', 'tone': 'warn'})
+
+        out.append({
+            'id': f"{row['id']}#{slot}",
+            'callsign': callsign,
+            'corridor': row['id'],
+            'fromName': row['fromName'], 'toName': row['toName'],
+            'fromProvince': row['fromProvince'], 'toProvince': row['toProvince'],
+            'fromLonLat': row['fromLonLat'], 'toLonLat': row['toLonLat'],
+            'kind': row['kind'], 'kindLabel': row.get('kindLabel'),
+            'lon': round(lon, 4), 'lat': round(lat, 4), 'heading': round(heading, 1),
+            'progress': round(progress, 3),
+            'altM': int(cruise * (1 - abs(progress - 0.5) * 1.4)) if progress < 0.15 or progress > 0.85 else cruise,
+            'speedKmh': int(sched['speed']),
+            'departMinute': round(depart, 1), 'arriveMinute': round(arrive, 1),
+            'durationMin': round(duration, 1), 'elapsedMin': round(elapsed, 1),
+            'departAt': _clock(depart), 'arriveAt': _clock(arrive),
+            # 申请 / 计划 / 实际是三个不同时刻，不能三列写同一个数：
+            # 申请 = 起飞前 8 分钟提交；计划 = 排班时刻；实际 = 计划 + 绕飞延误。
+            'requestAt': _clock(depart - 8), 'planAt': _clock(depart),
+            'actualAt': _clock(depart + late) if elapsed > 0 else '',
+            'status': 'DELAYED' if detour else 'ON_TIME',
+            'delayMin': late, 'detourKm': detour['shiftKm'] if detour else 0.0,
+            'riskP': risk['riskP'], 'riskLevel': risk['riskLevel'],
+            'riskLevelLabel': risk['riskLevelLabel'],
+            'decision': risk['decision'], 'decisionLabel': risk['decisionLabel'],
+            'drivers': risk['drivers'],
+            'clearance': _clearance(row, sched, depart, arrive, risk, detour),
+            'altProfile': altitude_profile(duration, cruise),
+            'alerts': alerts,
+            'exposure': {
+                'directMin': round((detour.get('hitKm', 0.0) / max(1.0, sched['speed'])) * 60.0, 1) if detour else 0.0,
+                'detourMin': 0.0,
+            },
+            'source': 'SIM',
+        })
+    out.sort(key=lambda item: item['departMinute'])
+    return out
+
+
+def upcoming(corridors: Iterable[Dict[str, Any]], minute: int,
+             horizon: int = 90) -> List[Dict[str, Any]]:
+    """未来 `horizon` 分钟内将要起飞的班次（用于台账的"未起飞"一栏）。"""
+    rows: List[Dict[str, Any]] = []
+    for row in corridors:
+        if row.get('borderBlocked'):
+            continue
+        sched = schedule(row)
+        headway, phase, duration = sched['headway'], sched['phase'], sched['duration']
+        elapsed = (minute - phase) % headway
+        wait = headway - elapsed if elapsed > duration else 0
+        if wait > horizon:
+            continue
+        depart = minute + wait
+        rows.append({
+            'id': f"{row['id']}#{int((depart - phase) // headway)}",
+            'corridor': row['id'], 'fromName': row['fromName'], 'toName': row['toName'],
+            'fromProvince': row['fromProvince'], 'toProvince': row['toProvince'],
+            'departMinute': round(depart, 1), 'arriveMinute': round(depart + duration, 1),
+            'departAt': _clock(depart), 'arriveAt': _clock(depart + duration),
+            'durationMin': round(duration, 1), 'waitMin': round(wait, 1),
+            'state': 'SCHEDULED', 'speedKmh': int(sched['speed']),
+            'source': 'SIM',
+        })
+    rows.sort(key=lambda item: item['departMinute'])
+    return rows
+
+
+def _airborne_by_province(flights: Iterable[Dict[str, Any]]) -> Dict[str, Dict[str, int]]:
+    """按**起飞机省**归属，避免跨省航线被两边各算一次。"""
+    table: Dict[str, Dict[str, int]] = {}
+    for flight in flights:
+        bucket = table.setdefault(flight['fromProvince'], {'airborne': 0, 'delayed': 0, 'hold': 0})
+        bucket['airborne'] += 1
+        if flight['status'] == 'DELAYED':
+            bucket['delayed'] += 1
+        if flight['decision'] == 'HOLD':
+            bucket['hold'] += 1
+    return table
+
+
+def _corridors_by_province(corridors: Iterable[Dict[str, Any]]) -> Dict[str, Dict[str, int]]:
+    table: Dict[str, Dict[str, int]] = {}
+    for row in corridors:
+        provinces = {row['fromProvince']}
+        if row['toProvince'] != row['fromProvince']:
+            provinces.add(row['toProvince'])
+        for province in provinces:
+            bucket = table.setdefault(province, {'corridors': 0, 'blocked': 0, 'detour': 0})
+            bucket['corridors'] += 1
+            if row.get('borderBlocked'):
+                bucket['blocked'] += 1
+            if row.get('detour'):
+                bucket['detour'] += 1
+    return table
+
+
+def province_blocks(provinces: Iterable[Dict[str, Any]], corridors: List[Dict[str, Any]],
+                    flights: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """给每个省一个**自己的块**：本省多少航线、在飞几架、异常几架、停飞几条。"""
+    air = _airborne_by_province(flights)
+    lines = _corridors_by_province(corridors)
+    out: List[Dict[str, Any]] = []
+    for row in provinces:
+        name = row['name']
+        a = air.get(name) or {'airborne': 0, 'delayed': 0, 'hold': 0}
+        c = lines.get(name) or {'corridors': 0, 'blocked': 0, 'detour': 0}
+        out.append({
+            'name': name, 'region': row.get('region'), 'regionLabel': row.get('regionLabel'),
+            'cities': row.get('cities'), 'airports': row.get('airports'),
+            'corridors': c['corridors'], 'blocked': c['blocked'], 'detour': c['detour'],
+            'airborne': a['airborne'], 'delayed': a['delayed'], 'hold': a['hold'],
+            'lowVisCities': row.get('lowVisCities') or 0,
+            'state': row.get('state'),
+        })
+    return out
+
+
+def city_blocks(province: Optional[str], cities: Iterable[Dict[str, Any]],
+                corridors: List[Dict[str, Any]], flights: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """市一级的块：每个城市自己的航线数与在飞数。"""
+    out: List[Dict[str, Any]] = []
+    air_counter: Dict[str, int] = {}
+    delay_counter: Dict[str, int] = {}
+    for flight in flights:
+        air_counter[flight['fromName']] = air_counter.get(flight['fromName'], 0) + 1
+        if flight['status'] == 'DELAYED':
+            delay_counter[flight['fromName']] = delay_counter.get(flight['fromName'], 0) + 1
+    for city in cities:
+        name = city['name']
+        links = [row for row in corridors if name in (row['fromName'], row['toName'])]
+        out.append({
+            'name': name, 'province': city.get('province') or province,
+            'airport': city.get('airport'), 'hasAirport': city.get('hasAirport'),
+            'corridors': len(links),
+            'airborne': air_counter.get(name, 0),
+            'delayed': delay_counter.get(name, 0),
+            'blocked': sum(1 for row in links if row.get('borderBlocked')),
+            'links': len(links),
+            'coordSource': city.get('coordSource'),
+            'lon': city.get('lon'), 'lat': city.get('lat'),
+        })
+    out.sort(key=lambda item: (-item['airborne'], -item['corridors'], item['name']))
+    return out
+
+
+def intel(cities: Iterable[Dict[str, Any]], weather: Dict[str, Dict[str, Any]],
+          airport_by_city: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """机场情报：全国机场城市的实况与放行建议（**实况为公开源，建议为规则派生**）。"""
+    rows: List[Dict[str, Any]] = []
+    for city in cities:
+        station = airport_by_city.get(city['name'])
+        if not station:
+            continue
+        live = weather.get(city['name']) or {}
+        vis = live.get('visM')
+        wind = live.get('windMps')
+        if vis is None:
+            status, tone = '无实况', 'quiet'
+        elif vis < 1500:
+            status, tone = '不建议放行', 'bad'
+        elif vis < 3000:
+            status, tone = '需谨慎', 'warn'
+        else:
+            status, tone = '可放行', 'good'
+        rows.append({
+            'city': city['name'], 'province': city['province'],
+            'icao': station.get('icao'), 'station': station.get('site'),
+            'visM': vis, 'windMps': wind, 'tempC': live.get('tempC'),
+            'low': bool(live.get('low')), 'status': status, 'tone': tone,
+            'hasWeather': bool(live),
+        })
+    rows.sort(key=lambda item: (item['status'] == '可放行', item['visM'] or 99999))
+    return rows
+
+
+def alerts(corridors: List[Dict[str, Any]], flights: List[Dict[str, Any]],
+           weather: Dict[str, Dict[str, Any]], cities: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """事件处置：把本视图内需要处置的事凑成一条条事件，带处置动作与状态。"""
+    out: List[Dict[str, Any]] = []
+    for city in cities:
+        live = weather.get(city['name']) or {}
+        if live.get('low'):
+            out.append({
+                'id': f"EV-VIS-{city['name']}", 'code': 'LOW_VIS', 'kind': '低能见度',
+                'severity': 'warn', 'place': city['name'], 'province': city['province'],
+                'detail': f"能见度 {live.get('visM', 0)/1000:.1f} km，低于 3 km 门槛",
+                'action': '端点城市降档：该端起降班次提高一层高度带，能见度 <1.5 km 的暂不放行',
+                'status': '自动处置', 'auto': True,
+            })
+    for row in corridors:
+        if row.get('borderBlocked'):
+            out.append({
+                'id': f"EV-BORDER-{row['id']}", 'code': 'BORDER_HOLD', 'kind': '边境受限',
+                'severity': 'bad', 'place': f"{row['fromName']} → {row['toName']}",
+                'province': row['fromProvince'],
+                'detail': '航路落在我方一侧 10 km 管制带内，绕飞后仍越界',
+                'action': '该航线停飞，不进入排班；恢复需空管批准',
+                'status': '已停飞', 'auto': True,
+            })
+        elif row.get('detour'):
+            out.append({
+                'id': f"EV-ECHO-{row['id']}", 'code': 'ECHO_DETOUR', 'kind': '回波绕飞',
+                'severity': 'warn', 'place': f"{row['fromName']} → {row['toName']}",
+                'province': row['fromProvince'],
+                'detail': f"原航路穿对流回波，外偏 {row['detour'].get('shiftKm', 0)} km 改航",
+                'action': '已按法线侧移改航，航迹图上琥珀色段为实际航路',
+                'status': '自动处置', 'auto': True,
+            })
+    for flight in flights:
+        if flight['decision'] == 'HOLD':
+            out.append({
+                'id': f"EV-HOLD-{flight['id']}", 'code': 'FLIGHT_HOLD', 'kind': '放行暂缓',
+                'severity': 'bad', 'place': f"{flight['fromName']} → {flight['toName']}",
+                'province': flight['fromProvince'],
+                'detail': '风险概率 ' + f"{flight['riskP']:.2f}" + '，高于 0.75 暂不放行',
+                'action': '留在地面等待下一个时隙；风险回落后自动恢复',
+                'status': '待处置', 'auto': False, 'flightId': flight['id'],
+            })
+    order = {'bad': 0, 'warn': 1, 'quiet': 2}
+    out.sort(key=lambda item: (order.get(item['severity'], 3), item['kind']))
+    return out
+
+
+def border_monitor(corridors: List[Dict[str, Any]], flights: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """越界监视（全国版）：本视图内有多少架落在管制带里、多少条航路被停飞。"""
+    blocked = [row for row in corridors if row.get('borderBlocked')]
+    rerouted = [row for row in corridors if row.get('borderDetour')]
+    inside = [flight for flight in flights if flight['corridor'] in {row['id'] for row in blocked}]
+    return {
+        'inside': len(inside),
+        'flights': [{'id': f['id'], 'place': f"{f['fromName']} → {f['toName']}"} for f in inside[:6]],
+        'blockedCorridors': len(blocked),
+        'blockedNames': [f"{row['fromName']} → {row['toName']}" for row in blocked],
+        'reroutedCorridors': len(rerouted),
+        'scope': '国界/实际控制线向我方一侧 10 km 管制带（本项目保守口径）',
+        'note': '停飞航路不进入排班，因此“本视图内在管制带内的架次”恒为 0；'
+                '这个 0 是**算出来的**，不是没算。',
+    }
