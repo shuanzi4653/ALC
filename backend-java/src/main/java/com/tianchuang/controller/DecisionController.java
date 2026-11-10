@@ -108,6 +108,17 @@ public class DecisionController {
         return python.decisionRequest("/traffic/v2/nation/flights" + (query.isEmpty() ? "" : "?" + query), null);
     }
 
+    /**
+     * 全国班次取证链。路径是两段（nation/evidence），上面那条 `{resource}` 单段白名单接不住，
+     * 所以单独开一条 —— 网关只透传显式声明过的路径，漏一条就是 404。
+     */
+    @GetMapping("/traffic/v2/nation/evidence")
+    public ResponseEntity<?> nationEvidence(@RequestParam Map<String, String> params) throws Exception {
+        String query = params.entrySet().stream().map(e -> encode(e.getKey()) + "=" + encode(e.getValue()))
+                .collect(Collectors.joining("&"));
+        return python.decisionRequest("/traffic/v2/nation/evidence" + (query.isEmpty() ? "" : "?" + query), null);
+    }
+
     @GetMapping("/traffic/health")
     public ResponseEntity<?> trafficHealth() throws Exception {
         return python.decisionRequest("/traffic/health", null);

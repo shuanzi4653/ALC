@@ -150,3 +150,39 @@ def test_city_nodes_carry_per_city_weather():
     for item in weather:
         assert 'tempC' in item and 'visM' in item and 'windMps' in item and 'low' in item
     assert payload['summary']['weatherSource'].startswith('open-meteo')
+
+
+def test_fog_areas_are_derived_from_city_visibility():
+    """雾区是**由城市能见度派生**的面，不是雾场观测：档位要和能见度对得上。"""
+    payload = nation.payload('nation', None, 60)
+    fog = payload['fog']
+    assert fog['note'] and '不是雾场观测' in fog['note'], '雾区必须标明派生口径'
+    for level in ('BAN', 'LOW'):
+        for ring in fog['bands'][level]:
+            assert len(ring) >= 4, '雾区面至少要是一个闭合环'
+    for city in fog['cities']:
+        assert city['visM'] < 3000, '能见度没低于 3 km 的城市不该进雾区'
+        assert (city['level'] == 'BAN') == (city['visM'] < 1500), '1.5 km 档位判错了'
+
+
+def test_evidence_chain_has_source_on_every_row():
+    """取证链的硬规矩：**每一行都要有来源**，没有来源的行不许写。"""
+    payload = nation.payload('nation', None, 60)
+    assert payload['flights'], '全国层此刻应有在飞班次'
+    flight = payload['flights'][0]
+    body = nation.evidence(flight['id'], 60)
+    assert body['status'] == 'OK', body.get('note')
+    assert body['steps'], '取证链不能是空的'
+    for step in body['steps']:
+        assert step['rows'], f"{step['title']} 没有内容"
+        for row in step['rows']:
+            assert row['source'] in ('SIM', 'PUBLIC', 'DERIVED', 'OFFICIAL', 'MANUAL'), row
+            assert row['value'] not in (None, ''), row
+    assert '规则派生' in body['discipline']
+
+
+def test_evidence_reports_not_airborne_instead_of_guessing():
+    """该分钟不在飞时要如实说"不在飞"，不能编一条出来。"""
+    body = nation.evidence('NC-0001#999', 60)
+    assert body['status'] in ('NOT_AIRBORNE', 'NOT_FOUND')
+    assert body.get('note')

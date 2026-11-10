@@ -14,6 +14,7 @@ const props=defineProps({
   flights:{type:Array,default:()=>[]},
   minute:{type:Number,default:0},
   radarOn:{type:Boolean,default:true},
+  fogOn:{type:Boolean,default:true},
   terrainOn:{type:Boolean,default:true},
   tilt:{type:Boolean,default:false},
   density:{type:String,default:'full'},
@@ -105,6 +106,22 @@ const radarTiles=computed(()=>{
   const t=props.data?.radar?.tiles
   if(!t) return []
   return tilesFor(t,6,6)
+})
+
+// —— 雾区 ——
+// 面是后端按城市能见度外扩合并出来的（DERIVED），点才是实测；所以面画得很淡，
+// 城市本身仍由节点的红圈标注，两者不混。
+const fogPolys=computed(()=>{
+  if(!props.fogOn) return []
+  const bands=props.data?.fog?.bands||{}
+  const out=[]
+  for(const level of ['BAN','LOW']){
+    for(const ring of bands[level]||[]){
+      if(!ring||ring.length<3) continue
+      out.push({level,d:toPath({type:'Polygon',coordinates:[ring]},project)})
+    }
+  }
+  return out
 })
 
 // —— 行政区 ——
@@ -291,7 +308,18 @@ function onMove(e){
 }
 function onUp(){dragging.value=false;dragStart=null}
 function resetView(){zoom.value=1;pan.value={x:0,y:0}}
-defineExpose({resetView})
+// 缩放到指定经纬框（定位回波 / 定位雾区用）。留 18% 余量，别贴边。
+function fitBounds(b){
+  if(!b||b.length<4||b[2]<=b[0]||b[3]<=b[1]) return false
+  const nw=project(b[0],b[3]), se=project(b[2],b[1])
+  const w=Math.abs(se[0]-nw[0])||1, h=Math.abs(se[1]-nw[1])||1
+  const next=Math.max(1,Math.min(9,Math.min(VIEW.w/w,VIEW.h/h)*0.82))
+  const cx=(nw[0]+se[0])/2, cy=(nw[1]+se[1])/2
+  zoom.value=next
+  pan.value={x:VIEW.w/2-cx*next, y:VIEW.h/2-cy*next}
+  return true
+}
+defineExpose({resetView,fitBounds})
 
 // —— 跟随航班 ——
 // 1.0.0 的"跟随"是相机跟着这一架走。这里没有相机，就把这一架钉在屏幕中心：
@@ -329,6 +357,9 @@ function clickNode(node){
         <stop offset="100%" stop-color="rgba(38,86,120,.25)"/>
       </linearGradient>
       <filter id="glow"><feGaussianBlur stdDeviation="1.6"/></filter>
+      <filter id="nmap-fog-blur" x="-20%" y="-20%" width="140%" height="140%">
+        <feGaussianBlur stdDeviation="3.2"/>
+      </filter>
       <clipPath id="nmap-china-clip"><path :d="chinaClipD"/></clipPath>
     </defs>
 
@@ -352,6 +383,13 @@ function clickNode(node){
               :d="toPath({type:'Polygon',coordinates:[ring]})"
               :stroke="virtualMode?'rgba(255,150,110,.95)':'rgba(255,120,90,.75)'"
               :stroke-width="virtualMode?2.2:.9"/>
+      </g>
+
+      <!-- 2.5 雾区：低能见度面（DERIVED） -->
+      <g v-if="fogPolys.length" class="nmap-fog" filter="url(#nmap-fog-blur)">
+        <path v-for="(poly,i) in fogPolys" :key="'fg'+i" :d="poly.d"
+              :fill="poly.level==='BAN'?'rgba(226,240,252,.34)':'rgba(196,222,244,.22)'"
+              stroke="rgba(206,232,255,.35)" stroke-width=".8"/>
       </g>
 
       <!-- 3 行政区 -->

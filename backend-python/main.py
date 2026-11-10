@@ -445,6 +445,30 @@ def traffic_v2_nation(level: str = Query('nation', pattern='^(nation|region|prov
         raise HTTPException(404, payload.get('note') or '未找到')
     return payload
 
+
+@app.get('/traffic/v2/nation/evidence')
+def traffic_v2_nation_evidence(flight: str = Query(..., min_length=3),
+                               minute: int = Query(60, ge=0, le=1440)):
+    """全国班次的取证链。
+
+    大模型只在配置了 key 时才可能参与；**没配置就明说**，不给"像模型结论"的规则话术。
+    """
+    from traffic import nation as traffic_nation
+    body = traffic_nation.evidence(flight, minute)
+    configured = bool(DS_CFG.get('api_key'))
+    body['llm'] = {
+        'configured': configured,
+        'model': DS_CFG.get('model') if configured else None,
+        'status': 'READY' if configured else 'NOT_CONFIGURED',
+        'note': ('大模型已配置：本页只展示规则证据链，模型结论另见「大模型取证」入口。'
+                 if configured else
+                 '大模型未配置（config 里没有 api-key）：这里给的是**规则证据链**，'
+                 '每一行都标了来源，没有一句话是模型生成的。'),
+    }
+    if body.get('status') == 'NOT_FOUND':
+        raise HTTPException(404, body.get('note') or '未找到该班次')
+    return body
+
 @app.get('/traffic/v2/national')
 def traffic_v2_national():
     """全国层聚合（七 大区 + 省级三态）。只读缓存，不做全网推理。"""

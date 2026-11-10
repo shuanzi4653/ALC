@@ -111,14 +111,21 @@ def _city_rows() -> List[Dict[str, Any]]:
     return rows
 
 
-def _city_weather() -> Dict[str, Dict[str, Any]]:
-    """逐市气象（open-meteo 公开接口，免密钥）。取不到的城市就是没有，不补零。"""
+def _city_weather_payload() -> Dict[str, Any]:
+    """逐市气象（open-meteo 公开接口，免密钥）。取不到的城市就是没有，不补零。
+
+    返回**整份载荷**（含 fetchedAt），取证要引用"这份实况是什么时候取的"；
+    只拿 cities 的调用走 `_city_weather()`。
+    """
     try:
         from weather import city_weather
-        payload = city_weather.fetch([(row['name'], row['lat'], row['lon']) for row in _city_rows()])
-        return payload.get('cities') or {}
+        return city_weather.fetch([(row['name'], row['lat'], row['lon']) for row in _city_rows()])
     except Exception:  # noqa: BLE001 - 气象源不可用不能把页面打崩
         return {}
+
+
+def _city_weather() -> Dict[str, Dict[str, Any]]:
+    return _city_weather_payload().get('cities') or {}
 
 
 @lru_cache(maxsize=1)
@@ -206,6 +213,67 @@ def _radar_polygons(bands: Dict[str, Any]):
             except Exception:  # noqa: BLE001
                 continue
     return unary_union(shapes) if shapes else None
+
+
+def _fog(cities: List[Dict[str, Any]], weather: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+    """低能见度区（雾区）：**由逐市能见度派生**的面，不是真实的雾场观测。
+
+    做法：能见度 <1500 m 的城市画 35 km 缓冲、1500–3000 m 画 55 km 缓冲，同档合并成片。
+    这是"已知这几个城市看不见，周围多大一片大概也看不见"的保守估计 ——
+    半径是按城市间距取的，不是气象上的雾团尺度，所以界面上必须标 DERIVED，
+    也不能拿它当"官方雾区预警"讲。
+    """
+    from shapely.geometry import Point
+    from shapely.ops import unary_union
+    radius = {'BAN': 0.32, 'LOW': 0.50}          # 度；约 35 km / 55 km
+    groups: Dict[str, List[Point]] = {'BAN': [], 'LOW': []}
+    rows: List[Dict[str, Any]] = []
+    for city in cities:
+        live = weather.get(city['name']) or {}
+        vis = live.get('visM')
+        if vis is None:
+            continue
+        if vis < 1500:
+            level = 'BAN'
+        elif vis < 3000:
+            level = 'LOW'
+        else:
+            continue
+        groups[level].append(Point(city['lon'], city['lat']))
+        rows.append({'name': city['name'], 'province': city['province'],
+                     'lon': city['lon'], 'lat': city['lat'], 'visM': vis, 'level': level})
+    bands: Dict[str, List[List[List[float]]]] = {}
+    for level, points in groups.items():
+        if not points:
+            bands[level] = []
+            continue
+        merged = unary_union([point.buffer(radius[level], quad_segs=6) for point in points])
+        merged = merged.simplify(0.02)
+        parts = getattr(merged, 'geoms', [merged])
+        rings = []
+        for part in parts:
+            if part.is_empty or part.area < 0.02:
+                continue
+            rings.append([[round(x, 3), round(y, 3)] for x, y in part.exterior.coords])
+        bands[level] = rings[:24]
+        # 城市点本身也要画：面是估的，点是实测的，两者不能混
+    all_points = [(row['lon'], row['lat']) for row in rows]
+    bbox = None
+    if all_points:
+        bbox = [round(min(p[0] for p in all_points) - 0.6, 3), round(min(p[1] for p in all_points) - 0.4, 3),
+                round(max(p[0] for p in all_points) + 0.6, 3), round(max(p[1] for p in all_points) + 0.4, 3)]
+    return {
+        'available': bool(rows),
+        'counts': {'BAN': sum(1 for row in rows if row['level'] == 'BAN'),
+                   'LOW': sum(1 for row in rows if row['level'] == 'LOW'),
+                   'cities': len(rows)},
+        'bands': bands,
+        'cities': rows,
+        'bbox': bbox,
+        'radiusKm': {'BAN': 35, 'LOW': 55},
+        'source': 'open-meteo current 逐市能见度（公开、免密钥）',
+        'note': '面由城市能见度按半径外扩合并得到（DERIVED），不是雾场观测；半径是工程估值，不是气象雾团尺度。',
+    }
 
 
 def _detour_for(path: List[List[float]], avoid) -> Optional[Dict[str, Any]]:
@@ -613,6 +681,7 @@ def payload(level: str = 'nation', ident: Optional[str] = None,
                 'upcoming': nation_ops.upcoming(corridors, minute)[:90],
                 'alerts': nation_ops.alerts(corridors, flights, weather, scoped_cities),
                 'intel': nation_ops.intel(scoped_cities, weather, airport_by_city),
+                'fog': _fog(scoped_cities, weather),
                 'border': {**nation_ops.border_monitor(corridors, flights),
                            'excludeKm': _network().get('borderExcludeKm'),
                            'excludedCities': _network().get('borderExcluded') or []},
@@ -791,4 +860,99 @@ def _totals(blocks: List[Dict[str, Any]], flights: List[Dict[str, Any]],
         'delayed': sum(int(b.get('delayed') or 0) for b in blocks),
         'hold': sum(int(b.get('hold') or 0) for b in blocks),
         'lowVisCities': sum(int(b.get('lowVisCities') or 0) for b in blocks),
+    }
+
+
+def evidence(flight_id: str, minute: int = 60) -> Dict[str, Any]:
+    """全国班次的取证链：**每一行都带来源**，没有来源的行不许写。
+
+    设计上刻意不依赖"班次属于哪个层级"：班次 id 里已经带走廊号（`NC-0310#-1`），
+    直接按走廊重算这一班，O(1)，不必为了一次点击重建整棵树。
+
+    大模型是否可用由**调用方**（main）决定并回填 `llm` 字段 —— 没配置就必须
+    如实说"只有规则链"，不能拿规则结论冒充模型判定。
+    """
+    raw = (flight_id or '').strip()
+    corridor_id = raw.split('#')[0]
+    destination = None
+    for row in _corridor_rows():
+        if row['id'] == corridor_id:
+            destination = row
+            break
+    if destination is None:
+        return {'status': 'NOT_FOUND', 'flightId': raw,
+                'note': f'没有这条航线：{corridor_id}'}
+    minute = max(0, min(1440, int(minute or 0)))
+    radar = _radar()
+    table = _detour_table(radar.get('ts') or 'none') if radar.get('available') else {}
+    weather_body = _city_weather_payload()
+    weather = weather_body.get('cities') or {}
+    weather_ts = weather_body.get('fetchedAt')
+    scoped = _slice_corridors({destination['fromProvince'], destination['toProvince']})
+    corridor = next((item for item in scoped if item['id'] == corridor_id), None)
+    if corridor is None:
+        return {'status': 'NOT_FOUND', 'flightId': raw, 'note': '航线不在当前路网里'}
+    if table.get(corridor_id):
+        corridor['detour'] = table[corridor_id]
+    flights = nation_ops.flight_objects([corridor], minute, table, weather)
+    flight = next((item for item in flights if item['id'] == raw), None)
+    if flight is None:
+        return {'status': 'NOT_AIRBORNE', 'flightId': raw, 'minute': minute,
+                'note': '该班次在此刻不在飞（可能已到达或尚未起飞）；时间轴上换一分钟再取证。'}
+
+    a = weather.get(flight['fromName']) or {}
+    b = weather.get(flight['toName']) or {}
+    detour = corridor.get('detour') or {}
+
+    def vis(value):
+        return '无实况' if value is None else (f'{value/1000:.1f} km' if value < 10000 else f'≥{value/1000:.0f} km')
+
+    steps = [
+        {'n': 1, 'title': '班次与航路', 'rows': [
+            {'label': '班次', 'value': f"{flight['callsign']}（{flight['id']}）", 'source': 'SIM'},
+            {'label': '起讫', 'value': f"{flight['fromName']} → {flight['toName']}", 'source': 'SIM'},
+            {'label': '航线', 'value': f"{corridor_id} · {corridor.get('kindLabel')} · {corridor.get('lengthKm')} km", 'source': 'SIM'},
+            {'label': '计划', 'value': f"{flight['planAt']} 起飞 / {flight['arriveAt']} 到达", 'source': 'SIM'},
+        ]},
+        {'n': 2, 'title': '端点实况', 'rows': [
+            {'label': f"{flight['fromName']} 能见度", 'value': vis(a.get('visM')), 'source': 'PUBLIC', 'ts': weather_ts},
+            {'label': f"{flight['toName']} 能见度", 'value': vis(b.get('visM')), 'source': 'PUBLIC', 'ts': weather_ts},
+            {'label': '端点风速', 'value': f"{a.get('windMps', '—')} / {b.get('windMps', '—')} m/s", 'source': 'PUBLIC', 'ts': weather_ts},
+        ]},
+        {'n': 3, 'title': '航路回波', 'rows': [
+            {'label': '回波段', 'value': (f"原航路穿回波 {detour.get('hitKm')} km" if detour else '本帧无回波压线'),
+             'source': 'DERIVED', 'ts': radar.get('ts')},
+            {'label': '处理', 'value': (f"外偏 {detour.get('shiftKm')} km 绕飞" if detour else '保持原航路'),
+             'source': 'DERIVED'},
+            {'label': '回波源', 'value': '公开雷达拼图（RainViewer），已裁到国内', 'source': 'PUBLIC', 'ts': radar.get('ts')},
+        ]},
+        {'n': 4, 'title': '风险与裁决', 'rows': [
+            {'label': '风险概率', 'value': f"{flight['riskP']:.2f}（{flight['riskLevelLabel']}）", 'source': 'DERIVED'},
+            {'label': '裁决', 'value': flight['decisionLabel'], 'source': 'DERIVED'},
+            *[{'label': f'依据 {index + 1}', 'value': text, 'source': 'DERIVED'}
+              for index, text in enumerate(flight.get('drivers') or [])],
+        ]},
+        {'n': 5, 'title': '反事实与边界', 'rows': [
+            {'label': '不绕飞暴露', 'value': f"{flight['exposure']['directMin']} 分钟", 'source': 'DERIVED'},
+            {'label': '绕飞后暴露', 'value': f"{flight['exposure']['detourMin']} 分钟", 'source': 'DERIVED'},
+            {'label': '边境', 'value': ('航线已按边境带改线' if corridor.get('borderDetour')
+                                      else ('该航线因边境受限停飞' if corridor.get('borderBlocked') else '未触发边境管制')),
+             'source': 'OFFICIAL'},
+        ]},
+    ]
+    conclusion = f"{flight['decisionLabel']}：风险 {flight['riskP']:.2f}"
+    if detour:
+        conclusion += f"；原航路穿回波 {detour.get('hitKm')} km，已外偏 {detour.get('shiftKm')} km"
+    else:
+        conclusion += '；端点实况与航路回波均未触发改航条件'
+    return {
+        'status': 'OK', 'flightId': raw, 'minute': minute,
+        'generatedAt': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
+        'flight': {key: flight[key] for key in
+                   ('id', 'callsign', 'fromName', 'toName', 'departAt', 'arriveAt',
+                    'riskP', 'riskLevel', 'riskLevelLabel', 'decision', 'decisionLabel', 'altM')},
+        'steps': steps,
+        'conclusion': conclusion,
+        'discipline': '本链为**规则派生**：实况来自公开源、回波来自公开拼图、概率由本系统阈值算出，'
+                      '不是训练模型输出，也不是官方管制结论。',
     }

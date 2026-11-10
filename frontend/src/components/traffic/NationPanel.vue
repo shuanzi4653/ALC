@@ -18,11 +18,15 @@ const data=ref(null)
 const view=ref('map')
 const error=ref(''),loading=ref(false)
 const busy=ref('')
+const evidence=ref(null)
+const evidenceBusy=ref(false)
+const evidenceErr=ref('')
 
 const minute=ref(60)
 const playing=ref(false)
 const speed=ref(1)                    // 分钟/秒：0.25≈15×、1=60×、5=300×
 const radarOn=ref(true)
+const fogOn=ref(true)
 const terrainOn=ref(true)
 const tilt=ref(false)
 const virtualMode=ref(false)
@@ -45,6 +49,44 @@ const rollup=computed(()=>data.value?.rollup||{level:'nation',total:{},regions:[
 const total=computed(()=>({...(rollup.value.total||{}),...live.value}))
 const radarMeta=computed(()=>data.value?.radar||{})
 const border=computed(()=>data.value?.border||{})
+const fog=computed(()=>data.value?.fog||{available:false,counts:{},bands:{},cities:[]})
+
+// 回波范围：三档环一起算，定位按钮按它飞过去
+const radarBBox=computed(()=>{
+  const bands=data.value?.radar?.bands||{}
+  let minLon=999,minLat=999,maxLon=-999,maxLat=-999,any=false
+  for(const level of ['STRONG','CONVECTIVE','WEAK']){
+    for(const ring of bands[level]||[]){
+      for(const [lon,lat] of ring||[]){
+        any=true
+        if(lon<minLon)minLon=lon; if(lon>maxLon)maxLon=lon
+        if(lat<minLat)minLat=lat; if(lat>maxLat)maxLat=lat
+      }
+    }
+  }
+  return any?[minLon,minLat,maxLon,maxLat]:null
+})
+// —— 全国取证 ——
+// 给的是"每一行都有来源"的证据链；大模型没配置就只显示规则链，不冒充模型结论。
+async function loadEvidence(){
+  const flight=selectedFlight.value
+  if(!flight) return
+  evidenceBusy.value=true
+  evidenceErr.value=''
+  try{
+    evidence.value=await requestJson(
+      `/api/traffic/v2/nation/evidence?flight=${encodeURIComponent(flight.id)}&minute=${Math.round(minute.value)}`,
+      {timeoutMs:25000})
+  }catch(e){evidenceErr.value=e.message||String(e);evidence.value=null}
+  finally{evidenceBusy.value=false}
+}
+function clearEvidence(){evidence.value=null;evidenceErr.value=''}
+
+function locateLayer(kind){
+  followId.value=''
+  const box=kind==='radar'?radarBBox.value:(data.value?.fog?.bbox||null)
+  if(box) mapRef.value?.fitBounds(box)
+}
 const alerts=computed(()=>data.value?.alerts||[])
 const intel=computed(()=>data.value?.intel||[])
 const upcoming=computed(()=>data.value?.upcoming||[])
@@ -145,7 +187,7 @@ function togglePlay(){
 watch(speed,()=>{ if(playing.value){togglePlay();togglePlay()} })
 
 function pickFlight(flight){
-  if(selectedId.value!==flight.id) followId.value=''
+  if(selectedId.value!==flight.id){followId.value='';clearEvidence()}
   selectedId.value=flight.id
   selectedCorridor.value=''
 }
@@ -310,6 +352,7 @@ onUnmounted(()=>{if(timer) clearInterval(timer)})
           <option :value="5">300 倍速</option>
         </select>
         <button :class="{on:radarOn}" @click="radarOn=!radarOn">回波</button>
+        <button :class="{on:fogOn}" @click="fogOn=!fogOn" :disabled="!fog.available">雾区</button>
         <button :class="{on:terrainOn}" @click="terrainOn=!terrainOn">地形</button>
         <button :class="{on:tilt}" @click="tilt=!tilt">立体</button>
         <button :class="{on:virtualMode}" @click="virtualMode=!virtualMode"
@@ -319,12 +362,14 @@ onUnmounted(()=>{if(timer) clearInterval(timer)})
           <option value="slim">精简</option>
           <option value="min">极简</option>
         </select>
+        <button :disabled="!radarBBox" @click="locateLayer('radar')">定位回波</button>
+        <button :disabled="!fog.bbox" @click="locateLayer('fog')">定位雾区</button>
         <button @click="followId='';mapRef?.resetView()">复位</button>
       </div>
 
       <div class="nrn-canvas">
       <NationMap ref="mapRef" :data="data" :flights="flights" :minute="minute"
-                 :radar-on="radarOn" :terrain-on="terrainOn" :tilt="tilt"
+                 :radar-on="radarOn" :fog-on="fogOn" :terrain-on="terrainOn" :tilt="tilt"
                  :density="density" :virtual-mode="virtualMode"
                  :selected-id="selectedId" :selected-corridor="selectedCorridor"
                  :follow-id="followId"
@@ -336,6 +381,7 @@ onUnmounted(()=>{if(timer) clearInterval(timer)})
         <span>比对范围：{{ border.scope }}</span>
         <span>停飞航线 {{ border.blockedCorridors||0 }} 条<template v-if="(border.blockedNames||[]).length">（{{ (border.blockedNames||[]).slice(0,3).join('、') }}{{ (border.blockedNames||[]).length>3?' 等':'' }}）</template></span>
         <span>已改线 {{ border.reroutedCorridors||0 }} 条</span>
+        <span v-if="fog.available">低能见度 {{ fog.counts.cities }} 城（&lt;1.5 km {{ fog.counts.BAN }} 城）</span>
         <span class="quiet">{{ border.note }}</span>
       </div>
 
@@ -513,7 +559,9 @@ onUnmounted(()=>{if(timer) clearInterval(timer)})
         <span class="tag" :class="selectedFlight.riskLevel==='HIGH'?'bad':(selectedFlight.riskLevel==='MEDIUM'?'warn':'good')">{{ selectedFlight.decisionLabel }}</span>
         <button class="follow" :class="{on:followId===selectedFlight.id}" @click="toggleFollow">
           {{ followId===selectedFlight.id?'取消跟随':'跟随此班次' }}</button>
-        <button @click="selectedId=''">收起</button>
+        <button class="follow" :disabled="evidenceBusy" @click="loadEvidence">
+          {{ evidenceBusy?'取证中…':'取证' }}</button>
+        <button @click="selectedId='';clearEvidence()">收起</button>
       </header>
       <div class="cols">
         <div>
@@ -549,6 +597,29 @@ onUnmounted(()=>{if(timer) clearInterval(timer)})
             <text x="10" y="16" fill="#7d9cb3" font-size="7.5">1200 m</text>
           </svg>
         </div>
+      </div>
+
+      <div class="evidence" v-if="evidence||evidenceErr" data-nation-evidence>
+        <p class="ev-err" v-if="evidenceErr">取证失败：{{ evidenceErr }}</p>
+        <template v-else>
+          <div class="ev-hd">
+            <b>取证链</b>
+            <span>{{ evidence.conclusion }}</span>
+            <em>{{ evidence.steps.length }} 步 · {{ evidence.generatedAt }}</em>
+          </div>
+          <div class="ev-steps">
+            <div class="ev-step" v-for="step in evidence.steps" :key="step.n">
+              <h5><i>{{ step.n }}</i>{{ step.title }}</h5>
+              <p v-for="row in step.rows" :key="row.label">
+                <span>{{ row.label }}</span>
+                <b>{{ row.value }}</b>
+                <code :class="row.source">{{ row.source }}</code>
+              </p>
+            </div>
+          </div>
+          <p class="ev-note">{{ evidence.llm?.note }}</p>
+          <p class="ev-note quiet">{{ evidence.discipline }}</p>
+        </template>
       </div>
     </template>
 
@@ -755,6 +826,26 @@ onUnmounted(()=>{if(timer) clearInterval(timer)})
 .nrn-detail .mini{margin-top:5px;background:#17394d;border:1px solid #2e6b85;color:#bfe9ff;border-radius:5px;padding:3px 8px;font-size:10.5px;cursor:pointer}
 .nrn-detail .quiet{display:block;color:#7d9cb3;font-size:10.5px;line-height:1.6}
 
+.evidence{margin-top:8px;border-top:1px solid rgba(70,110,140,.3);padding-top:7px}
+.ev-hd{display:flex;align-items:baseline;gap:10px;font-size:11.5px;flex-wrap:wrap}
+.ev-hd b{color:#eaf6ff}
+.ev-hd span{color:#8ef0ff}
+.ev-hd em{font-style:normal;color:#6f92a8;font-size:10.5px;margin-left:auto}
+.ev-steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px;margin-top:6px}
+.ev-step{border:1px solid rgba(70,110,140,.3);border-radius:7px;padding:6px 8px;background:rgba(8,22,34,.55)}
+.ev-step h5{margin:0 0 4px;font-size:11px;color:#a9cde2;display:flex;align-items:center;gap:5px;font-weight:600}
+.ev-step h5 i{font-style:normal;width:14px;height:14px;line-height:14px;text-align:center;border-radius:50%;
+  background:rgba(60,130,160,.35);color:#bfe9ff;font-size:9px}
+.ev-step p{margin:2px 0;display:grid;grid-template-columns:auto 1fr auto;gap:6px;font-size:10.5px;align-items:baseline}
+.ev-step p>span{color:#7493a8}
+.ev-step p>b{font-weight:400;color:#d9eefb}
+.ev-step code{font-size:9px;padding:0 4px;border-radius:3px;color:#9fb8c9;background:rgba(120,150,175,.12)}
+.ev-step code.PUBLIC{color:#7fe0bb;background:rgba(70,190,150,.14)}
+.ev-step code.DERIVED{color:#ffd479;background:rgba(245,190,60,.14)}
+.ev-step code.OFFICIAL{color:#c6b4ff;background:rgba(160,140,255,.14)}
+.ev-note{margin:6px 0 0;font-size:10.5px;color:#ffcf7a;line-height:1.6}
+.ev-note.quiet{color:#6f92a8}
+.ev-err{color:#ffa08a;font-size:11px}
 .nrn-state{margin:6px 0;color:#8fb2c8;font-size:12px}
 .nrn-state.bad{color:#ffa08a}
 .nrn-state button{margin-left:8px;background:#17394d;border:1px solid #2e6b85;color:#bfe9ff;border-radius:5px;padding:2px 8px;cursor:pointer}
