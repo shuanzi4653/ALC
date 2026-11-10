@@ -67,6 +67,9 @@ const shapes=computed(()=>{
     const name=props.name||''
     const boundary=props.adchar==='JD'
     if(!name&&!boundary) continue
+    // 九段线是**国家尺度**的符号：省/市级放大后会被拉成夸张的粗弧，反而读不出来。
+    // 全国层（和跨省的大区层）一定画，省/市层隐藏 —— 岛屿本身仍由海南几何照常绘制。
+    if(boundary&&!['nation','region'].includes(level.value)) continue
     const d=toPath(feature.geometry||{},project)
     if(!d) continue
     rows.push({key:name||'jd', name:name||'南海诸岛界线', boundary, d})
@@ -160,6 +163,17 @@ const nodes=computed(()=>(data.value?.nodes||[]).map(node=>{
 // 全国层靠尺寸区分层级（机场略大 + 细环），省/市层再给文字标注。
 const visibleNodes=computed(()=>nodes.value)
 const showCityLabels=computed(()=>nodes.value.length>0&&nodes.value.length<=30)
+// 标注避让：机场城市优先，同一块地方只留一个名字，避免珠三角那种糊成一坨
+const labels=computed(()=>{
+  if(!showCityLabels.value) return []
+  const ordered=[...nodes.value].sort((a,b)=>(b.hasAirport?1:0)-(a.hasAirport?1:0))
+  const placed=[]
+  for(const node of ordered){
+    if(placed.some(p=>Math.abs(p.y-node.y)<11&&Math.abs(p.x-node.x)<52)) continue
+    placed.push(node)
+  }
+  return placed
+})
 
 const summary=computed(()=>data.value?.summary||{})
 const regions=computed(()=>data.value?.regions||[])
@@ -290,10 +304,14 @@ onMounted(load)
                     :stroke="node.hasAirport?'rgba(8,20,32,.85)':'none'" stroke-width="0.6"/>
             <circle v-if="node.hasAirport" :cx="node.x" :cy="node.y" r="4.3"
                     fill="none" stroke="rgba(126,206,255,.50)" stroke-width="0.85"/>
-            <text v-if="showCityLabels" :x="node.x+(node.flip?-6:6)" :y="node.y+3.4" class="nrn-lbl"
-                  :text-anchor="node.flip?'end':'start'">{{ node.short }}</text>
             <title>{{ node.name }}{{ node.hasAirport?' · 机场 '+node.airport:' · 无机场（有专用接驳航线）' }}</title>
           </g>
+        </g>
+
+        <g class="nrn-labels" v-if="labels.length">
+          <text v-for="node in labels" :key="'t'+node.name"
+                :x="node.x+(node.flip?-6:6)" :y="node.y+3.4" class="nrn-lbl"
+                :text-anchor="node.flip?'end':'start'">{{ node.short }}</text>
         </g>
 
         <g v-for="point in stations" :key="point.code">
