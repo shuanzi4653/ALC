@@ -83,3 +83,6 @@ data/training/national/dataset.json
 
 # 高程瓦片缓存（可由 backend-python/terrain_tiles.py 的 prefetch 重建）
 data/terrain-cache/
+
+# 逐市实况缓存（运行时抓取，随时会变；由 backend-python/weather/city_weather.py 自动重建）
+data/cache/
