@@ -203,7 +203,7 @@ function changeWorkspace(){
 
 <template>
 <div ref="wrap" class="hstage-wrap" :class="{compact}" data-stage-compact>
-  <div class="hstage" :class="{compact}" :style="compact?null:{width:box.width+'px',height:box.height+'px',transform:`translate(-50%,-50%) scale(${box.scale})`}">
+  <div class="hstage" :class="{compact}" :style="[compact?null:{width:box.width+'px',height:box.height+'px',transform:`translate(-50%,-50%) scale(${box.scale})`},{'--alc-stage-scale':String(box.scale||1)}]">
     <div class="hs-brief hs-brief-band">
     <h1 class="hs-title" data-stage-title>
       <b>运行态势</b>
@@ -373,23 +373,26 @@ function changeWorkspace(){
 .hstage.compact .hs-center{grid-template-rows:auto auto}
 .hstage.compact .hs-panel{min-height:200px}
 .hstage.compact .hs-map-bd{min-height:360px}
-/* 断点内字号地板：只抬原本小于 12px 的辅助文字，不动数值大字。 */
-.hstage.compact :where(.hs-kpi-lab,.hs-kpi-note,.hs-drill-note,.hs-sum-lab,.hs-sum-val i,.hs-sum-note,
+/* 字号地板：渲染后必须 ≥12px，所以按当前缩放反算。scale=1 时就是 12px；
+   1920 下 scale≈0.937，反算成 12.8px → 渲染 12.0px。compact 模式 scale 记 1。 */
+.hstage :where(.hs-kpi-lab,.hs-kpi-note,.hs-drill-note,.hs-sum-lab,.hs-sum-val i,.hs-sum-note,
   .hs-layers label,.hs-ribbon-count,.hs-legend,.hs-tick b,.hs-tick span,.hs-model-links button,
-  .hs-model-links button small,.wx-toggle,.wx-temp i,.wx-wind,.wx-wind i,.wx-note){font-size:12px}
+  .hs-model-links button small,.wx-toggle,.wx-temp i,.wx-wind,.wx-wind i,.wx-note){
+  font-size:calc(12px / var(--alc-stage-scale, 1))!important;
+}
 /* 地图内的小字（图例、状态条、比例尺）同属首页容器，一并抬到 12px。 */
-.hstage.compact :deep(.city-map-info-status),
-.hstage.compact :deep(.city-map-info-status .text),
-.hstage.compact :deep(.city-map-info-status span),
-.hstage.compact :deep(.city-map-info-status button),
-.hstage.compact :deep(.city-map-tools button),
-.hstage.compact :deep(.city-map-issue-breakdown),
-.hstage.compact :deep(.ribbon-label i),
-.hstage.compact :deep(.ribbon-label b),
-.hstage.compact :deep(.city-map-zone-monitor),
-.hstage.compact :deep(.brief-kpi-scope),
-.hstage.compact :deep(.brief-kpi-note),
-.hstage.compact :deep(.maplibregl-ctrl-scale){font-size:12px!important}
+.hstage :deep(.city-map-info-status),
+.hstage :deep(.city-map-info-status .text),
+.hstage :deep(.city-map-info-status span),
+.hstage :deep(.city-map-info-status button),
+.hstage :deep(.city-map-tools button),
+.hstage :deep(.city-map-issue-breakdown),
+.hstage :deep(.ribbon-label i),
+.hstage :deep(.ribbon-label b),
+.hstage :deep(.city-map-zone-monitor),
+.hstage :deep(.brief-kpi-scope),
+.hstage :deep(.brief-kpi-note),
+.hstage :deep(.maplibregl-ctrl-scale){font-size:calc(12px / var(--alc-stage-scale, 1))!important}
 .hs-top{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px;min-width:0}
 .hs-top-l,.hs-top-r{display:flex;align-items:center;gap:9px;min-width:0}
 .hs-top-r{justify-content:flex-end}

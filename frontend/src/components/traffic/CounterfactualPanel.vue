@@ -86,6 +86,10 @@ function pctText(v){return typeof v==='number'?`${v>0?'+':''}${v}%`:'—'}
     <span aria-hidden="true" class="cf-spin"></span>
     运行计划还在生成（{{ d.progress!=null?d.progress+'%':'进度未报告' }}）·
     反事实要等同一份计划算完，本页每 {{POLL_MS/1000}} 秒自动重试（第 {{ polls }}/{{ MAX_POLLS }} 次）
+    <span class="cf-bar" role="progressbar" :aria-valuenow="d.progress||0" aria-valuemin="0" aria-valuemax="100">
+      <i :style="{width:Math.max(0,Math.min(100,d.progress||0))+'%'}"></i>
+    </span>
+    <span class="cf-eta">首次进入通常要 40–90 秒（当前 workspace 冷缓存要重跑整份计划）；这段可以先看别的分节，回来会接着算。</span>
     <span v-if="d.note"> · {{ d.note }}</span>
   </p>
   <p class="cf-state" v-else-if="d&&!ready">
@@ -210,6 +214,9 @@ function pctText(v){return typeof v==='number'?`${v>0?'+':''}${v}%`:'—'}
 .cf{padding:16px 0;color:var(--alc-text);font-size:13px}
 .cf-state{padding:16px;background:var(--alc-bg-1);border:1px solid var(--alc-line);border-radius:var(--alc-radius)}
 .cf-state.bad{border-left:3px solid var(--alc-danger)}
+.cf-bar{display:block;margin:10px 0 6px;height:6px;border-radius:3px;background:var(--alc-bg-2);overflow:hidden}
+.cf-bar i{display:block;height:100%;background:linear-gradient(90deg,#2b5fa8,#59dffc);transition:width .3s}
+.cf-eta{display:block;font-size:12px;color:var(--alc-text-mute);line-height:1.6}
 .cf-spin{display:inline-block;width:9px;height:9px;margin-right:6px;border-radius:50%;border:2px solid var(--alc-line);border-top-color:var(--alc-info);animation:cf-spin .9s linear infinite;vertical-align:-1px}
 @keyframes cf-spin{to{transform:rotate(360deg)}}
 .cf-state button{margin-left:10px;padding:2px 10px;border:1px solid var(--alc-line);background:var(--alc-bg-2);color:var(--alc-text);border-radius:4px;font-size:12px;cursor:pointer}

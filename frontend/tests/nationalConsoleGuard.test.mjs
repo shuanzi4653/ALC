@@ -41,8 +41,11 @@ test('home stage drops the whole-page scale on narrow containers', () => {
   assert.ok(threshold, '找不到 COMPACT_MAX_W，1366 断点会静默消失')
   assert.equal(Number(threshold[1]), 1500)
   // compact 时不能带内联 transform，否则 scale(0) 或 scale(旧值) 仍会生效。
-  assert.match(source, /:style="compact\?null:/,
+  assert.match(source, /:style="\[?compact\?null:/,
     'compact 时必须不输出内联 width/height/transform')
+  // 字号地板按当前缩放反算：缺了这个变量，1920 下 12px 会被 0.937 压成 11.2px。
+  assert.match(source, /--alc-stage-scale/,
+    'hstage 必须把 --alc-stage-scale 传给 CSS，否则 1920 下字号地板算不出来')
   assert.match(source, /compact\.value\s*=\s*w\s*>\s*0\s*&&\s*w\s*<\s*COMPACT_MAX_W/,
     'compact 的判据必须是容器宽度，不是 window.innerWidth')
 })

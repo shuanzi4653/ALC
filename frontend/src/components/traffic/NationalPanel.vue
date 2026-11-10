@@ -147,7 +147,10 @@ function pick(name){ selected.value=selected.value===name?null:name }
 function stateOf(name){ return byName.value[name]?.state||'pending' }
 function fillOf(name){
   if(region.value&&byName.value[name]&&byName.value[name].region!==region.value) return 'rgba(90,110,140,.07)'
-  return STATE_FILL[stateOf(name)]
+  const state=stateOf(name)
+  // 待接入用斜纹填充：不是"空白"，是"这一类没有数据源"。
+  if(state==='pending') return 'url(#nlx-hatch)'
+  return STATE_FILL[state]
 }
 function fmt(value,suffix){
   return typeof value==='number'?`${Math.round(value*10)/10}${suffix||''}`:'—'
@@ -191,6 +194,11 @@ function fmt(value,suffix){
           <defs>
             <pattern id="nlx-grid" width="50" height="50" patternUnits="userSpaceOnUse">
               <path d="M50 0H0V50" fill="none" stroke="rgba(120,170,220,.10)" stroke-width="1"/>
+            </pattern>
+            <!-- 待接入省的斜纹：让"没有数据源"看起来是一个确定状态，而不是"还没画" -->
+            <pattern id="nlx-hatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+              <rect width="7" height="7" fill="rgba(120,150,190,.10)"/>
+              <line x1="0" y1="0" x2="0" y2="7" stroke="rgba(150,185,215,.28)" stroke-width="1.1"/>
             </pattern>
           </defs>
           <rect x="0" y="0" :width="VIEW.w" :height="VIEW.h" fill="url(#nlx-grid)"/>
@@ -240,7 +248,15 @@ function fmt(value,suffix){
             <div><dt>城市</dt><dd>{{ detail.cities }}</dd></div>
             <div><dt>METAR 站</dt><dd>{{ detail.stations }}</dd></div>
           </dl>
-          <p class="nlx-hint">{{ detail?'再点一次该省返回大区口径':'点地图上的省可下钻；点大区按钮只看该区' }}</p>
+          <p class="nlx-hint" v-if="detail&&detail.state==='pending'">
+            这个省<strong>还没接入</strong>：模型只覆盖 ZYTX/ZYCC/ZYHB 三站，城际走廊目前只在东北三省建成。
+            待接入＝没有数据源，不是留白，也不代表已评估为可飞。
+          </p>
+          <p class="nlx-hint" v-else>{{ detail?'再点一次该省返回大区口径':'点地图上的省可下钻；点大区按钮只看该区' }}</p>
+          <p class="nlx-coverage">
+            覆盖范围：东北三省 51 条省内走廊 + 2 条跨省走廊、4 个 METAR 站；
+            其余 31 个省级单元为待接入（有界无源，按三态如实标注）。
+          </p>
         </div>
 
         <div class="nlx-wx">
@@ -302,6 +318,8 @@ function fmt(value,suffix){
 .nlx-kpi dd{margin:0;color:var(--alc-text)}
 .nlx-kpi dd.ok{color:#5fbf3a}
 .nlx-hint{margin:8px 0 0;font-size:11px;color:var(--alc-text-mute);line-height:1.5}
+.nlx-coverage{margin:8px 0 0;padding-top:8px;border-top:1px dashed var(--alc-line);
+  font-size:11px;color:var(--alc-text-mute);line-height:1.6}
 .nlx-wx-scroll article+article{margin-top:6px}
 .nlx-wx-scroll article{display:block;background:var(--alc-bg-2);border-radius:8px;padding:7px 9px;font-size:var(--alc-fs-aux);display:flex;flex-wrap:wrap;gap:6px;align-items:baseline}
 .nlx-wx-scroll b{font-weight:500}
