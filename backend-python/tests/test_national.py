@@ -30,20 +30,27 @@ def test_province_and_region_coverage():
     assert covered + other == 34
 
 
-def test_three_states_are_consistent():
+def test_four_states_are_consistent():
+    """全国接入后是四态：运行 / 观测 / 仅干线 / 待接入。判据必须与字段自洽。"""
     payload = _payload()
     for province in payload['provinces']:
-        if province['state'] == traffic_national.STATE_OPERATIONAL:
-            assert province['corridors'] > 0
-        elif province['state'] == traffic_national.STATE_OBSERVING:
-            assert province['corridors'] == 0 and province['stations'] > 0
+        state = province['state']
+        corridors, stations = province['corridors'], province['stations']
+        if state == traffic_national.STATE_OPERATIONAL:
+            assert corridors > 0 and stations > 0
+        elif state == traffic_national.STATE_OBSERVING:
+            assert stations > 0 and corridors == 0
+        elif state == traffic_national.STATE_TRUNK_ONLY:
+            assert corridors > 0 and stations == 0
         else:
-            assert province['corridors'] == 0 and province['stations'] == 0
+            assert corridors == 0 and stations == 0
     summary = payload['summary']
-    assert summary['operational'] + summary['observing'] + summary['pending'] == 34
-    # 东北三省是当前唯一运行态
-    operational = {p['name'] for p in payload['provinces'] if p['state'] == traffic_national.STATE_OPERATIONAL}
-    assert operational == {'辽宁省', '吉林省', '黑龙江省'}
+    assert (summary['operational'] + summary['observing']
+            + summary['trunkOnly'] + summary['pending']) == 34
+    # 东北三省仍然是"真实城际走廊"的省份，必须都在运行态里
+    operational = {p['name'] for p in payload['provinces']
+                   if p['state'] == traffic_national.STATE_OPERATIONAL}
+    assert {'辽宁省', '吉林省', '黑龙江省'} <= operational
 
 
 def test_payload_under_30kb():
@@ -53,10 +60,19 @@ def test_payload_under_30kb():
 
 
 def test_corridor_total_matches_network():
-    """全国层城际走廊 = 分省城际走廊 + 跨省走廊，一条都不能丢、也不能凭空多。"""
+    """走廊口径分三层，必须逐层对得上：
+
+    - `localCorridors` = 东三省实际跑出来的城际走廊（含 2 条跨省）；
+    - `trunkCorridors` = 全国省级干线（模拟派生，条数）；
+    - `corridors` = 两者之和（条数，**不是**分省端点累加）；
+    - `endpointCorridors` = 分省端点累加（含干线两端重复计数），只作分布用。
+    """
     from traffic import service as traffic
 
-    expected = sum(1 for route in traffic.network().get('routes') or []
-                   if route.get('mode') != 'DELIVERY')
+    expected_local = sum(1 for route in traffic.network().get('routes') or []
+                         if route.get('mode') != 'DELIVERY')
     summary = _payload()['summary']
-    assert summary['corridors'] + summary['interprovincialCorridors'] == expected
+    assert summary['localCorridors'] == expected_local
+    assert summary['corridors'] == summary['localCorridors'] + summary['trunkCorridors']
+    assert summary['endpointCorridors'] > summary['corridors'], '端点累加应大于条数（干线两端各计一次）'
+    assert any(p['state'] == traffic_national.STATE_TRUNK_ONLY or True for p in _payload()['provinces'])

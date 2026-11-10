@@ -9,9 +9,9 @@ const national=ref(null),network=ref(null),weather=ref(null)
 const error=ref(''),loading=ref(false)
 const region=ref(''),selected=ref(null),hovered=ref(null)
 
-const STATE_NAME={operational:'运行态',observing:'观测态',pending:'待接入'}
-const STATE_FILL={operational:'rgba(82,196,26,.30)',observing:'rgba(250,173,20,.26)',pending:'rgba(120,150,190,.10)'}
-const STATE_STROKE={operational:'#5fbf3a',observing:'#e0a83a',pending:'rgba(150,180,210,.30)'}
+const STATE_NAME={operational:'运行态',observing:'观测态',trunk:'仅干线',pending:'待接入'}
+const STATE_FILL={operational:'rgba(82,196,26,.30)',observing:'rgba(250,173,20,.26)',trunk:'rgba(90,170,220,.22)',pending:'rgba(120,150,190,.10)'}
+const STATE_STROKE={operational:'#5fbf3a',observing:'#e0a83a',trunk:'#5aaadc',pending:'rgba(150,180,210,.30)'}
 
 async function load(){
   loading.value=true
@@ -82,11 +82,24 @@ const regionProvinceNames=computed(()=>{
 })
 
 const corridors=computed(()=>{
+  const allowed=regionProvinceNames.value
+  const trunk=national.value?.corridors
+  if(Array.isArray(trunk)&&trunk.length){
+    const nameOf={}
+    for(const p of provinces.value) nameOf[p.adcode]=p.name
+    const out=[]
+    for(const row of trunk){
+      if(allowed&&!allowed.has(nameOf[row.from])&&!allowed.has(nameOf[row.to])) continue
+      const [x1,y1]=project(row.fromLonLat[0],row.fromLonLat[1])
+      const [x2,y2]=project(row.toLonLat[0],row.toLonLat[1])
+      out.push({id:row.id,x1,y1,x2,y2,trunk:true,lengthKm:row.lengthKm})
+    }
+    return out
+  }
   const net=network.value
   if(!net||!net.cities||!net.routes) return []
   const cities={},prov={}
   for(const c of net.cities){cities[c.id]=c.coordinate;prov[c.id]=c.province}
-  const allowed=regionProvinceNames.value
   const lines=[]
   for(const r of net.routes){
     if(r.mode==='DELIVERY') continue
@@ -94,12 +107,20 @@ const corridors=computed(()=>{
     if(!a||!b) continue
     if(allowed&&!allowed.has(prov[r.fromCity])&&!allowed.has(prov[r.toCity])) continue
     const [x1,y1]=project(a[0],a[1]),[x2,y2]=project(b[0],b[1])
-    lines.push({id:r.id,x1,y1,x2,y2})
+    lines.push({id:r.id,x1,y1,x2,y2,trunk:false})
   }
   return lines
 })
 
 const stations=computed(()=>{
+  const points=national.value?.stationPoints
+  if(Array.isArray(points)&&points.length){
+    const allowed=regionProvinceNames.value
+    return points.filter(p=>!allowed||allowed.has(p.name)).map(p=>{
+      const [x,y]=project(p.lon,p.lat)
+      return {id:p.code,city:p.name,x,y,low:!!p.low,temp:p.tempC,vis:p.visM}
+    })
+  }
   const rows=weather.value?.observations||[]
   const out=[]
   for(const item of rows){
@@ -169,14 +190,17 @@ function fmt(value,suffix){
         <p class="nlx-sub">
           运行态 <b class="alc-num">{{ summary.operational }}</b> ·
           观测态 <b class="alc-num">{{ summary.observing }}</b> ·
+          仅干线 <b class="alc-num">{{ summary.trunkOnly }}</b> ·
           待接入 <b class="alc-num">{{ summary.pending }}</b> ·
-          城际走廊 <b class="alc-num">{{ summary.corridors }}</b><span class="nlx-dim">（跨省 {{ summary.interprovincialCorridors }}）</span> ·
+          干线 <b class="alc-num">{{ summary.trunkCorridors }}</b>（模拟派生）+
+          省内走廊 <b class="alc-num">{{ summary.corridors - summary.trunkCorridors }}</b> ·
           METAR 站 <b class="alc-num">{{ summary.stations }}</b>
         </p>
       </div>
       <div class="nlx-legend">
         <span class="nlx-key operational">运行态</span>
         <span class="nlx-key observing">观测态</span>
+        <span class="nlx-key trunk">仅干线</span>
         <span class="nlx-key pending">待接入</span>
       </div>
     </header>
@@ -225,7 +249,7 @@ function fmt(value,suffix){
           </g>
         </svg>
         <p class="nlx-mapnote">
-          省界按三态着色；青线为城际走廊（当前仅东北建成网络）；圆点为 METAR 站，红色=能见度低于 3000 m。
+          省界按四态着色；青线为省级干线（模拟派生）与东北城际走廊；圆点为真实 METAR 站，红色=能见度低于 3000 m。
           <span v-if="hovered">指向：{{ hovered }}</span>
         </p>
       </div>
@@ -237,7 +261,8 @@ function fmt(value,suffix){
           <dl v-if="!detail">
             <div><dt>省级单元</dt><dd>{{ regionStats.provinces }}</dd></div>
             <div><dt>运行态</dt><dd class="ok">{{ regionStats.operational }}</dd></div>
-            <div><dt>城际走廊</dt><dd>{{ regionStats.corridors }}</dd></div>
+            <div><dt>走廊（条）</dt><dd>{{ region ? regionStats.corridors : summary.corridors }}</dd></div>
+            <div><dt>其中干线</dt><dd>{{ region ? '—' : summary.trunkCorridors }}</dd></div>
             <div><dt>城市</dt><dd>{{ regionStats.cities }}</dd></div>
             <div><dt>METAR 站</dt><dd>{{ regionStats.stations }}</dd></div>
           </dl>
@@ -249,13 +274,19 @@ function fmt(value,suffix){
             <div><dt>METAR 站</dt><dd>{{ detail.stations }}</dd></div>
           </dl>
           <p class="nlx-hint" v-if="detail&&detail.state==='pending'">
-            这个省<strong>还没接入</strong>：模型只覆盖 ZYTX/ZYCC/ZYHB 三站，城际走廊目前只在东北三省建成。
-            待接入＝没有数据源，不是留白，也不代表已评估为可飞。
+            这个省<strong>没有数据源</strong>：既没有报文站、也没有干线。待接入＝没接入，不是留白，也不代表可飞。
+          </p>
+          <p class="nlx-hint" v-else-if="detail&&detail.state==='trunk'">
+            有省级干线，但<strong>本地没有 METAR 报文站</strong>：干线可示意，判据拿不到本站实况，因此不算运行态。
+          </p>
+          <p class="nlx-hint" v-else-if="detail&&detail.state==='observing'">
+            有真实报文站，但<strong>没有干线</strong>：能看实况，不能算运行网络。
           </p>
           <p class="nlx-hint" v-else>{{ detail?'再点一次该省返回大区口径':'点地图上的省可下钻；点大区按钮只看该区' }}</p>
           <p class="nlx-coverage">
-            覆盖范围：东北三省 51 条省内走廊 + 2 条跨省走廊、4 个 METAR 站；
-            其余 31 个省级单元为待接入（有界无源，按三态如实标注）。
+            覆盖：全国 34 个省级单元 · 省级干线 {{ summary.trunkCorridors }} 条（<b>模拟派生</b>：省会代表点 MST + 就近补边）·
+            实时 METAR {{ summary.stations }} 站（<b>真实</b>，aviationweather.gov，按省界归属）。
+            东北三省另有 53 条真实城际走廊参与运行计划。
           </p>
         </div>
 
@@ -295,6 +326,8 @@ function fmt(value,suffix){
 .nlx-key::before{content:'';width:8px;height:8px;border-radius:2px;background:rgba(120,150,190,.5)}
 .nlx-key.operational::before{background:#5fbf3a}
 .nlx-key.observing::before{background:#e0a83a}
+.nlx-key.trunk::before{background:#5aaadc}
+.nlx-key.pending::before{background:rgba(150,180,210,.45)}
 .nlx-chips{display:flex;gap:8px;flex-wrap:wrap}
 .nlx-chips button{background:var(--alc-bg-2);border:1px solid var(--alc-line);color:var(--alc-text-dim);border-radius:999px;padding:4px 12px;font-size:var(--alc-fs-aux);cursor:pointer}
 .nlx-chips button.on{color:var(--alc-text);border-color:var(--alc-info);background:rgba(76,141,255,.12)}

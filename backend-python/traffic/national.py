@@ -22,11 +22,12 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from weather import metar_history
+from weather import metar_history, national_metar
 
 from . import service as traffic
 
 ASSET_PATH = Path(__file__).resolve().parents[2] / 'frontend' / 'src' / 'assets' / 'china.json'
+CORRIDOR_PATH = Path(__file__).resolve().parents[2] / 'data' / 'traffic' / 'national-corridors.json'
 
 REGION_ORDER: Tuple[str, ...] = (
     'north', 'northeast', 'east', 'central', 'southwest', 'northwest', 'xinjiang',
@@ -52,6 +53,7 @@ REGION_OF: Dict[int, str] = {
 
 STATE_OPERATIONAL = 'operational'
 STATE_OBSERVING = 'observing'
+STATE_TRUNK_ONLY = 'trunk'
 STATE_PENDING = 'pending'
 
 
@@ -89,10 +91,7 @@ def _distance_km(a: Tuple[float, float], b: Tuple[float, float]) -> float:
 
 
 def station_provinces() -> Counter:
-    """把 METAR 站挂到省：取最近的省会/城市代表点。
-
-    只有 4 个站（沈阳/长春/哈尔滨/大连），用最近城市反查比再写一张常量表更不容易失同步。
-    """
+    """把 METAR 站挂到省：取最近的省会/城市代表点（东三省那 4 站的旧口径）。"""
     cities = traffic.cities()
     counter: Counter = Counter()
     for code, info in metar_history.STATION_INFO.items():
@@ -105,6 +104,65 @@ def station_provinces() -> Counter:
         if best is not None and best[0] <= 150.0:
             counter[best[1]] += 1
     return counter
+
+
+# ------------------------------------------------------------------ 全国覆盖层
+# 两条数据来源必须分开写清楚，不能混：
+#   站 = 真实 METAR（aviationweather.gov，一次 bbox 拉全国，按省界多边形归属）
+#   干线 = 模拟派生（data/traffic/national-corridors.json，MST + 就近补边）
+
+@lru_cache(maxsize=1)
+def _province_shapes() -> Dict[int, Any]:
+    """省界多边形（经纬度），用于把报文站归属到省。底图与前端同一份。"""
+    from shapely.geometry import shape
+    with ASSET_PATH.open('r', encoding='utf-8') as handle:
+        payload = json.load(handle)
+    shapes: Dict[int, Any] = {}
+    for feature in payload.get('features') or []:
+        props = feature.get('properties') or {}
+        adcode = props.get('adcode')
+        geometry = feature.get('geometry')
+        if not isinstance(adcode, int) or not geometry:
+            continue
+        try:
+            shapes[adcode] = shape(geometry)
+        except Exception:  # noqa: BLE001 - 单个要素几何坏了不该拖垮全国层
+            continue
+    return shapes
+
+
+@lru_cache(maxsize=1)
+def _polygon_index():
+    """(adcode, prepared geometry) 列表，供逐站命中测试。"""
+    from shapely.prepared import prep
+    return [(adcode, prep(geometry)) for adcode, geometry in _province_shapes().items()]
+
+
+@lru_cache(maxsize=1)
+def national_corridors() -> Tuple[Dict[str, Any], ...]:
+    if not CORRIDOR_PATH.is_file():
+        return ()
+    payload = json.loads(CORRIDOR_PATH.read_text(encoding='utf-8'))
+    return tuple(payload.get('corridors') or ())
+
+
+def _station_rows() -> Tuple[Dict[int, List[Dict[str, Any]]], Dict[str, Any]]:
+    """把全国报文站按省界归属；返回 {adcode: [站...]} 与数据源状态。"""
+    payload = national_metar.fetch()
+    stations = payload.get('stations') or {}
+    by_province: Dict[int, List[Dict[str, Any]]] = {}
+    if not payload.get('available'):
+        return by_province, {'available': False, 'source': 'METAR (aviationweather.gov)',
+                             'error': payload.get('error'), 'count': 0}
+    from shapely.geometry import Point
+    for row in stations.values():
+        point = Point(row['lon'], row['lat'])
+        for adcode, prepared in _polygon_index():
+            if prepared.contains(point):
+                by_province.setdefault(adcode, []).append(row)
+                break
+    return by_province, {'available': True, 'source': payload.get('source'),
+                         'fetchedAt': payload.get('fetchedAt'), 'count': len(stations)}
 
 
 def _corridor_counts() -> Tuple[Counter, Counter, int]:
@@ -133,55 +191,88 @@ def _corridor_counts() -> Tuple[Counter, Counter, int]:
 
 
 def national() -> Dict[str, Any]:
-    """全国层聚合。体积目标 < 30 KB（约 35 条省级记录）。"""
+    """全国层聚合。体积目标 < 30 KB（约 35 条省级记录 + 干线/站点点位）。"""
     car_counts, delivery_counts, interprovincial = _corridor_counts()
     station_counts = station_provinces()
     city_counts: Counter = Counter(city['province'] for city in traffic.cities())
+    stations_by_province, station_meta = _station_rows()
+    corridors = national_corridors()
+
+    # 省级干线按端点归属：一条干线同时计入两端省份
+    trunk_counts: Counter = Counter()
+    for row in corridors:
+        trunk_counts[row['from']] += 1
+        trunk_counts[row['to']] += 1
 
     rows: List[Dict[str, Any]] = []
     region_stats: Dict[str, Dict[str, Any]] = {
         key: {'id': key, 'name': REGION_NAMES[key], 'provinceCount': 0,
-              'operational': 0, 'observing': 0, 'pending': 0, 'corridors': 0,
-              'deliveryCorridors': 0, 'cities': 0}
+              'operational': 0, 'observing': 0, 'trunk': 0, 'pending': 0, 'corridors': 0,
+              'deliveryCorridors': 0, 'cities': 0, 'stations': 0}
         for key in REGION_ORDER
     }
-    summary = {'operational': 0, 'observing': 0, 'pending': 0, 'corridors': 0,
-               'deliveryCorridors': 0, 'cities': 0}
+    summary = {'operational': 0, 'observing': 0, 'trunk': 0, 'trunkTotal': 0, 'pending': 0,
+               'endpointCorridors': 0, 'localTotal': 0,
+               'deliveryCorridors': 0, 'cities': 0, 'stations': 0}
+    station_points: List[Dict[str, Any]] = []
+    # 条数口径：干线 = 文件里的行数；本地网 = 东三省实际跑出来的城际走廊（含跨省）
+    summary['trunkTotal'] = len(corridors)
+    summary['localTotal'] = sum(car_counts.values()) + interprovincial
 
     for province in provinces():
         name = province['name']
-        corridors = int(car_counts.get(name, 0))
+        adcode = province['adcode']
+        trunk = int(trunk_counts.get(adcode, 0))
+        local = int(car_counts.get(name, 0))
+        corridors_total = trunk + local
         delivery = int(delivery_counts.get(name, 0))
-        stations = int(station_counts.get(name, 0))
+        live = stations_by_province.get(adcode) or []
+        stations = len(live) + int(station_counts.get(name, 0)) if live else int(station_counts.get(name, 0))
+        # 站数按真实报文站算；东三省那 4 站也在这批里，别再叠加两次
+        stations = len(live)
         cities = int(city_counts.get(name, 0))
-        if corridors > 0:
+        if corridors_total > 0 and stations > 0:
             state = STATE_OPERATIONAL
         elif stations > 0:
             state = STATE_OBSERVING
+        elif corridors_total > 0:
+            # 有干线但本站没有报文：不能算"运行态"，也不能说"待接入"——单列一态。
+            state = STATE_TRUNK_ONLY
         else:
             state = STATE_PENDING
         rows.append({
-            'adcode': province['adcode'],
+            'adcode': adcode,
             'name': name,
             'region': province['region'],
             'state': state,
-            'corridors': corridors,
+            'corridors': corridors_total,
+            'trunkCorridors': trunk,
+            'localCorridors': local,
             'deliveryCorridors': delivery,
             'cities': cities,
             'stations': stations,
             'center': province['center'],
         })
+        for row in live:
+            station_points.append({
+                'code': row['station'], 'name': province['name'],
+                'lon': row['lon'], 'lat': row['lat'], 'ts': row['ts'],
+                'visM': row['visM'], 'tempC': row['tempC'],
+                'low': bool(isinstance(row['visM'], (int, float)) and row['visM'] < 3000),
+            })
         summary[state] += 1
-        summary['corridors'] += corridors
+        summary['endpointCorridors'] += corridors_total
         summary['deliveryCorridors'] += delivery
         summary['cities'] += cities
+        summary['stations'] += stations
         region = region_stats.get(province['region'])
         if region is not None:
             region['provinceCount'] += 1
             region[state] += 1
-            region['corridors'] += corridors
+            region['corridors'] += corridors_total
             region['deliveryCorridors'] += delivery
             region['cities'] += cities
+            region['stations'] += stations
 
     return {
         'status': 'OK',
@@ -189,23 +280,38 @@ def national() -> Dict[str, Any]:
         'generatedAt': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
         'regions': [region_stats[key] for key in REGION_ORDER],
         'provinces': rows,
+        'corridors': list(corridors),
+        'stationPoints': station_points,
+        'coverage': {
+            'stations': station_meta,
+            'trunk': {'source': 'SIM', 'count': len(corridors),
+                      'note': '省级干线（省会代表点 MST + 就近补边），只用于全国屏聚合与示意，'
+                              '不参与运行计划与裁决'},
+            'local': {'source': 'RUN', 'provinces': 3,
+                      'note': '东北三省 51 条省内 + 2 条跨省城际走廊，来自运行计划实际跑出的航路'},
+        },
         'summary': {
             'provinces': len(rows),
             'regions': len(REGION_ORDER),
             'operational': summary['operational'],
             'observing': summary['observing'],
+            'trunkOnly': summary['trunk'],
             'pending': summary['pending'],
-            'corridors': summary['corridors'],
+            'corridors': summary['trunkTotal'] + summary['localTotal'],
+            'endpointCorridors': summary['endpointCorridors'],
+            'trunkCorridors': summary['trunkTotal'],
+            'localCorridors': summary['localTotal'],
             'interprovincialCorridors': interprovincial,
             'deliveryCorridors': summary['deliveryCorridors'],
             'cities': summary['cities'],
-            'stations': len(metar_history.STATION_INFO),
+            'stations': summary['stations'],
+            'stationChannels': station_meta.get('count', 0),
         },
         'notes': [
             '底图 35 个要素中 1 个为南海诸岛示意（无 adcode），省级单元实为 34。',
-            '全国层只传聚合，明细按省懒加载（点省再拉 /traffic/v2/corridors）。',
-            '三态：operational=有走廊且有站；observing=只有站；pending=待接入。',
-            '大区按民航局七大区划分；港澳台单列，不计入七大区。',
-            '本接口不参与规划与裁决，不改变任何既有运行数字。',
+            '站是真实 METAR（aviationweather.gov 一次拉全国，按省界多边形归属）；拿不到就是 0，不补零。',
+            '干线是模拟派生（省会代表点 MST + 就近补边），标注 source=SIM，不参与规划与裁决。',
+            '四态：operational=有走廊且有站；observing=只有站；trunk=有干线但本站无报文；pending=都没有。',
+            '全国层只传聚合与点位，明细仍按省懒加载；本接口不改变任何既有运行数字。',
         ],
     }
