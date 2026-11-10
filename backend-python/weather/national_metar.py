@@ -11,8 +11,9 @@ from __future__ import annotations
 
 import threading
 import time
+from functools import lru_cache
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import httpx
 
@@ -71,6 +72,87 @@ def _row(entry: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         'tempC': _num(entry.get('temp')),
         'raw': entry.get('rawOb'),
     }
+
+
+NORTH_PROVINCES = ('北京市', '天津市', '河北省', '山西省', '内蒙古自治区', '辽宁省', '吉林省',
+                   '黑龙江省', '陕西省', '甘肃省', '青海省', '宁夏回族自治区', '新疆维吾尔自治区')
+
+
+@lru_cache(maxsize=2)
+def province_bounds() -> Dict[str, Any]:
+    import json
+    from pathlib import Path
+    from shapely.geometry import shape
+    asset = Path(__file__).resolve().parents[2] / 'frontend' / 'src' / 'assets' / 'china.json'
+    payload = json.loads(asset.read_text(encoding='utf-8'))
+    out: Dict[str, Any] = {}
+    for feature in payload.get('features') or []:
+        name = (feature.get('properties') or {}).get('name')
+        geometry = feature.get('geometry')
+        if not name or not geometry:
+            continue
+        out[name] = shape(geometry)
+    return out
+
+
+def _rows_from(payload: Any) -> Dict[str, Dict[str, Any]]:
+    latest: Dict[str, Dict[str, Any]] = {}
+    for entry in payload if isinstance(payload, list) else []:
+        row = _row(entry)
+        if row is None:
+            continue
+        previous = latest.get(row['station'])
+        if previous is None or row['epoch'] > previous['epoch']:
+            latest[row['station']] = row
+    return latest
+
+
+def fetch_north(force: bool = False) -> Dict[str, Any]:
+    """按省 bbox 拉北方 13 省的报文站（一次 bbox 会被截断到 400 行，分省更稳）。
+
+    归属用**点在面**：站必须真的落在这个省的多边形里，边境站不会两边都算。
+    """
+    now = time.monotonic()
+    with _lock:
+        cached = _cache.get('north')
+        if not force and cached and now < _cache.get('north_expires', 0.0):
+            return cached
+    from shapely.geometry import Point
+    from shapely.prepared import prep
+    merged: Dict[str, Dict[str, Any]] = {}
+    errors: List[str] = []
+    for name in NORTH_PROVINCES:
+        geometry = province_bounds().get(name)
+        if geometry is None:
+            continue
+        minx, miny, maxx, maxy = geometry.bounds
+        params = {'bbox': f'{miny:.2f},{minx:.2f},{maxy:.2f},{maxx:.2f}',
+                  'format': 'json', 'hours': str(HOURS)}
+        try:
+            response = httpx.get(URL, params=params, timeout=TIMEOUT_SECONDS,
+                                 headers={'User-Agent': USER_AGENT})
+            response.raise_for_status()
+            payload = response.json()
+        except Exception as exc:  # noqa: BLE001
+            errors.append(f'{name}: {str(exc)[:60]}')
+            continue
+        prepared = prep(geometry)
+        for row in _rows_from(payload).values():
+            if not prepared.contains(Point(row['lon'], row['lat'])):
+                continue
+            row = {**row, 'province': name}
+            previous = merged.get(row['station'])
+            if previous is None or row['epoch'] > previous['epoch']:
+                merged[row['station']] = row
+    value = {
+        'available': True, 'source': 'METAR (aviationweather.gov，分省 bbox)',
+        'fetchedAt': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
+        'stations': merged, 'errors': errors,
+    }
+    with _lock:
+        _cache['north'] = value
+        _cache['north_expires'] = now + TTL_SECONDS
+    return value
 
 
 def fetch(force: bool = False) -> Dict[str, Any]:

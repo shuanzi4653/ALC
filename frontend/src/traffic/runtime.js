@@ -1882,7 +1882,7 @@ export const TIMELINE_SPAN_MINUTES=480
 
 export const SECTION_CAN_DO=Object.freeze({
   home:['看哪条走廊最差（点结论条）','把时间轴拖到 T+3h 看风险变化','按 Ctrl+K 搜班次或走廊'],
-  national:['按大区筛一遍省级单元','看哪几个省是运行态','切回首页看东北三省的实时结论'],
+  national:['按大区筛一遍北方省份','看哪几个省是运行态','逐级下钻到省与市'],
   overview:['点地图上的载具看单班航迹','切换图层看雷达与风险区','导出本轮快照'],
   briefing:['挑一个班次看放行许可报文','按状态筛选待放行','跳到走廊剖面看判据'],
   schedule:['按城市或班次号搜索','翻页看全量台账','点行选中后看单班处置'],
@@ -1943,7 +1943,7 @@ export const CALIBER_LEDGER=Object.freeze([
 ])
 
 export const SECTION_NAMES=Object.freeze({
-  home:'运行首页',overview:'运行总览',national:'全国视图',briefing:'民航情报',schedule:'调度台账',
+  home:'运行首页',overview:'运行总览',national:'北方地区',briefing:'民航情报',schedule:'调度台账',
   alerts:'事件处置台',weather:'气象监测',mechanism:'算法机理',reference:'口径与来源',
   assistant:'大模型取证',history:'运行日志',
   profile:'走廊剖面',card:'推演',counterfactual:'反事实对照',ledger:'分歧台账',
@@ -3549,7 +3549,7 @@ const NAV_SPEC = [
  */
 export const SECTION_HINTS = Object.freeze({
   home: '一屏结论：现在哪片天不能飞',
-  national: '七个大区、34 个省级单元：哪里在跑、哪里还没接入',
+  national: '北方地区四级：北方 → 东北/华北/西北 → 省 → 市；逐级加载、返回即释放',
   overview: '按城市与走廊铺开的全域态势',
   weather: '逐站观测、派生风险区与数据来源',
   profile: '沿走廊逐公里的不可飞概率剖面',

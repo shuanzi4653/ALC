@@ -426,6 +426,16 @@ def traffic_v2_overview(seed: int = Query(42),
     return traffic_v2.overview(seed=seed, scenario=scenario, case_id=case or None,
                                minute=minute, clearance=clearance)
 
+@app.get('/traffic/v2/northern')
+def traffic_v2_northern(level: str = Query('north', pattern='^(north|region|province|city)$'),
+                        id: str = Query('')):
+    """北方地区四级：北方 → 大区 → 省 → 市。每级单独请求，前端逐级加载。"""
+    from traffic import northern as traffic_northern
+    payload = traffic_northern.payload(level, id or None)
+    if payload.get('status') == 'NOT_FOUND':
+        raise HTTPException(404, payload.get('note') or '未找到')
+    return payload
+
 @app.get('/traffic/v2/national')
 def traffic_v2_national():
     """全国层聚合（七 大区 + 省级三态）。只读缓存，不做全网推理。"""
