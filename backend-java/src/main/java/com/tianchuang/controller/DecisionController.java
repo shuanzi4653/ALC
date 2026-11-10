@@ -101,6 +101,13 @@ public class DecisionController {
         return python.decisionRequest("/traffic/v2/" + resource + (query.isEmpty() ? "" : "?" + query), null);
     }
 
+    @GetMapping("/traffic/v2/nation/flights")
+    public ResponseEntity<?> nationFlights(@RequestParam Map<String, String> params) throws Exception {
+        String query = params.entrySet().stream().map(e -> encode(e.getKey()) + "=" + encode(e.getValue()))
+                .collect(Collectors.joining("&"));
+        return python.decisionRequest("/traffic/v2/nation/flights" + (query.isEmpty() ? "" : "?" + query), null);
+    }
+
     @GetMapping("/traffic/health")
     public ResponseEntity<?> trafficHealth() throws Exception {
         return python.decisionRequest("/traffic/health", null);

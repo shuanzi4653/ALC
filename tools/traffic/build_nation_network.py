@@ -30,7 +30,7 @@ sys.path.insert(0, str(ROOT / 'backend-python'))
 
 from pyproj import Transformer  # noqa: E402
 from shapely import make_valid  # noqa: E402
-from shapely.geometry import LineString, shape  # noqa: E402
+from shapely.geometry import LineString, Point, shape  # noqa: E402
 from shapely.ops import transform as shapely_transform, unary_union  # noqa: E402
 
 from traffic.routing import route  # noqa: E402
@@ -46,9 +46,17 @@ FORWARD = Transformer.from_crs('EPSG:4326', PROJ, always_xy=True)
 INVERSE = Transformer.from_crs(PROJ, 'EPSG:4326', always_xy=True)
 
 CROSS_MAX = 2
+BORDER_STRIP = None
 # 手工指定的跨海通道：渤海海峡（大连—烟台）。轮渡/短途摆渡是现实存在的通道，
 # 直飞约 170 km，比绕行山海关近得多；A* 在陆地并集里算不出来，按"海上航段"如实标 SEA。
 MANUAL_LINKS = (('大连市', '烟台市'),)
+
+# 边境缓冲：《无人驾驶航空器飞行管理暂行条例》第十九条(二)把"国界线、实际控制线、
+# 边境线向我方一侧一定范围的区域"划为管制空域，具体范围由空管机构确定。
+# 本系统按**向我方一侧 10 km** 保守执行（2018 征求意见稿对轻型机给的是 5 km/2 km，
+# 这里取更严的 10 km），并在航路上真的绕开：绕不开的标 borderBlocked，界面显示"边境受限"。
+BORDER_BUFFER_M = 10000.0
+ENDPOINT_EXEMPT_M = 12000.0   # 口岸城市本身就在缓冲带里，起降段豁免
 SIMPLIFY_M = 6000.0
 MAX_POINTS = 24
 
@@ -239,13 +247,72 @@ def best_pair(by_province, a: str, b: str, with_distance: bool = False):
     return (distance, ca['name'], cb['name']) if with_distance else (ca['name'], cb['name'])
 
 
+def border_strip(allowed):
+    """国境线内侧 10 km 的管制带（米制）。"""
+    try:
+        inner = allowed.buffer(-BORDER_BUFFER_M)
+        if inner.is_empty:
+            return None
+        return allowed.difference(inner)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def arc_inside(a, b, bulge, allowed, samples=12):
+    """前端画的是朝上的微弧，弧一旦鼓出国境就成了"飞出国"。这里按同样的算法验一遍。"""
+    from shapely.geometry import LineString, Point
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    length = math.hypot(dx, dy) or 1.0
+    px, py = -dy / length, dx / length
+    if py > 0:
+        px, py = -px, -py
+    cx = (a[0] + b[0]) / 2 + px * length * bulge
+    cy = (a[1] + b[1]) / 2 + py * length * bulge
+    pts = []
+    for i in range(samples + 1):
+        t = i / samples
+        u = 1 - t
+        pts.append((u * u * a[0] + 2 * u * t * cx + t * t * b[0],
+                    u * u * a[1] + 2 * u * t * cy + t * t * b[1]))
+    line = LineString(pts)
+    return allowed.covers(line) if allowed is not None else True
+
+
+def safe_bulge(a, b, allowed, tolerance_m=25000.0):
+    """选一个既好看又不出界的弧度。
+
+    判定用"国界外扩 25 km"的包络：沿海航线本来就会掠过海湾（连沈阳—大连都会切过辽东湾），
+    用严格内陆判定会把所有沿海航路都判死；而飞进邻国要几百公里，25 km 的容差足够挡住。
+    """
+    if allowed is None:
+        return 0.02
+    target = allowed.buffer(tolerance_m)
+    for bulge in (0.055, 0.035, 0.02, 0.0):
+        if arc_inside(a, b, bulge, target):
+            return bulge
+    return 0.0
+
+
 def build_geometry(edge: Dict[str, Any], cities: Dict[str, Dict[str, Any]], allowed) -> Dict[str, Any]:
     a, b = cities[edge['from']], cities[edge['to']]
     start, end = project(a['lon'], a['lat']), project(b['lon'], b['lat'])
     distance = math.dist(start, end)
     step = max(2000.0, min(15000.0, distance / 80.0))
     checks = 80000 if distance > 600000 else 25000
-    path = route(start, end, allowed, None, step_m=step, max_checks=checks)
+    strip = BORDER_STRIP
+    obstacles = None
+    if strip is not None and not strip.is_empty:
+        # 起降段豁免：口岸城市本身就在缓冲带里
+        holes = [Point(start[0], start[1]).buffer(ENDPOINT_EXEMPT_M),
+                 Point(end[0], end[1]).buffer(ENDPOINT_EXEMPT_M)]
+        obstacles = strip.difference(unary_union(holes))
+    path = route(start, end, allowed, obstacles, step_m=step, max_checks=checks)
+    border_detour = False
+    if path and len(path) >= 2 and obstacles is not None:
+        if LineString(path).intersects(obstacles):
+            border_detour = False
+        elif LineString([start, end]).intersects(obstacles):
+            border_detour = True
     if path and len(path) >= 2:
         line = LineString(path).simplify(SIMPLIFY_M, preserve_topology=False)
         coords = list(line.coords)
@@ -253,8 +320,13 @@ def build_geometry(edge: Dict[str, Any], cities: Dict[str, Dict[str, Any]], allo
             stride = math.ceil(len(coords) / MAX_POINTS)
             coords = coords[::stride] + [coords[-1]]
         lonlat = [[round(x, 4), round(y, 4)] for x, y in (unproject((px, py)) for px, py in coords)]
-        return {'path': lonlat, 'geometry': 'DIRECT' if len(coords) == 2 else 'ASTAR'}
-    return {'path': [[a['lon'], a['lat']], [b['lon'], b['lat']]], 'geometry': 'STRAIGHT_FALLBACK'}
+        bulge = safe_bulge(start, end, allowed)
+        return {'path': lonlat, 'geometry': 'DIRECT' if len(coords) == 2 else 'ASTAR',
+                'bulge': bulge, 'borderDetour': border_detour, 'borderBlocked': False}
+    blocked = bool(strip is not None and not strip.is_empty and
+                   LineString([start, end]).intersects(strip))
+    return {'path': [[a['lon'], a['lat']], [b['lon'], b['lat']]], 'geometry': 'STRAIGHT_FALLBACK',
+            'bulge': 0.0, 'borderDetour': False, 'borderBlocked': blocked}
 
 
 def main() -> int:
@@ -270,6 +342,8 @@ def main() -> int:
     print(f'边 {len(edges)}：{kinds}', flush=True)
 
     allowed = province_geometries(provinces)
+    global BORDER_STRIP
+    BORDER_STRIP = border_strip(allowed)
     index = {city['name']: city for city in cities}
     corridors = []
     for order, edge in enumerate(edges, start=1):
@@ -289,6 +363,9 @@ def main() -> int:
             'fromLonLat': [index[edge['from']]['lon'], index[edge['from']]['lat']],
             'toLonLat': [index[edge['to']]['lon'], index[edge['to']]['lat']],
             'path': geo['path'], 'geometry': geo['geometry'], 'source': 'SIM',
+            'bulge': geo.get('bulge', 0.0),
+            'borderDetour': bool(geo.get('borderDetour')),
+            'borderBlocked': bool(geo.get('borderBlocked')),
         })
         if order % 100 == 0:
             print(f'  航路 {order}/{len(edges)} · {time.time() - started:.0f}s', flush=True)
@@ -296,7 +373,7 @@ def main() -> int:
     fallback = sum(1 for row in corridors if row['geometry'] == 'STRAIGHT_FALLBACK')
     payload = {
         'source': 'SIM（AEQD 35N/105E + A*；省界来自 frontend/src/assets/china.json）',
-        'rule': '省内 MST（市市相连）+ 无机场市机场接驳（叠加，不替代）+ 省级 MST 跨省通道（每省 1–2 条最近邻）',
+        'rule': '省内 MST + 无机场市机场接驳 + 省级 MST 跨省通道；国境线内侧 10 km 为管制带，能绕则绕，绕不开标 borderBlocked',
         'excluded': ['台湾省', '西藏自治区', '香港特别行政区', '澳门特别行政区'],
         'generatedAt': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
         'counts': {'cities': len(cities), 'provinces': len(provinces), 'airports': airports,

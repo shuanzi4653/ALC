@@ -426,12 +426,21 @@ def traffic_v2_overview(seed: int = Query(42),
     return traffic_v2.overview(seed=seed, scenario=scenario, case_id=case or None,
                                minute=minute, clearance=clearance)
 
+@app.get('/traffic/v2/nation/flights')
+def traffic_v2_nation_flights(level: str = Query('nation', pattern='^(nation|region|province|city)$'),
+                              id: str = Query(''),
+                              minute: int = Query(0, ge=0, le=1440)):
+    """时间轴专用：只回本级的在飞航班与统计，不重算网络。"""
+    from traffic import nation as traffic_nation
+    return traffic_nation.flights_payload(level, id or None, minute)
+
+
 @app.get('/traffic/v2/nation')
 def traffic_v2_nation(level: str = Query('nation', pattern='^(nation|region|province|city)$'),
-                      id: str = Query('')):
+                      id: str = Query(''), minute: int = Query(0, ge=0, le=1440)):
     """全国航线网四级：全国 → 大区 → 省 → 市。每级单独请求，前端逐级加载。"""
     from traffic import nation as traffic_nation
-    payload = traffic_nation.payload(level, id or None)
+    payload = traffic_nation.payload(level, id or None, minute)
     if payload.get('status') == 'NOT_FOUND':
         raise HTTPException(404, payload.get('note') or '未找到')
     return payload

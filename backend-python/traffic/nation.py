@@ -29,6 +29,27 @@ from typing import Any, Dict, List, Optional, Tuple
 from . import national as national_mod
 
 ROOT = Path(__file__).resolve().parents[2]
+
+# 与 build_nation_network 相同的投影，用于把回波与航路放到同一平面做绕飞
+AEQD = '+proj=aeqd +lat_0=35 +lon_0=105 +datum=WGS84 +units=m'
+_TO_XY = None
+_TO_LL = None
+
+
+def _xy_transformer():
+    global _TO_XY
+    if _TO_XY is None:
+        from pyproj import Transformer
+        _TO_XY = Transformer.from_crs('EPSG:4326', AEQD, always_xy=True)
+    return _TO_XY
+
+
+def _ll_transformer():
+    global _TO_LL
+    if _TO_LL is None:
+        from pyproj import Transformer
+        _TO_LL = Transformer.from_crs(AEQD, 'EPSG:4326', always_xy=True)
+    return _TO_LL
 CITY_FILE = ROOT / 'data' / 'traffic' / 'cities-cn.json'
 NETWORK_FILE = ROOT / 'data' / 'traffic' / 'nation-network.json'
 AIRPORT_FILE = ROOT / 'data' / 'traffic' / 'airports-cn.json'
@@ -98,6 +119,133 @@ def _city_weather() -> Dict[str, Dict[str, Any]]:
 @lru_cache(maxsize=1)
 def _corridor_rows() -> List[Dict[str, Any]]:
     return list(_network().get('corridors') or [])
+
+
+@lru_cache(maxsize=1)
+def _radar() -> Dict[str, Any]:
+    try:
+        from weather import radar_public
+        return radar_public.fetch()
+    except Exception as exc:  # noqa: BLE001
+        return {'available': False, 'error': str(exc)[:80], 'bands': {}, 'counts': {}}
+
+
+def _radar_polygons(radar: Dict[str, Any]):
+    from shapely.geometry import Polygon
+    from shapely.ops import unary_union
+    shapes = []
+    for band in ('CONVECTIVE', 'STRONG'):
+        for ring in (radar.get('bands') or {}).get(band) or []:
+            try:
+                poly = Polygon(ring)
+                if poly.is_valid and poly.area > 0:
+                    shapes.append(poly)
+            except Exception:  # noqa: BLE001
+                continue
+    return unary_union(shapes) if shapes else None
+
+
+def _detour_for(path: List[List[float]], avoid) -> Optional[Dict[str, Any]]:
+    """走廊穿回波时**小绕一下**：把中点沿法线挪开，能避开就返回新路径。"""
+    from shapely.geometry import LineString, Point
+    to_xy, to_ll = _xy_transformer(), _ll_transformer()
+    if avoid is None or len(path) < 2:
+        return None
+    pts = [to_xy.transform(lon, lat) for lon, lat in path]
+    line = LineString(pts)
+    if not line.intersects(avoid):
+        return None
+    hit = line.intersection(avoid)
+    hit_m = max(3000.0, min(90000.0, hit.length))
+    best = None
+    for depth_m in (hit_m * 0.45 + 6000.0, hit_m * 0.75 + 8000.0, hit_m * 1.1 + 12000.0):
+      for sign in (1, -1):
+          a, b = pts[0], pts[-1]
+          dx, dy = b[0] - a[0], b[1] - a[1]
+          length = (dx * dx + dy * dy) ** 0.5 or 1.0
+          nx, ny = -dy / length * sign, dx / length * sign
+          shifted = LineString([a, (a[0] + dx / 2 + nx * depth_m, a[1] + dy / 2 + ny * depth_m), b])
+          if shifted.intersects(avoid):
+              continue
+          cost = shifted.length - line.length
+          if cost < 0 or cost > line.length * 0.4:
+              continue
+          if best is None or cost < best[0]:
+              best = (cost, shifted)
+    if best is None:
+        return None
+    _, shifted = best
+    coords = [list(to_ll.transform(x, y)) for x, y in shifted.coords]
+    return {'path': [[round(lon, 4), round(lat, 4)] for lon, lat in coords],
+            'shiftKm': round(best[0] / 1000.0, 1)}
+
+
+@lru_cache(maxsize=2)
+def _detour_table(radar_ts: str) -> Dict[str, Dict[str, Any]]:
+    """按雷达帧缓存绕飞结果：一帧 10 分钟，不用每个请求重算 514 条。"""
+    from shapely.ops import transform as shp_transform
+    radar = _radar()
+    avoid = _radar_polygons(radar)
+    if avoid is None:
+        return {}
+    # 回波多边形是经纬度，航路要投影到米制平面才能判交、才能算法线侧移
+    avoid = shp_transform(_xy_transformer().transform, avoid)
+    table: Dict[str, Dict[str, Any]] = {}
+    for row in _corridor_rows():
+        path = row.get('path') or [row['fromLonLat'], row['toLonLat']]
+        got = _detour_for(path, avoid)
+        if got:
+            table[row['id']] = got
+    return table
+
+
+def _flights(corridors: List[Dict[str, Any]], minute: int,
+             detours: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """按走廊排班，给出 `minute` 时刻在飞的飞行汽车。
+
+    排班是**确定性**的：走廊 id 的哈希决定发车间隔与相位，同一分钟刷新多少次都一样，
+    所以时间轴可以来回拖，不会出现"每次刷新车队全变"的假象。
+    """
+    out: List[Dict[str, Any]] = []
+    for row in corridors:
+        if row.get('borderBlocked'):
+            continue          # 边境管制带走不通又不让绕的，直接不放飞（界面记"待批"）
+        seed = abs(hash(row['id'])) % 9973
+        headway = 150 + seed % 120          # 2.5–4.5 h 一班
+        phase = seed % headway
+        speed = 200.0 if row.get('cross') else 180.0
+        duration = max(12.0, (row.get('lengthKm') or 100.0) / speed * 60.0)
+        elapsed = (minute - phase) % headway
+        if elapsed > duration:
+            continue
+        progress = elapsed / duration
+        path = row.get('path') or [row['fromLonLat'], row['toLonLat']]
+        if len(path) < 2:
+            continue
+        # 沿折线按进度取点
+        seg = max(1, len(path) - 1)
+        pos = progress * seg
+        idx = min(seg - 1, int(pos))
+        frac = pos - idx
+        lon = path[idx][0] + (path[idx + 1][0] - path[idx][0]) * frac
+        lat = path[idx][1] + (path[idx + 1][1] - path[idx][1]) * frac
+        detour = detours.get(row['id'])
+        late = 0
+        if detour:
+            late = int(6 + detour['shiftKm'] / 6.0)
+        out.append({
+            'id': f"{row['id']}-{int(headway)}",
+            'corridor': row['id'],
+            'fromName': row['fromName'], 'toName': row['toName'],
+            'lon': round(lon, 4), 'lat': round(lat, 4),
+            'progress': round(progress, 3),
+            'altM': int(600 + 500 * (1 - abs(progress - 0.5) * 2)),
+            'speedKmh': int(speed),
+            'status': 'DELAYED' if detour else 'ON_TIME',
+            'delayMin': late,
+            'detourKm': detour['shiftKm'] if detour else 0.0,
+        })
+    return out
 
 
 @lru_cache(maxsize=2)
@@ -248,6 +396,9 @@ def _slice_corridors(provinces: set, city: Optional[str] = None) -> List[Dict[st
             'kind': row['kind'], 'kindLabel': KIND_LABEL.get(row['kind'], row['kind']),
             'feed': bool(row.get('feed')), 'cross': bool(row.get('cross')),
             'sea': bool(row.get('sea')),
+            'bulge': row.get('bulge', 0.0),
+            'borderDetour': bool(row.get('borderDetour')),
+            'borderBlocked': bool(row.get('borderBlocked')),
             'lengthKm': row['lengthKm'], 'geometry': row['geometry'],
             'fromLonLat': row['fromLonLat'], 'toLonLat': row['toLonLat'],
         }
@@ -354,11 +505,71 @@ def _base(level: str, ident: Optional[str]) -> Dict[str, Any]:
     }
 
 
-def payload(level: str = 'nation', ident: Optional[str] = None) -> Dict[str, Any]:
+def flights_payload(level: str = 'nation', ident: Optional[str] = None,
+                    minute: int = 0) -> Dict[str, Any]:
+    """只回航班与统计：时间轴每拖一次都要刷新，不能把整份网络重算一遍。"""
+    minute = max(0, min(1440, int(minute or 0)))
+    provinces = [row['name'] for row in _province_rows()]
+    radar = _radar()
+    table = _detour_table(radar.get('ts') or 'none') if radar.get('available') else {}
+    if level == 'region':
+        scoped = {row['name'] for row in _province_rows() if row['region'] == (ident or 'north')}
+        corridors = _slice_corridors(scoped)
+    elif level == 'province':
+        corridors = _slice_corridors({ident or ''})
+    elif level == 'city':
+        corridors = _slice_corridors({''}, city=ident or '')
+        if not corridors:
+            city = next((item for item in _city_rows() if item['name'] == ident), None)
+            if city:
+                corridors = _slice_corridors({city['province']}, city=ident)
+    else:
+        corridors = _slice_corridors(set(provinces))
+    flights = _flights(corridors, minute, table)
+    return {
+        'status': 'OK', 'level': level, 'id': ident, 'minute': minute,
+        'radarTs': radar.get('ts'),
+        'flights': flights,
+        'traffic': {'corridors': len(corridors), 'airborne': len(flights),
+                    'delayed': sum(1 for row in flights if row['status'] == 'DELAYED'),
+                    'blocked': sum(1 for row in corridors if row.get('borderBlocked')),
+                    'radarHitCorridors': sum(1 for row in corridors if table.get(row['id']))},
+    }
+
+
+def payload(level: str = 'nation', ident: Optional[str] = None,
+            minute: int = 0) -> Dict[str, Any]:
     provinces = _province_rows()
     stations = _live_stations()
     base = _base(level, ident)
     names = [row['name'] for row in provinces]
+    radar = _radar()
+    table = _detour_table(radar.get('ts') or 'none') if radar.get('available') else {}
+    minute = max(0, min(1440, int(minute or 0)))
+
+    def attach(body: Dict[str, Any], corridors: List[Dict[str, Any]]) -> Dict[str, Any]:
+        for row in corridors:
+            got = table.get(row['id'])
+            if got:
+                row['detour'] = got          # 前端用它画绕飞后的实际航迹
+        flights = _flights(corridors, minute, table)
+        hit = sum(1 for row in corridors if row.get('detour'))
+        delayed = sum(1 for row in flights if row['status'] == 'DELAYED')
+        blocked = sum(1 for row in corridors if row.get('borderBlocked'))
+        border_hit = sum(1 for row in corridors if row.get('borderDetour'))
+        return {**body,
+                'minute': minute,
+                'radar': {'available': bool(radar.get('available')),
+                          'ts': radar.get('ts'),
+                          'source': radar.get('source'),
+                          'counts': radar.get('counts') or {},
+                          'bands': radar.get('bands') or {},
+                          'coverage': radar.get('coverage')},
+                'flights': flights,
+                'traffic': {'corridors': len(corridors), 'airborne': len(flights),
+                            'delayed': delayed, 'radarHitCorridors': hit,
+                            'blocked': blocked, 'borderDetourCorridors': border_hit,
+                            'detourShiftKm': round(sum(r['shiftKm'] for r in table.values()), 1)}}
 
     if level in ('nation', 'north'):
         corridors = _slice_corridors(set(names))
@@ -378,10 +589,10 @@ def payload(level: str = 'nation', ident: Optional[str] = None) -> Dict[str, Any
                 'operational': sum(1 for row in rows if row['state'] == 'operational'),
                 'pending': sum(1 for row in rows if row['state'] == 'pending'),
             })
-        return {**base, 'level': 'nation', 'regions': regions, 'provinces': provinces,
-                'nodes': nodes, 'corridors': corridors, 'stationPoints': stations,
-                'view': {'bbox': _scope_bbox(names)},
-                'summary': _summary(provinces, corridors, nodes, stations)}
+        return attach({**base, 'level': 'nation', 'regions': regions, 'provinces': provinces,
+                       'nodes': nodes, 'corridors': corridors, 'stationPoints': stations,
+                       'view': {'bbox': _scope_bbox(names)},
+                       'summary': _summary(provinces, corridors, nodes, stations)}, corridors)
 
     if level == 'region':
         key = ident if ident in REGION_ORDER else REGION_ORDER[0]
@@ -390,11 +601,11 @@ def payload(level: str = 'nation', ident: Optional[str] = None) -> Dict[str, Any
         corridors = _slice_corridors(scoped)
         nodes = _slice_nodes(scoped)
         scoped_stations = [point for point in stations if point['name'] in scoped]
-        return {**base, 'region': {'id': key, 'name': REGION_LABEL[key]},
-                'regions': [], 'provinces': rows, 'nodes': nodes,
-                'corridors': corridors, 'stationPoints': scoped_stations,
-                'view': {'bbox': _scope_bbox(list(scoped))},
-                'summary': _summary(rows, corridors, nodes, scoped_stations)}
+        return attach({**base, 'region': {'id': key, 'name': REGION_LABEL[key]},
+                       'regions': [], 'provinces': rows, 'nodes': nodes,
+                       'corridors': corridors, 'stationPoints': scoped_stations,
+                       'view': {'bbox': _scope_bbox(list(scoped))},
+                       'summary': _summary(rows, corridors, nodes, scoped_stations)}, corridors)
 
     if level == 'province':
         row = next((item for item in provinces if item['name'] == ident), None)
@@ -419,12 +630,12 @@ def payload(level: str = 'nation', ident: Optional[str] = None) -> Dict[str, Any
             })
         city_rows.sort(key=lambda item: (not item['hasAirport'], -item['links'], item['name']))
         scoped_stations = [point for point in stations if point['name'] == ident]
-        return {**base, 'region': {'id': row['region'], 'name': REGION_LABEL[row['region']]},
-                'regions': [], 'provinces': [row], 'province': row,
-                'cities': city_rows, 'nodes': nodes, 'corridors': corridors,
-                'stationPoints': scoped_stations,
-                'view': {'bbox': _points_bbox([(n['lon'], n['lat']) for n in nodes])},
-                'summary': _summary([row], corridors, nodes, scoped_stations)}
+        return attach({**base, 'region': {'id': row['region'], 'name': REGION_LABEL[row['region']]},
+                       'regions': [], 'provinces': [row], 'province': row,
+                       'cities': city_rows, 'nodes': nodes, 'corridors': corridors,
+                       'stationPoints': scoped_stations,
+                       'view': {'bbox': _points_bbox([(n['lon'], n['lat']) for n in nodes])},
+                       'summary': _summary([row], corridors, nodes, scoped_stations)}, corridors)
 
     if level == 'city':
         city = next((item for item in _city_rows() if item['name'] == ident), None)
@@ -449,7 +660,7 @@ def payload(level: str = 'nation', ident: Optional[str] = None) -> Dict[str, Any
                            else (feed[0]['fromName'] if feed else None)),
             'neighbours': neighbours,
         }
-        return {**base, 'regions': [], 'provinces': [row] if row else [], 'province': row,
+        body = {**base, 'regions': [], 'provinces': [row] if row else [], 'province': row,
                 # 市层只画"自己 + 直接相邻"的节点，视野也收到这几个点上：
                 # 否则整省会挤成一团，3 条航线看不出连到谁。
                 'city': detail,
@@ -459,6 +670,7 @@ def payload(level: str = 'nation', ident: Optional[str] = None) -> Dict[str, Any
                 'stationPoints': [point for point in stations if point['name'] == city['province']],
                 'view': {'bbox': _points_bbox([(row['lon'], row['lat']) for row in node_rows])},
                 'summary': _summary([row] if row else [], corridors, [city], [])}
+        return attach(body, corridors)
 
     return {'status': 'INVALID', 'level': level,
             'note': 'level 只能是 nation / region / province / city'}

@@ -19,6 +19,22 @@ const data=ref(null)
 const error=ref(''),loading=ref(false)
 const hovered=ref(null)
 
+// —— 推演时间轴 / 图层开关 / 视角 ——
+const MINUTES=180
+const minute=ref(0)
+const playing=ref(false)
+const radarOn=ref(true)
+const tilt=ref(false)
+const flights=ref([])
+const traffic=ref({corridors:0,airborne:0,delayed:0})
+let timer=null, flightSeq=0
+
+// 缩放与平移：地图内容整体做仿射变换，投影本身不动（拖动缩放只改这层）
+const zoom=ref(1)
+const pan=ref({x:0,y:0})
+const dragging=ref(false)
+let dragStart=null
+
 const KIND_NAME={INTRA:'省内',AIRPORT_FEED:'机场接驳',CROSS:'跨省通道'}
 
 const VIEW={w:1000,h:640}
@@ -117,11 +133,12 @@ const activeNames=computed(()=>{
 //   ① 一条线一个样：**同色、同宽、同端点样式**，不按类型分色分虚线；
 //   ② 两点之间走**微弧**（不是直尺线），弧度随长度轻微增长，像航路图上的大圆弧；
 //   ③ 弧一律朝图面上方鼓，同一屏里的弧成为一族，不会互相打结。
-function arcPoints(a,b){
+function arcPoints(a,b,bulgeIn){
   const dx=b[0]-a[0],dy=b[1]-a[1]
   const len=Math.hypot(dx,dy)
   if(len<10) return [a,b]
-  const bulge=Math.min(0.085,0.018+len/9000)     // 弦长的 2%–8.5%，短程几乎直、长程成弧
+  // 弧度由后端算好（它验过"弧不能鼓出国境"），没给就退回小弧
+  const bulge=(bulgeIn===undefined||bulgeIn===null)?0.02:bulgeIn
   const mx=(a[0]+b[0])/2,my=(a[1]+b[1])/2
   let px=-dy/len,py=dx/len                        // 法线
   if(py>0){px=-px;py=-py}                         // 统一朝屏幕上方鼓
@@ -142,8 +159,8 @@ const corridors=computed(()=>{
     const raw=Array.isArray(path)&&path.length>1?path:[row.fromLonLat,row.toLonLat]
     const coords=raw.map(([lon,lat])=>project(lon,lat))
     // A* 算出来的多段折线保留原形；两点直连的用微弧，视觉上才像航路而不是连线题
-    const points=coords.length===2?arcPoints(coords[0],coords[1]):coords
-    rows.push({id:row.id,points})
+    const points=coords.length===2?arcPoints(coords[0],coords[1],row.bulge):coords
+    rows.push({id:row.id,points,blocked:!!row.borderBlocked,border:!!row.borderDetour})
   }
   return rows
 })
@@ -172,6 +189,67 @@ const labels=computed(()=>{
   return placed
 })
 
+// —— 回波 / 绕飞 / 航班 三个图层 ——
+const RADAR_COLOR={WEAK:'rgba(34,197,94,.34)',CONVECTIVE:'rgba(245,197,66,.46)',STRONG:'rgba(239,68,68,.60)'}
+const radarPolys=computed(()=>{
+  const bands=data.value?.radar?.bands||{}
+  const out=[]
+  for(const band of ['WEAK','CONVECTIVE','STRONG']){
+    for(const ring of bands[band]||[]){
+      if(!ring||ring.length<3) continue
+      const d=ring.map(([lon,lat],i)=>{const [x,y]=project(lon,lat);return (i?'L':'M')+x.toFixed(1)+' '+y.toFixed(1)}).join(' ')+' Z'
+      out.push({band,d})
+    }
+  }
+  return out
+})
+
+// 绕飞后的实际航迹：跟原航路叠在一起看，才看得出"往哪边偏了"
+const detourLines=computed(()=>{
+  const rows=[]
+  for(const row of data.value?.corridors||[]){
+    const det=row.detour
+    if(!det||!Array.isArray(det.path)) continue
+    rows.push({id:row.id,points:det.path.map(([lon,lat])=>project(lon,lat))})
+  }
+  return rows
+})
+
+function pointAt(path,progress){
+  if(!path||path.length<2) return null
+  const seg=path.length-1
+  const pos=Math.max(0,Math.min(1,progress))*seg
+  const idx=Math.min(seg-1,Math.floor(pos))
+  const frac=pos-idx
+  const a=path[idx],b=path[idx+1]
+  return [a[0]+(b[0]-a[0])*frac,a[1]+(b[1]-a[1])*frac]
+}
+
+// 在飞的飞行汽车：位置 + 朝向 + 是否绕飞改航
+const flightDots=computed(()=>{
+  const byId={}
+  for(const row of data.value?.corridors||[]) byId[row.id]=row
+  const out=[]
+  for(const f of flights.value||[]){
+    const row=byId[f.corridor]
+    const path=row?.path||[row?.fromLonLat,row?.toLonLat]
+    if(!path||!path[0]) continue
+    const [lon,lat]=[f.lon,f.lat]
+    const ahead=pointAt(path,Math.min(1,f.progress+0.02))
+    const cur=project(lon,lat)
+    const nxt=ahead?project(ahead[0],ahead[1]):cur
+    const angle=Math.atan2(nxt[1]-cur[1],nxt[0]-cur[0])*180/Math.PI
+    out.push({...f,x:cur[0],y:cur[1],angle,delayed:f.status==='DELAYED'})
+  }
+  return out
+})
+
+const minuteLabel=computed(()=>{
+  const base=8*60      // 推演窗口从 08:00 起，和"早高峰"对齐
+  const t=base+minute.value
+  return `${String(Math.floor(t/60)).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`
+})
+
 // 线宽随层级：省级看的是"本市到哪"，线要粗；全国层 514 条，细线才不糊。
 const lineWidth=computed(()=>({nation:1.0,region:1.3,province:1.9,city:1.6}[level.value]||1.05))
 
@@ -198,13 +276,67 @@ function visText(vis,lower){
   return (lower?'≥':'')+(km>=10?Math.round(km):km.toFixed(1))+' km'
 }
 
+async function loadFlights(){
+  const seq=++flightSeq
+  try{
+    const query=`level=${encodeURIComponent(level.value)}&id=${encodeURIComponent(ident.value)}&minute=${minute.value}`
+    const payload=await requestJson(`/api/traffic/v2/nation/flights?${query}`,{timeoutMs:20000})
+    if(seq!==flightSeq) return                      // 只认最后一次请求，防止拖动时乱序覆盖
+    flights.value=payload.flights||[]
+    traffic.value=payload.traffic||{corridors:0,airborne:0,delayed:0}
+  }catch(e){/* 时间轴刷新失败不打断主界面 */}
+}
+
+function togglePlay(){
+  playing.value=!playing.value
+  if(playing.value){
+    timer=setInterval(()=>{
+      minute.value=(minute.value+3)%MINUTES
+      loadFlights()
+    },1200)
+  }else if(timer){clearInterval(timer);timer=null}
+}
+
+function onSlide(){
+  loadFlights()
+}
+
+function onWheel(event){
+  const rect=event.currentTarget.getBoundingClientRect()
+  const factor=event.deltaY<0?1.12:1/1.12
+  const next=Math.max(1,Math.min(6,zoom.value*factor))
+  if(next===zoom.value) return
+  // 以鼠标位置为中心缩放
+  const mx=(event.clientX-rect.left)/rect.width*VIEW.w
+  const my=(event.clientY-rect.top)/rect.height*VIEW.h
+  const k=next/zoom.value
+  pan.value={x:mx-(mx-pan.value.x)*k,y:my-(my-pan.value.y)*k}
+  zoom.value=next
+}
+
+function onDown(event){
+  dragging.value=true
+  dragStart={x:event.clientX,y:event.clientY,px:pan.value.x,py:pan.value.y}
+}
+function onMove(event){
+  if(!dragging.value||!dragStart) return
+  const rect=event.currentTarget.getBoundingClientRect()
+  pan.value={x:dragStart.px+(event.clientX-dragStart.x)/rect.width*VIEW.w,
+             y:dragStart.py+(event.clientY-dragStart.y)/rect.height*VIEW.h}
+}
+function onUp(){dragging.value=false;dragStart=null}
+function resetView(){zoom.value=1;pan.value={x:0,y:0}}
+
 async function load(){
   loading.value=true
   error.value=''
   data.value=null                      // 先卸屏，避免上一级的数据留在内存里
   try{
     const query=`level=${encodeURIComponent(level.value)}&id=${encodeURIComponent(ident.value)}`
-    data.value=await requestJson(`/api/traffic/v2/nation?${query}`,{timeoutMs:30000})
+    data.value=await requestJson(`/api/traffic/v2/nation?${query}&minute=${minute.value}`,{timeoutMs:30000})
+    flights.value=data.value?.flights||[]
+    traffic.value=data.value?.traffic||{corridors:0,airborne:0,delayed:0}
+    resetView()
   }catch(e){error.value=e.message||String(e)}
   finally{loading.value=false}
 }
@@ -231,7 +363,7 @@ function back(){
   load()
 }
 
-onMounted(load)
+onMounted(()=>{load()})
 </script>
 
 <template>
@@ -261,13 +393,71 @@ onMounted(load)
 
   <div class="nrn-body" v-else-if="data">
     <div class="nrn-map">
-      <svg :viewBox="`0 0 ${VIEW.w} ${VIEW.h}`" role="img" aria-label="全国航线网层级地图">
+      <!-- 推演时间轴 + 图层开关 + 视角复位 -->
+      <div class="nrn-tools">
+        <button class="play" @click="togglePlay">{{ playing?'暂停':'播放' }}</button>
+        <input type="range" min="0" :max="MINUTES" step="1" v-model.number="minute"
+               @input="onSlide" @change="onSlide" aria-label="推演时间"/>
+        <b class="clock">{{ minuteLabel }}</b>
+        <button :class="{on:radarOn}" @click="radarOn=!radarOn">回波</button>
+        <button :class="{on:tilt}" @click="tilt=!tilt">立体</button>
+        <button @click="resetView">复位</button>
+      </div>
+      <!-- 飞行汽车：等距视角的简化模型（转子带旋转动画），当图例也用 -->
+      <div class="nrn-car">
+        <svg viewBox="0 0 168 104" aria-label="飞行汽车模型">
+          <defs>
+            <linearGradient id="carBody" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#eaf7ff"/><stop offset="100%" stop-color="#9dc9e8"/>
+            </linearGradient>
+            <linearGradient id="carSide" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#6ea6c9"/><stop offset="100%" stop-color="#3c6b8c"/>
+            </linearGradient>
+          </defs>
+          <ellipse cx="84" cy="92" rx="46" ry="7" fill="rgba(10,26,40,.45)"/>
+          <!-- 机臂 -->
+          <g stroke="#7fb6d6" stroke-width="5" stroke-linecap="round" opacity=".85">
+            <line x1="52" y1="52" x2="28" y2="40"/><line x1="116" y1="52" x2="140" y2="40"/>
+            <line x1="52" y1="60" x2="28" y2="72"/><line x1="116" y1="60" x2="140" y2="72"/>
+          </g>
+          <!-- 转子 -->
+          <g fill="none" stroke="#bfe9ff" stroke-width="2">
+            <ellipse class="rotor" cx="28" cy="40" rx="15" ry="5"/>
+            <ellipse class="rotor" cx="140" cy="40" rx="15" ry="5"/>
+            <ellipse class="rotor" cx="28" cy="72" rx="15" ry="5"/>
+            <ellipse class="rotor" cx="140" cy="72" rx="15" ry="5"/>
+          </g>
+          <!-- 车身：上盖 + 侧面 + 座舱 -->
+          <path d="M84 34 L120 48 L84 62 L48 48 Z" fill="url(#carBody)"/>
+          <path d="M48 48 L84 62 L84 74 L48 60 Z" fill="url(#carSide)"/>
+          <path d="M120 48 L84 62 L84 74 L120 60 Z" fill="#2f5975"/>
+          <path d="M68 44 L84 38 L100 44 L84 50 Z" fill="#12324a" opacity=".85"/>
+          <circle cx="84" cy="46" r="2.2" fill="#8ef0ff"/>
+        </svg>
+        <span>飞行汽车 · 在飞 <b class="alc-num">{{ traffic.airborne }}</b></span>
+      </div>
+
+      <svg :viewBox="`0 0 ${VIEW.w} ${VIEW.h}`" role="img" aria-label="全国航线网层级地图"
+           :class="{tilt, dragging}"
+           @wheel.prevent="onWheel" @mousedown="onDown" @mousemove="onMove"
+           @mouseup="onUp" @mouseleave="onUp">
         <defs>
           <pattern id="nrn-grid" width="50" height="50" patternUnits="userSpaceOnUse">
             <path d="M50 0H0V50" fill="none" stroke="rgba(120,170,220,.08)" stroke-width="1"/>
           </pattern>
+          <filter id="nrn-radar-blur" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="2.4"/>
+          </filter>
         </defs>
         <rect x="0" y="0" :width="VIEW.w" :height="VIEW.h" fill="url(#nrn-grid)"/>
+
+        <g :transform="`translate(${pan.x} ${pan.y}) scale(${zoom})`">
+
+        <!-- 雷达回波：压在底图之上、航线之下，透明度足够低才不抢航路 -->
+        <g v-if="radarOn" class="nrn-radar" filter="url(#nrn-radar-blur)" opacity="0.95">
+          <path v-for="(poly,i) in radarPolys" :key="'r'+i" :d="poly.d"
+                :fill="RADAR_COLOR[poly.band]" stroke="none"/>
+        </g>
 
         <g>
           <path v-for="shape in shapes" :key="shape.key" :d="shape.d"
@@ -298,7 +488,10 @@ onMounted(load)
 
         <!-- 航线：同色同宽同端点，下面一层极淡的光晕只做体积感，不区分类别 -->
         <g class="nrn-routes" fill="none" stroke-linecap="round" stroke-linejoin="round">
-          <polyline v-for="line in corridors" :key="'g'+line.id"
+          <!-- 边境管制带内不放飞：细红线只作提示，不当作正常航路 -->
+          <polyline v-for="line in corridors.filter(l=>l.blocked)" :key="'b'+line.id"
+                    :points="line.points.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ')"
+                    stroke="rgba(226,92,74,.30)" :stroke-width="lineWidth*0.9"/>
                     :points="line.points.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ')"
                     stroke="rgba(120,200,255,.07)" :stroke-width="lineWidth*2.9"/>
           <polyline v-for="line in corridors" :key="line.id"
@@ -323,14 +516,34 @@ onMounted(load)
           </g>
         </g>
 
+        <!-- 绕飞航迹：回波挡路时实际飞的这条，比原航路亮一档 -->
+        <g class="nrn-detour" fill="none" stroke-linecap="round">
+          <polyline v-for="line in detourLines" :key="'d'+line.id"
+                    :points="line.points.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ')"
+                    stroke="rgba(255,214,102,.85)" :stroke-width="lineWidth*1.35"/>
+        </g>
+
+        <!-- 在飞的飞行汽车：同一个 glyph，按航向旋转；绕飞改航的用琥珀色 -->
+        <g class="nrn-flights">
+          <g v-for="f in flightDots" :key="f.id" :transform="`translate(${f.x.toFixed(1)} ${f.y.toFixed(1)}) rotate(${f.angle.toFixed(0)})`">
+            <ellipse v-if="f.delayed" cx="0" cy="0" rx="9" ry="6" fill="rgba(255,196,64,.10)"/>
+            <path d="M7 0 L-4 4 L-2 0 L-4 -4 Z"
+                  :fill="f.delayed?'#ffc857':'#dff3ff'"
+                  :stroke="f.delayed?'rgba(120,60,0,.7)':'rgba(10,30,45,.8)'" stroke-width="0.5"/>
+            <title>{{ f.fromName }} → {{ f.toName }} · {{ f.speedKmh }} km/h · 高度 {{ f.altM }} m{{ f.delayed?(' · 绕飞 +'+f.delayMin+' min / +'+f.detourKm+' km'):' · 正常' }}</title>
+          </g>
+        </g>
+
         <g class="nrn-labels" v-if="labels.length">
           <text v-for="node in labels" :key="'t'+node.name"
                 :x="node.x+(node.flip?-6:6)" :y="node.y+3.4" class="nrn-lbl"
                 :text-anchor="node.flip?'end':'start'">{{ node.short }}</text>
         </g>
 
+        </g>
       </svg>
       <p class="nrn-note">
+        回波按反射率分档：<i class="sw weak"></i>弱 <i class="sw conv"></i>对流 <i class="sw strong"></i>强；琥珀色航迹＝绕飞改航。
         一条弧线＝一条航线（同色同宽，不分类型）；节点三级：省会/首府（大点＋浅环）＞机场城市（中点）＞一般城市（小点）<template v-if="level==='nation'">；右下小图为南海诸岛</template>。
         定位：飞行汽车分担城市间出行，跨省长距离仍靠飞机与火车。
         <span v-if="hovered">指向：{{ hovered }}</span>
@@ -339,6 +552,12 @@ onMounted(load)
 
     <aside class="nrn-side">
       <div class="nrn-card">
+        <div class="nrn-stats">
+          <div><b class="alc-num">{{ traffic.corridors }}</b><span>航线</span></div>
+          <div><b class="alc-num">{{ traffic.airborne }}</b><span>在飞汽车</span></div>
+          <div :class="{alarm:traffic.delayed>0}"><b class="alc-num">{{ traffic.delayed }}</b><span>异常</span></div>
+          <div :class="{alarm:(traffic.blocked||0)>0}" v-if="traffic.blocked"><b class="alc-num">{{ traffic.blocked }}</b><span>边境待批</span></div>
+        </div>
         <h3>
           <template v-if="level==='nation'">各大区概览</template>
           <template v-else-if="level==='region'">本区省份</template>
@@ -426,7 +645,34 @@ onMounted(load)
 .nrn-body{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:12px;min-height:0;align-items:stretch}
 .nrn-map{position:relative;border:1px solid var(--alc-line);border-radius:10px;background:var(--alc-bg-1);overflow:hidden;
   display:flex;flex-direction:column;min-height:420px}
-.nrn-map svg{display:block;width:100%;height:100%;flex:1;min-height:0}
+.nrn-map svg{display:block;width:100%;height:100%;flex:1;min-height:0;cursor:grab}
+.nrn-map svg.dragging{cursor:grabbing}
+/* 立体视角：整体做轻微俯仰，只在"看形状"时用；倾斜状态下不做点选 */
+.nrn-map svg.tilt{transform:perspective(1800px) rotateX(17deg) scale(.86);transform-origin:50% 62%}
+.nrn-tools{position:absolute;left:10px;top:10px;z-index:3;display:flex;align-items:center;gap:6px;
+  padding:6px 8px;border:1px solid var(--alc-line);border-radius:8px;background:rgba(8,18,30,.82);
+  backdrop-filter:blur(4px);font-size:12px;color:var(--alc-text-dim)}
+.nrn-tools button{background:transparent;border:1px solid var(--alc-line);border-radius:5px;
+  color:var(--alc-text-dim);padding:2px 8px;font-size:12px;cursor:pointer}
+.nrn-tools button.on{border-color:var(--alc-info);color:#bfe9ff;background:rgba(90,170,220,.14)}
+.nrn-tools button.play{border-color:rgba(120,200,255,.5);color:#d6f1ff;min-width:46px}
+.nrn-tools input[type=range]{width:150px;accent-color:#5aaadc}
+.nrn-car{position:absolute;left:12px;bottom:44px;z-index:3;display:flex;flex-direction:column;align-items:center;
+  gap:2px;width:132px;padding:6px 8px 4px;border:1px solid var(--alc-line);border-radius:10px;
+  background:rgba(8,18,30,.62);backdrop-filter:blur(3px)}
+.nrn-car svg{width:120px;height:74px;display:block}
+.nrn-car span{font-size:11px;color:var(--alc-text-dim);white-space:nowrap}
+.nrn-car b{color:#e6f4ff}
+.rotor{animation:rotor-spin 1.1s linear infinite;transform-origin:center;transform-box:fill-box}
+@keyframes rotor-spin{from{opacity:.35;transform:scaleX(.35)}50%{opacity:.95;transform:scaleX(1)}to{opacity:.35;transform:scaleX(.35)}}
+.nrn-tools .clock{color:#e6f4ff;font-variant-numeric:tabular-nums;min-width:44px;text-align:center}
+.nrn-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:0 0 8px}
+.nrn-stats div{border:1px solid var(--alc-line);border-radius:7px;background:var(--alc-bg-2);
+  padding:6px 8px;display:flex;flex-direction:column;gap:2px}
+.nrn-stats b{font-size:18px;color:#e6f4ff;line-height:1.1}
+.nrn-stats span{font-size:12px;color:var(--alc-text-mute)}
+.nrn-stats div.alarm{border-color:rgba(255,196,64,.5);background:rgba(255,196,64,.10)}
+.nrn-stats div.alarm b{color:#ffc857}
 .nrn-map svg path.live{cursor:pointer}
 /* 标注：统一字号、统一颜色，加深色描边保证压在航线上也能读 */
 .nrn-lbl{font-size:9.5px;fill:rgba(226,241,255,.86);pointer-events:none;
@@ -465,4 +711,8 @@ onMounted(load)
 .nrn-wx-list li.low b{color:#ffb4b2}
 .nrn-wx-list span{margin-left:auto}
 .nrn-hint{margin:6px 0 0;font-size:12px;color:var(--alc-text-mute);line-height:1.6}
+.nrn-note .sw{display:inline-block;width:9px;height:9px;border-radius:2px;margin:0 3px 0 6px;vertical-align:-1px}
+.nrn-note .sw.weak{background:rgba(64,180,120,.55)}
+.nrn-note .sw.conv{background:rgba(232,190,60,.6)}
+.nrn-note .sw.strong{background:rgba(228,92,64,.65)}
 </style>
