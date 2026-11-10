@@ -6,7 +6,6 @@ import {isCaseMode, caseQuery, caseMeta} from '../traffic/caseMode.js'
 import TrafficScene from './CityTrafficMap.vue'
 import DispatchBoard from './traffic/DispatchBoard.vue'
 import WeatherSourceSwitch from './traffic/WeatherSourceSwitch.vue'
-import HomeStage from './traffic/HomeStage.vue'
 import NationPanel from './traffic/NationPanel.vue'
 import NationBriefing from './traffic/NationBriefing.vue'
 import CommandPalette from './traffic/CommandPalette.vue'
@@ -20,6 +19,12 @@ store.scope=readScopeFromUrl()
 const nationScopeKey=computed(()=>scopeKey(store.scope.level,store.scope.id))
 // 导航入口 → 全国台视图。处置看事件、取证看台账（选中班次后能取证）、
 // 气象与走廊都用态势图（右栏的气象实况与点航线出的剖面就是它们的内容）。
+// 这些页面共用一张图/一张表，不给一句"该做什么"，用户看到的只是空地图。
+const NATION_HINTS={
+  profile:'点地图上任意一条航线，右侧会给出逐公里回波剖面与绕飞段',
+  card:'点地图上任意一架飞机（或右栏城市），查看该班次从实况、判据到裁决的完整链路',
+  assistant:'在表里点一行班次选中它，再在下方详情里点「取证」，得到逐行带来源的证据链',
+}
 function nationViewOf(section){
   if(section==='alerts') return 'alerts'
   if(section==='assistant') return 'ledger'
@@ -658,8 +663,10 @@ onUnmounted(()=>{
   </div>
   <!-- 运行总览同样四级：全国走全国台，切到东北才用 V1.0.0 那张 maplibre 运行图。
        两者共用同一个 scope 变量，避免"总览是东北、情报是全国"的错位。 -->
+  <!-- 运行总览默认落「台账」视图：首页已经是地图态势，两个入口看同一张图没有意义。
+       总览给的是逐班次数据，首屏看地图、要看数就点这里。 -->
   <section class="traffic-page national-page" v-if="activeSection==='overview'&&scope==='nation'">
-    <NationPanel :scope-key="nationScopeKey" @scope-change="onScopeChange"/>
+    <NationPanel :scope-key="nationScopeKey" initial-view="ledger" @scope-change="onScopeChange"/>
   </section>
   <section class="traffic-main" v-if="activeSection==='overview'&&scope==='ne'">
     <div class="traffic-map-panel"><div class="traffic-map-heading"><div><h2>{{city?cityName:'全域运行总览'}} <small>{{city?'城区配送网络':'东北三省城市网络'}}</small></h2><span>{{clock(minute)}} · {{city?'配送起降点与航路交汇':'在导航栏选择运行区域，或直接点地图上的城市'}}</span></div><div><button v-if="city" @click="locateDelivery" :disabled="!ready">定位配送航班</button> <button @click="scene?.reset()">复位视角</button> <button @click="mapExpanded=!mapExpanded">{{mapExpanded?'退出专注':'地图专注'}}</button></div></div><div class="traffic-layer-row"><div class="traffic-layer-toggles"><label v-for="layer in layerRows" :key="layer.key" :title="layer.title"><input type="checkbox" :checked="homeLayers[layer.key]" @change="toggleLayerRow(layer.key)"><i :class="layer.rowDot"></i>{{layer.label}}</label>                    <span class="traffic-ribbon-count" v-if="overviewRibbon.length" data-overview-ribbon>
@@ -677,7 +684,9 @@ onUnmounted(()=>{
   <section class="traffic-page national-page"
            v-if="scope==='nation'&&['weather','profile','alerts','assistant','card'].includes(activeSection)">
     <NationPanel :scope-key="nationScopeKey" :initial-view="nationViewOf(activeSection)"
-                 @scope-change="onScopeChange"/>
+                 :mode="activeSection==='weather'?'weather':''"
+                 :hint="NATION_HINTS[activeSection]||''"
+                 :hide-tabs="activeSection!=='home'" @scope-change="onScopeChange"/>
   </section>
   <OperationsConsole v-if="!['home','overview','schedule','national'].includes(activeSection)&&!['briefing','weather','profile','alerts','assistant','card'].includes(activeSection)" :corridor-focus="corridorFocus" :corridor-pair="corridorPair" :view="activeSection" :session="session" :network="network" :flights="scoped" :weather="weather" :selected="selected" :minute="minute" :city-name="cityName" :operations="operations" :density="density" :focus="drillFocus" :weather-mode="weatherMode" :weather-mode-status="weatherModeStatus" :alert-flights="scoped" :event-focus="eventFocus" :ai-reviewed="aiReviewed" @select-flight="chooseFlight" @weather-mode-change="onWeatherModeChange" @locate-event="locateEvent" @ai-reviewed="onAiReviewed" @open-section="activeSection=$event" @seek="minute=$event" :max-minute="playbackMax"/>
   <!-- 全国范围：运行情报 / 调度台账接的是全国数据；切回东北就是 V1.0.0 原页 -->

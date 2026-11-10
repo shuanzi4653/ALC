@@ -27,7 +27,6 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from . import national as national_mod
 from . import nation_zones
 from . import nation_ops
 

@@ -21,6 +21,16 @@ const props=defineProps({
   // 从导航进入时先落哪个视图：气象/走廊看 map，处置看 alerts，取证看 ledger。
   // 目的是让左侧导航与页内视图一致，避免"点处置却停在态势图"。
   initialView:{type:String,default:'map'},
+  // 'weather' = 气象监测视图：右栏气象列表展开到全部城市、给更高高度。
+  // 否则三个态势子页（首页/总览/气象监测）看起来一模一样。
+  mode:{type:String,default:''},
+  // 从左侧导航进入时隐藏内部 tab 条：导航已经表达了"我在哪一页"，
+  // 再挂一条「态势/台账/情报/处置」只会和导航打架
+  // （例如从「大模型取证」进来却看到「台账」高亮）。
+  hideTabs:{type:Boolean,default:false},
+  // 从导航进来时的一句"该做什么"。这些页面共用一张图，
+  // 不给提示的话用户看到的就是一张空地图，不知道从哪下手。
+  hint:{type:String,default:''},
 })
 const emit=defineEmits(['scope-change'])
 
@@ -347,6 +357,7 @@ const wxRows=computed(()=>{
     p:n.pLowVis==null?null:n.pLowVis,
   }))
   rows.sort((a,b)=>((b.p??-1)-(a.p??-1))||((b.low?1:0)-(a.low?1:0))||a.rank-b.rank)
+  if(props.mode==='weather') return rows.slice(0,320)
   return rows.slice(0,level.value==='nation'?40:60)
 })
 const wxTotal=computed(()=>(data.value?.nodes||[]).filter(n=>n.weather).length)
@@ -465,7 +476,7 @@ onUnmounted(()=>{
     </p>
   </header>
 
-  <nav class="nrn-tabs" data-nation-tabs>
+  <nav class="nrn-tabs" data-nation-tabs v-if="!hideTabs">
     <button :class="{on:view==='map'}" @click="view='map'">态势</button>
     <button :class="{on:view==='ledger'}" @click="view='ledger'">台账 <em>{{ flights.length }}</em></button>
     <button :class="{on:view==='intel'}" @click="view='intel'">情报 <em>{{ intel.length }}</em></button>
@@ -475,7 +486,12 @@ onUnmounted(()=>{
   <p class="nrn-state" v-if="loading">正在加载本级数据…</p>
   <p class="nrn-state bad" v-else-if="error">本级不可用 · {{ error }}<button @click="load">重试</button></p>
 
-  <div class="nrn-body" v-else-if="data" :class="{'no-map':view!=='map'}">
+  <!-- 注意：这两条必须是**各自独立**的 v-if。
+       `nrn-body` 原本是承接 loading/error 的 `v-else-if`，在它前面的任何 v-if
+       都会把链条打断 —— 提示条有值时整个内容区会被排除掉（实测整页空白）。
+       所以这里显式写全条件，不用 else-if 链。 -->
+  <p class="nrn-hint" v-if="hint&&data&&!loading&&!error" data-nation-hint>{{ hint }}</p>
+  <div class="nrn-body" v-if="data&&!loading&&!error" :class="{'no-map':view!=='map'}">
     <!-- ================= 态势 ================= -->
     <div class="nrn-map" v-show="view==='map'">
       <div class="nrn-tools">
@@ -570,7 +586,7 @@ onUnmounted(()=>{
     </div>
 
     <!-- ================= 右栏：分块统计 ================= -->
-    <aside class="nrn-side">
+    <aside class="nrn-side" :class="{'wx-wide':mode==='weather'}">
       <div class="nrn-total">
         <div><b>{{ total.corridors||0 }}</b><span>航线</span></div>
         <div><b>{{ total.airborne||0 }}</b><span>在飞</span></div>
@@ -801,6 +817,8 @@ onUnmounted(()=>{
 .nrn-body.no-map{grid-template-columns:minmax(0,1fr) 360px}
 
 .nrn-map{position:relative;display:flex;flex-direction:column;min-height:0;gap:6px;min-width:0;width:auto}
+.nrn-hint{margin:0;padding:5px 9px;border-radius:6px;font-size:11.5px;color:#a9cde2;
+  background:rgba(20,60,80,.55);border:1px solid rgba(70,140,170,.35)}
 .nrn-canvas{position:relative;flex:1;min-height:240px;border-radius:10px;overflow:hidden;
   border:1px solid rgba(70,110,140,.3)}
 .nrn-tools{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:12px}
@@ -847,6 +865,11 @@ onUnmounted(()=>{
 .nrn-region em.warn,.nrn-city em.warn{color:#8ef0ff}
 .nrn-region em.sub{grid-row:2;color:#ffb38a}
 /* 气象面板：占满剩余高度，自己滚 */
+.nrn-side.wx-wide .nrn-blocks{flex:0 0 auto;display:grid;grid-template-columns:1fr 1fr;gap:4px;overflow:visible}
+.nrn-side.wx-wide .nrn-blocks h3{grid-column:1 / -1;margin:0}
+.nrn-side.wx-wide .nrn-region{padding:3px 6px;font-size:11px}
+.nrn-side.wx-wide .nrn-region span{font-size:9.5px}
+.nrn-side.wx-wide .nrn-wx{flex:1 1 auto;max-height:none;min-height:0}
 .nrn-wx{flex:0 1 auto;min-height:132px;max-height:36%;display:flex;flex-direction:column;
   border:1px solid rgba(60,100,130,.4);border-radius:8px;background:rgba(10,26,38,.6);padding:6px 8px}
 .nrn-wx h4{margin:0 0 4px;font-size:11.5px;color:#a9cde2;display:flex;gap:6px;align-items:baseline}
@@ -944,7 +967,11 @@ onUnmounted(()=>{
 .nrn-weather li.bad{outline:1px solid rgba(226,75,74,.5)}
 .nrn-weather span{color:#8fb2c8}
 
-.nrn-alerts{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:7px;overflow:auto;min-height:0}
+.nrn-alerts{list-style:none;margin:0;padding:0;display:grid;gap:7px;overflow:auto;min-height:0;
+  /* auto-fit 而不是 auto-fill：事件聚合后常常只有 2–5 条，
+     auto-fill 会保留空列、卡片挤在左边，右边空一大片。 */
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));
+  align-content:start}
 .nrn-alerts li{border:1px solid rgba(70,110,140,.35);border-left-width:3px;border-radius:7px;padding:7px 9px;background:rgba(10,26,38,.62)}
 .nrn-alerts li.bad{border-left-color:#ee5040}
 .nrn-alerts li.warn{border-left-color:#f5be3c}
