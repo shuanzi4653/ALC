@@ -110,12 +110,36 @@ const activeNames=computed(()=>{
   for(const row of data.value?.provinces||[]) map.set(row.name,row)
   return map
 })
+// 航线画法（参照民航航线图）：
+//   ① 一条线一个样：**同色、同宽、同端点样式**，不按类型分色分虚线；
+//   ② 两点之间走**微弧**（不是直尺线），弧度随长度轻微增长，像航路图上的大圆弧；
+//   ③ 弧一律朝图面上方鼓，同一屏里的弧成为一族，不会互相打结。
+function arcPoints(a,b){
+  const dx=b[0]-a[0],dy=b[1]-a[1]
+  const len=Math.hypot(dx,dy)
+  if(len<10) return [a,b]
+  const bulge=Math.min(0.085,0.018+len/9000)     // 弦长的 2%–8.5%，短程几乎直、长程成弧
+  const mx=(a[0]+b[0])/2,my=(a[1]+b[1])/2
+  let px=-dy/len,py=dx/len                        // 法线
+  if(py>0){px=-px;py=-py}                         // 统一朝屏幕上方鼓
+  const cx=mx+px*len*bulge,cy=my+py*len*bulge
+  const steps=Math.max(24,Math.min(96,Math.round(len/3)))   // 采样密一点，弧才圆
+  const pts=[]
+  for(let i=0;i<=steps;i++){
+    const t=i/steps,u=1-t
+    pts.push([u*u*a[0]+2*u*t*cx+t*t*b[0],u*u*a[1]+2*u*t*cy+t*t*b[1]])
+  }
+  return pts
+}
+
 const corridors=computed(()=>{
   const rows=[]
   for(const row of data.value?.corridors||[]){
     const path=row.path
-    const points=(Array.isArray(path)&&path.length>1?path:[row.fromLonLat,row.toLonLat])
-      .map(([lon,lat])=>project(lon,lat))
+    const raw=Array.isArray(path)&&path.length>1?path:[row.fromLonLat,row.toLonLat]
+    const coords=raw.map(([lon,lat])=>project(lon,lat))
+    // A* 算出来的多段折线保留原形；两点直连的用微弧，视觉上才像航路而不是连线题
+    const points=coords.length===2?arcPoints(coords[0],coords[1]):coords
     rows.push({id:row.id,points})
   }
   return rows
@@ -128,9 +152,14 @@ const stations=computed(()=>(data.value?.stationPoints||[]).map(point=>{
 }))
 const nodes=computed(()=>(data.value?.nodes||[]).map(node=>{
   const [x,y]=project(node.lon,node.lat)
-  return {...node,x,y}
+  // 标注贴边时翻到左侧，避免被裁掉；短名去掉"市/地区/自治州"后缀，图上更干净
+  const short=(node.name||'').replace(/(市|地区|盟|自治州|回族自治区|维吾尔自治区)$/,'')
+  return {...node,x,y,short,flip:x>VIEW.w-110}
 }))
-const showCityLabels=computed(()=>nodes.value.length>0&&nodes.value.length<=26)
+// 节点一律画：线是连到这些点上的，隐掉就会留下"悬空线头"。
+// 全国层靠尺寸区分层级（机场略大 + 细环），省/市层再给文字标注。
+const visibleNodes=computed(()=>nodes.value)
+const showCityLabels=computed(()=>nodes.value.length>0&&nodes.value.length<=30)
 
 const summary=computed(()=>data.value?.summary||{})
 const regions=computed(()=>data.value?.regions||[])
@@ -243,19 +272,28 @@ onMounted(load)
           <text :x="INSET.x+8" :y="INSET.y+INSET.h-8" class="nrn-inset-lbl">南海诸岛</text>
         </g>
 
-        <g v-for="line in corridors" :key="line.id">
-          <polyline :points="line.points.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ')"
-                    fill="none" stroke="rgba(90,170,220,.42)" stroke-width="1.05" stroke-linejoin="round"/>
+        <!-- 航线：同色同宽同端点，下面一层极淡的光晕只做体积感，不区分类别 -->
+        <g class="nrn-routes" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <polyline v-for="line in corridors" :key="'g'+line.id"
+                    :points="line.points.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ')"
+                    stroke="rgba(120,200,255,.07)" stroke-width="3.0"/>
+          <polyline v-for="line in corridors" :key="line.id"
+                    :points="line.points.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ')"
+                    stroke="rgba(126,206,255,.58)" stroke-width="1.05"/>
         </g>
 
-        <g v-for="node in nodes" :key="'n'+node.name">
-          <circle :cx="node.x" :cy="node.y" :r="node.hasAirport?3.2:1.9"
-                  :fill="node.hasAirport?'#8ef0ff':'rgba(200,225,245,.5)'"
-                  :stroke="node.hasAirport?'#0b1220':'rgba(11,18,32,.8)'" :stroke-width="0.7"/>
-          <template v-if="showCityLabels">
-            <text :x="node.x+5" :y="node.y+3.4" class="nrn-lbl">{{ node.name }}</text>
-          </template>
-          <title>{{ node.name }}{{ node.hasAirport?' · 机场 '+node.airport:' · 无机场（有专用接驳航线）' }}</title>
+        <!-- 节点：圆点一律同尺寸同色；机场城市加一圈细环（航图里的机场符号） -->
+        <g class="nrn-nodes">
+          <g v-for="node in visibleNodes" :key="'n'+node.name">
+            <circle :cx="node.x" :cy="node.y" :r="node.hasAirport?2.6:1.7"
+                    :fill="node.hasAirport?'#eaf6ff':'rgba(214,236,255,.55)'"
+                    :stroke="node.hasAirport?'rgba(8,20,32,.85)':'none'" stroke-width="0.6"/>
+            <circle v-if="node.hasAirport" :cx="node.x" :cy="node.y" r="4.3"
+                    fill="none" stroke="rgba(126,206,255,.50)" stroke-width="0.85"/>
+            <text v-if="showCityLabels" :x="node.x+(node.flip?-6:6)" :y="node.y+3.4" class="nrn-lbl"
+                  :text-anchor="node.flip?'end':'start'">{{ node.short }}</text>
+            <title>{{ node.name }}{{ node.hasAirport?' · 机场 '+node.airport:' · 无机场（有专用接驳航线）' }}</title>
+          </g>
         </g>
 
         <g v-for="point in stations" :key="point.code">
@@ -267,7 +305,7 @@ onMounted(load)
         </g>
       </svg>
       <p class="nrn-note">
-        实心点＝机场城市，空心小点＝无机场市（都有一条接驳航线连到最近的机场城市）<template v-if="level==='nation'">；右下小图为南海诸岛</template>。
+        一条弧线＝一条航线（同色同宽，不分类型）；白点为城市节点，机场城市多一圈细环；全国层只标机场城市，省/市层标出全部节点<template v-if="level==='nation'">；右下小图为南海诸岛</template>。
         定位：飞行汽车分担城市间出行，跨省长距离仍靠飞机与火车。
         <span v-if="hovered">指向：{{ hovered }}</span>
       </p>
@@ -363,7 +401,9 @@ onMounted(load)
   display:flex;flex-direction:column;min-height:420px}
 .nrn-map svg{display:block;width:100%;height:100%;flex:1;min-height:0}
 .nrn-map svg path.live{cursor:pointer}
-.nrn-lbl{font-size:9px;fill:rgba(200,225,245,.7);pointer-events:none}
+/* 标注：统一字号、统一颜色，加深色描边保证压在航线上也能读 */
+.nrn-lbl{font-size:9.5px;fill:rgba(226,241,255,.86);pointer-events:none;
+  paint-order:stroke;stroke:rgba(6,14,24,.85);stroke-width:2.4px;stroke-linejoin:round}
 .nrn-inset-lbl{font-size:9px;fill:rgba(190,215,235,.75);pointer-events:none}
 .nrn-note{margin:0;padding:6px 10px;font-size:12px;color:var(--alc-text-mute);border-top:1px solid var(--alc-line)}
 .nrn-side{display:grid;grid-template-rows:minmax(0,1fr) minmax(0,.7fr);gap:10px;min-height:0}
