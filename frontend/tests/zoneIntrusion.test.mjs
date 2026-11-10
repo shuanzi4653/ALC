@@ -142,7 +142,9 @@ test('intrusion wording stays inside the fixed-airspace vocabulary',()=>{
     assert.ok(!emoji.test(value),`不得使用 emoji：${value}`)
   }
   assert.match(zoneIntrusionLabels[ZONE_INTRUSION.PROHIBITED],/禁入区/)
-  assert.match(zoneIntrusionLabels[ZONE_INTRUSION.APPROVAL_REQUIRED],/批准/)
+  // 2026-11-10 口径：机场净空不再排队等人工，文案必须说"自动审批"而不是"须批准"。
+  assert.match(zoneIntrusionLabels[ZONE_INTRUSION.APPROVAL_REQUIRED],/净空/)
+  assert.match(zoneIntrusionLabels[ZONE_INTRUSION.APPROVAL_REQUIRED],/自动审批/)
   // The prohibited wording must not claim an official airspace closure — this is
   // the system reporting a planned crossing, not issuing a control order.
   for(const value of Object.values(zoneIntrusionLabels)){

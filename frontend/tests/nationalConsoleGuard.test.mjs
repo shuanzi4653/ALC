@@ -60,3 +60,22 @@ test('the four 1366 pages keep a 12px floor breakpoint', () => {
   assert.match(read('src/components/traffic/HomeStage.vue'), /\.hstage\.compact/,
     '首页 compact 断点缺失')
 })
+
+// 机场净空的审批口径（用户 2026-11-10 拍板）：能小绕就小绕，绕不掉的一律自动审批，
+// 不进人工队列。这条口径只活在文案里 —— 回退后页面不会算错任何数字，只会把
+// "已自动放行" 重新说成 "须经批准"，所以只能靠源码断言钉住。
+test('airport clearance crossings are described as auto-approved', () => {
+  const detail = read('src/components/TrafficWorkbench.vue')
+  assert.match(detail, /机场净空按自动审批放行/,
+    '班次详情必须说明机场净空是自动审批放行')
+  assert.doesNotMatch(detail, /须经空中交通管理机构批准/,
+    '旧的"须经空中交通管理机构批准"文案会让读者以为机场净空还在排队')
+
+  const map = read('src/components/CityTrafficMap.vue')
+  assert.match(map, /机场净空（自动审批放行/,
+    '地图越界监视条里的口径没跟上')
+
+  const runtime = read('src/traffic/runtime.js')
+  assert.match(runtime, /APPROVAL_REQUIRED\]:'已进入机场净空（自动审批）'/,
+    'zoneIntrusionLabels 的 APPROVAL_REQUIRED 仍是"须批准管制空域"')
+})

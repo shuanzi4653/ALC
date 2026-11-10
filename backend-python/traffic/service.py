@@ -26,7 +26,7 @@ from . import airspace, cma_tiles, delivery, radar_field, weather_control, weath
 from .catalog import CATALOG_FILE, city_pads, cities, connections, delivery_nodes
 from .obstacles import SOURCE_VERSION as OBSTACLE_SOURCE_VERSION, evaluate as evaluate_obstacles
 from .resources import ResourceCalendar, crossing_zones
-from .routing import penetration_limit, route
+from .routing import minimal_detour, penetration_limit, route
 from .spatial import bbox_2d, bbox_apart, conflict, rounded_path, trajectory, within_profile
 from .weather import (LiveWeatherEnvelope, PublicWeather, _polygon_parts,
                       extreme_thresholds, fog_rule_block, fog_tiers)
@@ -71,6 +71,8 @@ DETOUR_WINDOW_PADDING_MINUTES = 0.0
 CLEARANCE_MODES = ('off', 'soft')
 CLEARANCE_PENALTY_WEIGHT = 8.0
 CLEARANCE_EXEMPT_RADIUS_M = 8000.0
+# 「小绕」的侧移上限：16 km 净空环的尺度，超过这个数就不是"小绕"而是改航线了。
+CLEARANCE_MAX_SHIFT_M = 16000.0
 
 DELAY_SELECTION_STRATEGY = 'minimal'
 
@@ -692,16 +694,17 @@ def _plan_trajectory(seed=42, scenario='live', progress=lambda _: None, live_sna
         clearance_exempt = None
         if clearance_geometry is not None:
             # L-A：初始航道就把机场禁飞区避开，避免它们后来被记成「绕飞」。
+            # 做法是「小绕」——把走廊顶点侧移一小段，能压到 0 就压到 0；
+            # 压不掉的（邻场净空接壤成条带）不再阻断、也不走审批，直接自动审批放行。
             cache_key_initial = (route_item['id'], bool(direction))
             if cache_key_initial not in clearance_cache:
                 clearance_exempt = fixed_zones.covering_geometry_xy(*lateral[0]).union(
                     fixed_zones.covering_geometry_xy(*lateral[-1]))
-                clearance_cache[cache_key_initial] = route(
-                    lateral[0], lateral[-1], allowed, None,
-                    penalty_geometry=clearance_geometry,
-                    penalty_weight=clearance_weight,
-                    exempt_radius_m=CLEARANCE_EXEMPT_RADIUS_M,
-                    penalty_exempt=clearance_exempt) or None
+                nudged, info = minimal_detour(
+                    lateral, clearance_geometry, exempt=clearance_exempt,
+                    allowed=allowed, keep_clear=static_obstacle,
+                    max_shift_m=CLEARANCE_MAX_SHIFT_M)
+                clearance_cache[cache_key_initial] = nudged if info['shifted'] else None
             avoided = clearance_cache[cache_key_initial]
             if avoided:
                 lateral = avoided
@@ -958,9 +961,13 @@ def _plan_trajectory(seed=42, scenario='live', progress=lambda _: None, live_sna
             'noAltitudeStacking': True,
             'staticAirspace': {
                 'policy': static_policy,
+                # 环评口径：机场净空穿越自动审批（用户 2026-11-10 拍板），不再排队等人工。
+                'approvalPolicy': 'AUTO',
+                'approvalPolicyLabel': '机场净空穿越自动审批放行；核心禁飞区（核电站/导航台）仍不得进入',
                 'zoneCount': fixed_zones.status(static_policy)['withGeometry'],
                 'closedByStaticAirspace': sum(item['reason'] == 'STATIC_AIRSPACE_BLOCKED' for item in flights),
                 'flightsRequiringApproval': sum(item['staticAirspace']['approvalRequired'] > 0 for item in accepted),
+                'autoApprovedFlights': sum(item['staticAirspace']['approvalRequired'] > 0 for item in accepted),
                 'prohibitedConflicts': sum(item['staticAirspace']['prohibited'] for item in accepted),
                 'crossingRecords': sum(item['staticAirspace']['zones'] for item in accepted),
                 'clauses': sorted({clause for item in accepted for clause in item['staticAirspace']['clauses']}),
@@ -981,9 +988,11 @@ def simulate(seed=42, scenario='live', progress=lambda _: None, live_snapshot=No
 _CLEARANCE_LEDGER_CACHE = {}
 
 def clearance_ledger(mode='off', cache=None, catalog=None):
-    """净空台账（软件册 §2.3 三条）：待审批穿越 / 核心禁飞 / 航路规避。
+    """净空台账（软件册 §2.3 三条）：穿越自动审批 / 核心禁飞 / 航路规避。
 
     口径按走廊算，不按班次算 —— 逐条量「净空内航段长度」的 before/after。
+    审批口径（用户 2026-11-10 拍板）：机场净空不再走人工审批，一律**自动审批放行**；
+    能在初始航道小绕的就绕掉，绕不掉的也不卡流程，只留穿越记录。
     """
     mode = 'soft' if str(mode).lower() == 'soft' else 'off'
     key = mode
@@ -996,7 +1005,7 @@ def clearance_ledger(mode='off', cache=None, catalog=None):
     before_total = 0.0
     after_total = 0.0
     own_total = 0.0
-    pending = 0
+    crossing = 0
     core_hits = 0
     rerouted = 0
     weight = CLEARANCE_PENALTY_WEIGHT if mode == 'soft' else 0.0
@@ -1012,17 +1021,16 @@ def clearance_ledger(mode='off', cache=None, catalog=None):
         inside = line.intersection(geometry).difference(own).length / 1000.0
         if inside <= 0.05:
             continue
-        pending += 1
+        crossing += 1
         before_total += inside
         if line.intersection(core).length > 0.0:
             core_hits += 1
         avoided = (cache or {}).get((item['id'], False)) if cache is not None else None
         if mode == 'soft' and avoided is None:
             allowed = _allowed_for_route(item, catalog)
-            avoided = route(path[0], path[-1], allowed, None,
-                            penalty_geometry=geometry, penalty_weight=weight,
-                            exempt_radius_m=CLEARANCE_EXEMPT_RADIUS_M,
-                            penalty_exempt=own)
+            avoided, info = minimal_detour(path, geometry, exempt=own, allowed=allowed,
+                                           keep_clear=core, max_shift_m=CLEARANCE_MAX_SHIFT_M)
+            avoided = avoided if info['shifted'] else None
         after = (LineString(avoided).intersection(geometry).difference(own).length / 1000.0
                  if (mode == 'soft' and avoided) else inside)
         after_total += after
@@ -1030,19 +1038,24 @@ def clearance_ledger(mode='off', cache=None, catalog=None):
             rerouted += 1
     result = {
         'mode': mode,
-        'label': '净空三层（L-A 初始航道 + L-B 航段代价）' if mode == 'soft' else '净空未启用（默认口径）',
+        'label': '净空三层（L-A 初始航道小绕 + L-B 航段代价）' if mode == 'soft' else '净空未启用（默认口径）',
         'corridors': len(routes),
-        'pendingApprovalCrossings': pending,
+        'approvalPolicy': 'AUTO',
+        'approvalPolicyLabel': '机场净空穿越一律自动审批，不阻断、不排队',
+        'autoApprovedCrossings': crossing if mode == 'soft' else crossing,
+        'pendingApprovalCrossings': 0,
         'coreProhibitedCrossings': core_hits,
         'inZoneSegmentKm': {'before': round(before_total, 1), 'after': round(after_total, 1)},
         'exemptOwnAirportKm': round(own_total, 1),
         'reroutedCorridors': rerouted,
-        'forcedCrossingCorridors': pending - rerouted,
+        'autoApprovedCorridors': crossing - rerouted,
         'penaltyWeight': weight,
         'exemptRadiusM': CLEARANCE_EXEMPT_RADIUS_M,
+        'maxShiftM': CLEARANCE_MAX_SHIFT_M,
         'note': ('口径：机场净空 = 24 个机场净空巡视检查区域（严格口径视为禁入）。'
                  '本场起降段整体豁免，只统计「穿越邻场净空」的走廊与航段长度；'
-                 '默认 clearance=off 时不带净空代价、不改动任何既有运行数字。'),
+                 '能小绕的在小绕（顶点侧移 ≤ %.0f km）里压掉，压不掉的一律自动审批放行、不计待审批。'
+                 '默认 clearance=off 时不带净空代价、不改动任何既有运行数字。' % (CLEARANCE_MAX_SHIFT_M / 1000.0)),
     }
     if cache is None:
         _CLEARANCE_LEDGER_CACHE[key] = dict(result)

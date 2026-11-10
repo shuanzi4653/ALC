@@ -71,13 +71,49 @@ def test_route_penalty_exempt_zone_is_not_penalised():
 
 
 def test_clearance_ledger_off_keeps_baseline_values():
-    """默认台账：不带代价、before 等于 after、核心禁飞 0 条。"""
+    """默认台账：不带代价、before 等于 after、核心禁飞 0 条、待审批 0 条（自动审批）。"""
     ledger = traffic_service.clearance_ledger('off')
     assert ledger['mode'] == 'off'
     assert ledger['penaltyWeight'] == 0.0
     assert ledger['inZoneSegmentKm']['before'] == ledger['inZoneSegmentKm']['after']
     assert ledger['coreProhibitedCrossings'] == 0
     assert ledger['reroutedCorridors'] == 0
+    # 用户 2026-11-10 拍板：机场净空穿越不走人工审批，一律自动审批。
+    assert ledger['approvalPolicy'] == 'AUTO'
+    assert ledger['pendingApprovalCrossings'] == 0
+
+
+def test_minimal_detour_nudges_out_of_a_small_zone():
+    """「能绕就小绕」：一个顶点侧移就能把净空内航段压到 0。"""
+    from traffic.routing import minimal_detour
+    points = [(0.0, 0.0), (10000.0, 0.0), (20000.0, 0.0)]
+    zone = Point(10000.0, 0.0).buffer(3000.0, quad_segs=8)
+    shifted, info = minimal_detour(points, zone, max_shift_m=16000.0)
+    assert info['shifted'] is True
+    assert info['afterKm'] < info['beforeKm']
+    assert LineString(shifted).intersection(zone).length < 1.0
+    assert tuple(shifted[0]) == (0.0, 0.0) and tuple(shifted[-1]) == (20000.0, 0.0)
+
+
+def test_minimal_detour_gives_up_when_band_is_forced():
+    """绕不开时不许硬拗：允许域只有一条窄带 → 返回原线并标记未移动。"""
+    from traffic.routing import minimal_detour
+    points = [(0.0, 0.0), (10000.0, 0.0), (20000.0, 0.0)]
+    zone = Point(10000.0, 0.0).buffer(3000.0, quad_segs=8)
+    narrow = box(-10.0, -100.0, 20010.0, 100.0)  # 窄带：侧移 2 km 就出界
+    shifted, info = minimal_detour(points, zone, allowed=narrow, max_shift_m=16000.0)
+    assert info['shifted'] is False
+    assert shifted == [tuple(p) for p in points]
+
+
+def test_soft_ledger_small_detour_lowers_in_zone_length():
+    """soft 台账：小绕后净空内航段下降，剩下的一律自动审批。"""
+    ledger = traffic_service.clearance_ledger('soft')
+    assert ledger['approvalPolicy'] == 'AUTO'
+    assert ledger['pendingApprovalCrossings'] == 0
+    assert ledger['autoApprovedCrossings'] >= 1
+    assert ledger['inZoneSegmentKm']['after'] < ledger['inZoneSegmentKm']['before']
+    assert ledger['reroutedCorridors'] >= 1
 
 
 def test_clearance_switch_defaults_off():

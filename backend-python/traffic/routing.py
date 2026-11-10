@@ -32,6 +32,81 @@ def penalty_geometry_for(geometry, start, end, exempt_radius_m, exempt_geometry=
         geometry = geometry.difference(hole)
     return None if geometry.is_empty else geometry
 
+def _perpendicular(a, b, distance):
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    length = math.hypot(dx, dy) or 1.0
+    return (-dy / length * distance, dx / length * distance)
+
+SHIFT_STEPS_M = (2000.0, 4000.0, 6000.0, 9000.0, 12000.0, 16000.0)
+
+def minimal_detour(points, avoid, *, exempt=None, allowed=None, keep_clear=None,
+                   max_shift_m=16000.0, min_gain_km=0.1):
+    """「能绕就小绕一下」：把走廊顶点沿法线挪一小段，压低净空内航段长度。
+
+    不做全局 A*（在 16 km 净空环组成的条带里，网格搜索会因缝隙太窄而搜不到），
+    只做有界的单顶点/双顶点侧移，候选全部落在 `allowed` 内、不碰 `keep_clear`、
+    起终点不动、总航程增幅不超过 5%，才算数。
+    返回 `(points, info)`；没找到改进时返回原顶点与 `shifted=False`。
+    """
+    base = [tuple(point) for point in points]
+    if len(base) < 3 or avoid is None or avoid.is_empty:
+        return base, {'shifted': False, 'beforeKm': 0.0, 'afterKm': 0.0, 'shiftM': 0.0}
+    steps = [value for value in SHIFT_STEPS_M if value <= max_shift_m]
+
+    def inside_km(candidate):
+        line = LineString(candidate)
+        clipped = line.intersection(avoid)
+        if exempt is not None and not exempt.is_empty:
+            clipped = clipped.difference(exempt)
+        return clipped.length / 1000.0, line.length / 1000.0
+
+    def feasible(candidate, base_km):
+        line = LineString(candidate)
+        if allowed is not None and not allowed.covers(line):
+            return False
+        if keep_clear is not None and not keep_clear.is_empty and line.intersects(keep_clear):
+            return False
+        return line.length / 1000.0 <= base_km * 1.05 + 1.0
+
+    before, base_km = inside_km(base)
+    if before <= min_gain_km:
+        return base, {'shifted': False, 'beforeKm': round(before, 1),
+                      'afterKm': round(before, 1), 'shiftM': 0.0}
+    best = list(base)
+    best_inside = before
+    best_shift = 0.0
+    best_index = None
+    for index in range(1, len(base) - 1):
+        for distance in steps:
+            for sign in (1.0, -1.0):
+                dx, dy = _perpendicular(base[index - 1], base[index + 1], distance * sign)
+                candidate = list(base)
+                candidate[index] = (base[index][0] + dx, base[index][1] + dy)
+                if not feasible(candidate, base_km):
+                    continue
+                inside, _ = inside_km(candidate)
+                if inside < best_inside - 0.05:
+                    best, best_inside, best_shift, best_index = candidate, inside, distance * sign, index
+    if best_index is None:
+        return base, {'shifted': False, 'beforeKm': round(before, 1),
+                      'afterKm': round(before, 1), 'shiftM': 0.0}
+    # 第二处顶点：在第一处定好之后再挪一个，两道弯折才好贴住相邻净空。
+    for index in range(1, len(base) - 1):
+        if index == best_index:
+            continue
+        for distance in steps:
+            for sign in (1.0, -1.0):
+                dx, dy = _perpendicular(base[index - 1], base[index + 1], distance * sign)
+                candidate = list(best)
+                candidate[index] = (base[index][0] + dx, base[index][1] + dy)
+                if not feasible(candidate, base_km):
+                    continue
+                inside, _ = inside_km(candidate)
+                if inside < best_inside - 0.05:
+                    best, best_inside = candidate, inside
+    return best, {'shifted': True, 'beforeKm': round(before, 1),
+                  'afterKm': round(best_inside, 1), 'shiftM': abs(best_shift)}
+
 def route(start, end, allowed, obstacles=None, *,
           soft_obstacles=None, penetration_m=DEFAULT_PENETRATION_M,
           margin_m=None, step_m=None, max_checks=None,
