@@ -689,15 +689,19 @@ def _plan_trajectory(seed=42, scenario='live', progress=lambda _: None, live_sna
             continue
         lateral = list(reversed(route_item['path'])) if direction else route_item['path']
         lateral = _lateral(lateral, 220 if mode == 'CAR' else 90, allowed)
+        clearance_exempt = None
         if clearance_geometry is not None:
             # L-A：初始航道就把机场禁飞区避开，避免它们后来被记成「绕飞」。
             cache_key_initial = (route_item['id'], bool(direction))
             if cache_key_initial not in clearance_cache:
+                clearance_exempt = fixed_zones.covering_geometry_xy(*lateral[0]).union(
+                    fixed_zones.covering_geometry_xy(*lateral[-1]))
                 clearance_cache[cache_key_initial] = route(
                     lateral[0], lateral[-1], allowed, None,
                     penalty_geometry=clearance_geometry,
                     penalty_weight=clearance_weight,
-                    exempt_radius_m=CLEARANCE_EXEMPT_RADIUS_M) or None
+                    exempt_radius_m=CLEARANCE_EXEMPT_RADIUS_M,
+                    penalty_exempt=clearance_exempt) or None
             avoided = clearance_cache[cache_key_initial]
             if avoided:
                 lateral = avoided
@@ -764,7 +768,8 @@ def _plan_trajectory(seed=42, scenario='live', progress=lambda _: None, live_sna
                                                   soft_obstacles=soft_set, penetration_m=penetration_m,
                                                   penalty_geometry=clearance_geometry,
                                                   penalty_weight=clearance_weight,
-                                                  exempt_radius_m=CLEARANCE_EXEMPT_RADIUS_M)
+                                                  exempt_radius_m=CLEARANCE_EXEMPT_RADIUS_M,
+                                                  penalty_exempt=clearance_exempt)
                 candidate = path_cache[cache_key]
             if candidate:
                 path = candidate
@@ -990,26 +995,39 @@ def clearance_ledger(mode='off', cache=None, catalog=None):
     core = fixed_zones.envelope(airport_footprint_policy())
     before_total = 0.0
     after_total = 0.0
+    own_total = 0.0
     pending = 0
     core_hits = 0
+    rerouted = 0
     weight = CLEARANCE_PENALTY_WEIGHT if mode == 'soft' else 0.0
     for item in routes:
-        line = LineString(item['path'])
-        inside = line.intersection(geometry).length / 1000.0
-        if inside > 0.0:
-            pending += 1
+        path = item['path']
+        line = LineString(path)
+        if not line.intersects(geometry):
+            continue
+        # 起降段豁免：本场净空不算穿越别人的净空（否则每条走廊都被记一笔）。
+        own = fixed_zones.covering_geometry_xy(*path[0]).union(
+            fixed_zones.covering_geometry_xy(*path[-1]))
+        own_total += line.intersection(geometry).intersection(own).length / 1000.0
+        inside = line.intersection(geometry).difference(own).length / 1000.0
+        if inside <= 0.05:
+            continue
+        pending += 1
         before_total += inside
         if line.intersection(core).length > 0.0:
             core_hits += 1
         avoided = (cache or {}).get((item['id'], False)) if cache is not None else None
-        if mode == 'soft' and avoided is None and inside > 0.0:
+        if mode == 'soft' and avoided is None:
             allowed = _allowed_for_route(item, catalog)
-            avoided = route(item['path'][0], item['path'][-1], allowed, None,
+            avoided = route(path[0], path[-1], allowed, None,
                             penalty_geometry=geometry, penalty_weight=weight,
-                            exempt_radius_m=CLEARANCE_EXEMPT_RADIUS_M)
-        after = (LineString(avoided).intersection(geometry).length / 1000.0
+                            exempt_radius_m=CLEARANCE_EXEMPT_RADIUS_M,
+                            penalty_exempt=own)
+        after = (LineString(avoided).intersection(geometry).difference(own).length / 1000.0
                  if (mode == 'soft' and avoided) else inside)
         after_total += after
+        if after < inside - 0.05:
+            rerouted += 1
     result = {
         'mode': mode,
         'label': '净空三层（L-A 初始航道 + L-B 航段代价）' if mode == 'soft' else '净空未启用（默认口径）',
@@ -1017,9 +1035,14 @@ def clearance_ledger(mode='off', cache=None, catalog=None):
         'pendingApprovalCrossings': pending,
         'coreProhibitedCrossings': core_hits,
         'inZoneSegmentKm': {'before': round(before_total, 1), 'after': round(after_total, 1)},
+        'exemptOwnAirportKm': round(own_total, 1),
+        'reroutedCorridors': rerouted,
+        'forcedCrossingCorridors': pending - rerouted,
         'penaltyWeight': weight,
         'exemptRadiusM': CLEARANCE_EXEMPT_RADIUS_M,
-        'note': '默认 clearance=off：不带净空代价、不改动任何既有运行数字；soft 才按 L-A/L-B 重算初始航道。',
+        'note': ('口径：机场净空 = 24 个机场净空巡视检查区域（严格口径视为禁入）。'
+                 '本场起降段整体豁免，只统计「穿越邻场净空」的走廊与航段长度；'
+                 '默认 clearance=off 时不带净空代价、不改动任何既有运行数字。'),
     }
     if cache is None:
         _CLEARANCE_LEDGER_CACHE[key] = dict(result)

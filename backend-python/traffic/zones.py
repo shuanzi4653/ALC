@@ -158,6 +158,17 @@ def point_zones(coordinate, policy=DEFAULT_POLICY):
     return [_by_id(policy)[site_id] for site_id, geometry in _overlapping(target, policy)
             if intersects_xy(geometry, x, y)]
 
+def covering_geometry(coordinate, policy=DEFAULT_POLICY):
+    """该点所在的固定管制区几何（并集）。起降段豁免用它：本场净空不算穿越别人的净空。"""
+    x, y = project(tuple(coordinate))
+    return covering_geometry_xy(x, y, policy)
+
+def covering_geometry_xy(x, y, policy=DEFAULT_POLICY):
+    target = Point(float(x), float(y))
+    shapes = [geometry for site_id, geometry in _overlapping(target, policy)
+              if intersects_xy(geometry, float(x), float(y))]
+    return unary_union(shapes) if shapes else GeometryCollection()
+
 def covering_layer(coordinate, agl_m=None, policy=DEFAULT_POLICY):
     return [site for site in point_zones(coordinate, policy)
             if agl_m is None or (_vertical_band(site)[0] <= agl_m

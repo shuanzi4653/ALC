@@ -20,22 +20,23 @@ def penetration_limit(geometry, depth):
         return None
     return shrunk
 
-def penalty_geometry_for(geometry, start, end, exempt_radius_m):
-    """起降段豁免：把起点/终点半径内的部分从软代价几何里挖掉。"""
+def penalty_geometry_for(geometry, start, end, exempt_radius_m, exempt_geometry=None):
+    """起降段豁免：先挖掉起降点所在的本场净空，再挖半径缓冲区。"""
     if geometry is None or geometry.is_empty:
         return None
+    if exempt_geometry is not None and not exempt_geometry.is_empty:
+        geometry = geometry.difference(exempt_geometry)
     if exempt_radius_m and exempt_radius_m > 0:
         hole = Point(tuple(start)).buffer(float(exempt_radius_m)).union(
             Point(tuple(end)).buffer(float(exempt_radius_m)))
         geometry = geometry.difference(hole)
-        if geometry.is_empty:
-            return None
-    return geometry
+    return None if geometry.is_empty else geometry
 
 def route(start, end, allowed, obstacles=None, *,
           soft_obstacles=None, penetration_m=DEFAULT_PENETRATION_M,
           margin_m=None, step_m=None, max_checks=None,
-          penalty_geometry=None, penalty_weight=0.0, exempt_radius_m=8000.0):
+          penalty_geometry=None, penalty_weight=0.0, exempt_radius_m=8000.0,
+          penalty_exempt=None):
     start, end = tuple(start), tuple(end)
     checks_limit = SEARCH_MAX_CHECKS if max_checks is None else int(max_checks)
     prepared = prep(allowed)
@@ -45,7 +46,7 @@ def route(start, end, allowed, obstacles=None, *,
     # 净空软代价：默认 penalty_weight=0.0 → 下面两条分支都退化为原实现，路径逐字节不变。
     penalized = None
     if penalty_geometry is not None and float(penalty_weight) > 0.0:
-        trimmed = penalty_geometry_for(penalty_geometry, start, end, exempt_radius_m)
+        trimmed = penalty_geometry_for(penalty_geometry, start, end, exempt_radius_m, penalty_exempt)
         if trimmed is not None:
             penalized = trimmed
     penalty_w = float(penalty_weight) if penalized is not None else 0.0
@@ -73,7 +74,7 @@ def route(start, end, allowed, obstacles=None, *,
         return None
     if inside(start) or inside(end):
         return None
-    if valid(start, end):
+    if valid(start, end) and penalised(start, end) == 0.0:
         return [list(start), list(end)]
     distance = math.dist(start, end)
     step = max(SEARCH_STEP_MIN_M, min(SEARCH_STEP_MAX_M, distance / SEARCH_STEP_DIVISOR))

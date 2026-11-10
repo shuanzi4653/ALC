@@ -420,9 +420,11 @@ def traffic_network():
 def traffic_v2_overview(seed: int = Query(42),
                         scenario: str = Query('live', pattern='^(clear|unknown|live)$'),
                         case: str = Query(''),
-                        minute: float | None = Query(None, ge=0, le=1440)):
+                        minute: float | None = Query(None, ge=0, le=1440),
+                        clearance: str = Query('off', pattern='^(off|soft)$')):
     from traffic import v2 as traffic_v2
-    return traffic_v2.overview(seed=seed, scenario=scenario, case_id=case or None, minute=minute)
+    return traffic_v2.overview(seed=seed, scenario=scenario, case_id=case or None,
+                               minute=minute, clearance=clearance)
 
 @app.get('/traffic/v2/national')
 def traffic_v2_national():

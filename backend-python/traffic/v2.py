@@ -838,7 +838,8 @@ def _window_phrase(case_id: Optional[str], minute: Optional[float]) -> str:
 
 def overview(seed: int = 42, scenario: str = 'live',
              case_id: Optional[str] = None,
-             minute: Optional[float] = None) -> Dict[str, Any]:
+             minute: Optional[float] = None,
+             clearance: str = 'off') -> Dict[str, Any]:
     field_payload = field(case_id=case_id, minute=minute)
     snapshot = corridors(limit=None, case_id=case_id, minute=minute)
     items = snapshot['items']
@@ -1019,6 +1020,7 @@ def overview(seed: int = 42, scenario: str = 'live',
             'action': '查看走廊' if (weather_scoped and worst) else None,
         },
         'kpis': kpis,
+        'clearance': traffic.clearance_ledger(clearance),
         'kpiDetail': {
             'pending': {
                 'observations': len(pending_obs),
