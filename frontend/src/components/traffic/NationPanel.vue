@@ -213,6 +213,7 @@ onMounted(load)
       </svg>
       <p class="nrn-note">
         实心点＝机场城市，空心小点＝无机场市（都有一条接驳航线连到最近的机场城市）；虚线省界＝未纳入网络（台湾、西藏）。
+        定位：飞行汽车分担城市间出行，跨省长距离仍靠飞机与火车。
         <span v-if="hovered">指向：{{ hovered }}</span>
       </p>
     </div>
