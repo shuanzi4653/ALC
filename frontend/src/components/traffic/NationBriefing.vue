@@ -38,6 +38,8 @@ const rows=computed(()=>props.payload?props.flights:(local.value?.flights||[]))
 const upcoming=computed(()=>data.value?.upcoming||[])
 const intel=computed(()=>data.value?.intel||[])
 const summary=computed(()=>data.value?.summary||{})
+const model=computed(()=>data.value?.modelCard||null)
+const modelTest=computed(()=>model.value?.nationalModel?.metrics?.test||null)
 
 const limit=computed(()=>props.density==='slim'?16:(props.density==='min'?10:120))
 
@@ -98,7 +100,14 @@ function clock(m){
               <td>{{ f.fromName }} → {{ f.toName }}<small>{{ f.corridor }}</small></td>
               <td><small>申请 {{ f.requestAt }}</small><small>计划 {{ f.planAt }}</small><small>实际 {{ f.actualAt||'—' }}</small></td>
               <td><small>{{ f.altM }} m AGL</small><small>{{ f.clearance?.statusLabel }}</small></td>
-              <td><span class="risk" :class="f.riskLevel">{{ f.riskLevelLabel }} {{ f.riskP.toFixed(2) }}</span><small>{{ f.decisionLabel }}</small></td>
+              <td>
+                <span class="risk" :class="f.riskLevel">{{ f.riskLevelLabel }} {{ f.riskP.toFixed(2) }}</span>
+                <small>
+                  {{ f.decisionLabel }}
+                  <template v-if="f.pModel!=null"> · 模型 {{ (f.pModel*100).toFixed(0) }}%</template>
+                  <em class="src" :class="f.probSource">{{ f.probSource==='MODEL'?'模型':'规则' }}</em>
+                </small>
+              </td>
               <td>{{ (f.alerts||[]).map(a=>a.label).join(' / ')||'—' }}</td>
             </tr>
             <tr v-for="f in upcoming.slice(0,props.density==='slim'?12:30)" :key="'u'+f.id" class="future">
@@ -117,6 +126,12 @@ function clock(m){
 
     <!-- ============ 民航情报 ============ -->
     <div class="nb-table" v-else>
+      <div class="nb-model" v-if="modelTest" data-model-card>
+        <b>低能见度模型 {{ model.nationalModel.version }}</b>
+        <span>测试集 AUC {{ modelTest.auc }} · Brier {{ modelTest.brier }} · TS {{ modelTest.ts }} · 基线 {{ (modelTest.baseRate*100).toFixed(1) }}%</span>
+        <span>{{ model.nationalModel.provenance.cities }} 城 · {{ model.nationalModel.provenance.samples }} 样本 · 按时间切分</span>
+        <em>输入与标签同源（open-meteo 模式能见度），指标衡量的是"模式能见度的演变可预测性"</em>
+      </div>
       <div class="nb-hd">
         <h3>机场情报 <small>{{ intel.length }} 个机场城市</small></h3>
         <p>实况来自公开源（METAR / open-meteo）；“放行建议”是按能见度门槛算的规则派生值，不是官方结论。</p>
@@ -166,6 +181,13 @@ function clock(m){
 .nb-state.bad{color:#ffa08a}
 .nb-state button{margin-left:8px;background:#17394d;border:1px solid #2e6b85;color:#bfe9ff;border-radius:5px;padding:2px 8px;cursor:pointer}
 .nb-table{display:flex;flex-direction:column;gap:8px;min-height:0;flex:1}
+.nb-model{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;font-size:11px;color:#8fb2c8;
+  border:1px solid rgba(70,140,160,.4);border-radius:7px;padding:5px 9px;background:rgba(12,40,52,.6)}
+.nb-model b{color:#bfe9ff;font-size:11.5px}
+.nb-model em{font-style:normal;color:#ffcf7a;flex-basis:100%}
+.src{font-style:normal;font-size:9.5px;padding:0 4px;border-radius:3px;margin-left:4px}
+.src.MODEL{background:rgba(70,190,150,.18);color:#7fe0bb}
+.src.RULE{background:rgba(245,190,60,.16);color:#ffd479}
 .nb-hd h3{margin:0;font-size:13px;color:#eaf6ff}
 .nb-hd h3 small{margin-left:8px;font-size:11px;color:#7d9cb3;font-weight:400}
 .nb-hd p{margin:3px 0 0;font-size:11px;color:#7d9cb3}

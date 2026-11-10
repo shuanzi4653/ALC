@@ -186,3 +186,35 @@ def test_evidence_reports_not_airborne_instead_of_guessing():
     body = nation.evidence('NC-0001#999', 60)
     assert body['status'] in ('NOT_AIRBORNE', 'NOT_FOUND')
     assert body.get('note')
+
+
+def test_border_monitor_is_geometric_not_flag_based():
+    """越界监视必须是**逐条量距离**算出来的，不是读停飞标记。"""
+    payload = nation.payload('nation', None, 60)
+    border = payload['border']
+    assert '10 km' in border['method'] and '求距' in border['method']
+    assert border['checkedCorridors'] >= 400, '航路没有被逐条测量'
+    assert isinstance(border['nearestKm'], (int, float)) and border['nearestKm'] > 0
+    assert border['inside'] == 0, '按当前路网不应有飞机在 10 km 带内'
+
+
+def test_national_model_is_live_and_scored():
+    """全国模型（ml-v3）必须真的在跑：有指标、有覆盖、每架都有概率。"""
+    payload = nation.payload('nation', None, 60)
+    card = payload['modelCard'].get('nationalModel') or {}
+    assert card.get('available'), '全国模型没加载'
+    test = (card.get('metrics') or {}).get('test') or {}
+    assert test.get('auc', 0) > 0.8, f"测试集 AUC 异常：{test.get('auc')}"
+    assert card['provenance']['cities'] >= 300
+    covered = [row for row in payload['flights'] if row.get('pModel') is not None]
+    assert covered, '没有一架班次拿到模型概率'
+    assert all(row['probSource'] == 'MODEL' for row in covered)
+
+
+def test_pulse_reports_change_key():
+    """心跳只回答"变没变"：必须带雷达帧、实况时刻、模型版本三个键。"""
+    import json as _json
+    pulse = _json.loads(_json.dumps(nation.pulse(), ensure_ascii=False))
+    for key in ('radarTs', 'weatherAt', 'modelVersion', 'cities'):
+        assert key in pulse, f'心跳缺字段 {key}'
+    assert pulse['cities'] >= 300

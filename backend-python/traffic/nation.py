@@ -128,6 +128,22 @@ def _city_weather() -> Dict[str, Dict[str, Any]]:
     return _city_weather_payload().get('cities') or {}
 
 
+def _model_probs() -> Dict[str, float]:
+    """全国模型（ml-v3）逐市低能见度概率。
+
+    取不到就给空字典 —— 调用方据此退回规则派生，并把 probSource 标成 RULE。
+    这是"模型不可用要说出来"，不是"模型不可用就静默降级"。
+    """
+    try:
+        from ml import national_model
+        from weather import city_hourly
+        rows = [{'name': row['name'], 'lat': row['lat'], 'lon': row['lon']} for row in _city_rows()]
+        payload = city_hourly.fetch(rows)
+        return national_model.probability_map(payload.get('cities') or {})
+    except Exception:  # noqa: BLE001 - 模型或数据源不可用不能把页面打崩
+        return {}
+
+
 @lru_cache(maxsize=1)
 def _corridor_rows() -> List[Dict[str, Any]]:
     return list(_network().get('corridors') or [])
@@ -198,6 +214,65 @@ def _radar_clipped(radar_ts: str) -> Dict[str, Any]:
                 continue
         out[band] = kept[:45]
     return out
+
+
+@lru_cache(maxsize=2)
+def _neighbor_union_m():
+    """邻国并集（米制，AEQD）。用于"这条航路离境外多远"的真实几何判定。"""
+    from shapely.geometry import shape
+    from shapely.ops import transform as shp_transform, unary_union
+    payload = json.loads((ROOT / 'data' / 'traffic' / 'neighbors-50m.json').read_text(encoding='utf-8'))
+    parts = []
+    for feature in payload.get('features') or []:
+        try:
+            parts.append(shape(feature['geometry']))
+        except Exception:  # noqa: BLE001
+            continue
+    if not parts:
+        return None
+    return shp_transform(_xy_transformer().transform, unary_union(parts))
+
+
+@lru_cache(maxsize=2)
+def _corridor_border(network_stamp: str) -> Dict[str, Dict[str, Any]]:
+    """逐航路的**真实**离境距离与"进入 10/30 km 带"的进度区间。
+
+    之前越界监视是读 `borderBlocked` 标记算出来的，等于"我说它不越界它就不越界"。
+    这里改成几何：把航路按约 8 km 加密，逐点算到邻国的距离，缓存一份。
+    492 条大多离境几十到上千公里，先整体量一次，只有 <50 km 的才加密找区间。
+    """
+    from shapely.geometry import LineString, Point
+    near = _neighbor_union_m()
+    if near is None:
+        return {}
+    to_xy = _xy_transformer().transform
+    table: Dict[str, Dict[str, Any]] = {}
+    for row in _corridor_rows():
+        path = row.get('path') or [row['fromLonLat'], row['toLonLat']]
+        if len(path) < 2:
+            continue
+        line = LineString([to_xy(lon, lat) for lon, lat in path])
+        whole = near.distance(line) / 1000.0
+        item = {'minKm': round(whole, 1), 'band10': [], 'band30': []}
+        if whole < 50.0:
+            steps = max(12, min(60, int(line.length / 8000.0)))
+            samples = []
+            for index in range(steps + 1):
+                point = line.interpolate(index / steps, normalized=True)
+                samples.append((index / steps, near.distance(point) / 1000.0))
+            item['minKm'] = round(min(value for _, value in samples), 1)
+            for limit, key in ((10.0, 'band10'), (30.0, 'band30')):
+                start = None
+                for progress, distance in samples:
+                    if distance < limit and start is None:
+                        start = progress
+                    elif distance >= limit and start is not None:
+                        item[key].append([round(start, 3), round(progress, 3)])
+                        start = None
+                if start is not None:
+                    item[key].append([round(start, 3), 1.0])
+        table[row['id']] = item
+    return table
 
 
 def _radar_polygons(bands: Dict[str, Any]):
@@ -613,7 +688,7 @@ def flights_payload(level: str = 'nation', ident: Optional[str] = None,
                 corridors = _slice_corridors({city['province']}, city=ident)
     else:
         corridors = _slice_corridors(set(provinces))
-    flights = nation_ops.flight_objects(corridors, minute, table, _city_weather())
+    flights = nation_ops.flight_objects(corridors, minute, table, _city_weather(), _model_probs())
     by_province: Dict[str, Dict[str, int]] = {}
     by_city: Dict[str, Dict[str, int]] = {}
     for flight in flights:
@@ -655,7 +730,8 @@ def payload(level: str = 'nation', ident: Optional[str] = None,
             if got:
                 row['detour'] = got          # 前端用它画绕飞后的实际航迹
         weather = _city_weather()
-        flights = nation_ops.flight_objects(corridors, minute, table, weather)
+        model_probs = _model_probs()
+        flights = nation_ops.flight_objects(corridors, minute, table, weather, model_probs)
         hit = sum(1 for row in corridors if row.get('detour'))
         delayed = sum(1 for row in flights if row['status'] == 'DELAYED')
         blocked = sum(1 for row in corridors if row.get('borderBlocked'))
@@ -682,7 +758,11 @@ def payload(level: str = 'nation', ident: Optional[str] = None,
                 'alerts': nation_ops.alerts(corridors, flights, weather, scoped_cities),
                 'intel': nation_ops.intel(scoped_cities, weather, airport_by_city),
                 'fog': _fog(scoped_cities, weather),
-                'border': {**nation_ops.border_monitor(corridors, flights),
+                'modelCard': _model_card(model_probs),
+                'counterfactual': nation_ops.counterfactual(flights),
+                'border': {**nation_ops.border_monitor(
+                                corridors, flights,
+                                _corridor_border(_network().get('generatedAt') or 'v1')),
                            'excludeKm': _network().get('borderExcludeKm'),
                            'excludedCities': _network().get('borderExcluded') or []},
                 'traffic': {'corridors': len(corridors), 'airborne': len(flights),
@@ -955,4 +1035,54 @@ def evidence(flight_id: str, minute: int = 60) -> Dict[str, Any]:
         'conclusion': conclusion,
         'discipline': '本链为**规则派生**：实况来自公开源、回波来自公开拼图、概率由本系统阈值算出，'
                       '不是训练模型输出，也不是官方管制结论。',
+    }
+
+
+def _model_card(model_probs: Optional[Dict[str, float]] = None) -> Dict[str, Any]:
+    """模型卡：ml-v2（东北三站、不能外推）+ ml-v3（全国，真在这 319 城上训练的）。"""
+    card = nation_ops.model_card()
+    try:
+        from ml import national_model
+        national = national_model.card()
+    except Exception:  # noqa: BLE001
+        national = {'available': False}
+    card['nationalModel'] = national
+    if national.get('available'):
+        card['national']['applicable'] = True
+        card['national']['coverage'] = (f"全国 {national.get('provenance', {}).get('cities')} 城 · "
+                                        f"训练样本 {national.get('provenance', {}).get('samples')} 条")
+        card['national']['note'] = national.get('provenance', {}).get('caveat')
+        card['fallback'] = {'probSource': 'MODEL',
+                            'note': '端点两城的模型概率按独立事件合并，再与规则分各自把关'}
+    cards = sorted((model_probs or {}).values(), reverse=True)
+    card['liveCoverage'] = {
+        'cities': len(model_probs or {}),
+        'maxP': cards[0] if cards else None,
+        'medianP': cards[len(cards) // 2] if cards else None,
+    }
+    return card
+
+
+def pulse() -> Dict[str, Any]:
+    """状态心跳：只回"有没有东西变了"，不回整份数据。
+
+    推送的意义不是把 500 KB 反复塞给前端，而是让屏幕**不用轮询也知道**雷达换帧了、
+    实况更新了、模型换版了。前端收到变化再按需拉取。
+    """
+    radar = _radar()
+    weather = _city_weather_payload()
+    version = None
+    try:
+        from ml import national_model
+        card = national_model.card()
+        version = card.get('version') if card.get('available') else None
+    except Exception:  # noqa: BLE001
+        version = None
+    return {
+        'at': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
+        'radarTs': radar.get('ts'),
+        'radarBands': sum(len(v or []) for v in (_radar_clipped(radar.get('ts') or 'none') or {}).values()),
+        'weatherAt': weather.get('fetchedAt'),
+        'modelVersion': version,
+        'cities': len(_city_rows()),
     }

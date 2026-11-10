@@ -77,3 +77,6 @@ data/training/metar/*.csv
 data/training/metar/raw/
 data/training/annotate-cache/
 data/training/raw/
+
+# 全国模型的训练集（151 MB，可由 tools/model/train_national_vis.py 重建，不入库）
+data/training/national/dataset.json

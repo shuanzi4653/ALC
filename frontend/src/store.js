@@ -9,6 +9,7 @@ export const store = reactive({
     forecast: [], forecastSfi: [], alerts: [], lastError: null, lastAttempt: null
   },
   wsConnected: false,
+  nationPulse: null,
   connectionState: 'connecting',
   configStatus: { qweatherReady: false, mode: '-', note: '' },
   alertFlash: null,

@@ -94,6 +94,34 @@ public class DashboardWebSocketHandler extends TextWebSocketHandler {
         return new java.util.LinkedHashSet<>(workspaceBySession.values());
     }
 
+    /**
+     * 向所有在线大屏广播一条消息（不区分工作区）。
+     * 全国层的心跳用它：雷达换帧 / 实况更新这件事对每个屏幕都一样，不需要按工作区分片。
+     */
+    public int broadcast(String type, java.util.Map<String, Object> payload) {
+        try {
+            String json = mapper.writeValueAsString(java.util.Map.of(
+                    "type", type, "version", 1, "payload", payload));
+            int delivered = 0;
+            for (WebSocketSession session : sessions) {
+                try {
+                    if (session.isOpen()) {
+                        synchronized (session) {
+                            session.sendMessage(new TextMessage(json));
+                            delivered++;
+                        }
+                    }
+                } catch (Exception e) {
+                    log.warn("WS 广播失败 {}: {}", session.getId(), e.getMessage());
+                }
+            }
+            return delivered;
+        } catch (Exception e) {
+            log.warn("WS 广播序列化失败: {}", e.getMessage());
+            return 0;
+        }
+    }
+
     public int broadcastDashboardTo(String workspace, String runId, Map<String, Object> dashboard) {
         try {
             String json = mapper.writeValueAsString(Map.of(

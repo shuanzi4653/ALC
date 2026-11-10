@@ -133,7 +133,10 @@ function connectWs() {
     try {
       const message = JSON.parse(event.data)
       if (Number(message.version) !== 1 || !message.type) return
-      if (message.type === 'dashboard') {
+      if (message.type === 'nation_pulse') {
+        // 全国层心跳：只带"变了没有"，整份数据仍由页面按需拉取
+        store.nationPulse = message.payload || null
+      } else if (message.type === 'dashboard') {
         applyDashboard(normalizeDashboard(message.payload))
       } else if (message.type === 'alert') {
         const eventId = message.payload?.eventId ?? message.payload?.id

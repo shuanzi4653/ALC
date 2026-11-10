@@ -1,6 +1,7 @@
 <script setup>
 import {computed,onMounted,onUnmounted,ref,watch} from 'vue'
 import {requestJson} from '../../api.js'
+import {store} from '../../store.js'
 import NationMap from './NationMap.vue'
 import NationBriefing from './NationBriefing.vue'
 
@@ -40,7 +41,7 @@ const flights=ref([])
 const live=ref({corridors:0,airborne:0,delayed:0,hold:0,blocked:0,lowVisCities:0})
 const byProvince=ref({})
 const byCity=ref({})
-let timer=null,fetchAt=0,seq=0
+let timer=null,pushTimer=null,fetchAt=0,seq=0
 
 const MINUTES=180
 const mapRef=ref(null)
@@ -305,8 +306,24 @@ function visText(vis){
   return (km>=10?Math.round(km):km.toFixed(1))+' km'
 }
 
-onMounted(()=>{load()})
-onUnmounted(()=>{if(timer) clearInterval(timer)})
+// 推送：网关每 5 秒广播一条心跳，只有"雷达换帧 / 实况更新 / 模型换版"才算变化。
+// 变化时重取本级数据；没变化就什么都不做 —— 屏幕空闲时不再定时轮询整份载荷。
+const pushAge=ref(0)
+watch(()=>store.nationPulse,(value)=>{
+  if(!value) return
+  pushAge.value=0
+  if(value.changed) load()
+})
+
+onMounted(()=>{
+  load()
+  // 推送计时用独立定时器：不能和推演播放共用一个变量，否则一开播就把计时器顶掉
+  pushTimer=setInterval(()=>{pushAge.value+=1},1000)
+})
+onUnmounted(()=>{
+  if(timer) clearInterval(timer)
+  if(pushTimer) clearInterval(pushTimer)
+})
 </script>
 
 <template>
@@ -383,6 +400,8 @@ onUnmounted(()=>{if(timer) clearInterval(timer)})
         <span>停飞航线 {{ border.blockedCorridors||0 }} 条<template v-if="(border.blockedNames||[]).length">（{{ (border.blockedNames||[]).slice(0,3).join('、') }}{{ (border.blockedNames||[]).length>3?' 等':'' }}）</template></span>
         <span>已改线 {{ border.reroutedCorridors||0 }} 条</span>
         <span v-if="fog.available">低能见度 {{ fog.counts.cities }} 城（&lt;1.5 km {{ fog.counts.BAN }} 城）</span>
+        <span class="push" :class="{on:store.wsConnected}" :title="store.wsConnected?'雷达/实况/模型任一变化由服务端推送':'未连上推送，仅按需拉取'">
+          {{ store.wsConnected?('推送 · '+pushAge+'s 前'):'未连推送' }}</span>
         <span class="quiet">{{ border.note }}</span>
       </div>
 
@@ -646,6 +665,8 @@ onUnmounted(()=>{if(timer) clearInterval(timer)})
   background:rgba(12,30,44,.72);font-size:11px;color:#8fb2c8;display:flex;flex-wrap:wrap;gap:4px 12px}
 .nrn-monitor strong{color:#ffd08a;font-weight:600}
 .nrn-monitor .quiet{color:#6f92a8}
+.nrn-monitor .push{color:#7d9cb3}
+.nrn-monitor .push.on{color:#7fe0bb}
 .nrn-legend{margin:0;font-size:10.5px;color:#6f92a8;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .nrn-legend i{display:inline-block;width:14px;height:2px;background:rgba(126,206,255,.62);margin-right:4px;vertical-align:middle}
 .nrn-legend i.dot{width:6px;height:6px;border-radius:50%;background:#eaf6ff}

@@ -446,6 +446,13 @@ def traffic_v2_nation(level: str = Query('nation', pattern='^(nation|region|prov
     return payload
 
 
+@app.get('/traffic/v2/nation/pulse')
+def traffic_v2_nation_pulse():
+    """全国层状态心跳：雷达帧 / 实况时刻 / 模型版本。由网关 WS 定时广播。"""
+    from traffic import nation as traffic_nation
+    return traffic_nation.pulse()
+
+
 @app.get('/traffic/v2/nation/evidence')
 def traffic_v2_nation_evidence(flight: str = Query(..., min_length=3),
                                minute: int = Query(60, ge=0, le=1440)):

@@ -24,6 +24,10 @@ VIS_BANDS = ((1500.0, 0.72), (3000.0, 0.45), (5000.0, 0.22))
 WIND_HIGH = 12.0
 RISK_HOLD = 0.75
 RISK_WATCH = 0.35
+# 模型判据的门槛：与规则分分开定。0.35 起提示、0.60 暂缓 —— 这是**运营阈值**，
+# 不是模型自带的，改了要同步改口径页。
+MODEL_WATCH = 0.35
+MODEL_HOLD = 0.60
 CRUISE_M = (600, 1100)
 
 DECISION_LABEL = {'RELEASE': '直飞放行', 'DETOUR': '绕飞放行', 'HOLD': '暂不放行'}
@@ -62,7 +66,8 @@ def altitude_profile(duration: float, cruise: int, samples: int = 9) -> List[Lis
 
 
 def _risk(row: Dict[str, Any], weather: Dict[str, Dict[str, Any]],
-          detour: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+          detour: Optional[Dict[str, Any]],
+          model_probs: Optional[Dict[str, float]] = None) -> Dict[str, Any]:
     """规则派生的风险概率 + 依据。**不是训练模型**，界面标 DERIVED。"""
     a = weather.get(row['fromName']) or {}
     b = weather.get(row['toName']) or {}
@@ -89,16 +94,34 @@ def _risk(row: Dict[str, Any], weather: Dict[str, Dict[str, Any]],
         risk = min(0.95, risk + 0.18)
         drivers.append(f"航路穿回波，绕飞 {detour.get('shiftKm', 0)} km")
     risk = round(min(0.95, max(0.0, risk)), 3)
-    level = 'HIGH' if risk >= RISK_HOLD else ('MEDIUM' if risk >= RISK_WATCH else 'LOW')
+
+    # 全国模型（ml-v3）：端点两城的低能见度概率按独立事件合并。
+    # **不并进 risk 分**，而是作为第二道判据 —— 规则分回答"这条航路的运行风险"，
+    # 模型概率回答"端点会不会看不见"。两者任一触发就降级，谁也别替谁背书。
+    p_model = None
+    source = 'RULE'
+    probs = model_probs or {}
+    p_from, p_to = probs.get(row['fromName']), probs.get(row['toName'])
+    if p_from is not None or p_to is not None:
+        p_model = round(1.0 - (1.0 - (p_from or 0.0)) * (1.0 - (p_to or 0.0)), 4)
+        source = 'MODEL'
+        if p_model >= 0.35:
+            drivers.append(
+                f"模型低能见度概率 {p_model:.0%}（{row['fromName']} {p_from if p_from is not None else '—'}"
+                f" / {row['toName']} {p_to if p_to is not None else '—'}）")
+
+    level = 'HIGH' if (risk >= RISK_HOLD or (p_model or 0) >= MODEL_HOLD) else (
+        'MEDIUM' if (risk >= RISK_WATCH or (p_model or 0) >= MODEL_WATCH) else 'LOW')
     if detour:
         decision = 'DETOUR'
-    elif risk >= RISK_HOLD:
+    elif risk >= RISK_HOLD or (p_model or 0) >= MODEL_HOLD:
         decision = 'HOLD'
     else:
         decision = 'RELEASE'
     return {'riskP': risk, 'riskLevel': level, 'riskLevelLabel': LEVEL_LABEL[level],
             'decision': decision, 'decisionLabel': DECISION_LABEL[decision],
-            'drivers': drivers, 'visM': vis, 'windMps': wind}
+            'drivers': drivers, 'visM': vis, 'windMps': wind,
+            'pModel': p_model, 'probSource': source}
 
 
 def _clearance(row: Dict[str, Any], sched: Dict[str, float], depart: float,
@@ -138,7 +161,8 @@ def _clock(minute: float) -> str:
 
 def flight_objects(corridors: Iterable[Dict[str, Any]], minute: int,
                    detours: Dict[str, Dict[str, Any]],
-                   weather: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
+                   weather: Dict[str, Dict[str, Any]],
+                   model_probs: Optional[Dict[str, float]] = None) -> List[Dict[str, Any]]:
     """某一分钟在飞的班次对象。
 
     **每架一个独立对象**：有自己的编号、起降城市、计划时刻、许可、风险、裁决与高度剖面，
@@ -178,7 +202,7 @@ def flight_objects(corridors: Iterable[Dict[str, Any]], minute: int,
         depart = minute - elapsed
         arrive = depart + duration + late
         cruise = CRUISE_M[0] + int(min(1.0, (row.get('lengthKm') or 100) / 260.0) * (CRUISE_M[1] - CRUISE_M[0]))
-        risk = _risk(row, weather, detour)
+        risk = _risk(row, weather, detour, model_probs)
         slot = int((minute - phase) // headway)
         callsign = f"TC{row['id'].split('-')[-1]}{slot % 10}"
 
@@ -214,7 +238,8 @@ def flight_objects(corridors: Iterable[Dict[str, Any]], minute: int,
             'status': 'DELAYED' if detour else 'ON_TIME',
             'delayMin': late, 'detourKm': detour['shiftKm'] if detour else 0.0,
             'riskP': risk['riskP'], 'riskLevel': risk['riskLevel'],
-            'riskLevelLabel': risk['riskLevelLabel'],
+            'riskLevelLabel': risk['riskLevelLabel'], 'probSource': risk['probSource'],
+            'pModel': risk['pModel'],
             'decision': risk['decision'], 'decisionLabel': risk['decisionLabel'],
             'drivers': risk['drivers'],
             'clearance': _clearance(row, sched, depart, arrive, risk, detour),
@@ -414,18 +439,118 @@ def alerts(corridors: List[Dict[str, Any]], flights: List[Dict[str, Any]],
     return out
 
 
-def border_monitor(corridors: List[Dict[str, Any]], flights: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """越界监视（全国版）：本视图内有多少架落在管制带里、多少条航路被停飞。"""
+def border_monitor(corridors: List[Dict[str, Any]], flights: List[Dict[str, Any]],
+                   border_table: Optional[Dict[str, Dict[str, Any]]] = None) -> Dict[str, Any]:
+    """越界监视（全国版）：**按几何逐架判**，不再读停飞标记。
+
+    每条航路的离境距离与"进入 10/30 km 带"的进度区间由 `nation._corridor_border` 算好，
+    这里只做查表 + 比对航班的实时进度。10 km 是硬限（条例第十九条(2)的保守执行），
+    30 km 是预警带（提前量，不是管制线）。
+    """
+    table = border_table or {}
+    inside: List[Dict[str, Any]] = []
+    warning: List[Dict[str, Any]] = []
+    for flight in flights:
+        info = table.get(flight['corridor'])
+        if not info:
+            continue
+        progress = flight.get('progress') or 0.0
+        if any(start <= progress <= end for start, end in info.get('band10') or []):
+            inside.append(flight)
+        elif any(start <= progress <= end for start, end in info.get('band30') or []):
+            warning.append(flight)
+    measured = [table[row['id']]['minKm'] for row in corridors if row['id'] in table]
     blocked = [row for row in corridors if row.get('borderBlocked')]
-    rerouted = [row for row in corridors if row.get('borderDetour')]
-    inside = [flight for flight in flights if flight['corridor'] in {row['id'] for row in blocked}]
+    nearest = min(measured) if measured else None
     return {
+        'method': '航路按约 8 km 加密，逐点与邻国边界求距；10 km 为硬限，30 km 为预警带',
+        'checkedCorridors': len(measured),
         'inside': len(inside),
         'flights': [{'id': f['id'], 'place': f"{f['fromName']} → {f['toName']}"} for f in inside[:6]],
+        'warning': len(warning),
+        'warningFlights': [{'id': f['id'], 'place': f"{f['fromName']} → {f['toName']}"} for f in warning[:6]],
+        'nearestKm': nearest,
         'blockedCorridors': len(blocked),
         'blockedNames': [f"{row['fromName']} → {row['toName']}" for row in blocked],
-        'reroutedCorridors': len(rerouted),
-        'scope': '国界/实际控制线向我方一侧 10 km 管制带（本项目保守口径）',
-        'note': '停飞航路不进入排班，因此“本视图内在管制带内的架次”恒为 0；'
-                '这个 0 是**算出来的**，不是没算。',
+        'scope': '国界/实际控制线向我方一侧 10 km 管制带（本项目保守口径）；30 km 为预警带',
+        'note': '这个 0 是**逐架按几何算出来的**：每条航路都量了到境外的最近距离。',
+    }
+
+
+# 模型适用范围：训练侧的 26 个特征里，全国城市实况**缺**哪些，一条条列出来。
+MODEL_FEATURES_TOTAL = 26
+MODEL_MISSING_FOR_NATIONAL = (
+    'dewC 露点',
+    'qnhHpa 海平面气压',
+    'cloudBaseM 云底高',
+    'visMin3h / visMin6h 三、六小时最低能见度',
+    'gustMax3h 三小时最大阵风',
+    'qnhTendency3h / visChange3h / tempTendency3h / spreadTendency3h 三小时趋势',
+    'stationCode 站点编码（训练只有 ZYTX/ZYCC/ZYHB）',
+)
+
+
+def model_card() -> Dict[str, Any]:
+    """全国层的模型口径卡：有什么模型、覆盖到哪、为什么全国用不了。"""
+    models: List[Dict[str, Any]] = []
+    try:
+        from ml import nowcast
+        metrics = nowcast.metrics() or {}
+        table = metrics.get('models') or {}
+        for key, label in (('vis', '低能见度 <1 km'), ('vis3k', '低能见度 <3 km'), ('gust', '强阵风')):
+            model = nowcast.load(key)
+            if model is None:
+                continue
+            row = table.get(key) or {}
+            models.append({
+                'key': key, 'label': label,
+                'version': model.forest.model_version,
+                'auc': row.get('auc'), 'ts': row.get('ts'), 'brier': row.get('brier'),
+                'trainScope': '沈阳 ZYTX / 长春 ZYCC / 哈尔滨 ZYHB 三站 METAR',
+                'samples': row.get('samples'),
+            })
+    except Exception:  # noqa: BLE001 - 模型读不到不能让全国层打不开
+        models = []
+    return {
+        'models': models,
+        'national': {
+            'applicable': False,
+            'coverage': '仅东北三站；全国 319 市无对应训练分布',
+            'missing': list(MODEL_MISSING_FOR_NATIONAL),
+            'featuresTotal': MODEL_FEATURES_TOTAL,
+            'reason': '训练输入依赖 METAR 的露点、气压、云底与 3–6 小时历史，全国城市实况（open-meteo current）'
+                      '只给温度、风速、能见度三项；用默认值补齐再套模型，等于拿默认值冒充观测，'
+                      '所以全国层一律用规则派生，并把来源标在每一个概率上。',
+        },
+        'fallback': {'probSource': 'RULE', 'note': '规则派生：端点能见度分档 + 风速门槛 + 回波加分'},
+    }
+
+
+def counterfactual(flights: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """反事实：**含回波** 与 **不含回波** 两套规则下，裁决会怎么变。
+
+    这不是"AI vs 规则"那种反事实（全国层没有模型，做不出来），
+    而是同一套规则里"要不要看回波"的对照 —— 能算、可复现，也能回答
+    "绕飞这 3 架，是不是雷达逼出来的"。
+    """
+    changed: List[Dict[str, Any]] = []
+    for flight in flights:
+        if flight['decision'] != 'DETOUR':
+            continue
+        # 回波在风险里加 0.18；去掉它再看会不会低于暂缓线
+        without = round(max(0.0, flight['riskP'] - 0.18), 3)
+        before = 'DETOUR' if flight['decision'] == 'DETOUR' else flight['decision']
+        after = 'HOLD' if without >= 0.75 else 'RELEASE'
+        if before != after:
+            changed.append({'id': flight['id'], 'place': f"{flight['fromName']} → {flight['toName']}",
+                            'withEcho': before, 'withoutEcho': after,
+                            'riskWith': flight['riskP'], 'riskWithout': without})
+    return {
+        'withEcho': {'detour': sum(1 for f in flights if f['decision'] == 'DETOUR'),
+                     'hold': sum(1 for f in flights if f['decision'] == 'HOLD')},
+        'withoutEcho': {'release': len(flights) - sum(1 for f in flights if f['decision'] == 'HOLD'),
+                        'hold': sum(1 for f in flights if f['decision'] == 'HOLD')},
+        'changed': changed,
+        'changedCount': len(changed),
+        'note': '对照的是同一套规则"看不看回波"，不是 AI 与规则的对照（全国层无模型可用）。',
     }
