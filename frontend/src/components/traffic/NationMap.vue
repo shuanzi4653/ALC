@@ -22,6 +22,12 @@ const props=defineProps({
   selectedCorridor:{type:String,default:''},
   virtualMode:{type:Boolean,default:false},
   followId:{type:String,default:''},
+  // 净空层（DERIVED）：bands.LIMIT / bands.RUNWAY 是已裁好的环，直接投影画圈。
+  // 走独立接口按需取，故这里允许为 null —— 没取到就什么都不画，不假装有。
+  zoneBands:{type:Object,default:null},
+  zonePolicy:{type:String,default:'APPROVAL_REQUIRED'},
+  // 'ops' 运行视角 | 'airspace' 空域视角：同一套几何，换主体（航线让位给净空圈）
+  audience:{type:String,default:'ops'},
 })
 const emit=defineEmits(['drill','select-flight','select-corridor','hover-node'])
 
@@ -150,6 +156,34 @@ const fogPolys=computed(()=>{
       out.push({level,d:toPath({type:'Polygon',coordinates:[ring]},project)})
     }
   }
+  return out
+})
+
+// —— 净空层：287 个限制区 + 10 条跑道梯形（DERIVED，规则化生成） ——
+// 只有切到空域视角、或三维省/市层才取几何，取不到就返回空数组：
+// 空图层和"没有净空"是两回事，界面上另有 zoneErr 说明，不在这里编。
+const zonePolys=computed(()=>{
+  const bands=props.zoneBands
+  if(!bands) return []
+  const v=box.value
+  const out=[]
+  const push=(rows,kind)=>{
+    let count=0
+    for(const ring of rows||[]){
+      if(!ring||ring.length<3) continue
+      // 只画落在当前视口里的：全国层 287 个圈全画也行，但视野外的路径纯浪费
+      let hit=false
+      for(const [lon,lat] of ring){
+        if(lon>=v.lon0-.4&&lon<=v.lon1+.4&&lat>=v.lat0-.4&&lat<=v.lat1+.4){hit=true;break}
+      }
+      if(!hit) continue
+      if(count>=160) break
+      count+=1
+      out.push({kind,d:toPath({type:'Polygon',coordinates:[ring]},project)})
+    }
+  }
+  push(bands.LIMIT,'LIMIT')
+  push(bands.RUNWAY,'RWY')
   return out
 })
 
@@ -471,6 +505,20 @@ function clickNode(node){
         <text :x="insetBox.x+7" :y="insetBox.y+insetBox.h-7" class="inset-lbl">南海诸岛</text>
       </g>
 
+      <!-- 3.8 净空（DERIVED）：空域视角下是主体，运行视角只在省/市层做底图 -->
+      <g v-if="zonePolys.length" class="nmap-zones">
+        <path v-for="(zone,index) in zonePolys" :key="'z'+index" :d="zone.d"
+              :fill="zone.kind==='LIMIT'
+                ?(zonePolicy==='PROHIBITED'?'rgba(226,74,58,.20)':'rgba(245,190,60,.13)')
+                :'rgba(160,220,120,.15)'"
+              :stroke="zone.kind==='LIMIT'
+                ?(zonePolicy==='PROHIBITED'?'rgba(255,110,85,.85)':'rgba(245,200,90,.66)')
+                :'rgba(160,220,120,.55)'"
+              stroke-width=".65">
+          <title>{{ zone.kind==='LIMIT'?'机场净空限制区（规则化 DERIVED）':'跑道梯形净空（仅 10 站有方位）' }}</title>
+        </path>
+      </g>
+
       <!-- 4 建筑：城市体块。立体模式下才立起来，平面模式只留底影 -->
       <g class="nmap-towers">
         <g v-for="node in nodes" :key="'b'+node.name">
@@ -484,8 +532,8 @@ function clickNode(node){
       <rect v-if="tilt" x="-400" y="-300" :width="VIEW.w+800" :height="VIEW.h+900"
             fill="rgba(6,16,25,.55)" pointer-events="none"/>
 
-      <!-- 5 航线 -->
-      <g fill="none" stroke-linecap="round">
+      <!-- 5 航线：空域视角下让位给净空，不删只淡 -->
+      <g fill="none" stroke-linecap="round" :opacity="audience==='airspace'?.38:1">
         <path v-for="line in corridors" :key="'c'+line.id" :d="line.d"
               :stroke="line.blocked?(virtualMode?'rgba(255,96,70,.95)':'rgba(226,92,74,.55)'):'rgba(126,206,255,.62)'"
               :stroke-width="line.blocked?lineWidth*(virtualMode?2.2:.8):lineWidth"
@@ -516,7 +564,7 @@ function clickNode(node){
       </g>
 
       <!-- 7 航班：每架一个独立对象，点谁选谁 -->
-      <g class="nmap-flights">
+      <g class="nmap-flights" :opacity="audience==='airspace'?.3:1">
         <g v-for="f in flightDots" :key="f.id"
            :transform="`translate(${f.x.toFixed(1)} ${f.y.toFixed(1)}) rotate(${f.heading.toFixed(0)})`"
            @click.stop="!moved&&emit('select-flight',f)">

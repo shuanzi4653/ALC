@@ -117,9 +117,14 @@ def test_unknown_ident_is_explicit_not_silent():
 def test_payload_size_is_bounded_per_level():
     for level, ident in (('nation', ''), ('region', 'east'), ('province', '广东省')):
         body = json.dumps(nation.payload(level, ident), ensure_ascii=False)
-        # 班次对象化（许可/剖面/裁决依据）之后载荷变大，nation 级从 ~240 KB 涨到 ~480 KB。
-        # 上限放到 560 KB：gzip 后约 70 KB，仍在可接受范围，同时还能挡住"又翻一倍"的回归。
-        assert len(body.encode('utf-8')) < 560 * 1024, f'{level} 级载荷过大'
+        # 这条**不再是产品约束**，只是防"无意中翻倍"的回归线。
+        #
+        # 演进：班次对象化后 nation 级从 ~240 KB 涨到 ~480 KB → 上限设 560 KB。
+        # V1.0.2 起用户明确「本轮不设载荷上限，只压响应时间」，所以这里不再按带宽
+        # 卡体积；实测 576 KB（多出来的部分是 80 城逐市实况：温度/风速/能见度
+        # 由 null 变成真值，属于"多了真数据"，不是冗余）。
+        # 真要压，该压的是"每次请求重复解析"，而不是砍字段。
+        assert len(body.encode('utf-8')) < 700 * 1024, f'{level} 级载荷异常膨胀'
 
 
 def test_province_level_shows_cross_province_endpoints():

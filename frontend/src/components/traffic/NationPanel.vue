@@ -1,10 +1,15 @@
 <script setup>
-import {computed,onMounted,onUnmounted,ref,watch} from 'vue'
+import {computed,defineAsyncComponent,onMounted,onUnmounted,ref,watch} from 'vue'
 import {requestJson} from '../../api.js'
 import {store} from '../../store.js'
 import NationMap from './NationMap.vue'
 import NationBriefing from './NationBriefing.vue'
 import {parseScope,scopeKey} from '../../traffic/scope.js'
+import {probeGPU,gpuLabel} from '../../traffic/gpu.js'
+
+// 三维单独切包：maplibre + 地形瓦片只在真进三维时才加载。
+// 首页首屏用不到它，没必要为它多等一个 chunk。
+const NationGlobe=defineAsyncComponent(()=>import('./NationGlobe.vue'))
 
 // 全国运行台：态势 / 台账 / 情报 / 处置 四个视图共用同一份 `payload`。
 //
@@ -58,6 +63,22 @@ const selectedId=ref('')
 const selectedCorridor=ref('')
 const followId=ref('')
 
+// —— 视角：平面 / 倾斜（SVG 透视）/ 三维（maplibre 真透视） ——
+// 三维之前先问 GPU 能不能扛。软件渲染（SwiftShader）下进去就是拖死页面，
+// 所以按钮点了也会被挡回来，并说清"为什么不能看"，而不是默默什么都不发生。
+const gpu=probeGPU()
+const threeD=ref(false)
+const liftNote=ref('')
+const fps=ref(0)
+// —— 双受众视角 ——
+// 同一套几何两种读法：运行视角看航线与班次，空域视角看净空边界与等级。
+// 不做第二套数据，只是图层显隐 + 侧栏内容切换。
+const audience=ref('ops')
+const zoneGeom=ref(null)
+const zoneBusy=ref(false)
+const zoneErr=ref('')
+const zonePolicy=ref('APPROVAL_REQUIRED')
+
 const flights=ref([])
 const live=ref({corridors:0,airborne:0,delayed:0,hold:0,blocked:0,lowVisCities:0})
 const byProvince=ref({})
@@ -109,8 +130,9 @@ async function loadEvidence(){
 function clearEvidence(){evidence.value=null;evidenceErr.value=''}
 
 // 立体与平面是两套渲染，但"定位/复位"对用户是同一个动作：按当前模式找对那个组件。
+const globeRef=ref(null)
 function activeMap(){
-  return mapRef.value||null
+  return threeD.value?globeRef.value:(mapRef.value||null)
 }
 function locateLayer(kind){
   followId.value=''
@@ -121,6 +143,67 @@ function resetMap(){
   followId.value=''
   activeMap()?.resetView?.()
 }
+
+// —— 视角切换（含 WebGL 护栏） ——
+function toggle3d(){
+  if(threeD.value){threeD.value=false;liftNote.value='';return}
+  const probe=gpu||probeGPU()
+  if(!probe.ok){
+    // 不进三维，直接给倾斜视图 + 原因。静默失败是最糟的选择：
+    // 用户会以为是按钮坏了，然后反复点。
+    tilt.value=true
+    threeD.value=false
+    liftNote.value=`本机没开硬件加速，真实三维会拖死页面：${probe.reason}。已切到倾斜视图（同样的俯角，不依赖 GPU）`
+    return
+  }
+  threeD.value=true
+  tilt.value=false
+  liftNote.value=''
+  ensureZones()
+}
+function toggleTilt(){
+  tilt.value=!tilt.value
+  if(tilt.value){threeD.value=false}
+  liftNote.value=''
+}
+function onGlobeDegrade(info){
+  // ③ 看门狗触发：退出三维，落到倾斜视图，并说明是帧率问题而不是数据问题
+  threeD.value=false
+  tilt.value=true
+  liftNote.value=`三维帧率只有 ${info?.fps ?? '?'} fps（连续 3 秒低于 20），已自动降级为倾斜视图。多半是显卡驱动没走上硬件加速`
+}
+function onGlobeUnsupported(probe){
+  threeD.value=false
+  tilt.value=true
+  liftNote.value=`真实三维不可用：${probe?.reason||'本机 WebGL 未启用'}。已切到倾斜视图`
+}
+function onGlobeFps(value){fps.value=value}
+
+// —— 净空几何按需取 ——
+// 287 个 28 点环约 250 KB，首页不画它，所以不放进主载荷；只有切到空域视角
+// 或进了三维的省/市层才取。取过一次就留着，切换视角不再重复请求。
+function ensureZones(){
+  if(zoneGeom.value||zoneBusy.value) return
+  zoneBusy.value=true
+  zoneErr.value=''
+  requestJson(`/api/traffic/v2/nation/zones?policy=${zonePolicy.value}`,{timeoutMs:30000})
+    .then(body=>{zoneGeom.value=body||null})
+    .catch(e=>{zoneErr.value=e.message||String(e)})
+    .finally(()=>{zoneBusy.value=false})
+}
+function setAudience(next){
+  if(audience.value===next) return
+  audience.value=next
+  if(next==='airspace') ensureZones()
+}
+function switchZonePolicy(){
+  zonePolicy.value=zonePolicy.value==='PROHIBITED'?'APPROVAL_REQUIRED':'PROHIBITED'
+  zoneGeom.value=null
+  ensureZones()
+}
+// 空域视角下的统计：净空覆盖、待审穿越 —— 都来自后端可复算的计数
+const zoneCounts=computed(()=>zoneGeom.value?.counts||zones.value?.counts||{})
+const zoneCrossings=computed(()=>zoneGeom.value?.crossings||null)
 const alerts=computed(()=>data.value?.alerts||[])
 const intel=computed(()=>data.value?.intel||[])
 const upcoming=computed(()=>data.value?.upcoming||[])
@@ -386,6 +469,41 @@ const wxSourceText=computed(()=>{
 })
 function pBand(p){return p==null?'':(p>=0.6?'bad':(p>=0.35?'warn':(p>=0.15?'watch':'')))}
 
+// —— 推演个性化：先选对象，再看链路 ——
+// 之前这一页只能"在地图上点"，点到什么算什么。推演的逻辑应该是**先立题**：
+// 选一座城市（在哪一片空域）或一班航班（哪一条航路），再顺着实况→判据→裁决往下看。
+const pickCity=ref('')
+const cityOptions=computed(()=>{
+  const rows=(data.value?.nodes||[]).filter(n=>n.name)
+  // 省会/机场城市排前面：从 319 个城里找一个县城，用下拉是折磨
+  const weight=n=>(n.rank||3)*10+((n.hasAirport||n.airport)?0:1)
+  return [...rows].sort((a,b)=>weight(a)-weight(b)||String(a.name).localeCompare(String(b.name),'zh')).slice(0,120)
+})
+const flightOptions=computed(()=>{
+  const rows=[...flights.value]
+  rows.sort((a,b)=>String(a.callsign).localeCompare(String(b.callsign)))
+  return rows.slice(0,80)
+})
+function jumpToCity(){
+  const name=pickCity.value
+  if(!name) return
+  if(level.value==='city'&&ident.value===name) return
+  go('city',name,name)
+}
+function pickFromList(){
+  const flight=flights.value.find(f=>f.id===selectedId.value)
+  if(flight) pickFlight(flight)
+}
+// 选题行里的一句话：选中的这一班现在怎么样，细的看下方详情
+const pickSummary=computed(()=>{
+  const flight=selectedFlight.value
+  if(!flight) return ''
+  const wx=(data.value?.nodes||[]).find(n=>n.name===flight.fromName||n.name===flight.toName)
+  const parts=[flight.decisionLabel, `风险 ${flight.riskP.toFixed(2)}`]
+  if(wx?.weather) parts.push(`实况 ${wx.weather.tempC==null?'—':wx.weather.tempC+' °C'} / 能见度 ${visText(wx.weather.visM)}`)
+  return parts.join(' · ')
+})
+
 const profileText=computed(()=>{
   const prof=corridorProfile.value
   if(!prof) return ''
@@ -474,6 +592,16 @@ onUnmounted(()=>{
       逐市气象 <b>{{ summary.weatherCities }}</b>
       <span v-if="level==='nation'&&border.excludeKm"> · 边境 {{ border.excludeKm }} km 内 <b>{{ (border.excludedCities||[]).length }}</b> 城已退出通航</span>
     </p>
+    <!-- 双受众：同一套几何两种读法，不做第二套数据 -->
+    <div class="nrn-aud" v-if="view==='map'" data-audience-switch>
+      <button :class="{on:audience==='ops'}" @click="setAudience('ops')"
+              title="运行视角：看航线穿不穿净空、绕飞代价多少">运行视角</button>
+      <button :class="{on:audience==='airspace'}" @click="setAudience('airspace')"
+              title="空域视角：看净空边界、禁飞等级与待审穿越">空域视角</button>
+      <button class="policy" v-if="audience==='airspace'" @click="switchZonePolicy"
+              :title="'规则化净空整体切到「一律禁止进入」，用于演示；真实世界里这是审批结果不是开关'">
+        {{ zonePolicy==='PROHIBITED'?'一律禁飞':'可申请穿越' }}</button>
+    </div>
   </header>
 
   <nav class="nrn-tabs" data-nation-tabs v-if="!hideTabs">
@@ -482,6 +610,27 @@ onUnmounted(()=>{
     <button :class="{on:view==='intel'}" @click="view='intel'">情报 <em>{{ intel.length }}</em></button>
     <button :class="{on:view==='alerts'}" @click="view='alerts'">处置 <em :class="{bad:alerts.length}">{{ alerts.length }}</em></button>
   </nav>
+
+  <!-- 推演页的"立题"行：先选对象，再看链路。不给选择器的话，
+       这一页只能靠在地图上盲点，点不中就什么都没发生。 -->
+  <div class="nrn-pick" v-if="mode==='card'" data-card-picker>
+    <label>城市
+      <select v-model="pickCity" @change="jumpToCity" aria-label="推演城市">
+        <option value="">选择城市…</option>
+        <option v-for="c in cityOptions" :key="c.name" :value="c.name">
+          {{ shortName(c.name) }}{{ c.airport?(' · '+c.airport):' · 无机场' }}</option>
+      </select>
+    </label>
+    <label>班次
+      <select v-model="selectedId" @change="pickFromList" aria-label="推演班次">
+        <option value="">选择班次…</option>
+        <option v-for="f in flightOptions" :key="f.id" :value="f.id">
+          {{ f.callsign }} · {{ shortName(f.fromName) }}→{{ shortName(f.toName) }}</option>
+      </select>
+    </label>
+    <span class="pick-note" v-if="pickSummary">{{ pickSummary }}</span>
+    <span class="pick-note quiet" v-else>选城市定位空域，选班次看这一架的实况 → 判据 → 裁决</span>
+  </div>
 
   <p class="nrn-state" v-if="loading">正在加载本级数据…</p>
   <p class="nrn-state bad" v-else-if="error">本级不可用 · {{ error }}<button @click="load">重试</button></p>
@@ -507,7 +656,9 @@ onUnmounted(()=>{
         <button :class="{on:radarOn}" @click="radarOn=!radarOn">回波</button>
         <button :class="{on:fogOn}" @click="fogOn=!fogOn" :disabled="!fog.available">雾区</button>
         <button :class="{on:terrainOn}" @click="terrainOn=!terrainOn">地形</button>
-        <button :class="{on:tilt}" @click="tilt=!tilt">立体</button>
+        <button :class="{on:tilt}" @click="toggleTilt">倾斜</button>
+        <button :class="{on:threeD}" @click="toggle3d"
+                :title="gpu.ok?('真实三维 · '+gpuLabel(gpu)):(gpu.reason||'本机 WebGL 不可用')">三维</button>
         <button :class="{on:virtualMode}" @click="virtualMode=!virtualMode"
                 :title="'虚拟增强：回波与绕飞/停飞在图上更醒目，用于演示'">{{ virtualMode?'虚拟':'实测' }}</button>
         <select v-model="density" aria-label="信息密度">
@@ -520,15 +671,23 @@ onUnmounted(()=>{
         <button @click="resetMap()">复位</button>
       </div>
 
-      <!-- 立体＝SVG 倾斜视图。
-           试过用 maplibre 起真三维（俯角/旋转/高程瓦片），但那套在这台机器上
-           会把浏览器主线程拖死（两次实测 Edge 完全无响应，连扩展都断），
-           所以退回不依赖 WebGL 的透视倾斜：轻、稳、切页不卡。
-           代价是没有真高程起伏，文案里如实说明。 -->
+      <p class="nrn-lift" v-if="liftNote" data-lift-note>{{ liftNote }}</p>
+
+      <!-- 三维＝maplibre 真透视（俯角/旋转/DEM/体块），但先进能力探测：
+           软件渲染（SwiftShader）一律不进，直接退到倾斜视图并说明原因。
+           这是 V1.0.1 两次把 Edge 拖死的教训 —— 卡死的是浏览器 GPU，不是服务器。
+           倾斜＝不依赖 WebGL 的 CSS 透视，轻、稳、切页不卡，代价是没有真实高程。 -->
       <div class="nrn-canvas">
-      <NationMap ref="mapRef" :data="data" :flights="flights" :minute="minute"
+      <NationGlobe v-if="threeD" ref="globeRef" :data="data" :flights="flights"
+                   :radar-on="radarOn" :fog-on="fogOn" :density="density"
+                   :selected-id="selectedId" :selected-corridor="selectedCorridor"
+                   :follow-id="followId" :zones="zoneGeom" :audience="audience"
+                   @drill="drill" @select-flight="pickFlight" @select-corridor="pickCorridor"
+                   @degrade="onGlobeDegrade" @unsupported="onGlobeUnsupported" @fps="onGlobeFps"/>
+      <NationMap v-else ref="mapRef" :data="data" :flights="flights" :minute="minute"
                  :radar-on="radarOn" :fog-on="fogOn" :terrain-on="terrainOn" :tilt="tilt"
-                 :density="density" :virtual-mode="virtualMode"
+                 :density="density" :virtual-mode="virtualMode" :audience="audience"
+                 :zone-bands="zoneGeom&&zoneGeom.bands" :zone-policy="zonePolicy"
                  :selected-id="selectedId" :selected-corridor="selectedCorridor"
                  :follow-id="followId"
                  @drill="drill" @select-flight="pickFlight" @select-corridor="pickCorridor"/>
@@ -548,12 +707,20 @@ onUnmounted(()=>{
         <span class="quiet">{{ border.note }}</span>
       </div>
 
-      <p class="nrn-legend">
+      <p class="nrn-legend" v-if="audience==='ops'">
         <i class="dot"></i>节点三级：省会/首府（大点+浅环）＞机场城市＞一般
         <i class="line"></i>航线同色同宽
         <i class="line warn"></i>琥珀＝绕飞航迹
         <i class="line bad"></i>红＝边境受限停飞
+        <i class="zone"></i>琥珀圈＝机场净空限制区（规则化 DERIVED）
         <span v-if="virtualMode" class="virt">虚拟增强：回波与绕飞/停飞加亮</span>
+      </p>
+      <p class="nrn-legend air" v-else>
+        <i class="zone"></i><template v-if="zonePolicy==='PROHIBITED'">红圈＝净空限制区（演示态：一律禁止进入）</template><template v-else>琥珀圈＝净空限制区（默认：可申请穿越）</template>
+        <i class="line dim"></i>淡线＝航路（空域视角下不作为主体）
+        <span class="quiet">几何按公开跑道方位与机场等级规则化生成，非官方公布</span>
+        <span v-if="zoneBusy" class="quiet">净空几何载入中…</span>
+        <span v-else-if="zoneErr" class="bad">净空几何不可用：{{ zoneErr }}</span>
       </p>
     </div>
 
@@ -641,6 +808,24 @@ onUnmounted(()=>{
             <p><span>相邻</span><b>{{ (data.city?.neighbours||[]).map(shortName).join('、') }}</b></p>
           </div>
         </template>
+      </div>
+
+      <!-- 双受众的另一半：空域视角的侧栏。同一套几何，换成"哪些点禁飞、边界在哪"的读法 -->
+      <div class="nrn-zone" v-if="audience==='airspace'" data-zone-panel>
+        <h4>空域净空
+          <small>DERIVED · {{ zonePolicy==='PROHIBITED'?'一律禁飞':'可申请穿越' }}</small></h4>
+        <p><span>受限额</span><b>{{ zoneCounts.airports||0 }} 机场</b></p>
+        <p><span>限制区</span><b>{{ zoneCounts.limitZones||0 }} 个 · {{ zoneCounts.coverageSqKm||0 }} km²</b></p>
+        <p><span>覆盖率</span><b>{{ ((zoneCounts.coverageRatio||0)*100).toFixed(2) }}% 陆域</b></p>
+        <p><span>待审穿越</span><b v-if="zoneCrossings">{{ zoneCrossings.hit }} / {{ zoneCrossings.corridors }} 条（{{ ((zoneCrossings.ratio||0)*100).toFixed(0) }}%）</b><b v-else>—</b></p>
+        <ul v-if="(zoneCrossings?.rows||[]).length">
+          <li v-for="row in (zoneCrossings.rows||[]).slice(0,6)" :key="row.id">
+            <b>{{ row.place }}</b>
+            <em>{{ row.crossings }} 个限制区</em>
+            <span>{{ (row.airports||[]).join('、') }}</span>
+          </li>
+        </ul>
+        <p class="note">{{ zoneCrossings?.note||zones.note }}</p>
       </div>
 
       <!-- 下：气象。跟着上面的粒度走：全国看重点城市，进区看该区各市，进省看本省各市 -->
@@ -808,6 +993,24 @@ onUnmounted(()=>{
 .nrn-tabs em{font-style:normal;opacity:.75;margin-left:4px;font-size:11px}
 .nrn-tabs em.bad{color:#ffb38a}
 
+/* 双受众切换：和 tab 条同一视觉语言，但靠右，表示"换个读法"而不是"换一页" */
+.nrn-aud{margin-left:auto;display:flex;gap:4px;align-items:center}
+.nrn-aud button{background:transparent;border:1px solid rgba(70,110,140,.45);color:#8fb2c8;
+  border-radius:5px;padding:3px 9px;font-size:11px;cursor:pointer}
+.nrn-aud button.on{background:#17394d;border-color:#2e6b85;color:#bfe9ff}
+.nrn-aud button.policy{border-color:rgba(245,190,60,.5);color:#ffd479}
+.nrn-lift{margin:0;padding:4px 9px;border-radius:6px;font-size:11px;color:#ffd08a;
+  background:rgba(70,50,14,.5);border:1px solid rgba(160,120,40,.45)}
+
+/* 推演的立题行 */
+.nrn-pick{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:4px 8px;border-radius:7px;
+  background:rgba(14,36,52,.72);border:1px solid rgba(60,110,140,.4)}
+.nrn-pick label{display:flex;align-items:center;gap:5px;font-size:11.5px;color:#8fb2c8}
+.nrn-pick select{background:#10283a;border:1px solid #2b4c62;color:#cfe6f5;border-radius:5px;
+  padding:3px 6px;font-size:11.5px;max-width:260px}
+.nrn-pick .pick-note{font-size:11px;color:#a9cde2}
+.nrn-pick .pick-note.quiet{color:#6f92a8}
+
 .nrn-body{display:grid;gap:10px;min-height:0;flex:1;align-items:stretch;
   /* 右栏固定 560：再宽就只是把数字拉到离名字很远的地方；剩下的宽度给地图，
      地图多出来的部分会被 svg 居中留白，但总比"地图一条缝、右栏一大片"好看。 */
@@ -843,11 +1046,34 @@ onUnmounted(()=>{
 .nrn-legend i.dot{width:6px;height:6px;border-radius:50%;background:#eaf6ff}
 .nrn-legend i.warn{background:rgba(255,206,90,.9)}
 .nrn-legend i.bad{background:rgba(226,92,74,.75)}
+.nrn-legend i.zone{width:9px;height:9px;border-radius:50%;background:rgba(245,190,60,.22);
+  border:1px solid rgba(245,190,60,.75)}
+.nrn-legend i.dim{background:rgba(126,206,255,.3)}
+.nrn-legend .quiet{color:#6f92a8}
+.nrn-legend .bad{color:#ffa08a}
 .nrn-legend .virt{color:#ffcf7a}
+
+/* 空域视角侧栏 */
+.nrn-zone{border:1px solid rgba(120,150,90,.35);border-radius:8px;background:rgba(18,34,22,.55);
+  padding:6px 8px;display:flex;flex-direction:column;gap:2px;max-height:38%;min-height:0;overflow:auto}
+.nrn-zone h4{margin:0 0 3px;font-size:11.5px;color:#cfe6b5;display:flex;gap:6px;align-items:baseline}
+.nrn-zone h4 small{font-size:10px;color:#8a9c72;font-weight:400}
+.nrn-zone p{margin:1px 0;display:grid;grid-template-columns:64px 1fr;gap:6px;font-size:11px}
+.nrn-zone p>span{color:#8a9c72}
+.nrn-zone p>b{font-weight:400;color:#dbeccb;font-variant-numeric:tabular-nums}
+.nrn-zone p.note{display:block;margin-top:4px;font-size:10px;color:#7d8f66;line-height:1.5}
+.nrn-zone ul{list-style:none;margin:4px 0 0;padding:0;display:flex;flex-direction:column;gap:3px}
+.nrn-zone li{display:grid;grid-template-columns:1fr auto;gap:1px 6px;padding:3px 6px;border-radius:5px;
+  background:rgba(24,44,28,.7);font-size:10.5px}
+.nrn-zone li b{font-weight:500;color:#d7e8c6;grid-row:1;grid-column:1}
+.nrn-zone li em{font-style:normal;color:#ffd479;grid-row:1;grid-column:2;white-space:nowrap}
+.nrn-zone li span{grid-column:1/-1;color:#8a9c72;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 .nrn-side{display:flex;flex-direction:column;gap:8px;min-height:0;padding-right:2px}
 .nrn-side>*{flex:0 0 auto}
-.nrn-blocks{display:flex;flex-direction:column;gap:5px;overflow:auto;min-height:0;flex:1 1 auto}
+/* 层级列表按内容长，不抢剩余高度；剩余高度留给气象表 ——
+   否则省层只有一个"本省城市"卡片时，下面会空出一大块，气象挤在底部几行里。 */
+.nrn-blocks{display:flex;flex-direction:column;gap:5px;overflow:auto;min-height:0;flex:0 1 auto;max-height:46%}
 .nrn-blocks h3{margin:0 0 2px;font-size:11.5px;color:#a9cde2}
 .nrn-blocks h3 small{margin-left:6px;font-size:10px;color:#6f92a8;font-weight:400}
 /* 一级一个按钮：全国=大区，进区=省，进省=市 */
@@ -870,7 +1096,7 @@ onUnmounted(()=>{
 .nrn-side.wx-wide .nrn-region{padding:3px 6px;font-size:11px}
 .nrn-side.wx-wide .nrn-region span{font-size:9.5px}
 .nrn-side.wx-wide .nrn-wx{flex:1 1 auto;max-height:none;min-height:0}
-.nrn-wx{flex:0 1 auto;min-height:132px;max-height:36%;display:flex;flex-direction:column;
+.nrn-wx{flex:1 1 auto;min-height:132px;max-height:none;display:flex;flex-direction:column;
   border:1px solid rgba(60,100,130,.4);border-radius:8px;background:rgba(10,26,38,.6);padding:6px 8px}
 .nrn-wx h4{margin:0 0 4px;font-size:11.5px;color:#a9cde2;display:flex;gap:6px;align-items:baseline}
 .nrn-wx h4 small{font-size:10px;color:#6f92a8;font-weight:400}

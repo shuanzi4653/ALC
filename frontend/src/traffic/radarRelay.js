@@ -20,7 +20,11 @@ async function fetchSlotTiles(relay, slot, fetchImpl) {
       const response = await fetchImpl(url, { mode: 'cors', credentials: 'omit', cache: 'no-store' })
       if (!response.ok) return null
       buffer = await response.arrayBuffer()
-    } catch (_) {
+    } catch (error) {
+      // 网络层直接抛错（CORS 被拒 / DNS / 证书）说明"这一档"不是没发布，是根本读不到：
+      // 后面 5 个时次、每时次几十张图都会以同样方式失败，还会各留一条 CORS 红字。
+      // 记在这次取图说明上，本轮就不再往后试了。
+      if (error instanceof TypeError) relay.corsBlocked = true
       return null
     }
     if (buffer.byteLength !== relay.tileBytes) return null
@@ -31,6 +35,7 @@ async function fetchSlotTiles(relay, slot, fetchImpl) {
 
 export async function relayRadarTiles(relay, { fetchImpl = fetch, nowMs = Date.now() } = {}) {
   if (!radarRelayReady(relay)) return { ok: false, reason: 'NO_INSTRUCTIONS' }
+  if (relay && relay.corsBlocked) return { ok: false, reason: 'CORS_BLOCKED' }
   const steps = Number.isFinite(relay.maxLookbackSteps) ? relay.maxLookbackSteps : 12
   const candidates = radarRelaySlots(nowMs, relay.slotTimezoneOffsetMinutes ?? 480,
     relay.cadenceMinutes ?? 6, steps)

@@ -125,6 +125,21 @@ public class DecisionController {
         return python.decisionRequest("/traffic/v2/nation/evidence" + (query.isEmpty() ? "" : "?" + query), null);
     }
 
+    /**
+     * 全国机场净空几何（DERIVED）。同样是两段路径，`{resource}` 白名单接不住。
+     *
+     * 单开这一条的直接原因：空域视角一打开就报「净空几何不可用（HTTP 404）」——
+     * Python 侧 `/traffic/v2/nation/zones` 一直是通的（200 / 237 KB），
+     * 但网关只透传显式声明过的路径，没声明的就 404。
+     * 这类「后端有、网关没有」的路径不会在单测里暴露：前端接的是网关。
+     */
+    @GetMapping("/traffic/v2/nation/zones")
+    public ResponseEntity<?> nationZones(@RequestParam Map<String, String> params) throws Exception {
+        String query = params.entrySet().stream().map(e -> encode(e.getKey()) + "=" + encode(e.getValue()))
+                .collect(Collectors.joining("&"));
+        return python.decisionRequest("/traffic/v2/nation/zones" + (query.isEmpty() ? "" : "?" + query), null);
+    }
+
     @GetMapping("/traffic/health")
     public ResponseEntity<?> trafficHealth() throws Exception {
         return python.decisionRequest("/traffic/health", null);

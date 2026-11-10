@@ -340,6 +340,8 @@ function relayFailureText(result){
   if(result.reason==='NO_SLOT_AVAILABLE')return `本机浏览器也没取到可用的雷达时次（已试 ${result.tried} 档）。源站可能对本网络同样拒绝。`
   if(result.reason==='POST_FAILED')return `瓦片已取到但后端未接受：${result.message}`
   if(result.reason==='NO_INSTRUCTIONS')return '服务端未下发取图说明，未发起中继。'
+  // 源站没开 CORS 时浏览器连第一张都读不到，这不是"时次不对"，重试也没用
+  if(result.reason==='CORS_BLOCKED')return '瓦片源未开放 CORS，本机浏览器无法代取（已停止重试，不影响后端直取）'
   return `中继失败：${result.reason}`
 }
 let relayRetryTimer=null
@@ -684,7 +686,7 @@ onUnmounted(()=>{
   <section class="traffic-page national-page"
            v-if="scope==='nation'&&['weather','profile','alerts','assistant','card'].includes(activeSection)">
     <NationPanel :scope-key="nationScopeKey" :initial-view="nationViewOf(activeSection)"
-                 :mode="activeSection==='weather'?'weather':''"
+                 :mode="activeSection==='weather'?'weather':(activeSection==='card'?'card':'')"
                  :hint="NATION_HINTS[activeSection]||''"
                  :hide-tabs="activeSection!=='home'" @scope-change="onScopeChange"/>
   </section>
