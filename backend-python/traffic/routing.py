@@ -120,7 +120,9 @@ def route(start, end, allowed, obstacles=None, *,
             index = 0
             while index < len(path) - 1:
                 following = len(path) - 1
-                while following > index + 1 and not valid(path[index], path[following]):
+                # 拉直只能拉直"不重新踩进净空"的那一段，否则绕开的航段会被简化回原线。
+                while following > index + 1 and (not valid(path[index], path[following])
+                                                 or penalised(path[index], path[following]) > 0.0):
                     following -= 1
                 simplified.append(path[following])
                 index = following
