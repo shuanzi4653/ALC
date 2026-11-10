@@ -426,12 +426,12 @@ def traffic_v2_overview(seed: int = Query(42),
     return traffic_v2.overview(seed=seed, scenario=scenario, case_id=case or None,
                                minute=minute, clearance=clearance)
 
-@app.get('/traffic/v2/northern')
-def traffic_v2_northern(level: str = Query('north', pattern='^(north|region|province|city)$'),
-                        id: str = Query('')):
-    """北方地区四级：北方 → 大区 → 省 → 市。每级单独请求，前端逐级加载。"""
-    from traffic import northern as traffic_northern
-    payload = traffic_northern.payload(level, id or None)
+@app.get('/traffic/v2/nation')
+def traffic_v2_nation(level: str = Query('nation', pattern='^(nation|region|province|city)$'),
+                      id: str = Query('')):
+    """全国航线网四级：全国 → 大区 → 省 → 市。每级单独请求，前端逐级加载。"""
+    from traffic import nation as traffic_nation
+    payload = traffic_nation.payload(level, id or None)
     if payload.get('status') == 'NOT_FOUND':
         raise HTTPException(404, payload.get('note') or '未找到')
     return payload

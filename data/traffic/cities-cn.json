@@ -1,0 +1,3454 @@
+{
+ "source": "行政区划 modood/Administrative-divisions-of-China（民政部年度区划整理）；坐标 Wikidata P625（WGS84）",
+ "scope": "全国 30 个省级单元（不含台湾、西藏、港澳）",
+ "generatedAt": "2026-11-10T09:00:08Z",
+ "count": 331,
+ "resolved": 331,
+ "missing": [],
+ "suspect": [],
+ "provinces": {
+  "11": {
+   "name": "北京市",
+   "region": "north"
+  },
+  "12": {
+   "name": "天津市",
+   "region": "north"
+  },
+  "13": {
+   "name": "河北省",
+   "region": "north"
+  },
+  "14": {
+   "name": "山西省",
+   "region": "north"
+  },
+  "15": {
+   "name": "内蒙古自治区",
+   "region": "north"
+  },
+  "21": {
+   "name": "辽宁省",
+   "region": "northeast"
+  },
+  "22": {
+   "name": "吉林省",
+   "region": "northeast"
+  },
+  "23": {
+   "name": "黑龙江省",
+   "region": "northeast"
+  },
+  "31": {
+   "name": "上海市",
+   "region": "east"
+  },
+  "32": {
+   "name": "江苏省",
+   "region": "east"
+  },
+  "33": {
+   "name": "浙江省",
+   "region": "east"
+  },
+  "34": {
+   "name": "安徽省",
+   "region": "east"
+  },
+  "35": {
+   "name": "福建省",
+   "region": "east"
+  },
+  "36": {
+   "name": "江西省",
+   "region": "east"
+  },
+  "37": {
+   "name": "山东省",
+   "region": "east"
+  },
+  "41": {
+   "name": "河南省",
+   "region": "central"
+  },
+  "42": {
+   "name": "湖北省",
+   "region": "central"
+  },
+  "43": {
+   "name": "湖南省",
+   "region": "central"
+  },
+  "44": {
+   "name": "广东省",
+   "region": "central"
+  },
+  "45": {
+   "name": "广西壮族自治区",
+   "region": "central"
+  },
+  "46": {
+   "name": "海南省",
+   "region": "central"
+  },
+  "50": {
+   "name": "重庆市",
+   "region": "southwest"
+  },
+  "51": {
+   "name": "四川省",
+   "region": "southwest"
+  },
+  "52": {
+   "name": "贵州省",
+   "region": "southwest"
+  },
+  "53": {
+   "name": "云南省",
+   "region": "southwest"
+  },
+  "61": {
+   "name": "陕西省",
+   "region": "northwest"
+  },
+  "62": {
+   "name": "甘肃省",
+   "region": "northwest"
+  },
+  "63": {
+   "name": "青海省",
+   "region": "northwest"
+  },
+  "64": {
+   "name": "宁夏回族自治区",
+   "region": "northwest"
+  },
+  "65": {
+   "name": "新疆维吾尔自治区",
+   "region": "northwest"
+  }
+ },
+ "excluded": {
+  "54": "西藏自治区",
+  "71": "台湾省",
+  "81": "香港特别行政区",
+  "82": "澳门特别行政区"
+ },
+ "cities": [
+  {
+   "name": "北京市",
+   "province": "北京市",
+   "region": "north",
+   "adcode": "1101",
+   "lon": 116.4075,
+   "lat": 39.904,
+   "coordSource": "WIKIDATA",
+   "qid": "Q956"
+  },
+  {
+   "name": "天津市",
+   "province": "天津市",
+   "region": "north",
+   "adcode": "1201",
+   "lon": 117.2056,
+   "lat": 39.1467,
+   "coordSource": "WIKIDATA",
+   "qid": "Q11736"
+  },
+  {
+   "name": "石家庄市",
+   "province": "河北省",
+   "region": "north",
+   "adcode": "1301",
+   "lon": 114.51,
+   "lat": 38.0425,
+   "coordSource": "WIKIDATA",
+   "qid": "Q58401"
+  },
+  {
+   "name": "唐山市",
+   "province": "河北省",
+   "region": "north",
+   "adcode": "1302",
+   "lon": 118.1739,
+   "lat": 39.6294,
+   "coordSource": "WIKIDATA",
+   "qid": "Q58422"
+  },
+  {
+   "name": "秦皇岛市",
+   "province": "河北省",
+   "region": "north",
+   "adcode": "1303",
+   "lon": 119.5881,
+   "lat": 39.9398,
+   "coordSource": "WIKIDATA",
+   "qid": "Q58560"
+  },
+  {
+   "name": "邯郸市",
+   "province": "河北省",
+   "region": "north",
+   "adcode": "1304",
+   "lon": 114.4894,
+   "lat": 36.6116,
+   "coordSource": "WIKIDATA",
+   "qid": "Q58570"
+  },
+  {
+   "name": "邢台市",
+   "province": "河北省",
+   "region": "north",
+   "adcode": "1305",
+   "lon": 114.4753,
+   "lat": 37.0659,
+   "coordSource": "WIKIDATA",
+   "qid": "Q58576"
+  },
+  {
+   "name": "保定市",
+   "province": "河北省",
+   "region": "north",
+   "adcode": "1306",
+   "lon": 115.4845,
+   "lat": 38.8671,
+   "coordSource": "WIKIDATA",
+   "qid": "Q58584"
+  },
+  {
+   "name": "张家口市",
+   "province": "河北省",
+   "region": "north",
+   "adcode": "1307",
+   "lon": 114.8811,
+   "lat": 40.8108,
+   "coordSource": "WIKIDATA",
+   "qid": "Q58650"
+  },
+  {
+   "name": "承德市",
+   "province": "河北省",
+   "region": "north",
+   "adcode": "1308",
+   "lon": 117.9322,
+   "lat": 40.9739,
+   "coordSource": "WIKIDATA",
+   "qid": "Q58675"
+  },
+  {
+   "name": "沧州市",
+   "province": "河北省",
+   "region": "north",
+   "adcode": "1309",
+   "lon": 116.8452,
+   "lat": 38.3037,
+   "coordSource": "WIKIDATA",
+   "qid": "Q58695"
+  },
+  {
+   "name": "廊坊市",
+   "province": "河北省",
+   "region": "north",
+   "adcode": "1310",
+   "lon": 116.7006,
+   "lat": 39.5196,
+   "coordSource": "WIKIDATA",
+   "qid": "Q58710"
+  },
+  {
+   "name": "衡水市",
+   "province": "河北省",
+   "region": "north",
+   "adcode": "1311",
+   "lon": 115.686,
+   "lat": 37.7348,
+   "coordSource": "WIKIDATA",
+   "qid": "Q58724"
+  },
+  {
+   "name": "太原市",
+   "province": "山西省",
+   "region": "north",
+   "adcode": "1401",
+   "lon": 112.5425,
+   "lat": 37.8733,
+   "coordSource": "WIKIDATA",
+   "qid": "Q72778"
+  },
+  {
+   "name": "大同市",
+   "province": "山西省",
+   "region": "north",
+   "adcode": "1402",
+   "lon": 113.2914,
+   "lat": 40.0936,
+   "coordSource": "WIKIDATA",
+   "qid": "Q72877"
+  },
+  {
+   "name": "阳泉市",
+   "province": "山西省",
+   "region": "north",
+   "adcode": "1403",
+   "lon": 113.5762,
+   "lat": 37.8576,
+   "coordSource": "WIKIDATA",
+   "qid": "Q72907"
+  },
+  {
+   "name": "长治市",
+   "province": "山西省",
+   "region": "north",
+   "adcode": "1404",
+   "lon": 113.1111,
+   "lat": 36.195,
+   "coordSource": "WIKIDATA",
+   "qid": "Q72945"
+  },
+  {
+   "name": "晋城市",
+   "province": "山西省",
+   "region": "north",
+   "adcode": "1405",
+   "lon": 112.8483,
+   "lat": 35.4906,
+   "coordSource": "WIKIDATA",
+   "qid": "Q72990"
+  },
+  {
+   "name": "朔州市",
+   "province": "山西省",
+   "region": "north",
+   "adcode": "1406",
+   "lon": 112.4292,
+   "lat": 39.3408,
+   "coordSource": "WIKIDATA",
+   "qid": "Q73020"
+  },
+  {
+   "name": "晋中市",
+   "province": "山西省",
+   "region": "north",
+   "adcode": "1407",
+   "lon": 112.7416,
+   "lat": 37.6933,
+   "coordSource": "WIKIDATA",
+   "qid": "Q73045"
+  },
+  {
+   "name": "运城市",
+   "province": "山西省",
+   "region": "north",
+   "adcode": "1408",
+   "lon": 110.998,
+   "lat": 35.0304,
+   "coordSource": "WIKIDATA",
+   "qid": "Q73073"
+  },
+  {
+   "name": "忻州市",
+   "province": "山西省",
+   "region": "north",
+   "adcode": "1409",
+   "lon": 112.7233,
+   "lat": 38.4178,
+   "coordSource": "WIKIDATA",
+   "qid": "Q73119"
+  },
+  {
+   "name": "临汾市",
+   "province": "山西省",
+   "region": "north",
+   "adcode": "1410",
+   "lon": 111.5087,
+   "lat": 36.0812,
+   "coordSource": "WIKIDATA",
+   "qid": "Q73156"
+  },
+  {
+   "name": "吕梁市",
+   "province": "山西省",
+   "region": "north",
+   "adcode": "1411",
+   "lon": 111.1355,
+   "lat": 37.5203,
+   "coordSource": "WIKIDATA",
+   "qid": "Q73186"
+  },
+  {
+   "name": "呼和浩特市",
+   "province": "内蒙古自治区",
+   "region": "north",
+   "adcode": "1501",
+   "lon": 111.6629,
+   "lat": 40.8151,
+   "coordSource": "WIKIDATA",
+   "qid": "Q535534"
+  },
+  {
+   "name": "包头市",
+   "province": "内蒙古自治区",
+   "region": "north",
+   "adcode": "1502",
+   "lon": 109.8345,
+   "lat": 40.6562,
+   "coordSource": "WIKIDATA",
+   "qid": "Q569907"
+  },
+  {
+   "name": "乌海市",
+   "province": "内蒙古自治区",
+   "region": "north",
+   "adcode": "1503",
+   "lon": 106.8158,
+   "lat": 39.6844,
+   "coordSource": "WIKIDATA",
+   "qid": "Q570768"
+  },
+  {
+   "name": "赤峰市",
+   "province": "内蒙古自治区",
+   "region": "north",
+   "adcode": "1504",
+   "lon": 118.8825,
+   "lat": 42.255,
+   "coordSource": "WIKIDATA",
+   "qid": "Q570829"
+  },
+  {
+   "name": "通辽市",
+   "province": "内蒙古自治区",
+   "region": "north",
+   "adcode": "1505",
+   "lon": 122.264,
+   "lat": 43.6172,
+   "coordSource": "WIKIDATA",
+   "qid": "Q570884"
+  },
+  {
+   "name": "鄂尔多斯市",
+   "province": "内蒙古自治区",
+   "region": "north",
+   "adcode": "1506",
+   "lon": 109.9975,
+   "lat": 39.815,
+   "coordSource": "WIKIDATA",
+   "qid": "Q570937"
+  },
+  {
+   "name": "呼伦贝尔市",
+   "province": "内蒙古自治区",
+   "region": "north",
+   "adcode": "1507",
+   "lon": 119.751,
+   "lat": 49.2153,
+   "coordSource": "WIKIDATA",
+   "qid": "Q571033"
+  },
+  {
+   "name": "巴彦淖尔市",
+   "province": "内蒙古自治区",
+   "region": "north",
+   "adcode": "1508",
+   "lon": 107.4144,
+   "lat": 40.7567,
+   "coordSource": "WIKIDATA",
+   "qid": "Q571126"
+  },
+  {
+   "name": "乌兰察布市",
+   "province": "内蒙古自治区",
+   "region": "north",
+   "adcode": "1509",
+   "lon": 113.1244,
+   "lat": 40.9919,
+   "coordSource": "WIKIDATA",
+   "qid": "Q571219"
+  },
+  {
+   "name": "兴安盟",
+   "province": "内蒙古自治区",
+   "region": "north",
+   "adcode": "1522",
+   "lon": 122.0719,
+   "lat": 46.0726,
+   "coordSource": "WIKIDATA_SEAT",
+   "qid": "Q1000383",
+   "nodeName": "乌兰浩特市"
+  },
+  {
+   "name": "锡林郭勒盟",
+   "province": "内蒙古自治区",
+   "region": "north",
+   "adcode": "1525",
+   "lon": 116.0859,
+   "lat": 43.9452,
+   "coordSource": "WIKIDATA",
+   "qid": "Q573124"
+  },
+  {
+   "name": "阿拉善盟",
+   "province": "内蒙古自治区",
+   "region": "north",
+   "adcode": "1529",
+   "lon": 105.6703,
+   "lat": 38.8336,
+   "coordSource": "WIKIDATA_SEAT",
+   "qid": "Q1367222",
+   "nodeName": "阿拉善左旗"
+  },
+  {
+   "name": "沈阳市",
+   "province": "辽宁省",
+   "region": "northeast",
+   "adcode": "2101",
+   "lon": 123.4281,
+   "lat": 41.8025,
+   "coordSource": "WIKIDATA",
+   "qid": "Q11720"
+  },
+  {
+   "name": "大连市",
+   "province": "辽宁省",
+   "region": "northeast",
+   "adcode": "2102",
+   "lon": 121.6,
+   "lat": 38.9,
+   "coordSource": "WIKIDATA",
+   "qid": "Q74881"
+  },
+  {
+   "name": "鞍山市",
+   "province": "辽宁省",
+   "region": "northeast",
+   "adcode": "2103",
+   "lon": 122.9895,
+   "lat": 41.1066,
+   "coordSource": "WIKIDATA",
+   "qid": "Q74957"
+  },
+  {
+   "name": "抚顺市",
+   "province": "辽宁省",
+   "region": "northeast",
+   "adcode": "2104",
+   "lon": 123.8917,
+   "lat": 41.8708,
+   "coordSource": "WIKIDATA",
+   "qid": "Q75026"
+  },
+  {
+   "name": "本溪市",
+   "province": "辽宁省",
+   "region": "northeast",
+   "adcode": "2105",
+   "lon": 123.761,
+   "lat": 41.292,
+   "coordSource": "WIKIDATA",
+   "qid": "Q75091"
+  },
+  {
+   "name": "丹东市",
+   "province": "辽宁省",
+   "region": "northeast",
+   "adcode": "2106",
+   "lon": 124.3833,
+   "lat": 40.1167,
+   "coordSource": "WIKIDATA",
+   "qid": "Q75110"
+  },
+  {
+   "name": "锦州市",
+   "province": "辽宁省",
+   "region": "northeast",
+   "adcode": "2107",
+   "lon": 121.1292,
+   "lat": 41.1144,
+   "coordSource": "WIKIDATA",
+   "qid": "Q28996"
+  },
+  {
+   "name": "营口市",
+   "province": "辽宁省",
+   "region": "northeast",
+   "adcode": "2108",
+   "lon": 122.2297,
+   "lat": 40.6653,
+   "coordSource": "WIKIDATA",
+   "qid": "Q75150"
+  },
+  {
+   "name": "阜新市",
+   "province": "辽宁省",
+   "region": "northeast",
+   "adcode": "2109",
+   "lon": 121.6486,
+   "lat": 42.0127,
+   "coordSource": "WIKIDATA",
+   "qid": "Q34750"
+  },
+  {
+   "name": "辽阳市",
+   "province": "辽宁省",
+   "region": "northeast",
+   "adcode": "2110",
+   "lon": 123.1772,
+   "lat": 41.2643,
+   "coordSource": "WIKIDATA",
+   "qid": "Q75203"
+  },
+  {
+   "name": "盘锦市",
+   "province": "辽宁省",
+   "region": "northeast",
+   "adcode": "2111",
+   "lon": 122.0634,
+   "lat": 41.1198,
+   "coordSource": "WIKIDATA",
+   "qid": "Q75230"
+  },
+  {
+   "name": "铁岭市",
+   "province": "辽宁省",
+   "region": "northeast",
+   "adcode": "2112",
+   "lon": 123.8365,
+   "lat": 42.2841,
+   "coordSource": "WIKIDATA",
+   "qid": "Q75268"
+  },
+  {
+   "name": "朝阳市",
+   "province": "辽宁省",
+   "region": "northeast",
+   "adcode": "2113",
+   "lon": 120.4486,
+   "lat": 41.5757,
+   "coordSource": "WIKIDATA",
+   "qid": "Q75336"
+  },
+  {
+   "name": "葫芦岛市",
+   "province": "辽宁省",
+   "region": "northeast",
+   "adcode": "2114",
+   "lon": 120.8378,
+   "lat": 40.7094,
+   "coordSource": "WIKIDATA",
+   "qid": "Q75379"
+  },
+  {
+   "name": "长春市",
+   "province": "吉林省",
+   "region": "northeast",
+   "adcode": "2201",
+   "lon": 125.3228,
+   "lat": 43.88,
+   "coordSource": "WIKIDATA",
+   "qid": "Q92161"
+  },
+  {
+   "name": "吉林市",
+   "province": "吉林省",
+   "region": "northeast",
+   "adcode": "2202",
+   "lon": 126.5616,
+   "lat": 43.8461,
+   "coordSource": "WIKIDATA",
+   "qid": "Q92277"
+  },
+  {
+   "name": "四平市",
+   "province": "吉林省",
+   "region": "northeast",
+   "adcode": "2203",
+   "lon": 124.3644,
+   "lat": 43.1715,
+   "coordSource": "WIKIDATA",
+   "qid": "Q92297"
+  },
+  {
+   "name": "辽源市",
+   "province": "吉林省",
+   "region": "northeast",
+   "adcode": "2204",
+   "lon": 125.1381,
+   "lat": 42.8976,
+   "coordSource": "WIKIDATA",
+   "qid": "Q92311"
+  },
+  {
+   "name": "通化市",
+   "province": "吉林省",
+   "region": "northeast",
+   "adcode": "2205",
+   "lon": 125.9471,
+   "lat": 41.7302,
+   "coordSource": "WIKIDATA",
+   "qid": "Q92324"
+  },
+  {
+   "name": "白山市",
+   "province": "吉林省",
+   "region": "northeast",
+   "adcode": "2206",
+   "lon": 126.4179,
+   "lat": 41.9377,
+   "coordSource": "WIKIDATA_SEARCH",
+   "qid": "Q92348"
+  },
+  {
+   "name": "松原市",
+   "province": "吉林省",
+   "region": "northeast",
+   "adcode": "2207",
+   "lon": 124.808,
+   "lat": 45.1388,
+   "coordSource": "WIKIDATA_SEARCH",
+   "qid": "Q92364"
+  },
+  {
+   "name": "白城市",
+   "province": "吉林省",
+   "region": "northeast",
+   "adcode": "2208",
+   "lon": 122.832,
+   "lat": 45.6148,
+   "coordSource": "WIKIDATA",
+   "qid": "Q92381"
+  },
+  {
+   "name": "延边朝鲜族自治州",
+   "province": "吉林省",
+   "region": "northeast",
+   "adcode": "2224",
+   "lon": 129.5046,
+   "lat": 42.8939,
+   "coordSource": "WIKIDATA",
+   "qid": "Q714984"
+  },
+  {
+   "name": "哈尔滨市",
+   "province": "黑龙江省",
+   "region": "northeast",
+   "adcode": "2301",
+   "lon": 126.6333,
+   "lat": 45.75,
+   "coordSource": "WIKIDATA",
+   "qid": "Q42956"
+  },
+  {
+   "name": "齐齐哈尔市",
+   "province": "黑龙江省",
+   "region": "northeast",
+   "adcode": "2302",
+   "lon": 123.9512,
+   "lat": 47.3398,
+   "coordSource": "WIKIDATA",
+   "qid": "Q205922"
+  },
+  {
+   "name": "鸡西市",
+   "province": "黑龙江省",
+   "region": "northeast",
+   "adcode": "2303",
+   "lon": 130.965,
+   "lat": 45.2937,
+   "coordSource": "WIKIDATA",
+   "qid": "Q28979"
+  },
+  {
+   "name": "鹤岗市",
+   "province": "黑龙江省",
+   "region": "northeast",
+   "adcode": "2304",
+   "lon": 130.2775,
+   "lat": 47.3139,
+   "coordSource": "WIKIDATA",
+   "qid": "Q349982"
+  },
+  {
+   "name": "双鸭山市",
+   "province": "黑龙江省",
+   "region": "northeast",
+   "adcode": "2305",
+   "lon": 131.1545,
+   "lat": 46.6388,
+   "coordSource": "WIKIDATA",
+   "qid": "Q349973"
+  },
+  {
+   "name": "大庆市",
+   "province": "黑龙江省",
+   "region": "northeast",
+   "adcode": "2306",
+   "lon": 125.008,
+   "lat": 46.5979,
+   "coordSource": "WIKIDATA",
+   "qid": "Q304848"
+  },
+  {
+   "name": "伊春市",
+   "province": "黑龙江省",
+   "region": "northeast",
+   "adcode": "2307",
+   "lon": 128.8893,
+   "lat": 47.7235,
+   "coordSource": "WIKIDATA",
+   "qid": "Q349976"
+  },
+  {
+   "name": "佳木斯市",
+   "province": "黑龙江省",
+   "region": "northeast",
+   "adcode": "2308",
+   "lon": 130.3653,
+   "lat": 46.8081,
+   "coordSource": "WIKIDATA",
+   "qid": "Q29003"
+  },
+  {
+   "name": "七台河市",
+   "province": "黑龙江省",
+   "region": "northeast",
+   "adcode": "2309",
+   "lon": 131.0063,
+   "lat": 45.768,
+   "coordSource": "WIKIDATA",
+   "qid": "Q349979"
+  },
+  {
+   "name": "牡丹江市",
+   "province": "黑龙江省",
+   "region": "northeast",
+   "adcode": "2310",
+   "lon": 129.5997,
+   "lat": 44.5861,
+   "coordSource": "WIKIDATA",
+   "qid": "Q217646"
+  },
+  {
+   "name": "黑河市",
+   "province": "黑龙江省",
+   "region": "northeast",
+   "adcode": "2311",
+   "lon": 127.4886,
+   "lat": 50.2458,
+   "coordSource": "WIKIDATA",
+   "qid": "Q349983"
+  },
+  {
+   "name": "绥化市",
+   "province": "黑龙江省",
+   "region": "northeast",
+   "adcode": "2312",
+   "lon": 126.9808,
+   "lat": 46.6384,
+   "coordSource": "WIKIDATA",
+   "qid": "Q349985"
+  },
+  {
+   "name": "大兴安岭地区",
+   "province": "黑龙江省",
+   "region": "northeast",
+   "adcode": "2327",
+   "lon": 123.9,
+   "lat": 52.5,
+   "coordSource": "WIKIDATA",
+   "qid": "Q984457"
+  },
+  {
+   "name": "上海市",
+   "province": "上海市",
+   "region": "east",
+   "adcode": "3101",
+   "lon": 121.4692,
+   "lat": 31.2325,
+   "coordSource": "WIKIDATA",
+   "qid": "Q8686"
+  },
+  {
+   "name": "南京市",
+   "province": "江苏省",
+   "region": "east",
+   "adcode": "3201",
+   "lon": 118.7789,
+   "lat": 32.0608,
+   "coordSource": "WIKIDATA",
+   "qid": "Q16666"
+  },
+  {
+   "name": "无锡市",
+   "province": "江苏省",
+   "region": "east",
+   "adcode": "3202",
+   "lon": 120.2833,
+   "lat": 31.5667,
+   "coordSource": "WIKIDATA",
+   "qid": "Q42651"
+  },
+  {
+   "name": "徐州市",
+   "province": "江苏省",
+   "region": "east",
+   "adcode": "3203",
+   "lon": 117.1859,
+   "lat": 34.261,
+   "coordSource": "WIKIDATA",
+   "qid": "Q57719"
+  },
+  {
+   "name": "常州市",
+   "province": "江苏省",
+   "region": "east",
+   "adcode": "3204",
+   "lon": 119.9692,
+   "lat": 31.8122,
+   "coordSource": "WIKIDATA",
+   "qid": "Q57970"
+  },
+  {
+   "name": "苏州市",
+   "province": "江苏省",
+   "region": "east",
+   "adcode": "3205",
+   "lon": 120.6194,
+   "lat": 31.3,
+   "coordSource": "WIKIDATA",
+   "qid": "Q42622"
+  },
+  {
+   "name": "南通市",
+   "province": "江苏省",
+   "region": "east",
+   "adcode": "3206",
+   "lon": 120.8873,
+   "lat": 31.9829,
+   "coordSource": "WIKIDATA",
+   "qid": "Q57947"
+  },
+  {
+   "name": "连云港市",
+   "province": "江苏省",
+   "region": "east",
+   "adcode": "3207",
+   "lon": 119.1801,
+   "lat": 34.5906,
+   "coordSource": "WIKIDATA",
+   "qid": "Q57756"
+  },
+  {
+   "name": "淮安市",
+   "province": "江苏省",
+   "region": "east",
+   "adcode": "3208",
+   "lon": 119.0192,
+   "lat": 33.5886,
+   "coordSource": "WIKIDATA",
+   "qid": "Q57818"
+  },
+  {
+   "name": "盐城市",
+   "province": "江苏省",
+   "region": "east",
+   "adcode": "3209",
+   "lon": 120.1569,
+   "lat": 33.35,
+   "coordSource": "WIKIDATA",
+   "qid": "Q57866"
+  },
+  {
+   "name": "扬州市",
+   "province": "江苏省",
+   "region": "east",
+   "adcode": "3210",
+   "lon": 119.4363,
+   "lat": 32.3912,
+   "coordSource": "WIKIDATA",
+   "qid": "Q57906"
+  },
+  {
+   "name": "镇江市",
+   "province": "江苏省",
+   "region": "east",
+   "adcode": "3211",
+   "lon": 119.4551,
+   "lat": 32.2109,
+   "coordSource": "WIKIDATA",
+   "qid": "Q57958"
+  },
+  {
+   "name": "泰州市",
+   "province": "江苏省",
+   "region": "east",
+   "adcode": "3212",
+   "lon": 119.9,
+   "lat": 32.4831,
+   "coordSource": "WIKIDATA",
+   "qid": "Q57931"
+  },
+  {
+   "name": "宿迁市",
+   "province": "江苏省",
+   "region": "east",
+   "adcode": "3213",
+   "lon": 118.2831,
+   "lat": 33.9331,
+   "coordSource": "WIKIDATA",
+   "qid": "Q57787"
+  },
+  {
+   "name": "杭州市",
+   "province": "浙江省",
+   "region": "east",
+   "adcode": "3301",
+   "lon": 120.1675,
+   "lat": 30.25,
+   "coordSource": "WIKIDATA",
+   "qid": "Q4970"
+  },
+  {
+   "name": "宁波市",
+   "province": "浙江省",
+   "region": "east",
+   "adcode": "3302",
+   "lon": 121.5492,
+   "lat": 29.875,
+   "coordSource": "WIKIDATA",
+   "qid": "Q42780"
+  },
+  {
+   "name": "温州市",
+   "province": "浙江省",
+   "region": "east",
+   "adcode": "3303",
+   "lon": 120.6561,
+   "lat": 27.9991,
+   "coordSource": "WIKIDATA",
+   "qid": "Q42635"
+  },
+  {
+   "name": "嘉兴市",
+   "province": "浙江省",
+   "region": "east",
+   "adcode": "3304",
+   "lon": 120.75,
+   "lat": 30.7522,
+   "coordSource": "WIKIDATA",
+   "qid": "Q58178"
+  },
+  {
+   "name": "湖州市",
+   "province": "浙江省",
+   "region": "east",
+   "adcode": "3305",
+   "lon": 120.0875,
+   "lat": 30.8925,
+   "coordSource": "WIKIDATA",
+   "qid": "Q42664"
+  },
+  {
+   "name": "绍兴市",
+   "province": "浙江省",
+   "region": "east",
+   "adcode": "3306",
+   "lon": 120.5833,
+   "lat": 30.0,
+   "coordSource": "WIKIDATA",
+   "qid": "Q42666"
+  },
+  {
+   "name": "金华市",
+   "province": "浙江省",
+   "region": "east",
+   "adcode": "3307",
+   "lon": 119.6494,
+   "lat": 29.1046,
+   "coordSource": "WIKIDATA",
+   "qid": "Q58210"
+  },
+  {
+   "name": "衢州市",
+   "province": "浙江省",
+   "region": "east",
+   "adcode": "3308",
+   "lon": 118.8763,
+   "lat": 28.9545,
+   "coordSource": "WIKIDATA",
+   "qid": "Q58235"
+  },
+  {
+   "name": "舟山市",
+   "province": "浙江省",
+   "region": "east",
+   "adcode": "3309",
+   "lon": 122.2049,
+   "lat": 29.9887,
+   "coordSource": "WIKIDATA",
+   "qid": "Q58324"
+  },
+  {
+   "name": "台州市",
+   "province": "浙江省",
+   "region": "east",
+   "adcode": "3310",
+   "lon": 121.4221,
+   "lat": 28.6583,
+   "coordSource": "WIKIDATA",
+   "qid": "Q58273"
+  },
+  {
+   "name": "丽水市",
+   "province": "浙江省",
+   "region": "east",
+   "adcode": "3311",
+   "lon": 119.9167,
+   "lat": 28.45,
+   "coordSource": "WIKIDATA",
+   "qid": "Q58294"
+  },
+  {
+   "name": "合肥市",
+   "province": "安徽省",
+   "region": "east",
+   "adcode": "3401",
+   "lon": 117.2808,
+   "lat": 31.8639,
+   "coordSource": "WIKIDATA",
+   "qid": "Q185684"
+  },
+  {
+   "name": "芜湖市",
+   "province": "安徽省",
+   "region": "east",
+   "adcode": "3402",
+   "lon": 118.3622,
+   "lat": 31.334,
+   "coordSource": "WIKIDATA",
+   "qid": "Q359990"
+  },
+  {
+   "name": "蚌埠市",
+   "province": "安徽省",
+   "region": "east",
+   "adcode": "3403",
+   "lon": 117.3531,
+   "lat": 32.9354,
+   "coordSource": "WIKIDATA",
+   "qid": "Q360069"
+  },
+  {
+   "name": "淮南市",
+   "province": "安徽省",
+   "region": "east",
+   "adcode": "3404",
+   "lon": 117.0164,
+   "lat": 32.4831,
+   "coordSource": "WIKIDATA",
+   "qid": "Q360178"
+  },
+  {
+   "name": "马鞍山市",
+   "province": "安徽省",
+   "region": "east",
+   "adcode": "3405",
+   "lon": 119.3208,
+   "lat": 30.6417,
+   "coordSource": "WIKIDATA_SEARCH",
+   "qid": "Q31683447"
+  },
+  {
+   "name": "淮北市",
+   "province": "安徽省",
+   "region": "east",
+   "adcode": "3406",
+   "lon": 116.789,
+   "lat": 33.9562,
+   "coordSource": "WIKIDATA",
+   "qid": "Q360268"
+  },
+  {
+   "name": "铜陵市",
+   "province": "安徽省",
+   "region": "east",
+   "adcode": "3407",
+   "lon": 117.8114,
+   "lat": 30.9456,
+   "coordSource": "WIKIDATA",
+   "qid": "Q360326"
+  },
+  {
+   "name": "安庆市",
+   "province": "安徽省",
+   "region": "east",
+   "adcode": "3408",
+   "lon": 117.0333,
+   "lat": 30.5,
+   "coordSource": "WIKIDATA",
+   "qid": "Q360374"
+  },
+  {
+   "name": "黄山市",
+   "province": "安徽省",
+   "region": "east",
+   "adcode": "3410",
+   "lon": 118.3151,
+   "lat": 29.7132,
+   "coordSource": "WIKIDATA",
+   "qid": "Q180470"
+  },
+  {
+   "name": "滁州市",
+   "province": "安徽省",
+   "region": "east",
+   "adcode": "3411",
+   "lon": 118.3115,
+   "lat": 32.3062,
+   "coordSource": "WIKIDATA",
+   "qid": "Q114045"
+  },
+  {
+   "name": "阜阳市",
+   "province": "安徽省",
+   "region": "east",
+   "adcode": "3412",
+   "lon": 115.8045,
+   "lat": 32.8986,
+   "coordSource": "WIKIDATA",
+   "qid": "Q360584"
+  },
+  {
+   "name": "宿州市",
+   "province": "安徽省",
+   "region": "east",
+   "adcode": "3413",
+   "lon": 116.9683,
+   "lat": 33.6333,
+   "coordSource": "WIKIDATA",
+   "qid": "Q360643"
+  },
+  {
+   "name": "六安市",
+   "province": "安徽省",
+   "region": "east",
+   "adcode": "3415",
+   "lon": 116.5078,
+   "lat": 31.7542,
+   "coordSource": "WIKIDATA",
+   "qid": "Q360702"
+  },
+  {
+   "name": "亳州市",
+   "province": "安徽省",
+   "region": "east",
+   "adcode": "3416",
+   "lon": 115.7742,
+   "lat": 33.8626,
+   "coordSource": "WIKIDATA",
+   "qid": "Q360769"
+  },
+  {
+   "name": "池州市",
+   "province": "安徽省",
+   "region": "east",
+   "adcode": "3417",
+   "lon": 117.4849,
+   "lat": 30.6583,
+   "coordSource": "WIKIDATA",
+   "qid": "Q360870"
+  },
+  {
+   "name": "宣城市",
+   "province": "安徽省",
+   "region": "east",
+   "adcode": "3418",
+   "lon": 118.7518,
+   "lat": 30.9475,
+   "coordSource": "WIKIDATA",
+   "qid": "Q360942"
+  },
+  {
+   "name": "福州市",
+   "province": "福建省",
+   "region": "east",
+   "adcode": "3501",
+   "lon": 119.2917,
+   "lat": 26.0769,
+   "coordSource": "WIKIDATA",
+   "qid": "Q68481"
+  },
+  {
+   "name": "厦门市",
+   "province": "福建省",
+   "region": "east",
+   "adcode": "3502",
+   "lon": 118.0819,
+   "lat": 24.4797,
+   "coordSource": "WIKIDATA",
+   "qid": "Q68744"
+  },
+  {
+   "name": "莆田市",
+   "province": "福建省",
+   "region": "east",
+   "adcode": "3503",
+   "lon": 119.0103,
+   "lat": 25.4394,
+   "coordSource": "WIKIDATA",
+   "qid": "Q68579"
+  },
+  {
+   "name": "三明市",
+   "province": "福建省",
+   "region": "east",
+   "adcode": "3504",
+   "lon": 117.6302,
+   "lat": 26.2658,
+   "coordSource": "WIKIDATA",
+   "qid": "Q68614"
+  },
+  {
+   "name": "泉州市",
+   "province": "福建省",
+   "region": "east",
+   "adcode": "3505",
+   "lon": 118.5858,
+   "lat": 24.9139,
+   "coordSource": "WIKIDATA",
+   "qid": "Q68695"
+  },
+  {
+   "name": "漳州市",
+   "province": "福建省",
+   "region": "east",
+   "adcode": "3506",
+   "lon": 117.6612,
+   "lat": 24.5093,
+   "coordSource": "WIKIDATA",
+   "qid": "Q68814"
+  },
+  {
+   "name": "南平市",
+   "province": "福建省",
+   "region": "east",
+   "adcode": "3507",
+   "lon": 118.1728,
+   "lat": 26.6448,
+   "coordSource": "WIKIDATA",
+   "qid": "Q68534"
+  },
+  {
+   "name": "龙岩市",
+   "province": "福建省",
+   "region": "east",
+   "adcode": "3508",
+   "lon": 117.0244,
+   "lat": 25.0881,
+   "coordSource": "WIKIDATA",
+   "qid": "Q68862"
+  },
+  {
+   "name": "宁德市",
+   "province": "福建省",
+   "region": "east",
+   "adcode": "3509",
+   "lon": 119.5228,
+   "lat": 26.6617,
+   "coordSource": "WIKIDATA",
+   "qid": "Q68919"
+  },
+  {
+   "name": "南昌市",
+   "province": "江西省",
+   "region": "east",
+   "adcode": "3601",
+   "lon": 115.8872,
+   "lat": 28.6842,
+   "coordSource": "WIKIDATA",
+   "qid": "Q171943"
+  },
+  {
+   "name": "景德镇市",
+   "province": "江西省",
+   "region": "east",
+   "adcode": "3602",
+   "lon": 117.2036,
+   "lat": 29.2942,
+   "coordSource": "WIKIDATA",
+   "qid": "Q34405"
+  },
+  {
+   "name": "萍乡市",
+   "province": "江西省",
+   "region": "east",
+   "adcode": "3603",
+   "lon": 113.85,
+   "lat": 27.6333,
+   "coordSource": "WIKIDATA",
+   "qid": "Q362865"
+  },
+  {
+   "name": "九江市",
+   "province": "江西省",
+   "region": "east",
+   "adcode": "3604",
+   "lon": 116.0021,
+   "lat": 29.7048,
+   "coordSource": "WIKIDATA",
+   "qid": "Q216077"
+  },
+  {
+   "name": "新余市",
+   "province": "江西省",
+   "region": "east",
+   "adcode": "3605",
+   "lon": 114.9242,
+   "lat": 27.795,
+   "coordSource": "WIKIDATA",
+   "qid": "Q362959"
+  },
+  {
+   "name": "鹰潭市",
+   "province": "江西省",
+   "region": "east",
+   "adcode": "3606",
+   "lon": 117.0,
+   "lat": 28.2333,
+   "coordSource": "WIKIDATA",
+   "qid": "Q363076"
+  },
+  {
+   "name": "赣州市",
+   "province": "江西省",
+   "region": "east",
+   "adcode": "3607",
+   "lon": 114.9336,
+   "lat": 25.8292,
+   "coordSource": "WIKIDATA",
+   "qid": "Q363166"
+  },
+  {
+   "name": "吉安市",
+   "province": "江西省",
+   "region": "east",
+   "adcode": "3608",
+   "lon": 114.9793,
+   "lat": 27.1172,
+   "coordSource": "WIKIDATA",
+   "qid": "Q363262"
+  },
+  {
+   "name": "宜春市",
+   "province": "江西省",
+   "region": "east",
+   "adcode": "3609",
+   "lon": 114.383,
+   "lat": 27.8041,
+   "coordSource": "WIKIDATA",
+   "qid": "Q363326"
+  },
+  {
+   "name": "抚州市",
+   "province": "江西省",
+   "region": "east",
+   "adcode": "3610",
+   "lon": 116.3577,
+   "lat": 27.9814,
+   "coordSource": "WIKIDATA",
+   "qid": "Q363391"
+  },
+  {
+   "name": "上饶市",
+   "province": "江西省",
+   "region": "east",
+   "adcode": "3611",
+   "lon": 117.9633,
+   "lat": 28.4419,
+   "coordSource": "WIKIDATA",
+   "qid": "Q363479"
+  },
+  {
+   "name": "济南市",
+   "province": "山东省",
+   "region": "east",
+   "adcode": "3701",
+   "lon": 116.9833,
+   "lat": 36.6667,
+   "coordSource": "WIKIDATA",
+   "qid": "Q170247"
+  },
+  {
+   "name": "青岛市",
+   "province": "山东省",
+   "region": "east",
+   "adcode": "3702",
+   "lon": 120.4,
+   "lat": 36.1167,
+   "coordSource": "WIKIDATA",
+   "qid": "Q170322"
+  },
+  {
+   "name": "淄博市",
+   "province": "山东省",
+   "region": "east",
+   "adcode": "3703",
+   "lon": 118.0497,
+   "lat": 36.7831,
+   "coordSource": "WIKIDATA",
+   "qid": "Q198370"
+  },
+  {
+   "name": "枣庄市",
+   "province": "山东省",
+   "region": "east",
+   "adcode": "3704",
+   "lon": 117.55,
+   "lat": 34.8667,
+   "coordSource": "WIKIDATA",
+   "qid": "Q147187"
+  },
+  {
+   "name": "东营市",
+   "province": "山东省",
+   "region": "east",
+   "adcode": "3705",
+   "lon": 118.4667,
+   "lat": 37.45,
+   "coordSource": "WIKIDATA",
+   "qid": "Q372414"
+  },
+  {
+   "name": "烟台市",
+   "province": "山东省",
+   "region": "east",
+   "adcode": "3706",
+   "lon": 121.4478,
+   "lat": 37.4644,
+   "coordSource": "WIKIDATA",
+   "qid": "Q210493"
+  },
+  {
+   "name": "潍坊市",
+   "province": "山东省",
+   "region": "east",
+   "adcode": "3707",
+   "lon": 119.1,
+   "lat": 36.7167,
+   "coordSource": "WIKIDATA",
+   "qid": "Q217698"
+  },
+  {
+   "name": "济宁市",
+   "province": "山东省",
+   "region": "east",
+   "adcode": "3708",
+   "lon": 116.5667,
+   "lat": 35.4,
+   "coordSource": "WIKIDATA",
+   "qid": "Q372791"
+  },
+  {
+   "name": "泰安市",
+   "province": "山东省",
+   "region": "east",
+   "adcode": "3709",
+   "lon": 117.0809,
+   "lat": 36.2001,
+   "coordSource": "WIKIDATA",
+   "qid": "Q217681"
+  },
+  {
+   "name": "威海市",
+   "province": "山东省",
+   "region": "east",
+   "adcode": "3710",
+   "lon": 122.1,
+   "lat": 37.5,
+   "coordSource": "WIKIDATA",
+   "qid": "Q373023"
+  },
+  {
+   "name": "日照市",
+   "province": "山东省",
+   "region": "east",
+   "adcode": "3711",
+   "lon": 119.4331,
+   "lat": 35.4164,
+   "coordSource": "WIKIDATA",
+   "qid": "Q373101"
+  },
+  {
+   "name": "临沂市",
+   "province": "山东省",
+   "region": "east",
+   "adcode": "3713",
+   "lon": 118.3502,
+   "lat": 35.1041,
+   "coordSource": "WIKIDATA",
+   "qid": "Q373346"
+  },
+  {
+   "name": "德州市",
+   "province": "山东省",
+   "region": "east",
+   "adcode": "3714",
+   "lon": 116.3105,
+   "lat": 37.4513,
+   "coordSource": "WIKIDATA",
+   "qid": "Q162880"
+  },
+  {
+   "name": "聊城市",
+   "province": "山东省",
+   "region": "east",
+   "adcode": "3715",
+   "lon": 115.9833,
+   "lat": 36.45,
+   "coordSource": "WIKIDATA",
+   "qid": "Q373564"
+  },
+  {
+   "name": "滨州市",
+   "province": "山东省",
+   "region": "east",
+   "adcode": "3716",
+   "lon": 118.0125,
+   "lat": 37.3806,
+   "coordSource": "WIKIDATA",
+   "qid": "Q373687"
+  },
+  {
+   "name": "菏泽市",
+   "province": "山东省",
+   "region": "east",
+   "adcode": "3717",
+   "lon": 115.4333,
+   "lat": 35.2333,
+   "coordSource": "WIKIDATA",
+   "qid": "Q332753"
+  },
+  {
+   "name": "郑州市",
+   "province": "河南省",
+   "region": "central",
+   "adcode": "4101",
+   "lon": 113.6605,
+   "lat": 34.7492,
+   "coordSource": "WIKIDATA",
+   "qid": "Q30340"
+  },
+  {
+   "name": "开封市",
+   "province": "河南省",
+   "region": "central",
+   "adcode": "4102",
+   "lon": 114.345,
+   "lat": 34.795,
+   "coordSource": "WIKIDATA",
+   "qid": "Q208471"
+  },
+  {
+   "name": "洛阳市",
+   "province": "河南省",
+   "region": "central",
+   "adcode": "4103",
+   "lon": 112.4245,
+   "lat": 34.6587,
+   "coordSource": "WIKIDATA",
+   "qid": "Q187136"
+  },
+  {
+   "name": "平顶山市",
+   "province": "河南省",
+   "region": "central",
+   "adcode": "4104",
+   "lon": 113.2999,
+   "lat": 33.735,
+   "coordSource": "WIKIDATA",
+   "qid": "Q404116"
+  },
+  {
+   "name": "安阳市",
+   "province": "河南省",
+   "region": "central",
+   "adcode": "4105",
+   "lon": 114.3461,
+   "lat": 36.0956,
+   "coordSource": "WIKIDATA",
+   "qid": "Q324293"
+  },
+  {
+   "name": "鹤壁市",
+   "province": "河南省",
+   "region": "central",
+   "adcode": "4106",
+   "lon": 114.2887,
+   "lat": 35.7497,
+   "coordSource": "WIKIDATA",
+   "qid": "Q404301"
+  },
+  {
+   "name": "新乡市",
+   "province": "河南省",
+   "region": "central",
+   "adcode": "4107",
+   "lon": 113.8851,
+   "lat": 35.2992,
+   "coordSource": "WIKIDATA",
+   "qid": "Q404362"
+  },
+  {
+   "name": "焦作市",
+   "province": "河南省",
+   "region": "central",
+   "adcode": "4108",
+   "lon": 113.2304,
+   "lat": 35.229,
+   "coordSource": "WIKIDATA",
+   "qid": "Q404429"
+  },
+  {
+   "name": "濮阳市",
+   "province": "河南省",
+   "region": "central",
+   "adcode": "4109",
+   "lon": 115.03,
+   "lat": 35.7639,
+   "coordSource": "WIKIDATA",
+   "qid": "Q404484"
+  },
+  {
+   "name": "许昌市",
+   "province": "河南省",
+   "region": "central",
+   "adcode": "4110",
+   "lon": 113.8201,
+   "lat": 34.0244,
+   "coordSource": "WIKIDATA",
+   "qid": "Q404529"
+  },
+  {
+   "name": "漯河市",
+   "province": "河南省",
+   "region": "central",
+   "adcode": "4111",
+   "lon": 114.0109,
+   "lat": 33.583,
+   "coordSource": "WIKIDATA",
+   "qid": "Q404599"
+  },
+  {
+   "name": "三门峡市",
+   "province": "河南省",
+   "region": "central",
+   "adcode": "4112",
+   "lon": 111.195,
+   "lat": 34.7736,
+   "coordSource": "WIKIDATA",
+   "qid": "Q404636"
+  },
+  {
+   "name": "南阳市",
+   "province": "河南省",
+   "region": "central",
+   "adcode": "4113",
+   "lon": 112.5292,
+   "lat": 32.9987,
+   "coordSource": "WIKIDATA",
+   "qid": "Q404763"
+  },
+  {
+   "name": "商丘市",
+   "province": "河南省",
+   "region": "central",
+   "adcode": "4114",
+   "lon": 115.6467,
+   "lat": 34.4259,
+   "coordSource": "WIKIDATA",
+   "qid": "Q404817"
+  },
+  {
+   "name": "信阳市",
+   "province": "河南省",
+   "region": "central",
+   "adcode": "4115",
+   "lon": 114.0672,
+   "lat": 32.1264,
+   "coordSource": "WIKIDATA",
+   "qid": "Q404873"
+  },
+  {
+   "name": "周口市",
+   "province": "河南省",
+   "region": "central",
+   "adcode": "4116",
+   "lon": 114.6418,
+   "lat": 33.625,
+   "coordSource": "WIKIDATA",
+   "qid": "Q198061"
+  },
+  {
+   "name": "驻马店市",
+   "province": "河南省",
+   "region": "central",
+   "adcode": "4117",
+   "lon": 114.0253,
+   "lat": 32.9773,
+   "coordSource": "WIKIDATA",
+   "qid": "Q198240"
+  },
+  {
+   "name": "武汉市",
+   "province": "湖北省",
+   "region": "central",
+   "adcode": "4201",
+   "lon": 114.2975,
+   "lat": 30.595,
+   "coordSource": "WIKIDATA",
+   "qid": "Q11746"
+  },
+  {
+   "name": "黄石市",
+   "province": "湖北省",
+   "region": "central",
+   "adcode": "4202",
+   "lon": 115.0326,
+   "lat": 30.2018,
+   "coordSource": "WIKIDATA",
+   "qid": "Q71204"
+  },
+  {
+   "name": "十堰市",
+   "province": "湖北省",
+   "region": "central",
+   "adcode": "4203",
+   "lon": 110.7755,
+   "lat": 32.6351,
+   "coordSource": "WIKIDATA",
+   "qid": "Q71227"
+  },
+  {
+   "name": "宜昌市",
+   "province": "湖北省",
+   "region": "central",
+   "adcode": "4205",
+   "lon": 111.2803,
+   "lat": 30.7083,
+   "coordSource": "WIKIDATA",
+   "qid": "Q71266"
+  },
+  {
+   "name": "襄阳市",
+   "province": "湖北省",
+   "region": "central",
+   "adcode": "4206",
+   "lon": 112.1531,
+   "lat": 32.0654,
+   "coordSource": "WIKIDATA",
+   "qid": "Q71284"
+  },
+  {
+   "name": "鄂州市",
+   "province": "湖北省",
+   "region": "central",
+   "adcode": "4207",
+   "lon": 114.8842,
+   "lat": 30.3972,
+   "coordSource": "WIKIDATA",
+   "qid": "Q71305"
+  },
+  {
+   "name": "荆门市",
+   "province": "湖北省",
+   "region": "central",
+   "adcode": "4208",
+   "lon": 112.2114,
+   "lat": 31.0381,
+   "coordSource": "WIKIDATA",
+   "qid": "Q71323"
+  },
+  {
+   "name": "孝感市",
+   "province": "湖北省",
+   "region": "central",
+   "adcode": "4209",
+   "lon": 113.911,
+   "lat": 30.9273,
+   "coordSource": "WIKIDATA",
+   "qid": "Q71339"
+  },
+  {
+   "name": "荆州市",
+   "province": "湖北省",
+   "region": "central",
+   "adcode": "4210",
+   "lon": 112.2361,
+   "lat": 30.3244,
+   "coordSource": "WIKIDATA",
+   "qid": "Q71247"
+  },
+  {
+   "name": "黄冈市",
+   "province": "湖北省",
+   "region": "central",
+   "adcode": "4211",
+   "lon": 114.875,
+   "lat": 30.45,
+   "coordSource": "WIKIDATA",
+   "qid": "Q71355"
+  },
+  {
+   "name": "咸宁市",
+   "province": "湖北省",
+   "region": "central",
+   "adcode": "4212",
+   "lon": 114.3288,
+   "lat": 29.8341,
+   "coordSource": "WIKIDATA",
+   "qid": "Q71373"
+  },
+  {
+   "name": "随州市",
+   "province": "湖北省",
+   "region": "central",
+   "adcode": "4213",
+   "lon": 113.3658,
+   "lat": 31.7175,
+   "coordSource": "WIKIDATA",
+   "qid": "Q71401"
+  },
+  {
+   "name": "恩施土家族苗族自治州",
+   "province": "湖北省",
+   "region": "central",
+   "adcode": "4228",
+   "lon": 109.4802,
+   "lat": 30.2839,
+   "coordSource": "WIKIDATA",
+   "qid": "Q71415"
+  },
+  {
+   "name": "长沙市",
+   "province": "湖南省",
+   "region": "central",
+   "adcode": "4301",
+   "lon": 112.9709,
+   "lat": 28.1987,
+   "coordSource": "WIKIDATA",
+   "qid": "Q174091"
+  },
+  {
+   "name": "株洲市",
+   "province": "湖南省",
+   "region": "central",
+   "adcode": "4302",
+   "lon": 113.1469,
+   "lat": 27.8407,
+   "coordSource": "WIKIDATA",
+   "qid": "Q198266"
+  },
+  {
+   "name": "湘潭市",
+   "province": "湖南省",
+   "region": "central",
+   "adcode": "4303",
+   "lon": 112.9228,
+   "lat": 27.8431,
+   "coordSource": "WIKIDATA",
+   "qid": "Q215755"
+  },
+  {
+   "name": "衡阳市",
+   "province": "湖南省",
+   "region": "central",
+   "adcode": "4304",
+   "lon": 112.5857,
+   "lat": 26.8968,
+   "coordSource": "WIKIDATA",
+   "qid": "Q144663"
+  },
+  {
+   "name": "邵阳市",
+   "province": "湖南省",
+   "region": "central",
+   "adcode": "4305",
+   "lon": 111.4725,
+   "lat": 27.2418,
+   "coordSource": "WIKIDATA",
+   "qid": "Q194531"
+  },
+  {
+   "name": "岳阳市",
+   "province": "湖南省",
+   "region": "central",
+   "adcode": "4306",
+   "lon": 113.1309,
+   "lat": 29.3647,
+   "coordSource": "WIKIDATA",
+   "qid": "Q151958"
+  },
+  {
+   "name": "常德市",
+   "province": "湖南省",
+   "region": "central",
+   "adcode": "4307",
+   "lon": 111.6839,
+   "lat": 29.0397,
+   "coordSource": "WIKIDATA",
+   "qid": "Q416544"
+  },
+  {
+   "name": "张家界市",
+   "province": "湖南省",
+   "region": "central",
+   "adcode": "4308",
+   "lon": 110.4844,
+   "lat": 29.1255,
+   "coordSource": "WIKIDATA",
+   "qid": "Q197379"
+  },
+  {
+   "name": "益阳市",
+   "province": "湖南省",
+   "region": "central",
+   "adcode": "4309",
+   "lon": 112.3333,
+   "lat": 28.5833,
+   "coordSource": "WIKIDATA",
+   "qid": "Q416669"
+  },
+  {
+   "name": "郴州市",
+   "province": "湖南省",
+   "region": "central",
+   "adcode": "4310",
+   "lon": 113.0267,
+   "lat": 25.7989,
+   "coordSource": "WIKIDATA",
+   "qid": "Q416748"
+  },
+  {
+   "name": "永州市",
+   "province": "湖南省",
+   "region": "central",
+   "adcode": "4311",
+   "lon": 111.5953,
+   "lat": 26.4515,
+   "coordSource": "WIKIDATA",
+   "qid": "Q266014"
+  },
+  {
+   "name": "怀化市",
+   "province": "湖南省",
+   "region": "central",
+   "adcode": "4312",
+   "lon": 109.9592,
+   "lat": 27.5494,
+   "coordSource": "WIKIDATA",
+   "qid": "Q416922"
+  },
+  {
+   "name": "娄底市",
+   "province": "湖南省",
+   "region": "central",
+   "adcode": "4313",
+   "lon": 111.9974,
+   "lat": 27.7378,
+   "coordSource": "WIKIDATA",
+   "qid": "Q416988"
+  },
+  {
+   "name": "湘西土家族苗族自治州",
+   "province": "湖南省",
+   "region": "central",
+   "adcode": "4331",
+   "lon": 109.7367,
+   "lat": 28.3125,
+   "coordSource": "WIKIDATA",
+   "qid": "Q763069"
+  },
+  {
+   "name": "广州市",
+   "province": "广东省",
+   "region": "central",
+   "adcode": "4401",
+   "lon": 113.26,
+   "lat": 23.13,
+   "coordSource": "WIKIDATA",
+   "qid": "Q16572"
+  },
+  {
+   "name": "韶关市",
+   "province": "广东省",
+   "region": "central",
+   "adcode": "4402",
+   "lon": 113.5927,
+   "lat": 24.8011,
+   "coordSource": "WIKIDATA",
+   "qid": "Q59107"
+  },
+  {
+   "name": "深圳市",
+   "province": "广东省",
+   "region": "central",
+   "adcode": "4403",
+   "lon": 114.0544,
+   "lat": 22.5467,
+   "coordSource": "WIKIDATA",
+   "qid": "Q15174"
+  },
+  {
+   "name": "珠海市",
+   "province": "广东省",
+   "region": "central",
+   "adcode": "4404",
+   "lon": 113.5719,
+   "lat": 22.2742,
+   "coordSource": "WIKIDATA",
+   "qid": "Q59095"
+  },
+  {
+   "name": "汕头市",
+   "province": "广东省",
+   "region": "central",
+   "adcode": "4405",
+   "lon": 116.6822,
+   "lat": 23.3539,
+   "coordSource": "WIKIDATA",
+   "qid": "Q59100"
+  },
+  {
+   "name": "佛山市",
+   "province": "广东省",
+   "region": "central",
+   "adcode": "4406",
+   "lon": 113.1056,
+   "lat": 23.0292,
+   "coordSource": "WIKIDATA",
+   "qid": "Q34412"
+  },
+  {
+   "name": "江门市",
+   "province": "广东省",
+   "region": "central",
+   "adcode": "4407",
+   "lon": 113.0833,
+   "lat": 22.5833,
+   "coordSource": "WIKIDATA",
+   "qid": "Q59132"
+  },
+  {
+   "name": "湛江市",
+   "province": "广东省",
+   "region": "central",
+   "adcode": "4408",
+   "lon": 110.4031,
+   "lat": 21.1967,
+   "coordSource": "WIKIDATA",
+   "qid": "Q59144"
+  },
+  {
+   "name": "茂名市",
+   "province": "广东省",
+   "region": "central",
+   "adcode": "4409",
+   "lon": 110.9178,
+   "lat": 21.6618,
+   "coordSource": "WIKIDATA",
+   "qid": "Q38927"
+  },
+  {
+   "name": "肇庆市",
+   "province": "广东省",
+   "region": "central",
+   "adcode": "4412",
+   "lon": 112.4667,
+   "lat": 23.05,
+   "coordSource": "WIKIDATA",
+   "qid": "Q59164"
+  },
+  {
+   "name": "惠州市",
+   "province": "广东省",
+   "region": "central",
+   "adcode": "4413",
+   "lon": 114.4152,
+   "lat": 23.1115,
+   "coordSource": "WIKIDATA",
+   "qid": "Q59173"
+  },
+  {
+   "name": "梅州市",
+   "province": "广东省",
+   "region": "central",
+   "adcode": "4414",
+   "lon": 116.1191,
+   "lat": 24.2998,
+   "coordSource": "WIKIDATA",
+   "qid": "Q59184"
+  },
+  {
+   "name": "汕尾市",
+   "province": "广东省",
+   "region": "central",
+   "adcode": "4415",
+   "lon": 115.3601,
+   "lat": 22.7814,
+   "coordSource": "WIKIDATA_SEARCH",
+   "qid": "Q1070007"
+  },
+  {
+   "name": "河源市",
+   "province": "广东省",
+   "region": "central",
+   "adcode": "4416",
+   "lon": 114.6923,
+   "lat": 23.7503,
+   "coordSource": "WIKIDATA",
+   "qid": "Q59205"
+  },
+  {
+   "name": "阳江市",
+   "province": "广东省",
+   "region": "central",
+   "adcode": "4417",
+   "lon": 111.9627,
+   "lat": 21.8556,
+   "coordSource": "WIKIDATA",
+   "qid": "Q59209"
+  },
+  {
+   "name": "清远市",
+   "province": "广东省",
+   "region": "central",
+   "adcode": "4418",
+   "lon": 113.0507,
+   "lat": 23.6842,
+   "coordSource": "WIKIDATA",
+   "qid": "Q59213"
+  },
+  {
+   "name": "东莞市",
+   "province": "广东省",
+   "region": "central",
+   "adcode": "4419",
+   "lon": 113.7493,
+   "lat": 23.0475,
+   "coordSource": "WIKIDATA",
+   "qid": "Q59218"
+  },
+  {
+   "name": "中山市",
+   "province": "广东省",
+   "region": "central",
+   "adcode": "4420",
+   "lon": 113.35,
+   "lat": 22.5333,
+   "coordSource": "WIKIDATA",
+   "qid": "Q59223"
+  },
+  {
+   "name": "潮州市",
+   "province": "广东省",
+   "region": "central",
+   "adcode": "4451",
+   "lon": 116.63,
+   "lat": 23.67,
+   "coordSource": "WIKIDATA",
+   "qid": "Q59227"
+  },
+  {
+   "name": "揭阳市",
+   "province": "广东省",
+   "region": "central",
+   "adcode": "4452",
+   "lon": 116.3649,
+   "lat": 23.5533,
+   "coordSource": "WIKIDATA",
+   "qid": "Q26323"
+  },
+  {
+   "name": "云浮市",
+   "province": "广东省",
+   "region": "central",
+   "adcode": "4453",
+   "lon": 112.0353,
+   "lat": 22.9242,
+   "coordSource": "WIKIDATA",
+   "qid": "Q59233"
+  },
+  {
+   "name": "南宁市",
+   "province": "广西壮族自治区",
+   "region": "central",
+   "adcode": "4501",
+   "lon": 108.315,
+   "lat": 22.8192,
+   "coordSource": "WIKIDATA",
+   "qid": "Q179608"
+  },
+  {
+   "name": "柳州市",
+   "province": "广西壮族自治区",
+   "region": "central",
+   "adcode": "4502",
+   "lon": 109.4281,
+   "lat": 24.3264,
+   "coordSource": "WIKIDATA",
+   "qid": "Q38968"
+  },
+  {
+   "name": "桂林市",
+   "province": "广西壮族自治区",
+   "region": "central",
+   "adcode": "4503",
+   "lon": 110.2951,
+   "lat": 25.2796,
+   "coordSource": "WIKIDATA_SEARCH",
+   "qid": "Q18653993"
+  },
+  {
+   "name": "梧州市",
+   "province": "广西壮族自治区",
+   "region": "central",
+   "adcode": "4504",
+   "lon": 111.3167,
+   "lat": 23.4833,
+   "coordSource": "WIKIDATA",
+   "qid": "Q571652"
+  },
+  {
+   "name": "北海市",
+   "province": "广西壮族自治区",
+   "region": "central",
+   "adcode": "4505",
+   "lon": 109.1,
+   "lat": 21.4667,
+   "coordSource": "WIKIDATA",
+   "qid": "Q210365"
+  },
+  {
+   "name": "防城港市",
+   "province": "广西壮族自治区",
+   "region": "central",
+   "adcode": "4506",
+   "lon": 108.3,
+   "lat": 21.6,
+   "coordSource": "WIKIDATA",
+   "qid": "Q571712"
+  },
+  {
+   "name": "钦州市",
+   "province": "广西壮族自治区",
+   "region": "central",
+   "adcode": "4507",
+   "lon": 108.6167,
+   "lat": 21.95,
+   "coordSource": "WIKIDATA",
+   "qid": "Q571766"
+  },
+  {
+   "name": "贵港市",
+   "province": "广西壮族自治区",
+   "region": "central",
+   "adcode": "4508",
+   "lon": 109.5944,
+   "lat": 23.1144,
+   "coordSource": "WIKIDATA",
+   "qid": "Q571808"
+  },
+  {
+   "name": "玉林市",
+   "province": "广西壮族自治区",
+   "region": "central",
+   "adcode": "4509",
+   "lon": 110.1507,
+   "lat": 22.6293,
+   "coordSource": "WIKIDATA",
+   "qid": "Q571918"
+  },
+  {
+   "name": "百色市",
+   "province": "广西壮族自治区",
+   "region": "central",
+   "adcode": "4510",
+   "lon": 106.6194,
+   "lat": 23.901,
+   "coordSource": "WIKIDATA",
+   "qid": "Q571949"
+  },
+  {
+   "name": "贺州市",
+   "province": "广西壮族自治区",
+   "region": "central",
+   "adcode": "4511",
+   "lon": 111.5478,
+   "lat": 24.4164,
+   "coordSource": "WIKIDATA",
+   "qid": "Q572014"
+  },
+  {
+   "name": "河池市",
+   "province": "广西壮族自治区",
+   "region": "central",
+   "adcode": "4512",
+   "lon": 108.085,
+   "lat": 24.6928,
+   "coordSource": "WIKIDATA",
+   "qid": "Q572089"
+  },
+  {
+   "name": "来宾市",
+   "province": "广西壮族自治区",
+   "region": "central",
+   "adcode": "4513",
+   "lon": 109.2333,
+   "lat": 23.7333,
+   "coordSource": "WIKIDATA",
+   "qid": "Q572140"
+  },
+  {
+   "name": "崇左市",
+   "province": "广西壮族自治区",
+   "region": "central",
+   "adcode": "4514",
+   "lon": 107.3667,
+   "lat": 22.4167,
+   "coordSource": "WIKIDATA",
+   "qid": "Q572231"
+  },
+  {
+   "name": "海口市",
+   "province": "海南省",
+   "region": "central",
+   "adcode": "4601",
+   "lon": 110.32,
+   "lat": 20.02,
+   "coordSource": "WIKIDATA",
+   "qid": "Q189823"
+  },
+  {
+   "name": "三亚市",
+   "province": "海南省",
+   "region": "central",
+   "adcode": "4602",
+   "lon": 109.5036,
+   "lat": 18.2533,
+   "coordSource": "WIKIDATA",
+   "qid": "Q319804"
+  },
+  {
+   "name": "三沙市",
+   "province": "海南省",
+   "region": "central",
+   "adcode": "4603",
+   "lon": 112.3375,
+   "lat": 16.8342,
+   "coordSource": "WIKIDATA",
+   "qid": "Q264818"
+  },
+  {
+   "name": "儋州市",
+   "province": "海南省",
+   "region": "central",
+   "adcode": "4604",
+   "lon": 109.5833,
+   "lat": 19.5,
+   "coordSource": "WIKIDATA",
+   "qid": "Q1015132"
+  },
+  {
+   "name": "重庆市",
+   "province": "重庆市",
+   "region": "southwest",
+   "adcode": "5001",
+   "lon": 106.5069,
+   "lat": 29.55,
+   "coordSource": "WIKIDATA",
+   "qid": "Q11725"
+  },
+  {
+   "name": "重庆市",
+   "province": "重庆市",
+   "region": "southwest",
+   "adcode": "5002",
+   "lon": 106.5069,
+   "lat": 29.55,
+   "coordSource": "WIKIDATA",
+   "qid": "Q11725"
+  },
+  {
+   "name": "成都市",
+   "province": "四川省",
+   "region": "southwest",
+   "adcode": "5101",
+   "lon": 104.0633,
+   "lat": 30.66,
+   "coordSource": "WIKIDATA",
+   "qid": "Q30002"
+  },
+  {
+   "name": "自贡市",
+   "province": "四川省",
+   "region": "southwest",
+   "adcode": "5103",
+   "lon": 104.7645,
+   "lat": 29.3498,
+   "coordSource": "WIKIDATA",
+   "qid": "Q29015"
+  },
+  {
+   "name": "攀枝花市",
+   "province": "四川省",
+   "region": "southwest",
+   "adcode": "5104",
+   "lon": 101.7149,
+   "lat": 26.5849,
+   "coordSource": "WIKIDATA",
+   "qid": "Q425415"
+  },
+  {
+   "name": "泸州市",
+   "province": "四川省",
+   "region": "southwest",
+   "adcode": "5105",
+   "lon": 105.4409,
+   "lat": 28.8918,
+   "coordSource": "WIKIDATA",
+   "qid": "Q425492"
+  },
+  {
+   "name": "德阳市",
+   "province": "四川省",
+   "region": "southwest",
+   "adcode": "5106",
+   "lon": 104.395,
+   "lat": 31.1289,
+   "coordSource": "WIKIDATA",
+   "qid": "Q425996"
+  },
+  {
+   "name": "绵阳市",
+   "province": "四川省",
+   "region": "southwest",
+   "adcode": "5107",
+   "lon": 104.7385,
+   "lat": 31.4669,
+   "coordSource": "WIKIDATA",
+   "qid": "Q426130"
+  },
+  {
+   "name": "广元市",
+   "province": "四川省",
+   "region": "southwest",
+   "adcode": "5108",
+   "lon": 105.8398,
+   "lat": 32.4353,
+   "coordSource": "WIKIDATA",
+   "qid": "Q426237"
+  },
+  {
+   "name": "遂宁市",
+   "province": "四川省",
+   "region": "southwest",
+   "adcode": "5109",
+   "lon": 105.5737,
+   "lat": 30.5098,
+   "coordSource": "WIKIDATA",
+   "qid": "Q426644"
+  },
+  {
+   "name": "内江市",
+   "province": "四川省",
+   "region": "southwest",
+   "adcode": "5110",
+   "lon": 105.0635,
+   "lat": 29.5872,
+   "coordSource": "WIKIDATA",
+   "qid": "Q426756"
+  },
+  {
+   "name": "乐山市",
+   "province": "四川省",
+   "region": "southwest",
+   "adcode": "5111",
+   "lon": 103.7575,
+   "lat": 29.5854,
+   "coordSource": "WIKIDATA",
+   "qid": "Q426868"
+  },
+  {
+   "name": "南充市",
+   "province": "四川省",
+   "region": "southwest",
+   "adcode": "5113",
+   "lon": 106.0784,
+   "lat": 30.7991,
+   "coordSource": "WIKIDATA",
+   "qid": "Q426996"
+  },
+  {
+   "name": "眉山市",
+   "province": "四川省",
+   "region": "southwest",
+   "adcode": "5114",
+   "lon": 103.8381,
+   "lat": 30.0575,
+   "coordSource": "WIKIDATA",
+   "qid": "Q427097"
+  },
+  {
+   "name": "宜宾市",
+   "province": "四川省",
+   "region": "southwest",
+   "adcode": "5115",
+   "lon": 104.64,
+   "lat": 28.7596,
+   "coordSource": "WIKIDATA",
+   "qid": "Q427265"
+  },
+  {
+   "name": "广安市",
+   "province": "四川省",
+   "region": "southwest",
+   "adcode": "5116",
+   "lon": 106.6336,
+   "lat": 30.4673,
+   "coordSource": "WIKIDATA",
+   "qid": "Q427367"
+  },
+  {
+   "name": "达州市",
+   "province": "四川省",
+   "region": "southwest",
+   "adcode": "5117",
+   "lon": 107.4947,
+   "lat": 31.2152,
+   "coordSource": "WIKIDATA",
+   "qid": "Q427488"
+  },
+  {
+   "name": "雅安市",
+   "province": "四川省",
+   "region": "southwest",
+   "adcode": "5118",
+   "lon": 103.0007,
+   "lat": 29.9888,
+   "coordSource": "WIKIDATA",
+   "qid": "Q427557"
+  },
+  {
+   "name": "巴中市",
+   "province": "四川省",
+   "region": "southwest",
+   "adcode": "5119",
+   "lon": 106.7559,
+   "lat": 31.8576,
+   "coordSource": "WIKIDATA",
+   "qid": "Q178945"
+  },
+  {
+   "name": "资阳市",
+   "province": "四川省",
+   "region": "southwest",
+   "adcode": "5120",
+   "lon": 104.6397,
+   "lat": 30.1256,
+   "coordSource": "WIKIDATA",
+   "qid": "Q207030"
+  },
+  {
+   "name": "阿坝藏族羌族自治州",
+   "province": "四川省",
+   "region": "southwest",
+   "adcode": "5132",
+   "lon": 102.2206,
+   "lat": 31.901,
+   "coordSource": "WIKIDATA",
+   "qid": "Q1012450"
+  },
+  {
+   "name": "甘孜藏族自治州",
+   "province": "四川省",
+   "region": "southwest",
+   "adcode": "5133",
+   "lon": 101.9629,
+   "lat": 30.0525,
+   "coordSource": "WIKIDATA",
+   "qid": "Q128104"
+  },
+  {
+   "name": "凉山彝族自治州",
+   "province": "四川省",
+   "region": "southwest",
+   "adcode": "5134",
+   "lon": 102.2706,
+   "lat": 27.8983,
+   "coordSource": "WIKIDATA_SEAT",
+   "qid": "Q224603",
+   "nodeName": "西昌市"
+  },
+  {
+   "name": "贵阳市",
+   "province": "贵州省",
+   "region": "southwest",
+   "adcode": "5201",
+   "lon": 106.7078,
+   "lat": 26.5794,
+   "coordSource": "WIKIDATA",
+   "qid": "Q192271"
+  },
+  {
+   "name": "六盘水市",
+   "province": "贵州省",
+   "region": "southwest",
+   "adcode": "5202",
+   "lon": 104.8333,
+   "lat": 26.5944,
+   "coordSource": "WIKIDATA",
+   "qid": "Q485918"
+  },
+  {
+   "name": "遵义市",
+   "province": "贵州省",
+   "region": "southwest",
+   "adcode": "5203",
+   "lon": 106.9336,
+   "lat": 27.705,
+   "coordSource": "WIKIDATA",
+   "qid": "Q28994"
+  },
+  {
+   "name": "安顺市",
+   "province": "贵州省",
+   "region": "southwest",
+   "adcode": "5204",
+   "lon": 105.934,
+   "lat": 26.2456,
+   "coordSource": "WIKIDATA",
+   "qid": "Q486149"
+  },
+  {
+   "name": "毕节市",
+   "province": "贵州省",
+   "region": "southwest",
+   "adcode": "5205",
+   "lon": 105.2863,
+   "lat": 27.3019,
+   "coordSource": "WIKIDATA",
+   "qid": "Q486319"
+  },
+  {
+   "name": "铜仁市",
+   "province": "贵州省",
+   "region": "southwest",
+   "adcode": "5206",
+   "lon": 109.1885,
+   "lat": 27.7233,
+   "coordSource": "WIKIDATA",
+   "qid": "Q486235"
+  },
+  {
+   "name": "黔西南布依族苗族自治州",
+   "province": "贵州省",
+   "region": "southwest",
+   "adcode": "5223",
+   "lon": 104.8965,
+   "lat": 25.0931,
+   "coordSource": "WIKIDATA",
+   "qid": "Q988844"
+  },
+  {
+   "name": "黔东南苗族侗族自治州",
+   "province": "贵州省",
+   "region": "southwest",
+   "adcode": "5226",
+   "lon": 107.9746,
+   "lat": 26.5869,
+   "coordSource": "WIKIDATA",
+   "qid": "Q770297"
+  },
+  {
+   "name": "黔南布依族苗族自治州",
+   "province": "贵州省",
+   "region": "southwest",
+   "adcode": "5227",
+   "lon": 107.5143,
+   "lat": 26.2672,
+   "coordSource": "WIKIDATA_SEAT",
+   "qid": "Q1207027",
+   "nodeName": "都匀市"
+  },
+  {
+   "name": "昆明市",
+   "province": "云南省",
+   "region": "southwest",
+   "adcode": "5301",
+   "lon": 102.7061,
+   "lat": 25.0433,
+   "coordSource": "WIKIDATA",
+   "qid": "Q182852"
+  },
+  {
+   "name": "曲靖市",
+   "province": "云南省",
+   "region": "southwest",
+   "adcode": "5303",
+   "lon": 103.8029,
+   "lat": 25.5102,
+   "coordSource": "WIKIDATA",
+   "qid": "Q496405"
+  },
+  {
+   "name": "玉溪市",
+   "province": "云南省",
+   "region": "southwest",
+   "adcode": "5304",
+   "lon": 102.5432,
+   "lat": 24.3495,
+   "coordSource": "WIKIDATA",
+   "qid": "Q496496"
+  },
+  {
+   "name": "保山市",
+   "province": "云南省",
+   "region": "southwest",
+   "adcode": "5305",
+   "lon": 99.169,
+   "lat": 25.1211,
+   "coordSource": "WIKIDATA",
+   "qid": "Q496576"
+  },
+  {
+   "name": "昭通市",
+   "province": "云南省",
+   "region": "southwest",
+   "adcode": "5306",
+   "lon": 103.7144,
+   "lat": 27.3328,
+   "coordSource": "WIKIDATA",
+   "qid": "Q197519"
+  },
+  {
+   "name": "丽江市",
+   "province": "云南省",
+   "region": "southwest",
+   "adcode": "5307",
+   "lon": 100.2208,
+   "lat": 26.8808,
+   "coordSource": "WIKIDATA",
+   "qid": "Q205914"
+  },
+  {
+   "name": "普洱市",
+   "province": "云南省",
+   "region": "southwest",
+   "adcode": "5308",
+   "lon": 100.9698,
+   "lat": 22.7803,
+   "coordSource": "WIKIDATA",
+   "qid": "Q496765"
+  },
+  {
+   "name": "临沧市",
+   "province": "云南省",
+   "region": "southwest",
+   "adcode": "5309",
+   "lon": 100.0871,
+   "lat": 23.8864,
+   "coordSource": "WIKIDATA",
+   "qid": "Q496837"
+  },
+  {
+   "name": "楚雄彝族自治州",
+   "province": "云南省",
+   "region": "southwest",
+   "adcode": "5323",
+   "lon": 101.5464,
+   "lat": 25.0367,
+   "coordSource": "WIKIDATA",
+   "qid": "Q999163"
+  },
+  {
+   "name": "红河哈尼族彝族自治州",
+   "province": "云南省",
+   "region": "southwest",
+   "adcode": "5325",
+   "lon": 103.378,
+   "lat": 23.3708,
+   "coordSource": "WIKIDATA",
+   "qid": "Q999102"
+  },
+  {
+   "name": "文山壮族苗族自治州",
+   "province": "云南省",
+   "region": "southwest",
+   "adcode": "5326",
+   "lon": 104.2338,
+   "lat": 23.3761,
+   "coordSource": "WIKIDATA",
+   "qid": "Q999145"
+  },
+  {
+   "name": "西双版纳傣族自治州",
+   "province": "云南省",
+   "region": "southwest",
+   "adcode": "5328",
+   "lon": 100.8,
+   "lat": 22.0,
+   "coordSource": "WIKIDATA",
+   "qid": "Q868046"
+  },
+  {
+   "name": "大理白族自治州",
+   "province": "云南省",
+   "region": "southwest",
+   "adcode": "5329",
+   "lon": 100.2664,
+   "lat": 25.6096,
+   "coordSource": "WIKIDATA",
+   "qid": "Q999156"
+  },
+  {
+   "name": "德宏傣族景颇族自治州",
+   "province": "云南省",
+   "region": "southwest",
+   "adcode": "5331",
+   "lon": 98.5849,
+   "lat": 24.4355,
+   "coordSource": "WIKIDATA",
+   "qid": "Q999132"
+  },
+  {
+   "name": "怒江傈僳族自治州",
+   "province": "云南省",
+   "region": "southwest",
+   "adcode": "5333",
+   "lon": 98.8547,
+   "lat": 25.856,
+   "coordSource": "WIKIDATA",
+   "qid": "Q767684"
+  },
+  {
+   "name": "迪庆藏族自治州",
+   "province": "云南省",
+   "region": "southwest",
+   "adcode": "5334",
+   "lon": 99.709,
+   "lat": 27.8261,
+   "coordSource": "WIKIDATA",
+   "qid": "Q766073"
+  },
+  {
+   "name": "西安市",
+   "province": "陕西省",
+   "region": "northwest",
+   "adcode": "6101",
+   "lon": 108.9422,
+   "lat": 34.2611,
+   "coordSource": "WIKIDATA",
+   "qid": "Q5826"
+  },
+  {
+   "name": "铜川市",
+   "province": "陕西省",
+   "region": "northwest",
+   "adcode": "6102",
+   "lon": 108.9422,
+   "lat": 34.9057,
+   "coordSource": "WIKIDATA",
+   "qid": "Q514608"
+  },
+  {
+   "name": "宝鸡市",
+   "province": "陕西省",
+   "region": "northwest",
+   "adcode": "6103",
+   "lon": 107.1751,
+   "lat": 34.3609,
+   "coordSource": "WIKIDATA",
+   "qid": "Q514796"
+  },
+  {
+   "name": "咸阳市",
+   "province": "陕西省",
+   "region": "northwest",
+   "adcode": "6104",
+   "lon": 108.7092,
+   "lat": 34.3297,
+   "coordSource": "WIKIDATA",
+   "qid": "Q497341"
+  },
+  {
+   "name": "渭南市",
+   "province": "陕西省",
+   "region": "northwest",
+   "adcode": "6105",
+   "lon": 109.4684,
+   "lat": 34.4996,
+   "coordSource": "WIKIDATA",
+   "qid": "Q126995"
+  },
+  {
+   "name": "延安市",
+   "province": "陕西省",
+   "region": "northwest",
+   "adcode": "6106",
+   "lon": 109.4863,
+   "lat": 36.5952,
+   "coordSource": "WIKIDATA",
+   "qid": "Q515388"
+  },
+  {
+   "name": "汉中市",
+   "province": "陕西省",
+   "region": "northwest",
+   "adcode": "6107",
+   "lon": 107.026,
+   "lat": 33.0794,
+   "coordSource": "WIKIDATA",
+   "qid": "Q515573"
+  },
+  {
+   "name": "榆林市",
+   "province": "陕西省",
+   "region": "northwest",
+   "adcode": "6108",
+   "lon": 109.7388,
+   "lat": 38.2655,
+   "coordSource": "WIKIDATA",
+   "qid": "Q515712"
+  },
+  {
+   "name": "安康市",
+   "province": "陕西省",
+   "region": "northwest",
+   "adcode": "6109",
+   "lon": 109.0235,
+   "lat": 32.6877,
+   "coordSource": "WIKIDATA",
+   "qid": "Q515846"
+  },
+  {
+   "name": "商洛市",
+   "province": "陕西省",
+   "region": "northwest",
+   "adcode": "6110",
+   "lon": 109.9244,
+   "lat": 33.868,
+   "coordSource": "WIKIDATA",
+   "qid": "Q515983"
+  },
+  {
+   "name": "兰州市",
+   "province": "甘肃省",
+   "region": "northwest",
+   "adcode": "6201",
+   "lon": 103.8318,
+   "lat": 36.0617,
+   "coordSource": "WIKIDATA",
+   "qid": "Q183584"
+  },
+  {
+   "name": "嘉峪关市",
+   "province": "甘肃省",
+   "region": "northwest",
+   "adcode": "6202",
+   "lon": 98.2862,
+   "lat": 39.8112,
+   "coordSource": "WIKIDATA",
+   "qid": "Q532560"
+  },
+  {
+   "name": "金昌市",
+   "province": "甘肃省",
+   "region": "northwest",
+   "adcode": "6203",
+   "lon": 102.1866,
+   "lat": 38.5168,
+   "coordSource": "WIKIDATA",
+   "qid": "Q532776"
+  },
+  {
+   "name": "白银市",
+   "province": "甘肃省",
+   "region": "northwest",
+   "adcode": "6204",
+   "lon": 104.1766,
+   "lat": 36.5448,
+   "coordSource": "WIKIDATA",
+   "qid": "Q532981"
+  },
+  {
+   "name": "天水市",
+   "province": "甘肃省",
+   "region": "northwest",
+   "adcode": "6205",
+   "lon": 105.7311,
+   "lat": 34.5809,
+   "coordSource": "WIKIDATA",
+   "qid": "Q533157"
+  },
+  {
+   "name": "武威市",
+   "province": "甘肃省",
+   "region": "northwest",
+   "adcode": "6206",
+   "lon": 102.6329,
+   "lat": 37.9278,
+   "coordSource": "WIKIDATA",
+   "qid": "Q249007"
+  },
+  {
+   "name": "张掖市",
+   "province": "甘肃省",
+   "region": "northwest",
+   "adcode": "6207",
+   "lon": 100.4553,
+   "lat": 38.9355,
+   "coordSource": "WIKIDATA",
+   "qid": "Q197402"
+  },
+  {
+   "name": "平凉市",
+   "province": "甘肃省",
+   "region": "northwest",
+   "adcode": "6208",
+   "lon": 106.6819,
+   "lat": 35.5412,
+   "coordSource": "WIKIDATA",
+   "qid": "Q533985"
+  },
+  {
+   "name": "酒泉市",
+   "province": "甘肃省",
+   "region": "northwest",
+   "adcode": "6209",
+   "lon": 98.5049,
+   "lat": 39.737,
+   "coordSource": "WIKIDATA",
+   "qid": "Q533432"
+  },
+  {
+   "name": "庆阳市",
+   "province": "甘肃省",
+   "region": "northwest",
+   "adcode": "6210",
+   "lon": 107.64,
+   "lat": 35.7278,
+   "coordSource": "WIKIDATA",
+   "qid": "Q533764"
+  },
+  {
+   "name": "定西市",
+   "province": "甘肃省",
+   "region": "northwest",
+   "adcode": "6211",
+   "lon": 104.6263,
+   "lat": 35.5806,
+   "coordSource": "WIKIDATA",
+   "qid": "Q186006"
+  },
+  {
+   "name": "陇南市",
+   "province": "甘肃省",
+   "region": "northwest",
+   "adcode": "6212",
+   "lon": 105.349,
+   "lat": 33.535,
+   "coordSource": "WIKIDATA",
+   "qid": "Q519810"
+  },
+  {
+   "name": "临夏回族自治州",
+   "province": "甘肃省",
+   "region": "northwest",
+   "adcode": "6229",
+   "lon": 103.2103,
+   "lat": 35.5954,
+   "coordSource": "WIKIDATA",
+   "qid": "Q1001396"
+  },
+  {
+   "name": "甘南藏族自治州",
+   "province": "甘肃省",
+   "region": "northwest",
+   "adcode": "6230",
+   "lon": 102.9098,
+   "lat": 34.9845,
+   "coordSource": "WIKIDATA",
+   "qid": "Q1012462"
+  },
+  {
+   "name": "西宁市",
+   "province": "青海省",
+   "region": "northwest",
+   "adcode": "6301",
+   "lon": 101.7787,
+   "lat": 36.6239,
+   "coordSource": "WIKIDATA",
+   "qid": "Q69060"
+  },
+  {
+   "name": "海东市",
+   "province": "青海省",
+   "region": "northwest",
+   "adcode": "6302",
+   "lon": 102.1031,
+   "lat": 36.5014,
+   "coordSource": "WIKIDATA",
+   "qid": "Q984788"
+  },
+  {
+   "name": "海北藏族自治州",
+   "province": "青海省",
+   "region": "northwest",
+   "adcode": "6322",
+   "lon": 100.9938,
+   "lat": 36.9,
+   "coordSource": "WIKIDATA_SEAT",
+   "qid": "Q1208229",
+   "nodeName": "海晏县"
+  },
+  {
+   "name": "黄南藏族自治州",
+   "province": "青海省",
+   "region": "northwest",
+   "adcode": "6323",
+   "lon": 102.0166,
+   "lat": 35.5194,
+   "coordSource": "WIKIDATA",
+   "qid": "Q130023"
+  },
+  {
+   "name": "海南藏族自治州",
+   "province": "青海省",
+   "region": "northwest",
+   "adcode": "6325",
+   "lon": 100.6214,
+   "lat": 36.2742,
+   "coordSource": "WIKIDATA",
+   "qid": "Q1012428"
+  },
+  {
+   "name": "果洛藏族自治州",
+   "province": "青海省",
+   "region": "northwest",
+   "adcode": "6326",
+   "lon": 100.2444,
+   "lat": 34.4717,
+   "coordSource": "WIKIDATA",
+   "qid": "Q115594"
+  },
+  {
+   "name": "玉树藏族自治州",
+   "province": "青海省",
+   "region": "northwest",
+   "adcode": "6327",
+   "lon": 97.0089,
+   "lat": 33.0025,
+   "coordSource": "WIKIDATA",
+   "qid": "Q602936"
+  },
+  {
+   "name": "海西蒙古族藏族自治州",
+   "province": "青海省",
+   "region": "northwest",
+   "adcode": "6328",
+   "lon": 97.373,
+   "lat": 37.3697,
+   "coordSource": "WIKIDATA",
+   "qid": "Q874334"
+  },
+  {
+   "name": "银川市",
+   "province": "宁夏回族自治区",
+   "region": "northwest",
+   "adcode": "6401",
+   "lon": 106.225,
+   "lat": 38.485,
+   "coordSource": "WIKIDATA",
+   "qid": "Q211243"
+  },
+  {
+   "name": "石嘴山市",
+   "province": "宁夏回族自治区",
+   "region": "northwest",
+   "adcode": "6402",
+   "lon": 106.3694,
+   "lat": 39.0099,
+   "coordSource": "WIKIDATA",
+   "qid": "Q604385"
+  },
+  {
+   "name": "吴忠市",
+   "province": "宁夏回族自治区",
+   "region": "northwest",
+   "adcode": "6403",
+   "lon": 106.1919,
+   "lat": 37.9874,
+   "coordSource": "WIKIDATA",
+   "qid": "Q604517"
+  },
+  {
+   "name": "固原市",
+   "province": "宁夏回族自治区",
+   "region": "northwest",
+   "adcode": "6404",
+   "lon": 106.2782,
+   "lat": 36.008,
+   "coordSource": "WIKIDATA",
+   "qid": "Q604625"
+  },
+  {
+   "name": "中卫市",
+   "province": "宁夏回族自治区",
+   "region": "northwest",
+   "adcode": "6405",
+   "lon": 105.1884,
+   "lat": 37.5139,
+   "coordSource": "WIKIDATA",
+   "qid": "Q197922"
+  },
+  {
+   "name": "乌鲁木齐市",
+   "province": "新疆维吾尔自治区",
+   "region": "northwest",
+   "adcode": "6501",
+   "lon": 87.6125,
+   "lat": 43.8225,
+   "coordSource": "WIKIDATA",
+   "qid": "Q16959"
+  },
+  {
+   "name": "克拉玛依市",
+   "province": "新疆维吾尔自治区",
+   "region": "northwest",
+   "adcode": "6502",
+   "lon": 84.8711,
+   "lat": 45.5928,
+   "coordSource": "WIKIDATA",
+   "qid": "Q658240"
+  },
+  {
+   "name": "吐鲁番市",
+   "province": "新疆维吾尔自治区",
+   "region": "northwest",
+   "adcode": "6504",
+   "lon": 89.1822,
+   "lat": 42.95,
+   "coordSource": "WIKIDATA",
+   "qid": "Q868527"
+  },
+  {
+   "name": "哈密市",
+   "province": "新疆维吾尔自治区",
+   "region": "northwest",
+   "adcode": "6505",
+   "lon": 93.5155,
+   "lat": 42.8322,
+   "coordSource": "WIKIDATA",
+   "qid": "Q989892"
+  },
+  {
+   "name": "昌吉回族自治州",
+   "province": "新疆维吾尔自治区",
+   "region": "northwest",
+   "adcode": "6523",
+   "lon": 87.3167,
+   "lat": 44.0167,
+   "coordSource": "WIKIDATA",
+   "qid": "Q989898"
+  },
+  {
+   "name": "博尔塔拉蒙古自治州",
+   "province": "新疆维吾尔自治区",
+   "region": "northwest",
+   "adcode": "6527",
+   "lon": 82.0662,
+   "lat": 44.8929,
+   "coordSource": "WIKIDATA",
+   "qid": "Q874291"
+  },
+  {
+   "name": "巴音郭楞蒙古自治州",
+   "province": "新疆维吾尔自治区",
+   "region": "northwest",
+   "adcode": "6528",
+   "lon": 86.1732,
+   "lat": 41.7334,
+   "coordSource": "WIKIDATA",
+   "qid": "Q812564"
+  },
+  {
+   "name": "阿克苏地区",
+   "province": "新疆维吾尔自治区",
+   "region": "northwest",
+   "adcode": "6529",
+   "lon": 80.272,
+   "lat": 41.1697,
+   "coordSource": "WIKIDATA",
+   "qid": "Q421638"
+  },
+  {
+   "name": "克孜勒苏柯尔克孜自治州",
+   "province": "新疆维吾尔自治区",
+   "region": "northwest",
+   "adcode": "6530",
+   "lon": 76.1718,
+   "lat": 39.7131,
+   "coordSource": "WIKIDATA",
+   "qid": "Q861035"
+  },
+  {
+   "name": "喀什地区",
+   "province": "新疆维吾尔自治区",
+   "region": "northwest",
+   "adcode": "6531",
+   "lon": 75.9921,
+   "lat": 39.4656,
+   "coordSource": "WIKIDATA",
+   "qid": "Q739890"
+  },
+  {
+   "name": "和田地区",
+   "province": "新疆维吾尔自治区",
+   "region": "northwest",
+   "adcode": "6532",
+   "lon": 79.9248,
+   "lat": 37.1091,
+   "coordSource": "WIKIDATA",
+   "qid": "Q989885"
+  },
+  {
+   "name": "伊犁哈萨克自治州",
+   "province": "新疆维吾尔自治区",
+   "region": "northwest",
+   "adcode": "6540",
+   "lon": 81.32,
+   "lat": 43.92,
+   "coordSource": "WIKIDATA",
+   "qid": "Q848127"
+  },
+  {
+   "name": "塔城地区",
+   "province": "新疆维吾尔自治区",
+   "region": "northwest",
+   "adcode": "6542",
+   "lon": 82.9813,
+   "lat": 46.7459,
+   "coordSource": "WIKIDATA",
+   "qid": "Q644863"
+  },
+  {
+   "name": "阿勒泰地区",
+   "province": "新疆维吾尔自治区",
+   "region": "northwest",
+   "adcode": "6543",
+   "lon": 88.1334,
+   "lat": 47.8369,
+   "coordSource": "WIKIDATA",
+   "qid": "Q776550"
+  }
+ ]
+}

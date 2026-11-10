@@ -258,6 +258,7 @@ def national() -> Dict[str, Any]:
                 'code': row['station'], 'name': province['name'],
                 'lon': row['lon'], 'lat': row['lat'], 'ts': row['ts'],
                 'visM': row['visM'], 'tempC': row['tempC'],
+                'visLower': bool(row.get('visLower')),
                 'low': bool(isinstance(row['visM'], (int, float)) and row['visM'] < 3000),
             })
         summary[state] += 1

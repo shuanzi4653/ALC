@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 
-from weather.metar_history import KT_TO_MS, parse_visibility
+from weather.metar_history import KT_TO_MS, parse_visibility_detail
 
 URL = 'https://aviationweather.gov/api/data/metar'
 HOURS = 3
@@ -41,6 +41,10 @@ STATION_IDS = (
 )
 
 _cache: Dict[str, Any] = {'expires': 0.0, 'value': None}
+# 最近一次成功快照：网络抽风时回退到它，并在返回里标 stale + 距今年龄。
+# 这不是"补零"——数据仍是真实报文，只是旧了几分钟，界面必须照实说"几点的"。
+_last_good: Dict[str, Any] = {'value': None, 'at': 0.0}
+STALE_MAX_SECONDS = 1800.0
 _lock = threading.Lock()
 
 
@@ -58,7 +62,7 @@ def _row(entry: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         return None
     wind = _num(entry.get('wspd'))
     gust = _num(entry.get('wgst'))
-    vis = parse_visibility(entry.get('visib'))
+    vis, vis_lower, _ = parse_visibility_detail(entry.get('visib'))
     return {
         'station': code,
         'name': entry.get('name') or '',
@@ -67,6 +71,9 @@ def _row(entry: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         'epoch': int(epoch),
         'ts': datetime.fromtimestamp(int(epoch), tz=timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
         'visM': vis,
+        # 报文里写 "6+" 的，6 是**下界**不是实测值（aviationweather 对 ≥6 SM 一律给 "6+"）。
+        # 界面必须显示 "≥"，否则一排站全变成同一个 9656 m，看着像假数据。
+        'visLower': bool(vis_lower),
         'gustMps': None if gust is None else round(gust * KT_TO_MS, 2),
         'windMps': None if wind is None else round(wind * KT_TO_MS, 2),
         'tempC': _num(entry.get('temp')),
@@ -169,8 +176,14 @@ def fetch(force: bool = False) -> Dict[str, Any]:
         response.raise_for_status()
         payload = response.json()
     except Exception as exc:  # noqa: BLE001 - 网络不可用是常态，不能把页面打崩
-        value = {'available': False, 'fetchedAt': datetime.now(timezone.utc)
-                 .strftime('%Y-%m-%dT%H:%M:%SZ'), 'error': str(exc)[:120], 'stations': {}}
+        good = _last_good.get('value')
+        age = now - float(_last_good.get('at') or 0.0)
+        if good and age <= STALE_MAX_SECONDS:
+            value = {**good, 'stale': True, 'error': str(exc)[:120],
+                     'staleMinutes': round(age / 60.0, 1)}
+        else:
+            value = {'available': False, 'fetchedAt': datetime.now(timezone.utc)
+                     .strftime('%Y-%m-%dT%H:%M:%SZ'), 'error': str(exc)[:120], 'stations': {}}
         with _lock:
             _cache.update({'value': value, 'expires': now + 30.0})
         return value
@@ -192,4 +205,5 @@ def fetch(force: bool = False) -> Dict[str, Any]:
     }
     with _lock:
         _cache.update({'value': value, 'expires': now + TTL_SECONDS})
+        _last_good.update({'value': {**value, 'stale': False}, 'at': now})
     return value
