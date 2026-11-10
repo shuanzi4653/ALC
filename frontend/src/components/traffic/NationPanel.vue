@@ -147,17 +147,14 @@ const corridors=computed(()=>{
   }
   return rows
 })
-const stations=computed(()=>(data.value?.stationPoints||[]).map(point=>{
-  const [x,y]=project(point.lon,point.lat)
-  return {code:point.code,city:point.city||point.name,x,y,low:!!point.low,
-    vis:point.visM,visLower:!!point.visLower,temp:point.tempC,
-    source:point.source||'METAR',ts:point.ts}
-}))
+// 图上用短名：去掉"市/地区/盟/自治州"这类后缀
+function shortName(name){
+  return (name||'').replace(/(市|地区|盟|自治州|回族自治区|维吾尔自治区)$/,'')
+}
+
 const nodes=computed(()=>(data.value?.nodes||[]).map(node=>{
   const [x,y]=project(node.lon,node.lat)
-  // 标注贴边时翻到左侧，避免被裁掉；短名去掉"市/地区/自治州"后缀，图上更干净
-  const short=(node.name||'').replace(/(市|地区|盟|自治州|回族自治区|维吾尔自治区)$/,'')
-  return {...node,x,y,short,flip:x>VIEW.w-110}
+  return {...node,x,y,short:shortName(node.name),flip:x>VIEW.w-110}
 }))
 // 节点一律画：线是连到这些点上的，隐掉就会留下"悬空线头"。
 // 全国层靠尺寸区分层级（机场略大 + 细环），省/市层再给文字标注。
@@ -173,6 +170,19 @@ const labels=computed(()=>{
     placed.push(node)
   }
   return placed
+})
+
+// 线宽随层级：省级看的是"本市到哪"，线要粗；全国层 514 条，细线才不糊。
+const lineWidth=computed(()=>({nation:1.0,region:1.3,province:1.9,city:1.6}[level.value]||1.05))
+
+// 逐市气象：先列能见度低的，再列省会，其余按层级；全国层只列前 18 条，省/市层全列
+const weatherRows=computed(()=>{
+  const rows=(data.value?.nodes||[]).filter(node=>node.weather).map(node=>({
+    name:node.name,short:shortName(node.name),rank:node.rank||3,capital:!!node.capital,
+    temp:node.weather.tempC,wind:node.weather.windMps,vis:node.weather.visM,low:!!node.weather.low,
+  }))
+  rows.sort((a,b)=>(b.low?1:0)-(a.low?1:0)||(b.capital?1:0)-(a.capital?1:0)||a.rank-b.rank)
+  return rows.slice(0,level.value==='nation'?18:60)
 })
 
 const summary=computed(()=>data.value?.summary||{})
@@ -242,7 +252,7 @@ onMounted(load)
       无机场市 <b class="alc-num">{{ summary.feedCities }}</b> ·
       航线 <b class="alc-num">{{ summary.corridors }}</b>
       <span v-if="summary.byKind">（省内 {{ summary.byKind.INTRA }} · 接驳 {{ summary.byKind.AIRPORT_FEED }} · 跨省 {{ summary.byKind.CROSS }}）</span> ·
-      实况 <b class="alc-num">{{ summary.stations }}</b>
+      逐市气象 <b class="alc-num">{{ summary.weatherCities }}</b>
     </p>
   </header>
 
@@ -290,22 +300,26 @@ onMounted(load)
         <g class="nrn-routes" fill="none" stroke-linecap="round" stroke-linejoin="round">
           <polyline v-for="line in corridors" :key="'g'+line.id"
                     :points="line.points.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ')"
-                    stroke="rgba(120,200,255,.07)" stroke-width="3.0"/>
+                    stroke="rgba(120,200,255,.07)" :stroke-width="lineWidth*2.9"/>
           <polyline v-for="line in corridors" :key="line.id"
                     :points="line.points.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ')"
-                    stroke="rgba(126,206,255,.58)" stroke-width="1.05"/>
+                    stroke="rgba(126,206,255,.60)" :stroke-width="lineWidth"/>
         </g>
 
         <!-- 节点：圆点一律同尺寸同色；机场城市加一圈细环（航图里的机场符号） -->
         <g class="nrn-nodes">
           <g v-for="node in visibleNodes" :key="'n'+node.name">
             <!-- 三级节点：省会/首府最大 + 浅色环；机场城市中点；一般节点小点 -->
-            <circle :cx="node.x" :cy="node.y" :r="node.rank===1?3.1:(node.rank===2?2.2:1.45)"
+            <circle v-if="node.external" :cx="node.x" :cy="node.y" :r="node.rank===1?3.4:2.4"
+                    fill="none" stroke="rgba(160,200,235,.75)" stroke-width="1.1"/>
+            <circle v-else :cx="node.x" :cy="node.y" :r="node.rank===1?3.1:(node.rank===2?2.2:1.45)"
                     :fill="node.rank===3?'rgba(214,236,255,.5)':'#eaf6ff'"
                     :stroke="node.rank===3?'none':'rgba(8,20,32,.85)'" stroke-width="0.55"/>
             <circle v-if="node.capital" :cx="node.x" :cy="node.y" r="5.6"
                     fill="none" stroke="rgba(186,218,255,.40)" stroke-width="0.9"/>
-            <title>{{ node.name }}{{ node.capital?' · 省会/首府':'' }}{{ node.hasAirport?' · 机场 '+node.airport:' · 无机场（有专用接驳航线）' }}</title>
+            <circle v-if="node.weather&&node.weather.low" :cx="node.x" :cy="node.y" r="4.6"
+                    fill="none" stroke="rgba(226,75,74,.9)" stroke-width="1"/>
+            <title>{{ node.name }}{{ node.external?' · 邻省端点':'' }}{{ node.capital?' · 省会/首府':'' }}{{ node.hasAirport?' · 机场 '+node.airport:' · 无机场（有专用接驳航线）' }}<template v-if="node.weather"> · {{ node.weather.tempC==null?'—':node.weather.tempC+' °C' }} 能见 {{ visText(node.weather.visM,false) }}</template></title>
           </g>
         </g>
 
@@ -315,14 +329,6 @@ onMounted(load)
                 :text-anchor="node.flip?'end':'start'">{{ node.short }}</text>
         </g>
 
-        <g v-for="point in stations" :key="point.code">
-          <!-- 观测站用空心小环，和实心的城市节点分开，避免两种圆点混为一谈 -->
-          <circle :cx="point.x" :cy="point.y" :r="point.low?3.0:2.0"
-                  fill="none"
-                  :stroke="point.source==='MODEL'?'#e0a83a':(point.low?'#e24b4a':'#4dd0e1')"
-                  :stroke-width="point.low?1.3:0.9"/>
-          <title>{{ point.city }} · {{ point.source==='MODEL'?'模型实况':'METAR '+point.code }} · 能见 {{ visText(point.vis,point.visLower) }}</title>
-        </g>
       </svg>
       <p class="nrn-note">
         一条弧线＝一条航线（同色同宽，不分类型）；节点三级：省会/首府（大点＋浅环）＞机场城市（中点）＞一般城市（小点）<template v-if="level==='nation'">；右下小图为南海诸岛</template>。
@@ -351,7 +357,7 @@ onMounted(load)
         <ul v-else-if="level==='region'" class="nrn-list">
           <li v-for="row in provinceRows" :key="row.name" @click="go('province',row.name,row.name)">
             <b>{{ row.name }}</b>
-            <span>{{ row.cities }} 市 · 机场 {{ row.airports }} · 实况 {{ row.stations + (row.modelStations||0) }}</span>
+            <span>{{ row.cities }} 市 · 机场 {{ row.airports }} · 气象 {{ row.weatherCities||0 }}</span>
             <em>{{ row.corridors }} 条</em>
           </li>
         </ul>
@@ -389,16 +395,17 @@ onMounted(load)
       </div>
 
       <div class="nrn-card nrn-wx">
-        <h3>气象实况 <small>{{ stations.length }} 点</small></h3>
-        <ul v-if="stations.length" class="nrn-wx-list">
-          <li v-for="point in stations" :key="point.code">
-            <b>{{ point.city }}</b>
-            <em :class="{model:point.source==='MODEL'}">{{ point.source==='MODEL'?'模型':point.code }}</em>
-            <span>{{ point.temp==null?'—':point.temp+' °C' }} · 能见 {{ visText(point.vis,point.visLower) }}</span>
+        <h3>逐市气象 <small>{{ weatherRows.length }} 城 · open-meteo 公开实况</small></h3>
+        <ul v-if="weatherRows.length" class="nrn-wx-list">
+          <li v-for="row in weatherRows" :key="row.name" :class="{low:row.low}">
+            <b>{{ row.short }}</b>
+            <em v-if="row.capital">首府</em>
+            <span>{{ row.temp==null?'—':row.temp+' °C' }} · 风 {{ row.wind==null?'—':row.wind+' m/s' }} · 能见 {{ visText(row.vis,false) }}</span>
           </li>
         </ul>
-        <p v-else class="nrn-hint">本范围内没有可用报文站（拿不到就是没有，不补零）。</p>
+        <p v-else class="nrn-hint">气象源暂不可用（公开源拿不到就是没有，不补零）。</p>
       </div>
+
     </aside>
   </div>
 </section>
@@ -453,7 +460,9 @@ onMounted(load)
   padding:5px 8px;background:var(--alc-bg-2);border-radius:6px}
 .nrn-wx-list b{color:var(--alc-text)}
 .nrn-wx-list em{font-style:normal;color:var(--alc-text-mute)}
-.nrn-wx-list em.model{color:#e0a83a}
+.nrn-wx-list em{color:var(--alc-text-mute)}
+.nrn-wx-list li.low{background:rgba(226,75,74,.12);box-shadow:inset 0 0 0 1px rgba(226,75,74,.35)}
+.nrn-wx-list li.low b{color:#ffb4b2}
 .nrn-wx-list span{margin-left:auto}
 .nrn-hint{margin:6px 0 0;font-size:12px;color:var(--alc-text-mute);line-height:1.6}
 </style>

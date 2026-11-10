@@ -118,3 +118,32 @@ def test_payload_size_is_bounded_per_level():
     for level, ident in (('nation', ''), ('region', 'east'), ('province', '广东省')):
         body = json.dumps(nation.payload(level, ident), ensure_ascii=False)
         assert len(body.encode('utf-8')) < 400 * 1024, f'{level} 级载荷过大'
+
+
+def test_province_level_shows_cross_province_endpoints():
+    """省级页必须把跨省航线的**另一端**也画出来，否则只有一条线伸出去，看不出飞到哪。"""
+    payload = nation.payload('province', '辽宁省')
+    cross = [row for row in payload['corridors'] if row.get('cross')]
+    assert cross, '辽宁省应有跨省航线'
+    endpoints = set()
+    for row in cross:
+        if row['fromProvince'] != '辽宁省':
+            endpoints.add(row['fromName'])
+        if row['toProvince'] != '辽宁省':
+            endpoints.add(row['toName'])
+    external = {node['name'] for node in payload['nodes'] if node.get('external')}
+    assert endpoints, '跨省航线应有对端城市'
+    assert endpoints <= external, f'这些对端城市没画出来：{endpoints - external}'
+    # 本级城市数不能把对端城市算进来
+    assert payload['summary']['cities'] == 14
+    assert payload['summary']['externals'] == len(external)
+
+
+def test_city_nodes_carry_per_city_weather():
+    """气象是**逐市**的：每个城市节点带自己的温度/风速/能见度（取不到就是 None）。"""
+    payload = nation.payload('province', '辽宁省')
+    weather = [node['weather'] for node in payload['nodes'] if node.get('weather')]
+    assert len(weather) >= len(payload['nodes']) * 0.8, '逐市气象覆盖率过低'
+    for item in weather:
+        assert 'tempC' in item and 'visM' in item and 'windMps' in item
+        assert item.get('source') == 'OPEN_METEO'

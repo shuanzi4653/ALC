@@ -85,6 +85,16 @@ def _city_rows() -> List[Dict[str, Any]]:
     return rows
 
 
+def _city_weather() -> Dict[str, Dict[str, Any]]:
+    """逐市气象（open-meteo 公开接口，免密钥）。取不到的城市就是没有，不补零。"""
+    try:
+        from weather import city_weather
+        payload = city_weather.fetch([(row['name'], row['lat'], row['lon']) for row in _city_rows()])
+        return payload.get('cities') or {}
+    except Exception:  # noqa: BLE001 - 气象源不可用不能把页面打崩
+        return {}
+
+
 @lru_cache(maxsize=1)
 def _corridor_rows() -> List[Dict[str, Any]]:
     return list(_network().get('corridors') or [])
@@ -158,6 +168,7 @@ def _province_rows() -> List[Dict[str, Any]]:
         bucket[point['name']] = bucket.get(point['name'], 0) + 1
     by_province = _cities_by_province()
     stats = _corridor_stats()
+    weather = _city_weather()
     rows: List[Dict[str, Any]] = []
     for province, cities in by_province.items():
         bucket = stats.get(province) or {'intra': 0, 'feed': 0, 'cross': 0, 'total': 0}
@@ -172,6 +183,8 @@ def _province_rows() -> List[Dict[str, Any]]:
             'stations': live.get(province, 0),
             'modelStations': model.get(province, 0),
             'stationSource': 'METAR' if live.get(province) else ('MODEL' if model.get(province) else 'NONE'),
+            'weatherCities': sum(1 for item in cities if weather.get(item['name'])),
+            'lowVisCities': sum(1 for item in cities if (weather.get(item['name']) or {}).get('low')),
             'corridors': bucket['total'],
             'intraCorridors': bucket['intra'],
             'feedCorridors': bucket['feed'],
@@ -245,17 +258,43 @@ def _slice_corridors(provinces: set, city: Optional[str] = None) -> List[Dict[st
     return out
 
 
+def _node(row: Dict[str, Any], weather: Dict[str, Dict[str, Any]],
+          external: bool = False) -> Dict[str, Any]:
+    return {'name': row['name'], 'province': row['province'],
+            'lon': row['lon'], 'lat': row['lat'],
+            'hasAirport': row['hasAirport'], 'airport': row.get('airport'),
+            'capital': row.get('capital', False), 'rank': row.get('rank', 3),
+            'external': external,
+            'weather': weather.get(row['name'])}
+
+
 def _slice_nodes(provinces: set, city: Optional[str] = None) -> List[Dict[str, Any]]:
+    weather = _city_weather()
     out = []
     for row in _city_rows():
         if row['province'] not in provinces:
             continue
         if city is not None and row['name'] != city:
             continue
-        out.append({'name': row['name'], 'province': row['province'],
-                    'lon': row['lon'], 'lat': row['lat'],
-                    'hasAirport': row['hasAirport'], 'airport': row.get('airport'),
-                    'capital': row.get('capital', False), 'rank': row.get('rank', 3)})
+        out.append(_node(row, weather))
+    return out
+
+
+def _external_nodes(corridors: List[Dict[str, Any]], scoped: set) -> List[Dict[str, Any]]:
+    """跨省航线的**另一端**也要画出来 —— 否则屏上只有一条线伸出去，看不出"从哪飞到哪"。"""
+    wanted = set()
+    for row in corridors:
+        if row['fromProvince'] not in scoped:
+            wanted.add(row['fromName'])
+        if row['toProvince'] not in scoped:
+            wanted.add(row['toName'])
+    if not wanted:
+        return []
+    weather = _city_weather()
+    out = []
+    for row in _city_rows():
+        if row['name'] in wanted:
+            out.append(_node(row, weather, external=True))
     return out
 
 
@@ -269,13 +308,17 @@ def _summary(provinces: List[Dict[str, Any]], corridors: List[Dict[str, Any]],
             by_kind['AIRPORT_FEED'] += 1
         else:
             by_kind['INTRA'] += 1
+    local = [row for row in nodes if not row.get('external')]
     return {
         'provinces': len(provinces),
-        'cities': len(nodes),
-        'airports': sum(1 for row in nodes if row['hasAirport']),
-        'feedCities': sum(1 for row in nodes if not row['hasAirport']),
+        'cities': len(local),
+        'externals': len(nodes) - len(local),
+        'airports': sum(1 for row in local if row['hasAirport']),
+        'feedCities': sum(1 for row in local if not row['hasAirport']),
         'corridors': len(corridors),
         'byKind': by_kind,
+        'weatherCities': sum(1 for row in nodes if row.get('weather')),
+        'lowVisCities': sum(1 for row in nodes if (row.get('weather') or {}).get('low')),
         'stations': len(stations),
         'stationsMetar': sum(1 for row in stations if row.get('source') != 'MODEL'),
         'stationsModel': sum(1 for row in stations if row.get('source') == 'MODEL'),
@@ -352,7 +395,7 @@ def payload(level: str = 'nation', ident: Optional[str] = None) -> Dict[str, Any
                             else '没有这个省级单元'}
         cities = _cities_by_province().get(ident) or []
         corridors = _slice_corridors({ident})
-        nodes = _slice_nodes({ident})
+        nodes = _slice_nodes({ident}) + _external_nodes(corridors, {ident})
         city_rows = []
         for city in cities:
             links = [item for item in _corridor_rows()
@@ -371,7 +414,7 @@ def payload(level: str = 'nation', ident: Optional[str] = None) -> Dict[str, Any
                 'regions': [], 'provinces': [row], 'province': row,
                 'cities': city_rows, 'nodes': nodes, 'corridors': corridors,
                 'stationPoints': scoped_stations,
-                'view': {'bbox': _scope_bbox([ident])},
+                'view': {'bbox': _points_bbox([(n['lon'], n['lat']) for n in nodes])},
                 'summary': _summary([row], corridors, nodes, scoped_stations)}
 
     if level == 'city':
@@ -385,8 +428,7 @@ def payload(level: str = 'nation', ident: Optional[str] = None) -> Dict[str, Any
         neighbours = sorted({item['toName'] if item['fromName'] == ident else item['fromName']
                              for item in corridors})
         neighbour_set = {ident} | set(neighbours)
-        node_rows = [row for row in _city_rows()
-                     if row['province'] == city['province'] and row['name'] in neighbour_set]
+        node_rows = [row for row in _city_rows() if row['name'] in neighbour_set]
         detail = {
             'name': city['name'], 'province': city['province'], 'region': city['region'],
             'lon': city['lon'], 'lat': city['lat'],
@@ -402,10 +444,8 @@ def payload(level: str = 'nation', ident: Optional[str] = None) -> Dict[str, Any
                 # 市层只画"自己 + 直接相邻"的节点，视野也收到这几个点上：
                 # 否则整省会挤成一团，3 条航线看不出连到谁。
                 'city': detail,
-                'nodes': [{'name': row['name'], 'province': row['province'], 'lon': row['lon'],
-                           'lat': row['lat'], 'hasAirport': row['hasAirport'],
-                           'airport': row.get('airport'), 'capital': row.get('capital', False),
-                           'rank': row.get('rank', 3)} for row in node_rows],
+                'nodes': [_node(row, _city_weather(),
+                                external=row['province'] != city['province']) for row in node_rows],
                 'corridors': corridors,
                 'stationPoints': [point for point in stations if point['name'] == city['province']],
                 'view': {'bbox': _points_bbox([(row['lon'], row['lat']) for row in node_rows])},
