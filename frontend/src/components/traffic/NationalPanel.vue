@@ -303,7 +303,7 @@ function fmt(value,suffix){
 .nlx-kpi dd.ok{color:#5fbf3a}
 .nlx-hint{margin:8px 0 0;font-size:11px;color:var(--alc-text-mute);line-height:1.5}
 .nlx-wx-scroll{overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding-right:4px;flex:1}
-.nlx-wx-scroll article{background:var(--alc-bg-2);border-radius:8px;padding:7px 9px;font-size:var(--alc-fs-aux);display:flex;flex-wrap:wrap;gap:6px;align-items:baseline}
+.nlx-wx-scroll article{flex:0 0 auto;background:var(--alc-bg-2);border-radius:8px;padding:7px 9px;font-size:var(--alc-fs-aux);display:flex;flex-wrap:wrap;gap:6px;align-items:baseline}
 .nlx-wx-scroll b{font-weight:500}
 .nlx-wx-scroll em{font-style:normal;color:var(--alc-text-mute);font-size:11px}
 .nlx-wx-scroll span{color:var(--alc-text-dim);font-size:11px;width:100%}
