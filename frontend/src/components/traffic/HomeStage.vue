@@ -44,13 +44,18 @@ const layerDefs = computed(() => MAP_LAYERS.filter((layer) => !HOME_HIDDEN_LAYER
 })))
 
 const box=ref({width:0,height:1080,scale:0})
+const compact=ref(false)
+// 1366 级笔记本：整站缩放会把 12px 压到 7.8px（scale 0.648）。
+// 容器窄于该阈值时放弃缩放，改走断点紧凑排版（列宽压缩、去掉缩放舞台）。
+const COMPACT_MAX_W=1500
 const wrap=ref(null)
 let observer=null
 function fit(){
   const el=wrap.value
   const w=el?.clientWidth||0
   const h=el?.clientHeight||0
-  box.value=stageBox(w,h)
+  compact.value=w>0&&w<COMPACT_MAX_W
+  box.value=compact.value?{width:0,height:0,scale:0}:stageBox(w,h)
 }
 onMounted(()=>{
   fit()
@@ -197,8 +202,8 @@ function changeWorkspace(){
 </script>
 
 <template>
-<div ref="wrap" class="hstage-wrap">
-  <div class="hstage" :style="{width:box.width+'px',height:box.height+'px',transform:`translate(-50%,-50%) scale(${box.scale})`}">
+<div ref="wrap" class="hstage-wrap" :class="{compact}" data-stage-compact>
+  <div class="hstage" :class="{compact}" :style="compact?null:{width:box.width+'px',height:box.height+'px',transform:`translate(-50%,-50%) scale(${box.scale})`}">
     <div class="hs-brief hs-brief-band">
     <h1 class="hs-title" data-stage-title>
       <b>运行态势</b>
@@ -358,6 +363,33 @@ function changeWorkspace(){
 .hstage-wrap{position:relative;flex:1;min-height:0;width:100%;overflow:hidden;background:#050b16}
 .hstage{position:absolute;left:50%;top:50%;transform-origin:center center;
   display:grid;gap:10px;padding:10px;grid-template-rows:auto minmax(0,1fr) 46px}
+/* 1366 级断点：不缩放，改压缩列宽 + 去留白。判据是容器内实测字号 ≥12px。 */
+.hstage-wrap.compact{overflow-y:auto;overflow-x:hidden}
+.hstage.compact{position:static;left:auto;top:auto;transform:none;width:auto!important;height:auto!important;
+  min-height:100%;grid-template-rows:auto auto auto;gap:8px;padding:8px}
+.hstage.compact .hs-main{grid-template-columns:minmax(0,1fr);gap:8px}
+.hstage.compact .hs-col,.hstage.compact .hs-col-right{grid-template-rows:auto auto;gap:8px}
+.hstage.compact .hs-kpis{grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.hstage.compact .hs-center{grid-template-rows:auto auto}
+.hstage.compact .hs-panel{min-height:200px}
+.hstage.compact .hs-map-bd{min-height:360px}
+/* 断点内字号地板：只抬原本小于 12px 的辅助文字，不动数值大字。 */
+.hstage.compact :where(.hs-kpi-lab,.hs-kpi-note,.hs-drill-note,.hs-sum-lab,.hs-sum-val i,.hs-sum-note,
+  .hs-layers label,.hs-ribbon-count,.hs-legend,.hs-tick b,.hs-tick span,.hs-model-links button,
+  .hs-model-links button small,.wx-toggle,.wx-temp i,.wx-wind,.wx-wind i,.wx-note){font-size:12px}
+/* 地图内的小字（图例、状态条、比例尺）同属首页容器，一并抬到 12px。 */
+.hstage.compact :deep(.city-map-info-status),
+.hstage.compact :deep(.city-map-info-status .text),
+.hstage.compact :deep(.city-map-info-status span),
+.hstage.compact :deep(.city-map-info-status button),
+.hstage.compact :deep(.city-map-tools button),
+.hstage.compact :deep(.city-map-issue-breakdown),
+.hstage.compact :deep(.ribbon-label i),
+.hstage.compact :deep(.ribbon-label b),
+.hstage.compact :deep(.city-map-zone-monitor),
+.hstage.compact :deep(.brief-kpi-scope),
+.hstage.compact :deep(.brief-kpi-note),
+.hstage.compact :deep(.maplibregl-ctrl-scale){font-size:12px!important}
 .hs-top{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px;min-width:0}
 .hs-top-l,.hs-top-r{display:flex;align-items:center;gap:9px;min-width:0}
 .hs-top-r{justify-content:flex-end}

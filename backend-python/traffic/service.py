@@ -67,6 +67,11 @@ PROGRESS_STAGES = (
 RADAR_WAIT_PROBES = (0.0, 0.5, 1.0)
 DETOUR_WINDOW_PADDING_MINUTES = 0.0
 
+# 净空三层（L-A/L-B/L-C）：只在 clearance='soft' 下生效，默认 off 时一个数都不动。
+CLEARANCE_MODES = ('off', 'soft')
+CLEARANCE_PENALTY_WEIGHT = 8.0
+CLEARANCE_EXEMPT_RADIUS_M = 8000.0
+
 DELAY_SELECTION_STRATEGY = 'minimal'
 
 WIND_BAND_M = 45_000
@@ -610,7 +615,7 @@ def _flight(seed_rng, route_item, direction, scheduled):
     }
 
 def _plan_trajectory(seed=42, scenario='live', progress=lambda _: None, live_snapshot=None,
-                     weather_mode=None):
+                     weather_mode=None, clearance='off'):
     catalog, rng = network(), random.Random(seed)
     progress(PROGRESS_START_PERCENT)
     weather_mode = weather_mode or weather_control.mode()
@@ -629,6 +634,12 @@ def _plan_trajectory(seed=42, scenario='live', progress=lambda _: None, live_sna
     tree = STRtree(geometries)
     static_policy = airport_footprint_policy()
     static_obstacle = fixed_zones.envelope(static_policy)
+    # L-C 开关：clearance='soft' 才带上净空几何；off 时两个参数都保持 0 / None。
+    clearance_mode = 'soft' if str(clearance).lower() == 'soft' else 'off'
+    clearance_geometry = (fixed_zones.envelope(fixed_zones.PROHIBITED)
+                          if clearance_mode == 'soft' else None)
+    clearance_weight = CLEARANCE_PENALTY_WEIGHT if clearance_geometry is not None else 0.0
+    clearance_cache = {}
     progress(PROGRESS_SNAPSHOT_PERCENT)
     def sweep_progress(fraction):
         span = PROGRESS_SWEEP_PERCENT - PROGRESS_SNAPSHOT_PERCENT
@@ -678,6 +689,18 @@ def _plan_trajectory(seed=42, scenario='live', progress=lambda _: None, live_sna
             continue
         lateral = list(reversed(route_item['path'])) if direction else route_item['path']
         lateral = _lateral(lateral, 220 if mode == 'CAR' else 90, allowed)
+        if clearance_geometry is not None:
+            # L-A：初始航道就把机场禁飞区避开，避免它们后来被记成「绕飞」。
+            cache_key_initial = (route_item['id'], bool(direction))
+            if cache_key_initial not in clearance_cache:
+                clearance_cache[cache_key_initial] = route(
+                    lateral[0], lateral[-1], allowed, None,
+                    penalty_geometry=clearance_geometry,
+                    penalty_weight=clearance_weight,
+                    exempt_radius_m=CLEARANCE_EXEMPT_RADIUS_M) or None
+            avoided = clearance_cache[cache_key_initial]
+            if avoided:
+                lateral = avoided
         base = rounded_path(lateral, profile['minTurnRadiusM'])
         if not base or not allowed.covers(LineString(base)):
             flight['reason'] = 'TURN_RADIUS_OR_BOUNDARY_LIMIT'
@@ -738,7 +761,10 @@ def _plan_trajectory(seed=42, scenario='live', progress=lambda _: None, live_sna
                 cache_key = (route_id, direction, int(begin // 5))
                 if cache_key not in path_cache:
                     path_cache[cache_key] = route(lateral[0], lateral[-1], allowed, hard,
-                                                  soft_obstacles=soft_set, penetration_m=penetration_m)
+                                                  soft_obstacles=soft_set, penetration_m=penetration_m,
+                                                  penalty_geometry=clearance_geometry,
+                                                  penalty_weight=clearance_weight,
+                                                  exempt_radius_m=CLEARANCE_EXEMPT_RADIUS_M)
                 candidate = path_cache[cache_key]
             if candidate:
                 path = candidate
@@ -938,12 +964,69 @@ def _plan_trajectory(seed=42, scenario='live', progress=lambda _: None, live_sna
         'layerUsage': dict(sorted(layer_usage.items())),
         'hubs': hub_snapshot(calendar, catalog),
         'deliveryPlan': delivery_summary,
+        'clearance': clearance_ledger(clearance_mode, clearance_cache, catalog),
     }
 
 def simulate(seed=42, scenario='live', progress=lambda _: None, live_snapshot=None,
-             weather_mode=None):
+             weather_mode=None, clearance='off'):
     with _SIMULATE_LOCK:
-        return _plan_trajectory(seed, scenario, progress, live_snapshot, weather_mode)
+        return _plan_trajectory(seed, scenario, progress, live_snapshot, weather_mode, clearance)
+
+
+_CLEARANCE_LEDGER_CACHE = {}
+
+def clearance_ledger(mode='off', cache=None, catalog=None):
+    """净空台账（软件册 §2.3 三条）：待审批穿越 / 核心禁飞 / 航路规避。
+
+    口径按走廊算，不按班次算 —— 逐条量「净空内航段长度」的 before/after。
+    """
+    mode = 'soft' if str(mode).lower() == 'soft' else 'off'
+    key = mode
+    if cache is None and key in _CLEARANCE_LEDGER_CACHE:
+        return dict(_CLEARANCE_LEDGER_CACHE[key])
+    catalog = catalog or network()
+    routes = [item for item in catalog['routes'] if item.get('path')]
+    geometry = fixed_zones.envelope(fixed_zones.PROHIBITED)
+    core = fixed_zones.envelope(airport_footprint_policy())
+    before_total = 0.0
+    after_total = 0.0
+    pending = 0
+    core_hits = 0
+    weight = CLEARANCE_PENALTY_WEIGHT if mode == 'soft' else 0.0
+    for item in routes:
+        line = LineString(item['path'])
+        inside = line.intersection(geometry).length / 1000.0
+        if inside > 0.0:
+            pending += 1
+        before_total += inside
+        if line.intersection(core).length > 0.0:
+            core_hits += 1
+        avoided = (cache or {}).get((item['id'], False)) if cache is not None else None
+        if mode == 'soft' and avoided is None and inside > 0.0:
+            allowed = _allowed_for_route(item, catalog)
+            avoided = route(item['path'][0], item['path'][-1], allowed, None,
+                            penalty_geometry=geometry, penalty_weight=weight,
+                            exempt_radius_m=CLEARANCE_EXEMPT_RADIUS_M)
+        after = (LineString(avoided).intersection(geometry).length / 1000.0
+                 if (mode == 'soft' and avoided) else inside)
+        after_total += after
+    result = {
+        'mode': mode,
+        'label': '净空三层（L-A 初始航道 + L-B 航段代价）' if mode == 'soft' else '净空未启用（默认口径）',
+        'corridors': len(routes),
+        'pendingApprovalCrossings': pending,
+        'coreProhibitedCrossings': core_hits,
+        'inZoneSegmentKm': {'before': round(before_total, 1), 'after': round(after_total, 1)},
+        'penaltyWeight': weight,
+        'exemptRadiusM': CLEARANCE_EXEMPT_RADIUS_M,
+        'note': '默认 clearance=off：不带净空代价、不改动任何既有运行数字；soft 才按 L-A/L-B 重算初始航道。',
+    }
+    if cache is None:
+        _CLEARANCE_LEDGER_CACHE[key] = dict(result)
+    return result
+
+def zones_policy():
+    return airport_footprint_policy()
 
 def hub_snapshot(calendar, catalog):
     utilization = calendar.utilization()

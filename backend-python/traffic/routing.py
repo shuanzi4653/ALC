@@ -20,15 +20,40 @@ def penetration_limit(geometry, depth):
         return None
     return shrunk
 
+def penalty_geometry_for(geometry, start, end, exempt_radius_m):
+    """起降段豁免：把起点/终点半径内的部分从软代价几何里挖掉。"""
+    if geometry is None or geometry.is_empty:
+        return None
+    if exempt_radius_m and exempt_radius_m > 0:
+        hole = Point(tuple(start)).buffer(float(exempt_radius_m)).union(
+            Point(tuple(end)).buffer(float(exempt_radius_m)))
+        geometry = geometry.difference(hole)
+        if geometry.is_empty:
+            return None
+    return geometry
+
 def route(start, end, allowed, obstacles=None, *,
           soft_obstacles=None, penetration_m=DEFAULT_PENETRATION_M,
-          margin_m=None, step_m=None, max_checks=None):
+          margin_m=None, step_m=None, max_checks=None,
+          penalty_geometry=None, penalty_weight=0.0, exempt_radius_m=8000.0):
     start, end = tuple(start), tuple(end)
     checks_limit = SEARCH_MAX_CHECKS if max_checks is None else int(max_checks)
     prepared = prep(allowed)
     blocked = prep(obstacles) if obstacles is not None else None
     softened = penetration_limit(soft_obstacles, penetration_m)
     soft = prep(softened) if softened is not None else None
+    # 净空软代价：默认 penalty_weight=0.0 → 下面两条分支都退化为原实现，路径逐字节不变。
+    penalized = None
+    if penalty_geometry is not None and float(penalty_weight) > 0.0:
+        trimmed = penalty_geometry_for(penalty_geometry, start, end, exempt_radius_m)
+        if trimmed is not None:
+            penalized = trimmed
+    penalty_w = float(penalty_weight) if penalized is not None else 0.0
+
+    def penalised(a, b):
+        if penalized is None:
+            return 0.0
+        return penalty_w * LineString([a, b]).intersection(penalized).length
 
     def valid(a, b):
         segment = LineString([a, b])
@@ -73,7 +98,7 @@ def route(start, end, allowed, obstacles=None, *,
         for dy in range(-2, 3):
             node = (source[0] + dx, source[1] + dy)
             if valid(start, xy(node)):
-                costs[node] = math.dist(start, xy(node))
+                costs[node] = math.dist(start, xy(node)) + penalised(start, xy(node))
                 previous[node] = None
                 heapq.heappush(queue, (costs[node] + math.dist(xy(node), end), costs[node], node))
     checks = 0
@@ -103,7 +128,7 @@ def route(start, end, allowed, obstacles=None, *,
             following = (node[0] + dx, node[1] + dy)
             if not (0 <= following[0] <= nx and 0 <= following[1] <= ny):
                 continue
-            new = cost + step * math.hypot(dx, dy)
+            new = cost + step * math.hypot(dx, dy) + penalised(point, xy(following))
             if new >= costs.get(following, float('inf')):
                 continue
             if not valid(point, xy(following)):

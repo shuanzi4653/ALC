@@ -250,4 +250,10 @@ function pctText(v){return typeof v==='number'?`${v>0?'+':''}${v}%`:'—'}
 .cf-sample td.note{color:var(--alc-text-dim);font-size:11px}
 .cf-foot{display:flex;flex-direction:column;gap:4px;margin-top:14px;font-size:11px;color:var(--alc-text-mute)}
 .cf-foot .warn{color:var(--alc-watch)}
+/* 1366 级笔记本断点：把 10–11.5px 的辅助文字抬到 12px 地板（判据：容器内实测字号 ≥12px）。 */
+@media (max-width:1440px){
+  .cf-switch,.cf-policy button small,.cf-card-note,.cf-sample td.note,.cf-foot{font-size:12px}
+  .cf-policy{gap:6px}
+  .cf-policy button{padding:5px 9px}
+}
 </style>

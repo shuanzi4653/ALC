@@ -340,4 +340,11 @@ function exportCsv(){
 .corr-reading-meta .src{padding:1px 6px;border-radius:4px;border:1px solid var(--alc-line)}
 .corr-reading-meta .src-model{color:var(--alc-info);border-color:var(--alc-info)}
 .corr-reading-meta .src-template{color:var(--alc-watch);border-color:var(--alc-watch)}
+
+/* 1366 级笔记本断点：压缩列宽后把辅助文字抬到 12px 地板（判据：容器内实测字号 ≥12px）。 */
+@media (max-width:1440px){
+  .corr-row-vis,.corr-source,.corr-criteria-note,.c-src,.corr-foot{font-size:12px}
+  .corr-row{padding:9px 12px}
+  .corr-list{gap:6px}
+}
 </style>
