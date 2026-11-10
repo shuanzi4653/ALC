@@ -44,15 +44,31 @@ _CORRIDOR_CACHE: Dict[str, Any] = {}
 
 # ---------------------------------------------------------------- 配置
 
-def settings() -> Dict[str, Any]:
-    """读 `edge` 段；环境变量优先，便于现场临时开。"""
-    value: Dict[str, Any] = {}
+_CONFIG_CACHE: Dict[str, Any] = {'stamp': None, 'value': {}}
+
+
+def _config_section() -> Dict[str, Any]:
+    """按 mtime 缓存配置：心跳 60 s 一次，别每次都解析 YAML。"""
+    try:
+        stamp = (CONFIG_PATH.stat().st_mtime_ns, CONFIG_PATH.stat().st_size)
+    except OSError:
+        return {}
+    if _CONFIG_CACHE['stamp'] == stamp:
+        return _CONFIG_CACHE['value']
     try:
         import yaml
         with open(CONFIG_PATH, 'r', encoding='utf-8') as handle:
             value = (yaml.safe_load(handle) or {}).get('edge') or {}
-    except Exception:  # noqa: BLE001 - 配置缺失时按关闭处理，不抛
+    except Exception:  # noqa: BLE001 - 配置缺失/损坏时按关闭处理，不抛
         value = {}
+    _CONFIG_CACHE['stamp'] = stamp
+    _CONFIG_CACHE['value'] = value
+    return value
+
+
+def settings() -> Dict[str, Any]:
+    """读 `edge` 段；环境变量优先，便于现场临时开。"""
+    value = _config_section()
     enabled = os.getenv('EDGE_ENABLED')
     if enabled is None:
         enabled = value.get('enabled', False)
