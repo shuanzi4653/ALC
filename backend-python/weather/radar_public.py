@@ -38,7 +38,7 @@ META_URL = 'https://api.rainviewer.com/public/weather-maps.json'
 ROOT_DIR = Path(__file__).resolve().parents[2]
 CACHE_DIR = ROOT_DIR / '.run' / 'radar'
 CHINA_GEOJSON = ROOT_DIR / 'frontend' / 'src' / 'assets' / 'china.json'
-TILE_ZOOM = 5                    # 5 级：单瓦片 11.25°，回波边缘才有细节
+TILE_ZOOM = 6                    # 6 级：单瓦片 5.625°（≈2.4 km/px），全国回波纤毫毕现
 # 聚合网格：原来是 0.14°（≈15 km）。一个格子在全国缩放下就是 8 px 的方块，
 # 放大后是明显的大锯齿 —— 用户 2026-11-11 明确要求"不要锯齿、要高精度"。
 # 0.04°（≈4.4 km）接近单个回波胞的尺度，格子数约 12 倍，union 仍在几十毫秒量级。
@@ -56,21 +56,23 @@ USER_AGENT = 'ALC-tianchuang/1.0.1 (radar echo; contact: project maintainer)'
 BBOX = (73.0, 15.5, 136.0, 54.5)  # 与全国视图一致
 ROUND_PIXELS = 2.0                # 每 2 像素取一个点
 
-# NEXRAD 标准基本反射率（Base Reflectivity）12 级色表（dBZ 下界 -> RGBA）：
-# 外围浅绿 → 亮绿 → 中绿 → 深绿 → 亮黄 → 金黄 → 橙色 → 橙红 → 亮红 → 深红 → 品红核
+# NEXRAD WSR-88D / CMA CINRAD 标准基本反射率（Base Reflectivity）专业色表（dBZ 下界 -> RGBA）：
+# 100% 纯正气象高饱和度不透明配色（alpha=255，背景=0 完全透明），消灭暗沉发浑，边界鲜艳分明
 NEXRAD_LUT: Tuple[Tuple[float, Tuple[int, int, int, int]], ...] = (
-    (12.5, (18, 188, 196, 115)),   # 12.5–15 dBZ: 边缘浅青过渡
-    (15.0, (64, 228, 110, 165)),   # 15–19 dBZ: 浅绿（弱降水外缘）
-    (19.0, (24, 215, 48, 190)),    # 19–24 dBZ: 亮绿
-    (24.0, (8, 180, 24, 210)),     # 24–28 dBZ: 中绿
-    (28.0, (2, 138, 12, 224)),     # 28–32 dBZ: 深绿
-    (32.0, (250, 242, 16, 234)),   # 32–36 dBZ: 亮黄（对流初生）
-    (36.0, (235, 192, 0, 240)),    # 36–39 dBZ: 金黄
-    (39.0, (255, 144, 0, 245)),    # 39–42.5 dBZ: 橙色（中等对流）
-    (42.5, (255, 72, 0, 249)),     # 42.5–45.5 dBZ: 橙红（强对流）
-    (45.5, (232, 0, 0, 253)),      # 45.5–49 dBZ: 亮红（强回波核）
-    (49.0, (180, 0, 24, 255)),     # 49–53 dBZ: 深红
-    (53.0, (224, 0, 220, 255)),    # 53+ dBZ: 品红（极端强对流核）
+    (10.0, (0, 220, 220, 255)),    # 10–15 dBZ: 边缘浅青（毛毛雨 / 水汽边界）
+    (15.0, (0, 236, 0, 255)),      # 15–20 dBZ: 亮绿（小雨 / 弱回波外缘）
+    (20.0, (0, 196, 0, 255)),      # 20–25 dBZ: 纯绿
+    (25.0, (0, 144, 0, 255)),      # 25–30 dBZ: 深绿
+    (30.0, (144, 228, 0, 255)),    # 30–34 dBZ: 黄绿过渡（中雨初现）
+    (34.0, (255, 255, 0, 255)),    # 34–38 dBZ: 纯亮黄（对流初生 / 中雨）
+    (38.0, (244, 184, 0, 255)),    # 38–42 dBZ: 金黄
+    (42.0, (255, 130, 0, 255)),    # 42–46 dBZ: 鲜橙（大雨 / 中等对流）
+    (46.0, (255, 52, 0, 255)),     # 46–50 dBZ: 橙红（强降水）
+    (50.0, (236, 0, 0, 255)),      # 50–55 dBZ: 鲜红（暴雨 / 强对流内核）
+    (55.0, (188, 0, 0, 255)),      # 55–60 dBZ: 深红
+    (60.0, (236, 0, 228, 255)),    # 60–65 dBZ: 亮品红（极端对流 / 冰雹核）
+    (65.0, (168, 64, 220, 255)),   # 65–70 dBZ: 紫色
+    (70.0, (255, 255, 255, 255)),  # 70+ dBZ: 亮白核
 )
 
 _lock = threading.Lock()
@@ -210,20 +212,21 @@ def _china_raster_mask(z: int, x0: int, y0: int, x1: int, y1: int) -> Optional[n
 
 
 def _encode_nexrad_png(crop_dbz: np.ndarray, upscale: float = 2.0) -> Optional[str]:
-    """将裁剪后的连续 dBZ 矩阵做双线性插值超分并映射为 12 级 NEXRAD 索引色透明 PNG（Data URI）。"""
+    """将裁剪后的连续 dBZ 矩阵做双线性插值超分并映射为 14 级 NEXRAD 索引色透明 PNG（Data URI）。"""
     from PIL import Image
 
     if crop_dbz.size == 0 or float(crop_dbz.max()) < 15.0:
         return None
     h, w = crop_dbz.shape
-    scale = min(float(upscale), 1280.0 / max(1, max(w, h)))
+    scale = min(float(upscale), 4096.0 / max(1, max(w, h)))
     w_out = max(1, int(round(w * scale)))
     h_out = max(1, int(round(h * scale)))
     if (w_out, h_out) != (w, h):
         up_dbz = np.asarray(
-            Image.fromarray(crop_dbz.astype(np.float32), mode='F').resize((w_out, h_out), Image.BILINEAR),
+            Image.fromarray(crop_dbz.astype(np.float32), mode='F').resize((w_out, h_out), Image.BICUBIC),
             dtype=np.float32,
         )
+        up_dbz = np.clip(up_dbz, 0.0, 75.0)
     else:
         up_dbz = crop_dbz
 
@@ -249,9 +252,9 @@ def _encode_nexrad_png(crop_dbz: np.ndarray, upscale: float = 2.0) -> Optional[s
 
 
 def virtual_nexrad_image(bucket: int, cells_spec: Tuple[Tuple[str, float, float, float, float], ...]) -> Tuple[Optional[str], Optional[List[float]]]:
-    """为虚拟恶劣天气模式生成同口径的墨卡托 NEXRAD 多级反射率贴图与经纬框。"""
+    """为虚拟恶劣天气模式生成同口径的高清墨卡托 NEXRAD 多级反射率贴图与经纬框。"""
     lon0, lat0, lon1, lat1 = 101.0, 19.5, 130.5, 48.5
-    w, h = 520, 440
+    w, h = 800, 680
     lons = np.linspace(lon0, lon1, w, dtype=np.float32)[None, :]
     merc0 = math.log(math.tan(math.pi / 4.0 + math.radians(lat0) / 2.0))
     merc1 = math.log(math.tan(math.pi / 4.0 + math.radians(lat1) / 2.0))
@@ -274,7 +277,7 @@ def virtual_nexrad_image(bucket: int, cells_spec: Tuple[Tuple[str, float, float,
         cell_dbz = np.where(r_norm <= 1.04, 54.5 - 39.5 * (r_norm ** 1.15) + texture, 0.0)
         dbz = np.maximum(dbz, cell_dbz)
 
-    data_uri = _encode_nexrad_png(dbz, upscale=1.2)
+    data_uri = _encode_nexrad_png(dbz, upscale=2.0)
     return data_uri, [lon0, lat0, lon1, lat1] if data_uri else None
 
 
@@ -424,7 +427,7 @@ def fetch(force: bool = False) -> Dict[str, Any]:
         return _empty(f'取帧失败：{str(exc)[:90]}')
 
     stamp = datetime.fromtimestamp(frame['time'], tz=timezone.utc).strftime('%Y%m%d%H%M')
-    cache_file = CACHE_DIR / f'{stamp}-z{TILE_ZOOM}-g{GRID_DEG}-nexrad1.json'
+    cache_file = CACHE_DIR / f'{stamp}-z{TILE_ZOOM}-g{GRID_DEG}-nexrad3.json'
     if cache_file.exists() and not force:
         try:
             cached = json.loads(cache_file.read_text(encoding='utf-8'))
@@ -458,8 +461,8 @@ def fetch(force: bool = False) -> Dict[str, Any]:
         except Exception:  # noqa: BLE001 - 单瓦片失败跳过
             return None
 
-    # 35 张瓦片并发拉取，拼成无缝墨卡托 dBZ 场
-    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+    # 瓦片并发拉取，拼成无缝墨卡托 dBZ 场
+    with concurrent.futures.ThreadPoolExecutor(max_workers=24) as pool:
         for item in pool.map(grab, tiles):
             if item is None:
                 continue

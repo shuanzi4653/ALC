@@ -989,6 +989,27 @@ function clickNode(node){
       </g>
     </g>
   </svg>
+  <div v-if="props.radarOn && (radarImage || radarRings.length)" class="nmap-radar-scale" aria-hidden="true">
+    <div class="scale-head">
+      <span class="scale-title">dBZ</span>
+      <span class="scale-vcp">0.5° 基数据</span>
+    </div>
+    <div class="scale-bar">
+      <span class="scale-step" style="background:#ffffff"><em>70</em></span>
+      <span class="scale-step" style="background:#a840dc"><em>65</em></span>
+      <span class="scale-step" style="background:#ec00e4"><em>60</em></span>
+      <span class="scale-step" style="background:#bc0000"><em>55</em></span>
+      <span class="scale-step" style="background:#ec0000"><em>50</em></span>
+      <span class="scale-step" style="background:#ff3400"><em>45</em></span>
+      <span class="scale-step" style="background:#ff8200"><em>40</em></span>
+      <span class="scale-step" style="background:#f4b800"><em>35</em></span>
+      <span class="scale-step" style="background:#ffff00"><em>30</em></span>
+      <span class="scale-step" style="background:#009000"><em>25</em></span>
+      <span class="scale-step" style="background:#00c400"><em>20</em></span>
+      <span class="scale-step" style="background:#00ec00"><em>15</em></span>
+      <span class="scale-step" style="background:#00dcdc"><em>10</em></span>
+    </div>
+  </div>
   <div v-if="tip" class="nmap-tip" :style="{left:tip.x+'px', top:tip.y+'px'}" :class="{flip:tipFlip}">
     <b>{{ tip.title }}</b>
     <span v-for="(row,i) in tip.rows" :key="'t'+i" :class="row.cls||''">{{ row.text }}</span>
@@ -1017,8 +1038,21 @@ function clickNode(node){
 @media (prefers-reduced-motion: reduce){
   .echo-in,.echo-out{animation:none}
 }
-.nmap-radar-img{image-rendering:auto;opacity:.92;pointer-events:none}
-html[data-theme="light"] .nmap-radar-img{opacity:.86}
+.nmap-radar-img{image-rendering:pixelated;image-rendering:-moz-crisp-edges;image-rendering:-webkit-optimize-contrast;image-rendering:crisp-edges;opacity:.98;pointer-events:none}
+html[data-theme="light"] .nmap-radar-img{opacity:.92}
+.nmap-radar-scale{position:absolute;left:14px;top:16px;z-index:25;pointer-events:none;
+  background:rgba(4,14,24,.82);border:1px solid rgba(64,136,192,.35);
+  backdrop-filter:blur(6px);border-radius:4px;padding:6px 7px;
+  display:flex;flex-direction:column;gap:5px;box-shadow:0 4px 14px rgba(0,0,0,.45)}
+.scale-head{display:flex;flex-direction:column;gap:1px}
+.scale-title{font-size:11px;font-weight:700;color:#e6f4ff;letter-spacing:.4px}
+.scale-vcp{font-size:8px;color:#8ab4d4;letter-spacing:.2px}
+.scale-bar{display:flex;flex-direction:column;width:34px;border-radius:2px;overflow:hidden;border:1px solid rgba(0,0,0,.45)}
+.scale-step{height:10px;display:flex;align-items:center;justify-content:flex-end;padding-right:3px;position:relative}
+.scale-step em{font-style:normal;font-size:7.5px;font-weight:700;line-height:1;color:#000000;text-shadow:0 0 2px rgba(255,255,255,.9)}
+html[data-theme="light"] .nmap-radar-scale{background:rgba(255,255,255,.88);border-color:rgba(180,205,225,.7);box-shadow:0 3px 10px rgba(0,0,0,.15)}
+html[data-theme="light"] .scale-title{color:#103450}
+html[data-theme="light"] .scale-vcp{color:#4b6e8a}
 .echo-weak{fill:rgba(24,205,60,.36);stroke:none}
 .echo-convective{fill:rgba(248,200,16,.52);stroke:none}
 .echo-strong{fill:rgba(232,24,18,.68);stroke:none}
