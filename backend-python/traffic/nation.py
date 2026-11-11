@@ -21,6 +21,7 @@
 from __future__ import annotations
 
 import json
+import math
 import threading
 from datetime import datetime, timezone
 from functools import lru_cache
@@ -306,6 +307,108 @@ def _radar_polygons(bands: Dict[str, Any]):
             except Exception:  # noqa: BLE001
                 continue
     return unary_union(shapes) if shapes else None
+
+
+# —— 虚拟气象（演示包）——
+# 用户要的"全国恶劣天气"场景：不是给前端加一层滤镜，而是**真的造出回波几何**，
+# 让绕飞、停飞、事件、禁飞区框全部按这套几何重算一遍。
+# 固定种子（按 10 分钟一档 + 余弦扰动），同一帧重跑结果一致，方便复核与截图对比。
+_VIRTUAL_CACHE: Dict[Any, Any] = {}
+
+# 六个大区各给一个中心点与半径（经度±、纬度±），覆盖东部沿海与长江中游两条主廊道
+_VIRTUAL_CELLS = (
+    ('华东', 119.2, 31.6, 3.1, 2.2),
+    ('中南-长江中游', 113.4, 29.6, 2.8, 2.0),
+    ('中南-华南沿海', 112.6, 22.8, 2.4, 1.7),
+    ('华北', 116.6, 37.8, 2.6, 1.9),
+    ('东北', 125.4, 45.2, 2.2, 1.6),
+    ('西南', 105.6, 29.2, 2.0, 1.5),
+)
+
+
+def _ellipse_ring(lon: float, lat: float, rx: float, ry: float, phase: float,
+                  n: int = 40) -> List[List[float]]:
+    """椭圆环 + 两谐波扰动：形状像回波胞，不像标准椭圆。
+
+    顶点数 40 与真实回波同量级（真实环经闭运算 + Chaikin 后约 60–120 点），
+    前端不需要为虚拟数据走另一套渲染。
+    """
+    ring = []
+    for i in range(n):
+        t = 2 * math.pi * i / n
+        wobble = 1 + 0.16 * math.sin(3 * t + phase) + 0.09 * math.cos(5 * t - phase)
+        x = lon + rx * wobble * math.cos(t)
+        y = lat + ry * wobble * math.sin(t)
+        ring.append([round(x, 3), round(y, 3)])
+    ring.append(ring[0])
+    return ring
+
+
+def _virtual_bands(bucket: int) -> Dict[str, List[List[List[float]]]]:
+    """按 10 分钟一档生成合成回波：STRONG 6 片 + CONVECTIVE 6 片 + WEAK 6 片。"""
+    strong, convective, weak = [], [], []
+    for index, (_region, lon, lat, rx, ry) in enumerate(_VIRTUAL_CELLS):
+        phase = (bucket * 0.37 + index * 1.13) % (2 * 3.14159)
+        # 中心随时间缓慢漂移：演示"回波在动"，但不会漂出国境
+        drift_lon = 0.55 * math.cos(phase)
+        drift_lat = 0.32 * math.sin(phase * 0.8)
+        cx, cy = lon + drift_lon, lat + drift_lat
+        strong.append(_ellipse_ring(cx, cy, rx * 0.42, ry * 0.42, phase))
+        convective.append(_ellipse_ring(cx, cy, rx * 0.72, ry * 0.72, phase + 0.9))
+        weak.append(_ellipse_ring(cx, cy, rx, ry, phase + 1.7))
+    return {'STRONG': strong, 'CONVECTIVE': convective, 'WEAK': weak}
+
+
+def _virtual_radar(bucket: int) -> Dict[str, Any]:
+    bands = _VIRTUAL_CACHE.get(('bands', bucket))
+    if bands is None:
+        bands = _virtual_bands(bucket)
+        _VIRTUAL_CACHE[('bands', bucket)] = bands
+    return {
+        'available': True,
+        'ts': f'VIRTUAL-{bucket * 600}',      # 600 秒一档，形如时间戳，前端按字符串比较即可
+        'source': 'VIRTUAL（演示包：合成回波，非实况）',
+        'virtual': True,
+        'bands': bands,
+        'counts': {k: len(v) for k, v in bands.items()},
+    }
+
+
+def _virtual_detour_table(bucket: int) -> Dict[str, Dict[str, Any]]:
+    """按合成回波重算绕飞：与真实回波同一套判定（_detour_for），不是另写一套。"""
+    cached = _VIRTUAL_CACHE.get(('table', bucket))
+    if cached is not None:
+        return cached
+    from shapely.ops import transform as shp_transform
+    avoid = _radar_polygons(_virtual_bands(bucket))
+    table: Dict[str, Dict[str, Any]] = {}
+    blocked: set = set()
+    if avoid is not None:
+        avoid_xy = shp_transform(_xy_transformer().transform, avoid)
+        for row in _corridor_rows():
+            path = row.get('path') or [row['fromLonLat'], row['toLonLat']]
+            got = _detour_for(path, avoid_xy)
+            if got:
+                table[row['id']] = got
+            elif _path_hits(path, avoid_xy):   # 必须用投影后的 avoid：_path_hits 比的是米制平面
+                # 压线但小绕脱不开：这条航路此刻不成立，交给上层的"停飞"处理
+                blocked.add(row['id'])
+    _VIRTUAL_CACHE[('table', bucket)] = (table, blocked)
+    return table, blocked
+
+
+def _path_hits(path: List[List[float]], avoid) -> bool:
+    """航路是否落在回波多边形里（米制平面判交，与 _detour_for 同一套投影）。"""
+    from shapely.geometry import LineString
+    if avoid is None or len(path) < 2:
+        return False
+    to_xy = _xy_transformer()
+    line = LineString([to_xy.transform(lon, lat) for lon, lat in path])
+    return bool(line.intersects(avoid))
+
+
+def _virtual_bucket(minute: int) -> int:
+    return int(max(0, min(1440, minute)) // 10)
 
 
 def _fog(cities: List[Dict[str, Any]], weather: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
@@ -693,12 +796,17 @@ def _base(level: str, ident: Optional[str]) -> Dict[str, Any]:
 
 
 def _flights_payload_locked(level: str = 'nation', ident: Optional[str] = None,
-                    minute: int = 0) -> Dict[str, Any]:
+                    minute: int = 0, virtual: bool = False) -> Dict[str, Any]:
     """只回航班与统计：时间轴每拖一次都要刷新，不能把整份网络重算一遍。"""
     minute = max(0, min(1440, int(minute or 0)))
     provinces = [row['name'] for row in _province_rows()]
-    radar = _radar()
-    table = _detour_table(radar.get('ts') or 'none') if radar.get('available') else {}
+    blocked_ids: set = set()
+    if virtual:
+        radar = _virtual_radar(_virtual_bucket(minute))
+        table, blocked_ids = _virtual_detour_table(_virtual_bucket(minute))
+    else:
+        radar = _radar()
+        table = _detour_table(radar.get('ts') or 'none') if radar.get('available') else {}
     if level == 'region':
         scoped = {row['name'] for row in _province_rows() if row['region'] == (ident or 'north')}
         corridors = _slice_corridors(scoped)
@@ -712,7 +820,8 @@ def _flights_payload_locked(level: str = 'nation', ident: Optional[str] = None,
                 corridors = _slice_corridors({city['province']}, city=ident)
     else:
         corridors = _slice_corridors(set(provinces))
-    flights = nation_ops.flight_objects(corridors, minute, table, _city_weather(), _model_probs())
+    flights = nation_ops.flight_objects(corridors, minute, table, _city_weather(), _model_probs(),
+                                        blocked_ids=blocked_ids)
     by_province: Dict[str, Dict[str, int]] = {}
     by_city: Dict[str, Dict[str, int]] = {}
     for flight in flights:
@@ -738,14 +847,21 @@ def _flights_payload_locked(level: str = 'nation', ident: Optional[str] = None,
 
 
 def _payload_locked(level: str = 'nation', ident: Optional[str] = None,
-            minute: int = 0) -> Dict[str, Any]:
+            minute: int = 0, virtual: bool = False) -> Dict[str, Any]:
     provinces = _province_rows()
     stations = _live_stations()
     base = _base(level, ident)
     names = [row['name'] for row in provinces]
-    radar = _radar()
-    table = _detour_table(radar.get('ts') or 'none') if radar.get('available') else {}
     minute = max(0, min(1440, int(minute or 0)))
+    # 虚拟气象：换的是**几何来源**，不是结果 —— 绕飞与停飞仍由同一套 _detour_for 判定，
+    # 所以"开演示包"与"真实天气"跑的是同一条代码路径，只是输入不同。
+    blocked_ids: set = set()
+    if virtual:
+        radar = _virtual_radar(_virtual_bucket(minute))
+        table, blocked_ids = _virtual_detour_table(_virtual_bucket(minute))
+    else:
+        radar = _radar()
+        table = _detour_table(radar.get('ts') or 'none') if radar.get('available') else {}
 
     def attach(body: Dict[str, Any], corridors: List[Dict[str, Any]],
                cities: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
@@ -756,7 +872,8 @@ def _payload_locked(level: str = 'nation', ident: Optional[str] = None,
         weather_doc = _city_weather_payload()
         weather = weather_doc.get('cities') or {}
         model_probs = _model_probs()
-        flights = nation_ops.flight_objects(corridors, minute, table, weather, model_probs)
+        flights = nation_ops.flight_objects(corridors, minute, table, weather, model_probs,
+                                            blocked_ids=blocked_ids)
         hit = sum(1 for row in corridors if row.get('detour'))
         delayed = sum(1 for row in flights if row['status'] == 'DELAYED')
         blocked = sum(1 for row in corridors if row.get('borderBlocked'))
@@ -771,15 +888,28 @@ def _payload_locked(level: str = 'nation', ident: Optional[str] = None,
                 node['pLowVis'] = model_probs[node['name']]
         return {**body,
                 'minute': minute,
-                'radar': {'available': bool(radar.get('available')),
-                          'ts': radar.get('ts'),
-                          'source': radar.get('source'),
-                          'counts': {band: len(rings) for band, rings
-                                     in _radar_clipped(radar.get('ts') or 'none').items()},
-                          'bands': _radar_clipped(radar.get('ts') or 'none'),
-                          'coverage': radar.get('coverage'),
-                          # 瓦片直链：前端按墨卡托贴图，边界比矢量多边形更像真实回波
-                          'tiles': radar.get('tiles_url')},
+                'radar': ({
+                    # 虚拟气象：直接用合成几何，**不能**再去读 _radar_clipped（那会读回真实帧）
+                    'available': True,
+                    'ts': radar.get('ts'),
+                    'source': radar.get('source'),
+                    'counts': {band: len(rings) for band, rings in radar.get('bands', {}).items()},
+                    'bands': radar.get('bands', {}),
+                    'coverage': None,
+                    'tiles': None,
+                    'virtual': True,
+                } if radar.get('virtual') else {
+                    'available': bool(radar.get('available')),
+                    'ts': radar.get('ts'),
+                    'source': radar.get('source'),
+                    'counts': {band: len(rings) for band, rings
+                               in _radar_clipped(radar.get('ts') or 'none').items()},
+                    'bands': _radar_clipped(radar.get('ts') or 'none'),
+                    'coverage': radar.get('coverage'),
+                    # 瓦片直链：前端按墨卡托贴图，边界比矢量多边形更像真实回波
+                    'tiles': radar.get('tiles_url'),
+                    'virtual': False,
+                }),
                 'clearanceNote': '许可要素由本班次已写定的计划字段组装，不重新计算；标“待批”的班次不进入在飞序列。',
                 'flights': flights,
                 'upcoming': nation_ops.upcoming(corridors, minute)[:90],
@@ -1085,6 +1215,117 @@ def _evidence_locked(flight_id: str, minute: int = 60) -> Dict[str, Any]:
              'source': 'OFFICIAL'},
         ]},
     ]
+    # —— 判据：把"凭什么这样裁决"拆成逐条可核对的阈值判断 ——
+    # 之前证据链只给一句"风险 0.05（低）"，读者没法核。这里每条都写：实测多少、阈值多少、过没过。
+    # 值域 0–1 的 ratio 一并给出，前端据此画条，不用自己再算一遍（两处算就会两处不一致）。
+    criteria = []
+    vis_floor = nation_ops.VIS_BANDS[-1][0]      # 5.0 km：最后一道可见度门槛
+    # 注意：本函数里 `vis` 是**格式化函数**（把米数变成"≥58 km"），不是数值。
+    # 数值要在这里单独取，别把函数当数用 —— 会直接 TypeError。
+    vis_list = [v.get('visM') for v in (a, b) if v.get('visM') is not None]
+    vis_val = min(vis_list) if vis_list else None
+    wind_list = [v.get('windMps') for v in (a, b) if v.get('windMps') is not None]
+    wind_val = max(wind_list) if wind_list else None
+    if vis_val is not None:
+        criteria.append({
+            'key': 'vis', 'label': '端点能见度（取两端较差）',
+            'display': vis(vis_val),
+            'actual': round(vis_val / 1000.0, 1), 'threshold': round(vis_floor / 1000.0, 1),
+            'unit': 'km', 'higherBetter': True,
+            'ratio': round(min(1.0, vis_val / vis_floor), 3),
+            'pass': vis_val >= vis_floor, 'source': 'PUBLIC',
+        })
+    else:
+        criteria.append({'key': 'vis', 'label': '端点能见度（取两端较差）',
+                         'display': '无实况', 'actual': None, 'threshold': 5.0, 'unit': 'km',
+                         'higherBetter': True, 'ratio': 0.0, 'pass': False,
+                         'source': 'ABSENT', 'note': '两端都没有实况，按"未通过"处理'})
+    if wind_val is not None:
+        criteria.append({
+            'key': 'wind', 'label': '端点风速（取两端较大）',
+            'display': f'{wind_val:.1f} m/s', 'actual': round(wind_val, 1),
+            'threshold': nation_ops.WIND_HIGH, 'unit': 'm/s', 'higherBetter': False,
+            'ratio': round(min(1.0, wind_val / nation_ops.WIND_HIGH), 3),
+            'pass': wind_val < nation_ops.WIND_HIGH, 'source': 'PUBLIC',
+        })
+    if radar_ok:
+        hit = float(detour.get('hitKm') or 0.0)
+        criteria.append({
+            'key': 'echo', 'label': '航路穿强回波',
+            'display': (f"穿 {hit:g} km" if detour else '无压线'),
+            'actual': hit, 'threshold': 0.0, 'unit': 'km', 'higherBetter': False,
+            'ratio': 1.0 if detour else 0.0,
+            'pass': not detour, 'source': 'DERIVED',
+        })
+    else:
+        criteria.append({'key': 'echo', 'label': '航路穿强回波', 'display': '回波不可用',
+                         'actual': None, 'threshold': 0.0, 'unit': 'km', 'higherBetter': False,
+                         'ratio': 0.0, 'pass': True, 'source': 'ABSENT',
+                         'note': '本帧没取到回波，这一条不参与裁决'})
+    criteria.append({
+        'key': 'risk', 'label': '运行风险概率',
+        'display': f"{flight['riskP']:.2f}（{flight['riskLevelLabel']}）",
+        'actual': round(flight['riskP'], 3), 'threshold': nation_ops.RISK_HOLD,
+        'unit': '', 'higherBetter': False,
+        'ratio': round(min(1.0, flight['riskP'] / nation_ops.RISK_HOLD), 3),
+        'pass': flight['riskP'] < nation_ops.RISK_HOLD, 'source': 'DERIVED',
+    })
+    if flight.get('pModel') is not None:
+        criteria.append({
+            'key': 'pmodel', 'label': '模型低能见概率（ml-v3）',
+            'display': f"{flight['pModel']:.0%}", 'actual': round(flight['pModel'], 3),
+            'threshold': nation_ops.MODEL_HOLD, 'unit': '', 'higherBetter': False,
+            'ratio': round(min(1.0, flight['pModel'] / nation_ops.MODEL_HOLD), 3),
+            'pass': flight['pModel'] < nation_ops.MODEL_HOLD, 'source': 'DERIVED',
+        })
+
+    # —— 期望损失：直飞 / 绕飞 / 延期三个方案的代价对比 ——
+    # 三项加权，系数直接印在界面上，读者可以自己复算。
+    #  风险损失 = 该方案下的飞行风险概率 × 1.0
+    #  时间成本 = 延误分钟 ÷ 60 × 0.6
+    #  能耗成本 = 航程增量 km × 0.02
+    W_RISK, W_HOUR, W_KM = 1.0, 0.6, 0.02
+    speed = float(flight.get('speedKmh') or 200.0)
+    detour_km = float(flight.get('detourKm') or 0.0)
+    # 压线时"直飞"不是可选项：穿强回波是**硬约束**，不参与代价比较。
+    # 若还把它算进"最省"里，界面会推荐一条规则明令禁止的航路 —— 表里与裁决自相矛盾。
+    direct_option = {
+        'key': 'direct', 'label': '直飞（原航路）',
+        'riskP': round(flight['riskP'], 3), 'delayMin': 0, 'extraKm': 0.0,
+        'available': not detour,
+        'note': ('保持当前航路' if not detour else '航路压强回波，直飞不成立（硬约束优先于代价比较）'),
+    }
+    # 绕飞：去掉回波那一项加成（_risk 里回波固定 +0.18），航程增 detourKm
+    echo_surcharge = 0.18 if detour else 0.0
+    detour_risk = round(max(0.05, flight['riskP'] - echo_surcharge), 3)
+    detour_option = {
+        'key': 'detour', 'label': '绕飞（外偏避让）',
+        'riskP': detour_risk,
+        'delayMin': round(detour_km / max(60.0, speed) * 60.0, 1),
+        'extraKm': round(detour_km, 1),
+        'available': bool(detour),
+        'note': (f"原航路穿回波，外偏 {detour.get('shiftKm')} km" if detour
+                 else '本帧无可用绕飞方案（航路未压线或周围无安全间隙）'),
+    }
+    # 延期：不承担飞行风险（风险项记 0），代价按 60 分钟计 —— 不假设天气会好转
+    hold_option = {
+        'key': 'hold', 'label': '延期（等窗口）',
+        'riskP': 0.0, 'delayMin': 60, 'extraKm': 0.0,
+        'available': True, 'note': '不飞则不承担飞行风险；按推迟 60 分钟计，不假设天气好转',
+    }
+    options = []
+    for opt in (direct_option, detour_option, hold_option):
+        cost = opt['riskP'] * W_RISK + opt['delayMin'] / 60.0 * W_HOUR + opt['extraKm'] * W_KM
+        options.append({**opt, 'cost': round(cost, 3)})
+    usable = [o for o in options if o['available']]
+    best = min(usable, key=lambda o: o['cost'])['key'] if usable else None
+    for opt in options:
+        opt['recommended'] = opt['key'] == best
+        opt['delta'] = round(opt['cost'] - (min(o['cost'] for o in usable) if usable else 0), 3)
+    expected_loss = {'weights': {'risk': W_RISK, 'perHour': W_HOUR, 'perKm': W_KM},
+                     'options': options, 'best': best,
+                     'formula': '代价 = 风险概率×1.0 + 延误分钟÷60×0.6 + 航程增量km×0.02'}
+
     conclusion = f"{flight['decisionLabel']}：风险 {flight['riskP']:.2f}"
     if detour:
         conclusion += f"；原航路穿回波 {detour.get('hitKm')} km，已外偏 {detour.get('shiftKm')} km"
@@ -1097,9 +1338,130 @@ def _evidence_locked(flight_id: str, minute: int = 60) -> Dict[str, Any]:
                    ('id', 'callsign', 'fromName', 'toName', 'departAt', 'arriveAt',
                     'riskP', 'riskLevel', 'riskLevelLabel', 'decision', 'decisionLabel', 'altM')},
         'steps': steps,
+        'criteria': criteria,
+        'expectedLoss': expected_loss,
+        'observed': {
+            'fromName': flight['fromName'], 'toName': flight['toName'],
+            'fromVis': vis(a.get('visM')), 'toVis': vis(b.get('visM')),
+            'fromWind': a.get('windMps'), 'toWind': b.get('windMps'),
+            'echo': band_text, 'echoTs': radar.get('ts'), 'weatherTs': weather_ts,
+            'radarOk': radar_ok, 'hasDetour': bool(detour),
+            'detourKm': round(detour_km, 1), 'speedKmh': speed,
+            'exposureDirect': flight['exposure']['directMin'],
+            'exposureDetour': flight['exposure']['detourMin'],
+        },
         'conclusion': conclusion,
         'discipline': '本链为「规则派生」：实况来自公开源、回波来自公开拼图、概率由本系统阈值算出，'
                       '不是训练模型输出，也不是官方管制结论。',
+    }
+
+
+def journal(minute: int = 60, lookback: int = 40, level: str = 'nation',
+            ident: str = '') -> Dict[str, Any]:
+    """运行日志：从**当前这一刻的快照**里派生出的运行事件。
+
+    为什么不存历史表：本系统的班次是解析式生成的（给定分钟，位置与裁决都是确定的），
+    没有"历史"可存，也不需要存 —— 每一分钟都能重算出来。所以这里的做法是
+    **在时间窗内扫一遍**，把进出场、绕飞、延期、停飞挑出来，带上发生的时刻。
+
+    产出行的字段与东北会话日志（/traffic/journal）对齐，前端两本账可以共用一个表格。
+    """
+    minute = max(0, min(1440, int(minute or 0)))
+    lookback = max(5, min(180, int(lookback or 40)))
+    start = max(0, minute - lookback)
+
+    body = payload(level=level, ident=ident, minute=minute) if ident else payload(level=level, minute=minute)
+    flights = body.get('flights') or []
+    corridors = body.get('corridors') or []
+    weather_meta = body.get('weatherMeta') or {}
+    summary = body.get('summary') or {}
+    radar = body.get('radar') or {}
+
+    rows: List[Dict[str, Any]] = []
+
+    def clock(m: float) -> str:
+        # 与前端同口径：08:00 起算，跨零点加 +Nd
+        raw = 8 * 60 + float(m or 0)
+        day = int(raw // 1440)
+        t = int(raw % 1440)
+        text = f'{t // 60:02d}:{t % 60:02d}'
+        return f'{text} +{day}d' if day > 0 else text
+
+    for f in flights:
+        name = f"{f.get('fromName')} → {f.get('toName')}"
+        fid = f.get('id')
+        dep = f.get('departMinute')
+        arr = f.get('arriveMinute')
+        decision = f.get('decision')
+        # 起飞：发生在窗口内
+        if dep is not None and start <= dep <= minute:
+            rows.append({'minute': round(dep, 1), 'at': clock(dep), 'kind': 'SYSTEM',
+                         'kindLabel': '运行事件', 'actionLabel': '起飞',
+                         'name': name, 'flightId': fid,
+                         'detail': f"{f.get('callsign')} 于 {f.get('actualAt') or f.get('departAt')} 起飞，"
+                                   f"高度 {f.get('altM')} m，许可 {f.get('clearance', {}).get('statusLabel') or '—'}"})
+        # 到达：发生在窗口内
+        if arr is not None and start <= arr <= minute:
+            rows.append({'minute': round(arr, 1), 'at': clock(arr), 'kind': 'SYSTEM',
+                         'kindLabel': '运行事件', 'actionLabel': '到达',
+                         'name': name, 'flightId': fid,
+                         'detail': f"{f.get('callsign')} 到达，全程 {f.get('durationMin')} 分钟"})
+        # 绕飞 / 延期 / 停飞：这是"当前状态"，时刻记在当前分钟
+        if decision == 'DETOUR':
+            rows.append({'minute': minute, 'at': clock(minute), 'kind': 'SYSTEM',
+                         'kindLabel': '运行事件', 'actionLabel': '绕飞',
+                         'name': name, 'flightId': fid,
+                         'detail': f"风险 {f.get('riskP')}；外偏后航程增加 {f.get('detourKm')} km"})
+        if decision == 'HOLD':
+            # 关键：延期可能来自"规则风险"也可能来自"模型低能见概率"。
+            # 只写"风险 0.05（高）"会读不通 —— 0.05 是低分，档位是高的，因为档位看的是模型概率。
+            pm = f.get('pModel')
+            why = (f"模型低能见概率 {pm:.0%}" if (f.get('probSource') == 'MODEL' and pm is not None)
+                   else f"规则风险 {f.get('riskP')}")
+            rows.append({'minute': minute, 'at': clock(minute), 'kind': 'SYSTEM',
+                         'kindLabel': '运行事件', 'actionLabel': '延期',
+                         'name': name, 'flightId': fid,
+                         'detail': f"{why}（{f.get('riskLevelLabel')}档）；规则分 {f.get('riskP')}；"
+                                   f"计划 {f.get('planAt')}，实际未放行"})
+    for c in corridors:
+        if c.get('borderBlocked'):
+            rows.append({'minute': minute, 'at': clock(minute), 'kind': 'SYSTEM',
+                         'kindLabel': '运行事件', 'actionLabel': '停飞',
+                         'name': f"{c.get('fromName')} → {c.get('toName')}", 'flightId': None,
+                         'detail': f"{c.get('id')} 受限停飞；航线 {c.get('lengthKm')} km"})
+
+    # 数据源：把"这一屏的实况是什么时候的"也记一条，否则日志里只有结论没有来源
+    if weather_meta.get('fetchedAt'):
+        sources = weather_meta.get('sources') or {}
+        src_text = '、'.join(f'{k} {v}' for k, v in sources.items()) or '—'
+        rows.append({'minute': minute, 'at': clock(minute), 'kind': 'SOURCE',
+                     'kindLabel': '数据源', 'actionLabel': '气象实况',
+                     'name': f"{weather_meta.get('cities') or summary.get('weatherCities') or 0} 城",
+                     'flightId': None,
+                     'detail': (f"来源 {src_text}；抓取于 {weather_meta.get('fetchedAt')}"
+                                + ('；已过期快照' if weather_meta.get('expiredSnapshot') else '')
+                                + ('；数据偏旧' if weather_meta.get('stale') else ''))})
+    rows.append({'minute': minute, 'at': clock(minute), 'kind': 'SOURCE',
+                 'kindLabel': '数据源', 'actionLabel': '雷达回波',
+                 'name': '全国拼图' if radar.get('available') else '不可用',
+                 'flightId': None,
+                 'detail': (f"帧时刻 {radar.get('ts')}；三档轮廓已按面积排序取前 200 片"
+                            if radar.get('available') else '本帧未取到回波，绕飞与暴露结论不成立')})
+
+    rows.sort(key=lambda r: (-float(r['minute']), str(r['actionLabel'])))
+    counts = {'SYSTEM': 0, 'SOURCE': 0, 'MANUAL': 0, 'EXPORT': 0}
+    for r in rows:
+        counts[r['kind']] = counts.get(r['kind'], 0) + 1
+    return {
+        'status': 'OK',
+        'minute': minute,
+        'window': [start, minute],
+        'level': level,
+        'ident': ident,
+        'rows': rows[:400],
+        'counts': counts,
+        'note': ('这些行由当前分钟的快照**重算**得出：班次是解析式生成的，没有历史表，'
+                 '也不需要历史表。窗口内的起飞与到达是"发生过"，绕飞/延期/停飞是"此刻仍如此"。'),
     }
 
 
@@ -1170,14 +1532,16 @@ def _pulse_locked() -> Dict[str, Any]:
 _NATION_LOCK = threading.RLock()
 
 
-def payload(level: str = 'nation', ident: Optional[str] = None, minute: int = 60):
+def payload(level: str = 'nation', ident: Optional[str] = None, minute: int = 60,
+            virtual: bool = False):
     with _NATION_LOCK:
-        return _payload_locked(level, ident, minute)
+        return _payload_locked(level, ident, minute, virtual)
 
 
-def flights_payload(level: str = 'nation', ident: Optional[str] = None, minute: int = 60):
+def flights_payload(level: str = 'nation', ident: Optional[str] = None, minute: int = 60,
+                    virtual: bool = False):
     with _NATION_LOCK:
-        return _flights_payload_locked(level, ident, minute)
+        return _flights_payload_locked(level, ident, minute, virtual)
 
 
 def pulse() -> Dict[str, Any]:

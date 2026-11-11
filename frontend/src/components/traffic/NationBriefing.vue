@@ -81,10 +81,79 @@ onUnmounted(()=>{
 
 const data=computed(()=>props.payload||local.value)
 const baseRows=computed(()=>props.payload?props.flights:(local.value?.flights||[]))
+// —— 二次归类：表头可点排序 + 状态筛选片 ——
+// 之前只有写死的"按风险降序"一种排法：想按起飞时刻看、想把延期挑出来，都做不到。
+// 排序状态放在组件内（不写 URL）：这是"看一眼"的读法，不是需要分享的视图。
+const sortKey=ref(props.variant==='briefing'?'risk':'depart')
+const sortDir=ref(props.variant==='briefing'?'desc':'asc')
+const filterKey=ref('all')
+const FILTERS=[
+  {key:'all',label:'全部'},
+  {key:'high',label:'高风险'},
+  {key:'detour',label:'绕飞'},
+  {key:'hold',label:'延期'},
+  {key:'model',label:'模型预警'},
+]
+function toggleSort(key){
+  if(sortKey.value===key){ sortDir.value=sortDir.value==='asc'?'desc':'asc' }
+  else{
+    sortKey.value=key
+    // 数值列第一次点按"从大到小"更符合直觉（先看风险最高的、先看能见度最差的）；
+    // 文本列第一次点按"从小到大"（按拼音/编号顺着来）。
+    sortDir.value=(key==='callsign'||key==='city'||key==='icao')?'asc':'desc'
+  }
+}
+function sortMark(key){ return sortKey.value===key?(sortDir.value==='asc'?'▲':'▼'):'' }
+
+const SORTERS={
+  risk:(f)=>f.riskP||0,
+  depart:(f)=>f.departMinute==null?1e9:f.departMinute,
+  arrive:(f)=>f.arriveMinute==null?1e9:f.arriveMinute,
+  callsign:(f)=>String(f.callsign||''),
+  alt:(f)=>f.altM||0,
+  pModel:(f)=>f.pModel==null?-1:f.pModel,
+}
+function matchFilter(f){
+  const k=filterKey.value
+  if(k==='all') return true
+  if(k==='high') return f.riskLevel==='HIGH'
+  if(k==='detour') return f.decision==='DETOUR'
+  if(k==='hold') return f.decision==='HOLD'
+  if(k==='model') return (f.pModel||0)>=0.35
+  return true
+}
+const shownRows=computed(()=>{
+  let list=baseRows.value.filter(matchFilter)
+  const get=SORTERS[sortKey.value]
+  if(get){
+    const dir=sortDir.value==='asc'?1:-1
+    list=[...list].sort((a,b)=>{
+      const x=get(a),y=get(b)
+      if(typeof x==='string'||typeof y==='string') return String(x).localeCompare(String(y),'zh')*dir
+      return (x-y)*dir
+    })
+  }
+  return list
+})
+const SORT_LABEL={risk:'风险从高到低',depart:'起飞从早到晚',arrive:'到达从早到晚',
+  callsign:'班次号',alt:'高度从高到低',pModel:'模型概率从高到低'}
+const sortLabel=computed(()=>{
+  const name=SORT_LABEL[sortKey.value]||sortKey.value
+  return (sortDir.value==='asc'?name.replace('从高到低','从低到高').replace('从早到晚','从晚到早'):name)
+})
+const filterCounts=computed(()=>{
+  const list=baseRows.value
+  return {
+    all:list.length,
+    high:list.filter(f=>f.riskLevel==='HIGH').length,
+    detour:list.filter(f=>f.decision==='DETOUR').length,
+    hold:list.filter(f=>f.decision==='HOLD').length,
+    model:list.filter(f=>(f.pModel||0)>=0.35).length,
+  }
+})
 const rows=computed(()=>{
   const list=[...baseRows.value]
-  if(props.variant==='briefing'){
-    // 情报的读法是"先看最危险的那几班"，不是"先看最早起飞的那班"
+  if(props.variant==='briefing'&&sortKey.value==='risk'&&sortDir.value==='desc'){
     list.sort((a,b)=>(b.riskP||0)-(a.riskP||0))
   }
   return list
@@ -97,6 +166,29 @@ const model=computed(()=>data.value?.modelCard||null)
 const modelTest=computed(()=>model.value?.nationalModel?.metrics?.test||null)
 
 const limit=computed(()=>props.density==='slim'?16:(props.density==='min'?10:120))
+
+// 机场情报的排序：默认保持接口顺序（机场城市按重要性排过），点表头才换。
+const intelKey=ref('')
+const intelDir=ref('asc')
+function toggleIntel(key){
+  if(intelKey.value===key){ intelDir.value=intelDir.value==='asc'?'desc':'asc' }
+  else{ intelKey.value=key; intelDir.value=(key==='city'||key==='icao')?'asc':'asc' }
+}
+function intelMark(key){ return intelKey.value===key?(intelDir.value==='asc'?'▲':'▼'):'' }
+const intelRows=computed(()=>{
+  const list=[...intel.value]
+  if(!intelKey.value) return list
+  const get={vis:r=>r.visM==null?1e9:r.visM, wind:r=>r.windMps==null?-1:r.windMps,
+             temp:r=>r.tempC==null?-1e9:r.tempC,
+             city:r=>String(r.city||''), icao:r=>String(r.icao||'')}[intelKey.value]
+  if(!get) return list
+  const dir=intelDir.value==='asc'?1: -1
+  return list.sort((a,b)=>{
+    const x=get(a),y=get(b)
+    if(typeof x==='string'||typeof y==='string') return String(x).localeCompare(String(y),'zh')*dir
+    return (x-y)*dir
+  })
+})
 
 // 逐市实况：和机场情报放在同一页，才有"机场能飞、周边看不见"的对照
 const weatherRows=computed(()=>{
@@ -155,22 +247,39 @@ function clock(m){
           <p>点一行选中班次，再在下方详情里点「取证」，得到从实况、判据到裁决的逐行来源链。</p>
         </template>
         <template v-else-if="variant==='briefing'">
-          <h3>在飞班次情报 <small>{{ rows.length }} 架 · 按风险从高到低</small></h3>
+          <h3>在飞班次情报 <small>{{ shownRows.length }} 架 · {{ sortLabel }}</small></h3>
           <p>每行一架飞行汽车：风险分、判据来源与放行裁决。申请 / 计划 / 实际三个时刻见「处置 · 调度台账」。</p>
         </template>
         <template v-else>
-          <h3>全国班次台账 <small>{{ rows.length }} 架在飞 · {{ upcoming.length }} 班待起飞</small></h3>
+          <h3>全国班次台账 <small>{{ shownRows.length }} 架在飞 · {{ upcoming.length }} 班待起飞</small></h3>
           <p>申请、计划、实际分列；每行是一架独立班次，点行选中后在详情里可取证。</p>
         </template>
       </div>
+
+      <!-- 二次归类：状态筛选片 + 表头排序。默认"全部 / 风险降序"，
+           但读者可以自己换成"按起飞时刻""只看延期"等等。 -->
+      <div class="nb-filters" data-intel-filters>
+        <button v-for="f in FILTERS" :key="f.key" :class="{on:filterKey===f.key}"
+                :data-filter="f.key" @click="filterKey=f.key">
+          {{ f.label }} <em>{{ filterCounts[f.key] }}</em>
+        </button>
+        <span class="nb-sortnote">
+          排序：{{ sortLabel }}<template v-if="filterKey!=='all'"> · 已筛 {{ shownRows.length }} 架</template>
+        </span>
+      </div>
+
       <div class="nb-scroll">
         <table class="ledger">
           <thead><tr>
-            <th>班次 / 类型</th><th>起讫与航线</th><th>申请 / 计划 / 实际</th>
-            <th>高度 / 许可</th><th>风险 / 裁决</th><th>限制</th>
+            <th class="srt" @click="toggleSort('callsign')">班次 / 类型 <i>{{ sortMark('callsign') }}</i></th>
+            <th>起讫与航线</th>
+            <th class="srt" @click="toggleSort('depart')">申请 / 计划 / 实际 <i>{{ sortMark('depart') }}</i></th>
+            <th class="srt" @click="toggleSort('alt')">高度 / 许可 <i>{{ sortMark('alt') }}</i></th>
+            <th class="srt" @click="toggleSort('risk')">风险 / 裁决 <i>{{ sortMark('risk') }}</i></th>
+            <th class="srt" @click="toggleSort('pModel')">限制 <i>{{ sortMark('pModel') }}</i></th>
           </tr></thead>
           <tbody>
-            <tr v-for="f in rows.slice(0,limit)" :key="f.id"
+            <tr v-for="f in shownRows.slice(0,limit)" :key="f.id"
                 :class="{sel:f.id===selectedId}" @click="emit('select',f)">
               <td><b>{{ f.callsign }}</b><small>{{ f.id }} · {{ f.kindLabel||'省内' }}</small></td>
               <td><span class="leg">{{ f.fromName }} → {{ f.toName }}</span><small>{{ f.corridor }}</small></td>
@@ -186,7 +295,7 @@ function clock(m){
               </td>
               <td>{{ (f.alerts||[]).map(a=>a.label).join(' / ')||'—' }}</td>
             </tr>
-            <tr v-for="f in upcoming.slice(0,props.density==='slim'?12:30)" :key="'u'+f.id" class="future">
+            <tr v-if="filterKey==='all'" v-for="f in upcoming.slice(0,props.density==='slim'?12:30)" :key="'u'+f.id" class="future">
               <td><b>{{ f.id.split('#')[0] }}</b><small>待起飞</small></td>
               <td>{{ f.fromName }} → {{ f.toName }}</td>
               <td><small>计划 {{ f.departAt }}</small><small>到达 {{ f.arriveAt }}</small></td>
@@ -194,7 +303,8 @@ function clock(m){
               <td><small>{{ f.waitMin }} 分钟后</small></td>
               <td>—</td>
             </tr>
-            <tr v-if="!rows.length&&!upcoming.length"><td colspan="6" class="empty">此刻没有班次</td></tr>
+            <tr v-if="!shownRows.length&&!upcoming.length"><td colspan="6" class="empty">
+              {{ filterKey==='all'?'此刻没有班次':'当前筛选下没有班次 —— 换一个筛选片或点「全部」' }}</td></tr>
           </tbody>
         </table>
       </div>
@@ -218,9 +328,16 @@ function clock(m){
         </p>
       </div>      <div class="nb-scroll">
         <table>
-          <thead><tr><th>机场</th><th>城市</th><th>能见度</th><th>风</th><th>温度</th><th>建议</th></tr></thead>
+          <thead><tr>
+            <th class="srt" @click="toggleIntel('icao')">机场 <i>{{ intelMark('icao') }}</i></th>
+            <th class="srt" @click="toggleIntel('city')">城市 <i>{{ intelMark('city') }}</i></th>
+            <th class="srt" @click="toggleIntel('vis')">能见度 <i>{{ intelMark('vis') }}</i></th>
+            <th class="srt" @click="toggleIntel('wind')">风 <i>{{ intelMark('wind') }}</i></th>
+            <th class="srt" @click="toggleIntel('temp')">温度 <i>{{ intelMark('temp') }}</i></th>
+            <th>建议</th>
+          </tr></thead>
           <tbody>
-            <tr v-for="row in intel.slice(0,props.density==='slim'?16:80)" :key="row.city+row.icao">
+            <tr v-for="row in intelRows.slice(0,props.density==='slim'?16:80)" :key="row.city+row.icao">
               <td><b>{{ row.icao||'—' }}</b><small>{{ row.station||'—' }}</small></td>
               <td>{{ row.city }}<small>{{ row.province }}</small></td>
               <td :class="{bad:row.low}">{{ visText(row.visM) }}</td>
@@ -297,6 +414,21 @@ function clock(m){
 .nb-weather li b{flex:0 0 auto}
 .nb-weather li.bad{outline:1px solid rgba(226,75,74,.5)}
 .nb-weather span{color:#8fb2c8}
+.nb-filters{display:flex;align-items:center;gap:5px;flex-wrap:wrap;padding:0 2px 6px}
+.nb-filters button{background:none;border:1px solid rgba(70,110,140,.45);color:#9dbccf;
+  border-radius:999px;padding:2px 9px;font-size:10.5px;cursor:pointer;transition:.15s}
+.nb-filters button:hover{border-color:rgba(110,180,215,.7);color:#cfe6f5}
+.nb-filters button.on{background:rgba(126,206,255,.16);border-color:rgba(126,206,255,.7);color:#eaf8ff}
+.nb-filters button em{font-style:normal;opacity:.7;margin-left:3px}
+.nb-sortnote{margin-left:auto;font-size:10px;color:#6f92a8}
+table th.srt{cursor:pointer;user-select:none;white-space:nowrap}
+table th.srt:hover{color:#eaf8ff}
+table th.srt i{font-style:normal;font-size:9px;color:#8ef0ff;margin-left:2px}
+html[data-theme="light"] .nb-filters button{border-color:#cfdcea;color:#31556f}
+html[data-theme="light"] .nb-filters button.on{background:#e3f0fb;border-color:#9cc7e8;color:#0d4f74}
+html[data-theme="light"] .nb-sortnote{color:#6b8399}
+html[data-theme="light"] table th.srt:hover{color:#0f3550}
+html[data-theme="light"] table th.srt i{color:#0b7ea6}
 .nb-scroll{overflow:auto;min-height:0;flex:1;border:1px solid rgba(70,110,140,.3);border-radius:8px}
 table{width:100%;border-collapse:collapse;font-size:11.5px}
 /* 台账：列宽定死，否则"起讫与航线"会把后面几列挤到看不见；表格本身不横向滚 */

@@ -452,18 +452,27 @@ def traffic_v2_overview(seed: int = Query(42),
 @app.get('/traffic/v2/nation/flights')
 def traffic_v2_nation_flights(level: str = Query('nation', pattern='^(nation|region|province|city)$'),
                               id: str = Query(''),
-                              minute: int = Query(0, ge=0, le=1440)):
-    """时间轴专用：只回本级的在飞航班与统计，不重算网络。"""
+                              minute: int = Query(0, ge=0, le=1440),
+                              virtual: int = Query(0, ge=0, le=1)):
+    """时间轴专用：只回本级的在飞航班与统计，不重算网络。
+
+    virtual=1 走"虚拟气象演示包"：合成回波几何，绕飞/停飞按同一套判定重算。
+    """
     from traffic import nation as traffic_nation
-    return traffic_nation.flights_payload(level, id or None, minute)
+    return traffic_nation.flights_payload(level, id or None, minute, bool(virtual))
 
 
 @app.get('/traffic/v2/nation')
 def traffic_v2_nation(level: str = Query('nation', pattern='^(nation|region|province|city)$'),
-                      id: str = Query(''), minute: int = Query(0, ge=0, le=1440)):
-    """全国航线网四级：全国 → 大区 → 省 → 市。每级单独请求，前端逐级加载。"""
+                      id: str = Query(''), minute: int = Query(0, ge=0, le=1440),
+                      virtual: int = Query(0, ge=0, le=1)):
+    """全国航线网四级：全国 → 大区 → 省 → 市。每级单独请求，前端逐级加载。
+
+    virtual=1 走"虚拟气象演示包"（合成回波，非实况），用来演示全国恶劣天气下的
+    大面积停飞与绕飞；关掉即回到真实回波，两条路径不共享缓存。
+    """
     from traffic import nation as traffic_nation
-    payload = traffic_nation.payload(level, id or None, minute)
+    payload = traffic_nation.payload(level, id or None, minute, bool(virtual))
     if payload.get('status') == 'NOT_FOUND':
         raise HTTPException(404, payload.get('note') or '未找到')
     return payload
@@ -483,6 +492,19 @@ def traffic_v2_nation_pulse():
     """全国层状态心跳：雷达帧 / 实况时刻 / 模型版本。由网关 WS 定时广播。"""
     from traffic import nation as traffic_nation
     return traffic_nation.pulse()
+
+
+@app.get('/traffic/v2/nation/journal')
+def traffic_v2_nation_journal(minute: int = Query(60, ge=0, le=1440),
+                             lookback: int = Query(40, ge=5, le=180),
+                             level: str = Query('nation'),
+                             ident: str = Query('')):
+    """全国运行日志：窗口内的起飞/到达/绕飞/延期/停飞 + 数据源时刻。
+
+    不存在历史表：班次是解析式生成的，给定分钟就能重算，所以日志是**派生**的。
+    """
+    from traffic import nation as traffic_nation
+    return traffic_nation.journal(minute, lookback, level, ident)
 
 
 @app.get('/traffic/v2/nation/evidence')

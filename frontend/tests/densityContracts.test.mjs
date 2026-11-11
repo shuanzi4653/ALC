@@ -47,8 +47,14 @@ async function sources() {
 function consumedKeys(rows) {
   const out = new Set()
   for (const { text } of rows) {
-    for (const match of text.matchAll(/:open="(?:policy|densityPolicy\(density\))\.(\w+)"/g)) {
-      out.add(match[1])
+    // 只要求"这个开关出现在某个 :open 表达式里"，不要求它是整个表达式的第一项：
+    // 日志页的写法是 `:open="journalSource==='nation'?true:policy.audit"` ——
+    // 全国模式下强制展开，东北会话仍听密度策略。旧正则只匹配 `:open="policy.x"`，
+    // 于是"确实消费了"却被判成没人读。
+    for (const match of text.matchAll(/:open="([^"]*)"/g)) {
+      for (const key of match[1].matchAll(/(?:policy|densityPolicy\(density\))\.(\w+)/g)) {
+        out.add(key[1])
+      }
     }
   }
   return out

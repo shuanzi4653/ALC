@@ -140,6 +140,17 @@ public class DecisionController {
         return python.decisionRequest("/traffic/v2/nation/zones" + (query.isEmpty() ? "" : "?" + query), null);
     }
 
+    /**
+     * 全国运行日志（派生）。与 zones/evidence 同属两段路径：网关只透传显式声明过的路径，
+     * 漏一条前端就是 404 —— 而 404 在界面上看起来像"没有日志"，不像"路由没开"。
+     */
+    @GetMapping("/traffic/v2/nation/journal")
+    public ResponseEntity<?> nationJournal(@RequestParam Map<String, String> params) throws Exception {
+        String query = params.entrySet().stream().map(e -> encode(e.getKey()) + "=" + encode(e.getValue()))
+                .collect(Collectors.joining("&"));
+        return python.decisionRequest("/traffic/v2/nation/journal" + (query.isEmpty() ? "" : "?" + query), null);
+    }
+
     @GetMapping("/traffic/health")
     public ResponseEntity<?> trafficHealth() throws Exception {
         return python.decisionRequest("/traffic/health", null);

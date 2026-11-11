@@ -2,6 +2,7 @@
 import {computed,defineAsyncComponent,onMounted,onUnmounted,ref,watch} from 'vue'
 import {requestJson} from '../../api.js'
 import {store} from '../../store.js'
+import NationDeduce from './NationDeduce.vue'
 import NationMap from './NationMap.vue'
 import NationBriefing from './NationBriefing.vue'
 import {parseScope,scopeKey} from '../../traffic/scope.js'
@@ -82,6 +83,10 @@ const audience=ref('ops')
 const zoneGeom=ref(null)
 // 禁飞区在首页默认开（用户 2026-11-11 要求：气象与非气象都要在首页看得到）
 const zoneOn=ref(true)
+// 虚拟气象演示包：后端 ?virtual=1 生成合成回波并**重算**绕飞与停飞，
+// 不是前端加一层滤镜 —— 关掉立刻回到真实回波，两条路径互不污染。
+const virtualWx=ref(false)
+const wxVirtual=computed(()=>!!data.value?.radar?.virtual)
 // —— 航线显示：三档开关 + 条数上限（用户要"人工决定开多少个"） ——
 const LINE_KEY='alc.traffic.lines'
 const lineKinds=ref({cross:true,feed:true,intra:false})
@@ -277,13 +282,18 @@ async function loadFlights(){
   const my=++seq
   try{
     const payload=await requestJson(
-      `/api/traffic/v2/nation/flights?level=${encodeURIComponent(level.value)}&id=${encodeURIComponent(ident.value)}&minute=${Math.round(minute.value)}`,
+      `/api/traffic/v2/nation/flights?level=${encodeURIComponent(level.value)}&id=${encodeURIComponent(ident.value)}&minute=${Math.round(minute.value)}${virtualWx.value?'&virtual=1':''}`,
       {timeoutMs:20000})
     if(my!==seq) return
     flights.value=payload.flights||[]
     byProvince.value=payload.byProvince||{}
     byCity.value=payload.byCity||{}
     live.value={...live.value,...(payload.traffic||{})}
+    // 选中的那架如果这一分钟已经落地/飞出窗口，选中态必须跟着清掉 ——
+    // 否则详情卡还挂着一架"库里已经没有"的飞机，切层级后更是只留下一条画不出来的航线。
+    if(selectedId.value&&!flights.value.some(f=>f.id===selectedId.value)){
+      selectedId.value='';followId.value='';clearEvidence()
+    }
   }catch(e){/* 时间轴刷新失败不打断主界面 */}
 }
 
@@ -297,7 +307,7 @@ async function load(){
   flights.value=[]
   try{
     data.value=await requestJson(
-      `/api/traffic/v2/nation?level=${encodeURIComponent(level.value)}&id=${encodeURIComponent(ident.value)}&minute=${Math.round(minute.value)}`,
+      `/api/traffic/v2/nation?level=${encodeURIComponent(level.value)}&id=${encodeURIComponent(ident.value)}&minute=${Math.round(minute.value)}${virtualWx.value?'&virtual=1':''}`,
       {timeoutMs:45000})
     flights.value=data.value?.flights||[]
     live.value={...(data.value?.traffic||{})}
@@ -346,6 +356,13 @@ function drill(nextLevel,nextId,label){
 }
 
 function togglePlay(){ playing.value=!playing.value }
+
+// 切虚拟气象要整份重取（网络、绕飞、事件、禁飞区全变），
+// 只刷航班不够 —— 航班表是从 network 里切出来的。
+function toggleVirtual(){
+  virtualWx.value=!virtualWx.value
+  load()
+}
 
 // 常驻 rAF：播放时才推进 frameMinute，暂停时把它对齐回 minute。
 // 用 rAF 而不是 setInterval：60fps 的连续性才能让"移动"成立，
@@ -696,6 +713,11 @@ onUnmounted(()=>{
       纳入 <b>{{ summary.provinces }}</b> 省 · <b>{{ summary.cities }}</b> 市 ·
       <b>{{ summary.airports }}</b> 机场 · <b>{{ summary.feedCities }}</b> 市无机场（专用接驳）·
       <b>{{ summary.weatherCities }}</b> 市有实况
+      <!-- 演示包必须自带角标：合成回波看起来和实况一模一样，
+           不在页头挂一个"虚拟"，任何人截图出去都会当成真实天气。 -->
+      <em class="nrn-virt" v-if="wxVirtual" data-virtual-badge>
+        虚拟气象 · 合成回波，非实况
+      </em>
     </p>
   </header>
 
@@ -735,7 +757,7 @@ onUnmounted(()=>{
        都会把链条打断 —— 提示条有值时整个内容区会被排除掉（实测整页空白）。
        所以这里显式写全条件，不用 else-if 链。 -->
   <p class="nrn-hint" v-if="hint&&mode!=='card'&&data&&!loading&&!error" data-nation-hint>{{ hint }}</p>
-  <div class="nrn-body" v-if="data&&!loading&&!error" :class="{'no-map':view!=='map'}">
+  <div class="nrn-body" v-if="data&&!loading&&!error" :class="{'no-map':view!=='map','card-mode':mode==='card'}">
     <!-- ================= 态势 ================= -->
     <div class="nrn-map" v-show="view==='map'">
       <div class="nrn-tools">
@@ -753,6 +775,9 @@ onUnmounted(()=>{
         <button :class="{on:lineStats.shown>0}" @click="linePanel=!linePanel"
                 :title="'显示哪些航线：跨省主干 / 机场接驳 / 省内短途；条数可以自己拖'">
           航线 {{ lineStats.shown }}/{{ lineStats.total }}</button>
+        <button :class="{on:virtualWx}" @click="toggleVirtual"
+                :title="'虚拟气象演示包：在后端生成合成回波，并按同一套判定重算绕飞与停飞；非实况'">
+          虚拟气象</button>
         <button :class="{on:zoneOn}" @click="zoneOn=!zoneOn; zoneOn&&ensureZones()"
                 :title="'禁飞区：机场净空 + 强回波，红色多边形框；关掉连绕飞一起隐藏'">禁飞</button>
         <button :class="{on:terrainOn}" @click="terrainOn=!terrainOn">地形</button>
@@ -898,7 +923,11 @@ onUnmounted(()=>{
       </div>
 
       <!-- 上：区块。全国只列大区，点进去才换成省；再往里换城市 —— 一层只放一层 -->
-      <div class="nrn-blocks">
+      <!-- 推演：六段链路。与态势共用同一栏，但内容完全不同 ——
+           之前两页长得一样，是因为推演根本没有自己的面板，直接复用了右栏。 -->
+      <NationDeduce v-if="mode==='card'" :flight="selectedFlight" :minute="minute" :paused="!playing"/>
+
+      <div class="nrn-blocks" v-if="mode!=='card'">
         <template v-if="rollup.level==='nation'">
           <h3>各大区<small>点区块下钻</small></h3>
           <button class="nrn-region" v-for="region in rollup.regions" :key="region.id"
@@ -946,7 +975,7 @@ onUnmounted(()=>{
       </div>
 
       <!-- 双受众的另一半：空域视角的侧栏。同一套几何，换成"哪些点禁飞、边界在哪"的读法 -->
-      <div class="nrn-zone" v-if="audience==='airspace'" data-zone-panel>
+      <div class="nrn-zone" v-if="mode!=='card'&&audience==='airspace'" data-zone-panel>
         <h4>空域净空
           <small>规则化生成 · {{ zonePolicy==='PROHIBITED'?'一律禁飞':'可申请穿越' }}</small></h4>
         <p><span>受限额</span><b>{{ zoneCounts.airports||0 }} 机场</b></p>
@@ -964,7 +993,7 @@ onUnmounted(()=>{
       </div>
 
       <!-- 下：气象。跟着上面的粒度走：全国看重点城市，进区看该区各市，进省看本省各市 -->
-      <div class="nrn-wx" data-nation-weather>
+      <div class="nrn-wx" v-if="mode!=='card'" data-nation-weather>
         <h4 :title="wxSourceDetail">气象实况
           <small v-if="wxTotal">{{ wxTotal }} 城<template v-if="wxSourceText"> · {{ wxSourceText }}</template><template v-if="wxStale"> · 旧数据<template v-if="wxAgeText">（{{ wxAgeText }}）</template></template><template v-else-if="wxAgeText"> · {{ wxAgeText }}</template></small>
           <small v-else>{{ wxRefreshing?'补数中…（后台抓取多源实况）':(weatherMeta.expiredSnapshot?'快照超过 6 小时已作废，等重新抓取':'暂无实况') }}</small>
@@ -991,7 +1020,7 @@ onUnmounted(()=>{
   </div>
 
   <!-- ================= 详情：班次 / 走廊 ================= -->
-  <div class="nrn-detail" v-if="selectedFlight||selectedLine" data-nation-detail>
+  <div class="nrn-detail" v-if="mode!=='card'&&(selectedFlight||selectedLine)" data-nation-detail>
     <template v-if="selectedFlight">
       <header>
         <b>{{ selectedFlight.callsign }}</b>
@@ -1136,6 +1165,9 @@ onUnmounted(()=>{
   border-radius:5px;padding:3px 9px;font-size:11px;cursor:pointer}
 .nrn-aud button.on{background:#17394d;border-color:#2e6b85;color:#bfe9ff}
 .nrn-aud button.policy{border-color:rgba(245,190,60,.5);color:#ffd479}
+.nrn-virt{margin-left:8px;font-style:normal;font-size:10px;padding:1px 7px;border-radius:999px;
+  color:#ffd08a;background:rgba(200,140,30,.16);border:1px solid rgba(220,170,60,.55)}
+html[data-theme="light"] .nrn-virt{color:#8a5a00;background:#fdf3e0;border-color:#e0bb78}
 .nrn-linepanel{position:absolute;top:52px;left:14px;z-index:9;width:250px;
   display:flex;flex-direction:column;gap:6px;padding:9px 11px;border-radius:9px;
   background:rgba(9,24,36,.97);border:1px solid rgba(70,120,155,.6);
@@ -1175,6 +1207,10 @@ html[data-theme="light"] .nrn-lineall{background:#f2f7fc;border-color:#cfdcea;co
 .nrn-body>.nrn-map{min-width:0;overflow:hidden}
 .nrn-body>.nrn-side{min-width:0}
 .nrn-body.no-map{grid-template-columns:minmax(0,1fr) 360px}
+/* 推演：右栏内容比一屏高。grid 行默认按内容高度撑开，会把右栏顶出容器、
+   压到下面的详情卡上（实测板子直接盖住取证按钮）。钉成一整行，让板子自己滚。 */
+.nrn-body.card-mode{grid-template-rows:minmax(0,1fr)}
+.nrn-body.card-mode>.nrn-side{overflow:hidden}
 
 .nrn-map{position:relative;display:flex;flex-direction:column;min-height:0;gap:6px;min-width:0;width:auto}
 .nrn-hint{margin:0;padding:5px 9px;border-radius:6px;font-size:11.5px;color:#a9cde2;
@@ -1191,7 +1227,12 @@ html[data-theme="light"] .nrn-lineall{background:#f2f7fc;border-color:#cfdcea;co
 .nrn-mapfoot{position:absolute;left:8px;right:8px;bottom:6px;z-index:4;
   display:flex;flex-direction:column;gap:4px;pointer-events:none;
   transition:opacity .25s ease}
-.nrn-mapfoot.dim{opacity:.26}
+/* 压暗后鼠标移上去要能恢复：容器是 pointer-events:none（不能挡住地图），
+   所以 hover 必须挂在容器自己身上，而不是靠子元素冒泡上去 —— 子元素同样不吃事件。
+   做法：容器在压暗时恢复 auto 事件，靠 :has 只在指针真落在浮层上时提亮。 */
+.nrn-mapfoot.dim{opacity:.26;pointer-events:none}
+.nrn-mapfoot{pointer-events:none}
+.nrn-mapfoot:hover{opacity:1}
 .nrn-mapfoot.dim:hover{opacity:1}
 .nrn-monitor{
   padding:5px 9px;border:1px solid rgba(80,130,160,.35);border-radius:7px;

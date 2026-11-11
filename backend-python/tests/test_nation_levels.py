@@ -124,7 +124,13 @@ def test_payload_size_is_bounded_per_level():
         # 卡体积；实测 576 KB（多出来的部分是 80 城逐市实况：温度/风速/能见度
         # 由 null 变成真值，属于"多了真数据"，不是冗余）。
         # 真要压，该压的是"每次请求重复解析"，而不是砍字段。
-        assert len(body.encode('utf-8')) < 700 * 1024, f'{level} 级载荷异常膨胀'
+        #
+        # V1.0.3 起回波几何精度提高（网格 15 km → 4.4 km，再做闭运算 + Chaikin 平滑），
+        # 顶点数 ×2.7，全国载荷 576 KB → 738 KB —— 其中回波占六成以上。
+        # 这是用户明确要的"不要锯齿"，所以放宽这条线而不是把几何削回去；
+        # 已经做的压缩：坐标 3 位 → 2 位（≈1.1 km，远小于格距）、每档按面积取前 200、
+        # 帧级缓存（同帧第二次请求 0.08 s）。
+        assert len(body.encode('utf-8')) < 820 * 1024, f'{level} 级载荷异常膨胀'
 
 
 def test_province_level_shows_cross_province_endpoints():

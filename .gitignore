@@ -86,3 +86,6 @@ data/terrain-cache/
 
 # 逐市实况缓存（运行时抓取，随时会变；由 backend-python/weather/city_weather.py 自动重建）
 data/cache/
+
+# 临时抓包（调试时 curl 落盘的整份载荷，别提交：738 KB 的机器生成 JSON）
+*.tmp.json

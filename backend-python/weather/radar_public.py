@@ -173,7 +173,9 @@ def _rings_of(cells: List[Tuple[float, float]]) -> List[List[List[float]]]:
         if part.area < 0.004:
             continue
         smooth = _chaikin(list(part.exterior.coords), 1)
-        coords = [[round(x, 3), round(y, 3)] for x, y in smooth]
+        # 2 位小数 ≈ 1.1 km：平滑后的顶点间距本来就在 0.5–1 km，
+        # 再保留 3 位只是在给 JSON 加字节（全国载荷 830 KB，其中回波占七成）。
+        coords = [[round(x, 2), round(y, 2)] for x, y in smooth]
         if len(coords) >= 4:
             rings.append(coords)
     rings.sort(key=lambda ring: -abs(_ring_area(ring)))
@@ -221,7 +223,7 @@ def fetch(force: bool = False) -> Dict[str, Any]:
         return _empty(f'取帧失败：{str(exc)[:90]}')
 
     stamp = datetime.fromtimestamp(frame['time'], tz=timezone.utc).strftime('%Y%m%d%H%M')
-    cache_file = CACHE_DIR / f'{stamp}-z{TILE_ZOOM}-g{GRID_DEG}-geo2.json'
+    cache_file = CACHE_DIR / f'{stamp}-z{TILE_ZOOM}-g{GRID_DEG}-geo3.json'
     if cache_file.exists() and not force:
         try:
             cached = json.loads(cache_file.read_text(encoding='utf-8'))

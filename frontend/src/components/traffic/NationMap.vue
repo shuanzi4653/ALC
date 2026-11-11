@@ -383,11 +383,24 @@ const corridors=computed(()=>{
 function shortName(name){
   // 省级与市级共用一个规则：先剥自治区/特区/省，再剥市/地区/盟/自治州。
   // 两处（地图标签、右栏列表）必须一致，否则同一个省在图上叫"新疆"、在右栏叫"新疆维吾尔自治区"。
-  return (name||'')
+  const base=(name||'')
     .replace(/维吾尔自治区$/,'').replace(/壮族自治区$/,'').replace(/回族自治区$/,'')
     .replace(/特别行政区$/,'').replace(/自治区$/,'').replace(/省$/,'')
     .replace(/(市|地区|盟|自治州|自治县)$/,'')
-    .replace(/(朝鲜族|蒙古族|藏族|苗族|侗族|彝族|哈尼族|壮族|傣族|白族|土家族|布依族|傈僳族|景颇族|羌族|回族|维吾尔族)$/,'')
+  return trimEthnic(base)
+}
+
+// 民族名可能有两三个连着（"黔西南布依族苗族自治州" → 剥掉自治州还剩"布依族苗族"）。
+// 只剥一次会留下"黔西南布依族"这种半截名字，看着像没写完 —— 循环剥到剥不动为止。
+const ETHNIC=/(朝鲜族|蒙古族|藏族|苗族|侗族|彝族|哈尼族|壮族|傣族|白族|土家族|布依族|傈僳族|景颇族|羌族|回族|维吾尔族|哈萨克族|柯尔克孜族|锡伯族|达斡尔族|鄂温克族|鄂伦春族|满族|瑶族|畲族|黎族|水族|仡佬族|拉祜族|佤族|纳西族|普米族|阿昌族|怒族|独龙族|基诺族|德昂族|布朗族|撒拉族|东乡族|保安族|裕固族|土族|门巴族|珞巴族)$/
+function trimEthnic(name){
+  let out=name
+  for(let i=0;i<4;i++){
+    const next=out.replace(ETHNIC,'')
+    if(next===out) break
+    out=next
+  }
+  return out
 }
 const nodes=computed(()=>{
   const all=(props.data?.nodes||[])
@@ -405,12 +418,23 @@ const labels=computed(()=>{
     const [x,y]=project(node.lon,node.lat)
     return {...node,x,y,short:shortName(node.name)}
   })
-  const limit=level.value==='nation'?0:(props.density==='slim'?12:40)
-  if(!limit) return []
-  const ordered=list.sort((a,b)=>(a.rank||3)-(b.rank||3))
+  // 跨省航线的两端**提权**：它们不一定有机场（南通、锦州这类），rank 天然靠后，
+  // 以前只取 rank<=2 且截断 12/40，于是"有航线、没地名"，读者只能对着一条线猜起讫。
+  // 现在：凡是当前画出来的跨省航线端点，与省会同级参与排版。
+  const ends=new Set()
+  for(const line of corridors.value){
+    if(line.kind==='CROSS'){ ends.add(line.fromName); ends.add(line.toName) }
+  }
+  const rankOf=(node)=>ends.has(node.name)?0:(node.rank||3)
+  // 全国层现在也标（只标本级之外有连线的端点与省会，约 40 个）：
+  // 一个地名都不给，等于让读者自己数城市点。
+  const limit=props.density==='slim'?18:(level.value==='nation'?44:40)
+  const ordered=list.filter(node=>level.value!=='nation'||rankOf(node)===0||node.capital)
+    .sort((a,b)=>rankOf(a)-rankOf(b))
   const placed=[]
   for(const node of ordered){
-    if(placed.some(p=>Math.abs(p.y-node.y)<12&&Math.abs(p.x-node.x)<54)) continue
+    // 避让盒从 54×12 收到 48×10：多留几个位置，跨省端点才排得下
+    if(placed.some(p=>Math.abs(p.y-node.y)<10&&Math.abs(p.x-node.x)<48)) continue
     placed.push(node)
     if(placed.length>=limit) break
   }
@@ -449,6 +473,9 @@ const flightDots=computed(()=>{
     // 进站淡出、离站淡入 —— "飞出去就没了"，而不是从图上突然跳掉，
     // 这是 Flightradar24 那种"活的"观感的来源。命中判据只在这一小段里失效。
     const fade=p>=.985?Math.max(0,(1-p)/.015):(p<=.02?Math.max(.25,p/.02):1)
+    // 已经淡到看不见的班次直接不生成 DOM：只把 opacity 设 0 的话，
+    // 每帧仍要重建这些节点（实测多出 10–20 个死节点），命中判据也还认它们。
+    if(fade<=0.02) continue
     out.push({...f,x,y,progressNow:Math.max(0,Math.min(1,p)),fade,
       selected:props.selectedId===f.id,
       detour:f.status==='DELAYED',bad:f.riskLevel==='HIGH'})

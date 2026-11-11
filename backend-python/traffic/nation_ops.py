@@ -169,7 +169,8 @@ def _clock(minute: float) -> str:
 def flight_objects(corridors: Iterable[Dict[str, Any]], minute: int,
                    detours: Dict[str, Dict[str, Any]],
                    weather: Dict[str, Dict[str, Any]],
-                   model_probs: Optional[Dict[str, float]] = None) -> List[Dict[str, Any]]:
+                   model_probs: Optional[Dict[str, float]] = None,
+                   blocked_ids: Optional[Any] = None) -> List[Dict[str, Any]]:
     """某一分钟在飞的班次对象。
 
     **每架一个独立对象**：有自己的编号、起降城市、计划时刻、许可、风险、裁决与高度剖面，
@@ -210,6 +211,15 @@ def flight_objects(corridors: Iterable[Dict[str, Any]], minute: int,
         arrive = depart + duration + late
         cruise = CRUISE_M[0] + int(min(1.0, (row.get('lengthKm') or 100) / 260.0) * (CRUISE_M[1] - CRUISE_M[0]))
         risk = _risk(row, weather, detour, model_probs)
+        # 航路压在强回波里、又找不到能脱离的小绕方案 —— 这不是"照原路飞"，
+        # 是"这条航路此刻不成立"。以前这种走廊在表里没有记录，于是被当成正常放行，
+        # 屏上就会出现"穿红回波却写着直飞放行"的自相矛盾。
+        if blocked_ids and row['id'] in blocked_ids:
+            risk = {**risk,
+                    'decision': 'HOLD',
+                    'decisionLabel': '停飞（无可用绕飞方案）',
+                    'riskLevel': 'HIGH', 'riskLevelLabel': '高',
+                    'drivers': list(risk.get('drivers') or []) + ['航路压在强回波内，小绕无法脱离']}
         slot = int((minute - phase) // headway)
         callsign = f"TC{row['id'].split('-')[-1]}{slot % 10}"
 

@@ -243,15 +243,36 @@ const JOURNAL_KINDS=[
   {key:'EXPORT',label:'导出'},
 ]
 const journal=ref([]),journalLoading=ref(false),journalError=ref(''),journalKind=ref(''),journalQuery=ref('')
+const journalSource=ref('')      // 'session' | 'nation' | ''
 async function loadJournal(){
   const id=props.session?.sessionId
-  if(!id){journal.value=[];return}
   journalLoading.value=true;journalError.value=''
-  try{journal.value=await requestJson('/api/traffic/journal?sessionId='+id)}
-  catch(e){journalError.value=e.message;journal.value=[]}
+  // 两本账：有东北会话 id 就读那本（含人工处置记录）；
+  // 全国模式没有会话 —— 之前这里直接 return，于是日志页永远是空表。
+  // 现在改读全国派生日志：窗口内的起飞/到达/绕飞/延期/停飞 + 数据源时刻。
+  if(id){
+    try{
+      const rows=await requestJson('/api/traffic/journal?sessionId='+id)
+      if(Array.isArray(rows)&&rows.length){
+        journalSource.value='session'
+        journal.value=rows
+        journalLoading.value=false
+        return
+      }
+      // 会话在、但这本日志是空的（全国作用域下常见：那个会话只服务东北原页）。
+      // 以前这里就 return 了，于是日志页永远 0 行 —— 空表不是"没有事件"，是"读错了账本"。
+    }catch(e){journalError.value=e.message}
+  }
+  journalSource.value='nation'
+  try{
+    const body=await requestJson(`/api/traffic/v2/nation/journal?minute=${Math.round(props.minute||60)}&lookback=40`)
+    journal.value=(body?.rows||[]).map(row=>({...row,at:row.at||''}))
+    const w=body?.window||[]
+    journalWindow.value=w.length===2?`第 ${w[0]}–${w[1]} 分钟` : ''
+  }catch(e){journalError.value=e.message;journal.value=[]}
   finally{journalLoading.value=false}
 }
-watch(()=>[props.view,props.session?.sessionId],()=>{
+watch(()=>[props.view,props.session?.sessionId,props.session?.sessionId?null:Math.round(props.minute||60)],()=>{
   if(props.view==='history'||props.view==='alerts')loadJournal()
 },{immediate:true})
 const journalRows=computed(()=>{
@@ -268,7 +289,15 @@ const journalCounts=computed(()=>{
   for(const row of journal.value)counts[row.kind]=(counts[row.kind]||0)+1
   return counts
 })
-const journalTime=row=>row.at?new Date(row.at).toLocaleString('zh-CN',{hour12:false}):'—'
+const journalWindow=ref('')
+const journalWindowText=computed(()=>journalWindow.value)
+const journalTime=row=>{
+  const at=String(row.at||'')
+  if(/^\d{2}:\d{2}( \+\d+d)?$/.test(at)) return at      // 派生日志：已经是推演时刻
+  if(!at) return '—'
+  const d=new Date(at)
+  return Number.isNaN(d.getTime())?at:d.toLocaleString('zh-CN',{hour12:false})
+}
 const journalMinute=row=>Number.isFinite(Number(row.minute))?Number(row.minute).toFixed(1):'—'
 const journalTarget=row=>row.name?(row.name+(row.flightId?' · '+row.flightId:'')):(row.flightId||'—')
 
@@ -980,8 +1009,12 @@ async function copyReceipt(row){
   </div>
   </template>
   <template v-else-if="view==='history'">
-  <div class="operations-heading"><h2>运行操作与决策日志 <small>{{cityName}} · {{journal.length}} 条</small></h2><p>人工干预、系统决策、数据源变更与导出记在同一本日志里，可按类型筛选、按关键词搜索、整表导出 CSV。<b>只有「人工干预」会改变班次状态</b>——其余三类只记录事实，不参与时间轴回放。</p></div>
-  <div class="assistant-context"><span title="本次运行计划的唯一编号">计划标识 {{session?.sessionId||'—'}}</span><span title="调度算法的版本号">算法版本 {{session?.version||'—'}}</span><span title="算法 + 快照 + 气象通道的联合指纹，三者相同则重跑逐字节一致">快照指纹 {{session?.fingerprint||'—'}}</span></div>
+  <div class="operations-heading"><h2>运行操作与决策日志 <small>{{cityName}} · {{journal.length}} 条</small></h2>
+    <p v-if="journalSource==='session'">人工干预、系统决策、数据源变更与导出记在同一本日志里，可按类型筛选、按关键词搜索、整表导出 CSV。<b>只有「人工干预」会改变班次状态</b>——其余三类只记录事实，不参与时间轴回放。</p>
+    <p v-else>全国模式没有推演会话，这本日志<b>由当前分钟的快照重算</b>：窗口内的起飞与到达是「发生过」，绕飞 / 延期 / 停飞是「此刻仍如此」，另附数据源时刻。班次是解析式生成的，所以不需要历史表，也能逐分钟复现。<template v-if="journalWindowText"> 当前窗口 {{ journalWindowText }}。</template></p>
+  </div>
+  <div class="assistant-context" v-if="journalSource==='session'"><span title="本次运行计划的唯一编号">计划标识 {{session?.sessionId||'—'}}</span><span title="调度算法的版本号">算法版本 {{session?.version||'—'}}</span><span title="算法 + 快照 + 气象通道的联合指纹，三者相同则重跑逐字节一致">快照指纹 {{session?.fingerprint||'—'}}</span></div>
+  <div class="assistant-context" v-else><span>作用域 全国</span><span>数据时刻 第 {{ Math.round(minute||60) }} 分钟</span><span>来源 派生日志（无历史表）</span></div>
   <div class="journal-bar">
     <div class="journal-filters">
       <button v-for="k in JOURNAL_KINDS" :key="k.key||'all'" class="journal-chip" :class="{on:journalKind===k.key}" @click="journalKind=k.key">
@@ -992,7 +1025,7 @@ async function copyReceipt(row){
     <button class="journal-export" :disabled="!journalRows.length" @click="exportJournal">导出 CSV</button>
   </div>
   <p class="operations-error" v-if="journalError">{{journalError}}</p>
-  <details class="replay density-fold" :open="policy.replay" data-density="replay">
+  <details class="replay density-fold" :open="policy.replay&&journalSource==='session'" data-density="replay">
     <summary>复盘回放 <span>按推演分钟重放全站时钟 · 另有 {{journal.length}} 条操作记录</span></summary>
     <p class="replay-span" v-if="!journal.length" data-replay-empty>
       本计划<b>还没有操作记录</b>（没人点过处置）—— 但时间轴照样能放：
@@ -1056,7 +1089,10 @@ async function copyReceipt(row){
       <p class="briefing-note">{{replayWeather.note}}</p>
     </div>
   </details>
-  <details class="density-fold journal-fold" v-if="journalRows.length" :open="policy.audit" data-density="audit">
+  <!-- 全国派生模式下默认展开（这页存在的意义就是看这些行）；
+       东北会话模式仍交给密度策略 —— policy.audit 是密度开关的消费点，不能丢。 -->
+  <details class="density-fold journal-fold" v-if="journalRows.length"
+           :open="journalSource==='nation'?true:policy.audit" data-density="audit">
   <summary>运行日志明细 <span>{{journalRows.length}} 条</span></summary>
   <table class="operation-journal">
     <thead><tr><th>时刻</th><th>类型</th><th>推演分钟</th><th>对象</th><th>内容</th><th>明细</th></tr></thead>
