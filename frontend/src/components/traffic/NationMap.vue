@@ -292,7 +292,7 @@ function arcPoints(a,b,bulgeIn){
   }
   return pts
 }
-const lineWidth=computed(()=>({nation:.9,region:1.15,province:1.7,city:1.5}[level.value]||1))
+const lineWidth=computed(()=>({nation:.62,region:.95,province:1.6,city:1.4}[level.value]||1))
 
 const corridors=computed(()=>(props.data?.corridors||[]).map(row=>{
   const path=row.path&&row.path.length>1?row.path:[row.fromLonLat,row.toLonLat]
@@ -304,7 +304,25 @@ const corridors=computed(()=>(props.data?.corridors||[]).map(row=>{
     const dp=row.detour.path.map(([lon,lat])=>project(lon,lat))
     detour='M'+dp.map(p=>p[0].toFixed(1)+' '+p[1].toFixed(1)).join('L')
   }
-  return {id:row.id,d,detour,blocked:!!row.borderBlocked,
+  // 航线方向箭头：取约 48% 处那一段的切线角。整条线只放一个，
+  // 多了会和"航班图标"抢注意力 —— 箭头说明的是"这条线往哪飞"，不是"现在在哪"。
+  // 箭头只在"看得见方向"的线段上放：全国层 492 条线平均只有 20–40 px，
+  // 每条都插箭头等于在图上撒三角。所以按屏幕长度取阈值，级别越近阈值越低。
+  let arrow=null
+  const arrowMin=level.value==='nation'?34:(level.value==='region'?18:5)
+  let screenLen=0
+  for(let i=1;i<points.length;i++){
+    screenLen+=Math.hypot(points[i][0]-points[i-1][0],points[i][1]-points[i-1][1])
+  }
+  if(points.length>=2&&screenLen>=arrowMin){
+    const at=Math.round((points.length-1)*0.5)
+    const a=points[Math.max(0,at-1)], b=points[Math.min(points.length-1,at)]
+    const dx=b[0]-a[0], dy=b[1]-a[1]
+    if(Math.hypot(dx,dy)>0.8){
+      arrow={x:points[at][0],y:points[at][1],angle:Math.atan2(dy,dx)*180/Math.PI}
+    }
+  }
+  return {id:row.id,d,detour,arrow,blocked:!!row.borderBlocked,
     fromName:row.fromName,toName:row.toName,kindLabel:row.kindLabel,lengthKm:row.lengthKm,
     selected:props.selectedCorridor===row.id}
 }))
@@ -319,11 +337,17 @@ function shortName(name){
     .replace(/(市|地区|盟|自治州|自治县)$/,'')
     .replace(/(朝鲜族|蒙古族|藏族|苗族|侗族|彝族|哈尼族|壮族|傣族|白族|土家族|布依族|傈僳族|景颇族|羌族|回族|维吾尔族)$/,'')
 }
-const nodes=computed(()=>(props.data?.nodes||[]).map(node=>{
-  const [x,y]=project(node.lon,node.lat)
-  return {...node,x,y,short:shortName(node.name),
-    tower:node.rank===1?17:(node.rank===2?11:7)}
-}))
+const nodes=computed(()=>{
+  const all=(props.data?.nodes||[])
+  // 全国层 319 个城市点在屏幕上是一片沙：真正要读的是"省会 + 有机场的城市"（约 87 个）。
+  // 其余城市并没有被删掉 —— 下钻到大区/省就全部回来，右栏列表也一直都在。
+  const list=level.value==='nation'?all.filter(node=>(node.rank||3)<=2):all
+  return list.map(node=>{
+    const [x,y]=project(node.lon,node.lat)
+    return {...node,x,y,short:shortName(node.name),
+      tower:node.rank===1?17:(node.rank===2?11:7)}
+  })
+})
 const labels=computed(()=>{
   const list=(props.data?.nodes||[]).map(node=>{
     const [x,y]=project(node.lon,node.lat)
@@ -342,10 +366,15 @@ const labels=computed(()=>{
 })
 const provinceLabels=computed(()=>{
   if(level.value!=='nation') return []
-  return (props.data?.provinces||[]).map(row=>{
+  // 省名会互相压：东部几省的中心点只差十几个像素，30 个名字叠成一片灰。
+  // 这里按 26×11 的包围盒做一次贪心避让，宁可少几个名字，也不要糊成一团。
+  const placed=[]
+  for(const row of (props.data?.provinces||[])){
     const [x,y]=project(row.center[0],row.center[1])
-    return {name:shortName(row.name),x,y}
-  })
+    if(placed.some(p=>Math.abs(p.x-x)<26&&Math.abs(p.y-y)<11)) continue
+    placed.push({name:shortName(row.name),x,y})
+  }
+  return placed
 })
 
 // —— 航班 ——
@@ -480,11 +509,12 @@ function clickNode(node){
       <!-- 3 行政区 -->
       <g>
         <path v-for="shape in shapes" :key="shape.key" :d="shape.d"
-              :style="{fill: shape.boundary?'var(--map-boundary)':(shape.live?'var(--map-land)':'var(--map-land-dim)'),
+              :style="{fill: shape.boundary?'var(--map-boundary)':'var(--map-land)',
                        stroke: shape.boundary?'none':'var(--map-line)'}"
+              :opacity="shape.boundary||shape.live||level==='nation'?1:.55"
               stroke-width=".7" :class="{clickable:shape.live&&!shape.boundary}"
               @click="clickShape(shape)">
-          <title>{{ shape.name }}{{ shape.boundary?' · 南海诸岛界线':(shape.live?'':' · 不在本级范围') }}</title>
+          <title>{{ shape.name }}{{ shape.boundary?' · 南海诸岛界线':(shape.live?'':(level==='nation'?' · 未纳入通航范围（台湾、西藏、香港、澳门）':' · 不在本级范围')) }}</title>
         </path>
       </g>
 
@@ -533,7 +563,8 @@ function clickNode(node){
             style="fill:var(--map-ground)" pointer-events="none"/>
 
       <!-- 5 航线：空域视角下让位给净空，不删只淡 -->
-      <g fill="none" stroke-linecap="round" :opacity="audience==='airspace'?.38:1">
+      <g fill="none" stroke-linecap="round"
+         :opacity="audience==='airspace'?.3:(level==='nation'?.45:1)">
         <path v-for="line in corridors" :key="'c'+line.id" :d="line.d"
               :stroke="line.blocked?(virtualMode?'rgba(255,96,70,.95)':'var(--map-corridor-blocked)'):'var(--map-corridor)'"
               :stroke-width="line.blocked?lineWidth*(virtualMode?2.2:.8):lineWidth"
@@ -545,13 +576,27 @@ function clickNode(node){
               @click="!moved&&emit('select-corridor',line)"/>
       </g>
 
+      <!-- 5.5 航线方向箭头：每条线一枚，说明"往哪飞"。
+           全国层 492 条线如果每段都画箭头，会在图上撒满三角；
+           所以只在 48% 处放一枚，并按当前级别缩放，省/市层才看得清。 -->
+      <g class="nmap-arrows" :opacity="audience==='airspace'?.12:(level==='nation'?.42:.9)">
+        <template v-for="line in corridors" :key="'a'+line.id">
+          <path v-if="line.arrow"
+                :transform="`translate(${line.arrow.x.toFixed(1)} ${line.arrow.y.toFixed(1)}) rotate(${line.arrow.angle.toFixed(1)}) scale(${level==='nation'?0.62:(level==='region'?0.8:1)})`"
+                d="M-2.6 -1.8 L3 0 L-2.6 1.8 Z"
+                :fill="line.blocked?'var(--map-corridor-blocked)':'var(--map-corridor)'"
+                :stroke="line.blocked?'var(--map-corridor-blocked)':'var(--map-corridor)'"
+                stroke-width=".2"/>
+        </template>
+      </g>
+
       <!-- 6 节点 -->
       <g class="nmap-nodes">
         <g v-for="node in nodes" :key="'n'+node.name" @click="clickNode(node)">
           <circle v-if="node.external" :cx="node.x" :cy="node.y" :r="node.rank===1?3.4:2.4"
                   fill="none" stroke="rgba(160,200,235,.75)" stroke-width="1.1"/>
           <template v-else>
-            <circle :cx="node.x" :cy="node.y" :r="node.rank===1?3.1:(node.rank===2?2.2:1.5)"
+            <circle :cx="node.x" :cy="node.y" :r="node.rank===1?3:(node.rank===2?2:1.05)"
                     :style="{fill: node.rank===3?'var(--map-node-dim)':'var(--map-node)',
                             stroke: node.rank===3?'none':'var(--map-node-stroke)'}" stroke-width=".55"/>
             <circle v-if="node.capital" :cx="node.x" :cy="node.y" r="5.8" fill="none"
@@ -605,6 +650,6 @@ function clickNode(node){
 .nmap path.hit{filter:drop-shadow(0 0 2px rgba(255,206,90,.55))}
 .nmap path.virt-alarm{filter:drop-shadow(0 0 4px rgba(255,90,60,.85))}
 .nmap .inset-lbl{font-size:7.5px;fill:rgba(170,205,230,.85)}
-.nmap .prov{font-size:9px;letter-spacing:.6px;fill:var(--map-label);opacity:.82;pointer-events:none}
+.nmap .prov{font-size:8.5px;letter-spacing:.4px;fill:var(--map-label);opacity:.72;pointer-events:none}
 .nmap .city{font-size:8.6px;fill:#dceefb;paint-order:stroke;stroke:rgba(4,12,20,.85);stroke-width:2.4px;pointer-events:none}
 </style>

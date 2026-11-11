@@ -479,6 +479,29 @@ const wxSourceDetail=computed(()=>{
   return [...parts, ...errs].join('；')||'未记录数据来源'
 })
 function pBand(p){return p==null?'':(p>=0.6?'bad':(p>=0.35?'warn':(p>=0.15?'watch':'')))}
+// 气象表要"一眼看出哪列是异常"，所以温度/风速/能见度各自上色。
+// 阈值集中在这里，别散到模板里 —— 否则改一次要翻三个地方。
+function tempBand(t){
+  if(t==null) return ''
+  if(t<=0) return 't-cold'
+  if(t<=10) return 't-cool'
+  if(t<=22) return 't-mild'
+  if(t<=30) return 't-warm'
+  return 't-hot'
+}
+function windBand(w){
+  if(w==null) return ''
+  if(w<3) return 'w-calm'
+  if(w<6) return 'w-breezy'
+  return 'w-windy'
+}
+function visBand(v){
+  if(v==null) return ''
+  if(v>=10000) return 'v-good'
+  if(v>=3000) return 'v-mid'
+  if(v>=1500) return 'v-low'
+  return 'v-bad'
+}
 
 // —— 推演个性化：先选对象，再看链路 ——
 // 之前这一页只能"在地图上点"，点到什么算什么。推演的逻辑应该是**先立题**：
@@ -856,15 +879,15 @@ onUnmounted(()=>{
           <!-- 表头：五列如果没有表头，第二列的百分比会被当成"降水概率"。
                它其实是 ml-v3 算的低能见概率，必须写清楚。 -->
           <li class="head" aria-hidden="true">
-            <b>城市</b><em title="ml-v3 低能见概率（阈值 0.35 以上触发预警）">概率</em>
+            <b>城市</b><em title="ml-v3 模型算出的低能见概率，0.35 以上进入预警带">低能见概率</em>
             <span>温度</span><span>风速</span><span>能见度</span>
           </li>
           <li v-for="row in wxRows" :key="row.name" :class="{bad:row.low}">
             <b>{{ row.short }}</b>
             <em :class="pBand(row.p)">{{ row.p==null?'—':(row.p*100).toFixed(0)+'%' }}</em>
-            <span>{{ row.temp==null?'—':row.temp+'°' }}</span>
-            <span>{{ row.wind==null?'—':row.wind+' m/s' }}</span>
-            <span>{{ visText(row.vis) }}</span>
+            <span :class="tempBand(row.temp)">{{ row.temp==null?'—':row.temp+'°' }}</span>
+            <span :class="windBand(row.wind)">{{ row.wind==null?'—':row.wind+' m/s' }}</span>
+            <span :class="visBand(row.vis)">{{ visText(row.vis) }}</span>
           </li>
           <li v-if="!wxRows.length" class="empty">
             {{ wxRefreshing?'实况补数中，约 1 分钟刷新后可见':'本级暂无逐市气象' }}</li>
@@ -1123,7 +1146,7 @@ onUnmounted(()=>{
 .nrn-wx h4{margin:0 0 4px;font-size:11.5px;color:#a9cde2;display:flex;gap:6px;align-items:baseline}
 .nrn-wx h4 small{font-size:10px;color:#6f92a8;font-weight:400}
 .nrn-wx ul{list-style:none;margin:0;padding:0;overflow:auto;flex:1;display:flex;flex-direction:column;gap:2px}
-.nrn-wx li{display:grid;grid-template-columns:minmax(68px,1fr) 44px 40px 52px 62px;gap:5px;font-size:10.5px;
+.nrn-wx li{display:grid;grid-template-columns:minmax(60px,1fr) 58px 40px 52px 60px;gap:5px;font-size:10.5px;
   padding:2px 5px;border-radius:4px;background:rgba(14,34,48,.75);color:#a8c6d8;white-space:nowrap}
 .nrn-wx li.bad{outline:1px solid rgba(226,75,74,.45)}
 .nrn-wx li b{color:#d9eefb;font-weight:500;overflow:hidden;text-overflow:ellipsis}
@@ -1132,6 +1155,31 @@ onUnmounted(()=>{
 .nrn-wx li em.warn{color:#ffd479}
 .nrn-wx li em.bad{color:#ff8f6b}
 .nrn-wx li span{text-align:right;font-variant-numeric:tabular-nums}
+
+/* 气象表分级配色：温度/风速/能见度各一条暖冷轴，异常值一眼能挑出来 */
+.nrn-wx li span.t-cold{color:#8fc8ff}
+.nrn-wx li span.t-cool{color:#9fd7ef}
+.nrn-wx li span.t-mild{color:#a8d8b0}
+.nrn-wx li span.t-warm{color:#ffcf8a}
+.nrn-wx li span.t-hot{color:#ff9d6e}
+.nrn-wx li span.w-calm{color:#8fbfa8}
+.nrn-wx li span.w-breezy{color:#ffd479}
+.nrn-wx li span.w-windy{color:#ff9d6e}
+.nrn-wx li span.v-good{color:#8fd8b0}
+.nrn-wx li span.v-mid{color:#cfe0a0}
+.nrn-wx li span.v-low{color:#ffcf8a}
+.nrn-wx li span.v-bad{color:#ff8f6b;font-weight:600}
+
+/* 低能见度行：红框做一次"渐显渐隐"，让它在满屏数字里自己跳出来。
+   只动背景与描边，不动位置 —— 闪动不该影响阅读。 */
+.nrn-wx li.bad{animation:wx-alarm 2.8s ease-in-out infinite}
+@keyframes wx-alarm{
+  0%,100%{background:rgba(226,75,74,.06);outline-color:rgba(226,75,74,.35)}
+  50%{background:rgba(226,75,74,.20);outline-color:rgba(255,120,95,.85)}
+}
+@media (prefers-reduced-motion: reduce){
+  .nrn-wx li.bad{animation:none;background:rgba(226,75,74,.14)}
+}
 .nrn-wx li.empty{grid-template-columns:1fr;color:#6f92a8;text-align:center}
 .nrn-wx li.head{background:none;color:#6a8ca2;font-size:9.5px;padding:0 5px 2px;letter-spacing:.2px;
   position:sticky;top:0;z-index:1}

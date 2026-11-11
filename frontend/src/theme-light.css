@@ -26,16 +26,16 @@ html[data-theme="light"] {
   --map-bg-2: #f4f8fc;
   --map-land: rgba(255, 255, 255, .92);
   --map-land-dim: rgba(210, 224, 238, .55);
-  --map-line: rgba(84, 124, 166, .55);
+  --map-line: rgba(72, 112, 155, .78);
   --map-boundary: rgba(40, 90, 130, .75);
   --map-inset-bg: rgba(255, 255, 255, .94);
   --map-inset-line: rgba(84, 124, 166, .45);
   --map-ground: rgba(236, 243, 250, .82);
   --map-node: #16384f;
-  --map-node-dim: rgba(38, 76, 104, .62);
+  --map-node-dim: rgba(32, 68, 96, .78);
   --map-node-stroke: rgba(255, 255, 255, .92);
-  --map-label: #2c5270;
-  --map-corridor: rgba(30, 110, 170, .58);
+  --map-label: #24485f;
+  --map-corridor: rgba(24, 96, 152, .78);
   --map-corridor-blocked: rgba(198, 58, 38, .7);
   --map-detour: rgba(186, 124, 8, .95);
 }
@@ -607,3 +607,24 @@ html[data-theme="light"] .operations-console .replay-bar .replay-play {
   border-color: #1668dc !important;
   color: #ffffff !important;
 }
+
+/* ---------- 气象表分级配色（浅色版：同色相加深，保证在白底上够对比） ---------- */
+html[data-theme="light"] .nrn-wx li span.t-cold { color: #0b5f9e !important; }
+html[data-theme="light"] .nrn-wx li span.t-cool { color: #16688f !important; }
+html[data-theme="light"] .nrn-wx li span.t-mild { color: #1f6b3f !important; }
+html[data-theme="light"] .nrn-wx li span.t-warm { color: #a35c00 !important; }
+html[data-theme="light"] .nrn-wx li span.t-hot { color: #c0392b !important; }
+html[data-theme="light"] .nrn-wx li span.w-calm { color: #2c6e58 !important; }
+html[data-theme="light"] .nrn-wx li span.w-breezy { color: #a35c00 !important; }
+html[data-theme="light"] .nrn-wx li span.w-windy { color: #c0392b !important; }
+html[data-theme="light"] .nrn-wx li span.v-good { color: #1f6b3f !important; }
+html[data-theme="light"] .nrn-wx li span.v-mid { color: #5d6b18 !important; }
+html[data-theme="light"] .nrn-wx li span.v-low { color: #a35c00 !important; }
+html[data-theme="light"] .nrn-wx li span.v-bad { color: #c0392b !important; }
+
+@keyframes wx-alarm-light {
+  0%, 100% { background: rgba(212, 56, 13, .04); outline-color: rgba(212, 56, 13, .28); }
+  50% { background: rgba(212, 56, 13, .13); outline-color: rgba(212, 56, 13, .62); }
+}
+html[data-theme="light"] .nrn-wx li.bad { animation-name: wx-alarm-light; }
+html[data-theme="light"] .nrn-wx li.bad { outline-color: rgba(212, 56, 13, .45) !important; }
