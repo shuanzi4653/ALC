@@ -515,7 +515,7 @@ function clickNode(node){
                 ?(zonePolicy==='PROHIBITED'?'rgba(255,110,85,.85)':'rgba(245,200,90,.66)')
                 :'rgba(160,220,120,.55)'"
               stroke-width=".65">
-          <title>{{ zone.kind==='LIMIT'?'机场净空限制区（规则化 DERIVED）':'跑道梯形净空（仅 10 站有方位）' }}</title>
+          <title>{{ zone.kind==='LIMIT'?'机场净空限制区（规则化生成，非官方公布）':'跑道梯形净空（仅 10 站有跑道方位）' }}</title>
         </path>
       </g>
 

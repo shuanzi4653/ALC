@@ -210,8 +210,9 @@ const upcoming=computed(()=>data.value?.upcoming||[])
 
 const headline=computed(()=>{
   const t=total.value
-  const where=level.value==='nation'?'全国':(trail.value[trail.value.length-1]?.label||'本级')
-  const parts=[`${where} ${t.corridors||0} 条航线`,`在飞 ${t.airborne||0} 架`]
+  // 不再以"全国/华北"开头：面包屑上一行已经写明在哪一级，
+  // 两行连着读会变成"全国 全国 492 条航线…"。这里只讲这一刻的数字。
+  const parts=[`${t.corridors||0} 条航线`,`在飞 ${t.airborne||0} 架`]
   if(t.delayed)parts.push(`绕飞 ${t.delayed} 架`)
   if(t.hold)parts.push(`暂缓 ${t.hold} 架`)
   if(t.blocked)parts.push(`边境停飞 ${t.blocked} 条`)
@@ -462,10 +463,20 @@ const wxAgeText=computed(()=>{
 })
 const wxSourceText=computed(()=>{
   const src=weatherMeta.value.sources||{}
+  // 只写用了哪几个源。以前写成 "open-meteo 319"，和前面的 "319 城" 重复，
+  // 读者会以为是两个不同的数。各源贡献放在 title 里。
   const parts=[]
-  if(src.OPEN_METEO) parts.push(`open-meteo ${src.OPEN_METEO}`)
-  if(src.WTTR) parts.push(`wttr ${src.WTTR}`)
-  return parts.join(' + ')
+  if(src.OPEN_METEO) parts.push('open-meteo')
+  if(src.WTTR) parts.push('wttr')
+  return parts.length?('源 '+parts.join(' + ')):''
+})
+const wxSourceDetail=computed(()=>{
+  const src=weatherMeta.value.sources||{}
+  const parts=[]
+  if(src.OPEN_METEO) parts.push(`open-meteo 供 ${src.OPEN_METEO} 城`)
+  if(src.WTTR) parts.push(`wttr 补 ${src.WTTR} 城`)
+  const errs=(weatherMeta.value.errors||[]).filter(Boolean)
+  return [...parts, ...errs].join('；')||'未记录数据来源'
 })
 function pBand(p){return p==null?'':(p>=0.6?'bad':(p>=0.35?'warn':(p>=0.15?'watch':'')))}
 
@@ -576,32 +587,36 @@ onUnmounted(()=>{
 
 <template>
 <section class="nrn">
+  <!-- 头部三层：面包屑（我在哪）→ 态势一句话（这一刻怎么样）→ 规模与口径（这个视图覆盖什么）。
+       以前三层挤在一条 flex 里换行，读起来是一句几十字的长句，
+       "492 条航线"和"319 市有实况"在同一行并列，分不清哪个是态势、哪个是分母。 -->
   <header class="nrn-hd">
-    <div class="nrn-crumb">
-      <template v-for="(item,index) in trail" :key="item.level+item.id">
-        <button v-if="index<trail.length-1" @click="go(item.level,item.id,item.label)">{{ item.label }}</button>
-        <b v-else>{{ item.label }}</b>
-        <span v-if="index<trail.length-1" class="sep">›</span>
-      </template>
-      <button v-if="trail.length>1" class="back" @click="back">返回上一级</button>
+    <div class="nrn-hd-top">
+      <div class="nrn-crumb">
+        <template v-for="(item,index) in trail" :key="item.level+item.id">
+          <button v-if="index<trail.length-1" @click="go(item.level,item.id,item.label)">{{ item.label }}</button>
+          <b v-else>{{ item.label }}</b>
+          <span v-if="index<trail.length-1" class="sep">›</span>
+        </template>
+        <button v-if="trail.length>1" class="back" @click="back">返回上一级</button>
+      </div>
+      <!-- 双受众：同一套几何两种读法，不做第二套数据 -->
+      <div class="nrn-aud" v-if="view==='map'" data-audience-switch>
+        <button :class="{on:audience==='ops'}" @click="setAudience('ops')"
+                title="运行视角：看航线穿不穿净空、绕飞代价多少">运行视角</button>
+        <button :class="{on:audience==='airspace'}" @click="setAudience('airspace')"
+                title="空域视角：看净空边界、禁飞等级与待审穿越">空域视角</button>
+        <button class="policy" v-if="audience==='airspace'" @click="switchZonePolicy"
+                :title="'规则化净空整体切到「一律禁止进入」，用于演示；真实世界里这是审批结果不是开关'">
+          {{ zonePolicy==='PROHIBITED'?'一律禁飞':'可申请穿越' }}</button>
+      </div>
     </div>
     <p class="nrn-headline" data-nation-headline>{{ headline }}</p>
     <p class="nrn-sub">
-      省 <b>{{ summary.provinces }}</b> · 市 <b>{{ summary.cities }}</b> ·
-      机场 <b>{{ summary.airports }}</b> · 无机场市 <b>{{ summary.feedCities }}</b> ·
-      逐市气象 <b>{{ summary.weatherCities }}</b>
-      <span v-if="level==='nation'&&border.excludeKm"> · 边境 {{ border.excludeKm }} km 内 <b>{{ (border.excludedCities||[]).length }}</b> 城已退出通航</span>
+      纳入 <b>{{ summary.provinces }}</b> 省 · <b>{{ summary.cities }}</b> 市 ·
+      <b>{{ summary.airports }}</b> 机场 · <b>{{ summary.feedCities }}</b> 市无机场（专用接驳）·
+      <b>{{ summary.weatherCities }}</b> 市有实况
     </p>
-    <!-- 双受众：同一套几何两种读法，不做第二套数据 -->
-    <div class="nrn-aud" v-if="view==='map'" data-audience-switch>
-      <button :class="{on:audience==='ops'}" @click="setAudience('ops')"
-              title="运行视角：看航线穿不穿净空、绕飞代价多少">运行视角</button>
-      <button :class="{on:audience==='airspace'}" @click="setAudience('airspace')"
-              title="空域视角：看净空边界、禁飞等级与待审穿越">空域视角</button>
-      <button class="policy" v-if="audience==='airspace'" @click="switchZonePolicy"
-              :title="'规则化净空整体切到「一律禁止进入」，用于演示；真实世界里这是审批结果不是开关'">
-        {{ zonePolicy==='PROHIBITED'?'一律禁飞':'可申请穿越' }}</button>
-    </div>
   </header>
 
   <nav class="nrn-tabs" data-nation-tabs v-if="!hideTabs">
@@ -639,7 +654,7 @@ onUnmounted(()=>{
        `nrn-body` 原本是承接 loading/error 的 `v-else-if`，在它前面的任何 v-if
        都会把链条打断 —— 提示条有值时整个内容区会被排除掉（实测整页空白）。
        所以这里显式写全条件，不用 else-if 链。 -->
-  <p class="nrn-hint" v-if="hint&&data&&!loading&&!error" data-nation-hint>{{ hint }}</p>
+  <p class="nrn-hint" v-if="hint&&mode!=='card'&&data&&!loading&&!error" data-nation-hint>{{ hint }}</p>
   <div class="nrn-body" v-if="data&&!loading&&!error" :class="{'no-map':view!=='map'}">
     <!-- ================= 态势 ================= -->
     <div class="nrn-map" v-show="view==='map'">
@@ -694,17 +709,18 @@ onUnmounted(()=>{
       </div>
 
       <div class="nrn-monitor" data-border-monitor>
-        <strong>越界监视：本视图内 {{ border.inside||0 }} 架位于管制带</strong>
-        <span>比对范围：{{ border.scope }}</span>
-        <span>停飞航线 {{ border.blockedCorridors||0 }} 条<template v-if="(border.blockedNames||[]).length">（{{ (border.blockedNames||[]).slice(0,3).join('、') }}{{ (border.blockedNames||[]).length>3?' 等':'' }}）</template></span>
-        <span>已改线 {{ border.reroutedCorridors||0 }} 条</span>
-        <span v-if="fog.available">低能见度 {{ fog.counts.cities }} 城（&lt;1.5 km {{ fog.counts.BAN }} 城）</span>
+        <!-- 口径写进 title，不上主行：主行放"这一刻是什么"，规则解释放悬停。
+             先前这里既有"比对范围：…30 km 为预警带"整句，又有末尾一句 border.note，
+             两条长句把主行挤成两行，反而看不清"到底几架在管制带"。 -->
+        <strong :title="`${border.scope}。${border.note}`">越界监视 <b>{{ border.inside||0 }}</b> 架在管制带</strong>
+        <span>停飞 {{ border.blockedCorridors||0 }} 条<template v-if="(border.blockedNames||[]).length">（{{ (border.blockedNames||[]).slice(0,3).join('、') }}{{ (border.blockedNames||[]).length>3?' 等':'' }}）</template></span>
+        <span>改线 {{ border.reroutedCorridors||0 }} 条</span>
+        <span v-if="fog.available" title="能见度低于 3 km 计低能见度；低于 1.5 km 计浓雾">低能见度 {{ fog.counts.cities }} 城（浓雾 {{ fog.counts.BAN }}）</span>
         <span v-if="zones.available" title="规则化生成，非官方公布；与东北 69 站点法定管制区分开计数">
           净空 {{ zones.counts.airports }} 机场 · 覆盖 {{ ((zones.counts.coverageRatio||0)*100).toFixed(2) }}%</span>
         <span class="diag" v-if="showDiag">视口 {{ viewport.w }}×{{ viewport.h }} · 根容器 {{ viewport.root }}px</span>
         <span class="push" :class="{on:store.wsConnected}" :title="store.wsConnected?'雷达/实况/模型任一变化由服务端推送':'未连上推送，仅按需拉取'">
           {{ store.wsConnected?('推送 · '+pushAge+'s 前'):'未连推送' }}</span>
-        <span class="quiet">{{ border.note }}</span>
       </div>
 
       <p class="nrn-legend" v-if="audience==='ops'">
@@ -712,8 +728,9 @@ onUnmounted(()=>{
         <i class="line"></i>航线同色同宽
         <i class="line warn"></i>琥珀＝绕飞航迹
         <i class="line bad"></i>红＝边境受限停飞
-        <i class="zone"></i>琥珀圈＝机场净空限制区（规则化 DERIVED）
+        <i class="zone"></i>琥珀圈＝机场净空限制区（规则化）
         <span v-if="virtualMode" class="virt">虚拟增强：回波与绕飞/停飞加亮</span>
+        <span class="quiet" v-if="border.excludeKm">边境 {{ border.excludeKm }} km 内侧城市整体退出通航（保守取值；名单见「运行情报 · 空域情报」）</span>
       </p>
       <p class="nrn-legend air" v-else>
         <i class="zone"></i><template v-if="zonePolicy==='PROHIBITED'">红圈＝净空限制区（演示态：一律禁止进入）</template><template v-else>琥珀圈＝净空限制区（默认：可申请穿越）</template>
@@ -726,7 +743,8 @@ onUnmounted(()=>{
 
     <!-- ================= 台账 / 情报：与原生页共用同一份组件 ================= -->
     <div class="nrn-table" v-show="view==='ledger'">
-      <NationBriefing view="ledger" :payload="data" :flights="flights"
+      <NationBriefing view="ledger" :variant="mode==='evidence'?'evidence':'ledger'"
+                      :payload="data" :flights="flights"
                       :minute="minute" :density="density" :selected-id="selectedId"
                       @select="pickFlight"/>
     </div>
@@ -738,7 +756,7 @@ onUnmounted(()=>{
     <div class="nrn-table" v-show="view==='alerts'">
       <div class="nrn-table-hd">
         <h3>事件处置 <small>{{ alerts.length }} 条</small></h3>
-        <p>低能见度、回波绕飞、边境停飞、放行暂缓四类。自动处置的是规则动作，待处置的需要人工确认。</p>
+        <p>四类：低能见度、边境受限、回波绕飞、放行暂缓。规则动作自动给出处置建议，需人工确认的标为待处置。</p>
       </div>
       <ul class="nrn-alerts">
         <li v-for="row in alerts" :key="row.id" :class="row.severity">
@@ -813,7 +831,7 @@ onUnmounted(()=>{
       <!-- 双受众的另一半：空域视角的侧栏。同一套几何，换成"哪些点禁飞、边界在哪"的读法 -->
       <div class="nrn-zone" v-if="audience==='airspace'" data-zone-panel>
         <h4>空域净空
-          <small>DERIVED · {{ zonePolicy==='PROHIBITED'?'一律禁飞':'可申请穿越' }}</small></h4>
+          <small>规则化生成 · {{ zonePolicy==='PROHIBITED'?'一律禁飞':'可申请穿越' }}</small></h4>
         <p><span>受限额</span><b>{{ zoneCounts.airports||0 }} 机场</b></p>
         <p><span>限制区</span><b>{{ zoneCounts.limitZones||0 }} 个 · {{ zoneCounts.coverageSqKm||0 }} km²</b></p>
         <p><span>覆盖率</span><b>{{ ((zoneCounts.coverageRatio||0)*100).toFixed(2) }}% 陆域</b></p>
@@ -830,11 +848,17 @@ onUnmounted(()=>{
 
       <!-- 下：气象。跟着上面的粒度走：全国看重点城市，进区看该区各市，进省看本省各市 -->
       <div class="nrn-wx" data-nation-weather>
-        <h4>气象实况
+        <h4 :title="wxSourceDetail">气象实况
           <small v-if="wxTotal">{{ wxTotal }} 城<template v-if="wxSourceText"> · {{ wxSourceText }}</template><template v-if="wxStale"> · 旧数据<template v-if="wxAgeText">（{{ wxAgeText }}）</template></template><template v-else-if="wxAgeText"> · {{ wxAgeText }}</template></small>
           <small v-else>{{ wxRefreshing?'补数中…（后台抓取多源实况）':(weatherMeta.expiredSnapshot?'快照超过 6 小时已作废，等重新抓取':'暂无实况') }}</small>
         </h4>
         <ul>
+          <!-- 表头：五列如果没有表头，第二列的百分比会被当成"降水概率"。
+               它其实是 ml-v3 算的低能见概率，必须写清楚。 -->
+          <li class="head" aria-hidden="true">
+            <b>城市</b><em title="ml-v3 低能见概率（阈值 0.35 以上触发预警）">概率</em>
+            <span>温度</span><span>风速</span><span>能见度</span>
+          </li>
           <li v-for="row in wxRows" :key="row.name" :class="{bad:row.low}">
             <b>{{ row.short }}</b>
             <em :class="pBand(row.p)">{{ row.p==null?'—':(row.p*100).toFixed(0)+'%' }}</em>
@@ -846,11 +870,6 @@ onUnmounted(()=>{
             {{ wxRefreshing?'实况补数中，约 1 分钟刷新后可见':'本级暂无逐市气象' }}</li>
         </ul>
       </div>
-
-      <details class="nrn-border-card" v-if="(border.excludedCities||[]).length&&level==='nation'">
-        <summary>边境 {{ border.excludeKm }} km 内 {{ (border.excludedCities||[]).length }} 城已退出通航</summary>
-        <p>{{ (border.excludedCities||[]).map(c=>shortName(c.name)+' '+c.distanceKm+'km').join('、') }}</p>
-      </details>
     </aside>
   </div>
 
@@ -977,7 +996,8 @@ onUnmounted(()=>{
 
 <style scoped>
 .nrn{display:flex;flex-direction:column;gap:8px;min-height:0;height:100%;overflow:hidden;color:#cfe6f5}
-.nrn-hd{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px;padding:2px 2px 0}
+.nrn-hd{display:flex;flex-direction:column;gap:2px;padding:2px 2px 0}
+.nrn-hd-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .nrn-crumb{display:flex;align-items:center;gap:5px;font-size:13px}
 .nrn-crumb button{background:none;border:0;color:#7fd4ff;cursor:pointer;font-size:13px;padding:2px 4px}
 .nrn-crumb button:hover{text-decoration:underline}
@@ -1073,30 +1093,32 @@ onUnmounted(()=>{
 .nrn-side>*{flex:0 0 auto}
 /* 层级列表按内容长，不抢剩余高度；剩余高度留给气象表 ——
    否则省层只有一个"本省城市"卡片时，下面会空出一大块，气象挤在底部几行里。 */
-.nrn-blocks{display:flex;flex-direction:column;gap:5px;overflow:auto;min-height:0;flex:0 1 auto;max-height:46%}
+.nrn-blocks{display:flex;flex-direction:column;gap:4px;overflow:auto;min-height:0;flex:0 1 auto;max-height:50%}
 .nrn-blocks h3{margin:0 0 2px;font-size:11.5px;color:#a9cde2}
 .nrn-blocks h3 small{margin-left:6px;font-size:10px;color:#6f92a8;font-weight:400}
 /* 一级一个按钮：全国=大区，进区=省，进省=市 */
-.nrn-region,.nrn-city{display:grid;grid-template-columns:auto 1fr auto;gap:0 8px;width:100%;text-align:left;
-  background:rgba(16,40,56,.75);border:1px solid rgba(60,100,130,.4);border-radius:6px;padding:5px 8px;
-  color:#cfe6f5;cursor:pointer;font-size:12px;align-items:baseline}
-.nrn-region b{grid-column:1}
-.nrn-region span{grid-column:2;text-align:right;font-size:10.5px;color:#7d9cb3}
-.nrn-region em{grid-column:3;font-size:10.5px;color:#8fb2c8;white-space:nowrap}
-.nrn-region em.sub{display:none}
-.nrn-region:hover,.nrn-city:hover{background:rgba(34,86,112,.8);border-color:#3f8ba8}
-.nrn-region b,.nrn-city b{font-weight:600}
-.nrn-region span,.nrn-city span{grid-column:1;font-size:10.5px;color:#7d9cb3}
-.nrn-region em,.nrn-city em{grid-row:1;grid-column:2;font-style:normal;font-size:10.5px;color:#8fb2c8}
+/* 一级一个按钮：全国=大区，进区=省，进省=市。
+   单行排布（名字 · 规模 · 在飞/停飞）。两行会让 6 个大区占到 300 px，
+   右栏一半高度被导航吃掉，气象只剩三四行。 */
+.nrn-region,.nrn-city{display:flex;align-items:center;gap:8px;width:100%;text-align:left;min-width:0;
+  background:rgba(16,40,56,.75);border:1px solid rgba(60,100,130,.4);border-radius:6px;padding:4px 8px;
+  color:#cfe6f5;cursor:pointer;font-size:11.5px;line-height:1.6}
+.nrn-region b,.nrn-city b{flex:0 0 auto;font-weight:600;white-space:nowrap}
+.nrn-region span,.nrn-city span{flex:1 1 auto;min-width:0;font-size:10.5px;color:#7d9cb3;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nrn-region em,.nrn-city em{flex:0 0 auto;font-style:normal;font-size:10.5px;color:#8fb2c8;white-space:nowrap}
 .nrn-region em.warn,.nrn-city em.warn{color:#8ef0ff}
-.nrn-region em.sub{grid-row:2;color:#ffb38a}
+.nrn-region em.sub,.nrn-city em.sub{color:#ffb38a}
+.nrn-region:hover,.nrn-city:hover{background:rgba(34,86,112,.8);border-color:#3f8ba8}
 /* 气象面板：占满剩余高度，自己滚 */
 .nrn-side.wx-wide .nrn-blocks{flex:0 0 auto;display:grid;grid-template-columns:1fr 1fr;gap:4px;overflow:visible}
 .nrn-side.wx-wide .nrn-blocks h3{grid-column:1 / -1;margin:0}
 .nrn-side.wx-wide .nrn-region{padding:3px 6px;font-size:11px}
 .nrn-side.wx-wide .nrn-region span{font-size:9.5px}
 .nrn-side.wx-wide .nrn-wx{flex:1 1 auto;max-height:none;min-height:0}
-.nrn-wx{flex:1 1 auto;min-height:132px;max-height:none;display:flex;flex-direction:column;
+/* 气象表吃满剩余高度：flex-basis 设 0 而不是 auto，
+   否则它按内容高度（300+ px）定尺寸，把上面的区块列表压到只剩一行半。 */
+.nrn-wx{flex:1 1 0;min-height:132px;max-height:none;display:flex;flex-direction:column;
   border:1px solid rgba(60,100,130,.4);border-radius:8px;background:rgba(10,26,38,.6);padding:6px 8px}
 .nrn-wx h4{margin:0 0 4px;font-size:11.5px;color:#a9cde2;display:flex;gap:6px;align-items:baseline}
 .nrn-wx h4 small{font-size:10px;color:#6f92a8;font-weight:400}
@@ -1111,6 +1133,9 @@ onUnmounted(()=>{
 .nrn-wx li em.bad{color:#ff8f6b}
 .nrn-wx li span{text-align:right;font-variant-numeric:tabular-nums}
 .nrn-wx li.empty{grid-template-columns:1fr;color:#6f92a8;text-align:center}
+.nrn-wx li.head{background:none;color:#6a8ca2;font-size:9.5px;padding:0 5px 2px;letter-spacing:.2px;
+  position:sticky;top:0;z-index:1}
+.nrn-wx li.head b,.nrn-wx li.head em,.nrn-wx li.head span{color:#6a8ca2;font-weight:400}
 .nrn-total{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;background:rgba(12,32,46,.8);
   border:1px solid rgba(70,110,140,.4);border-radius:8px;padding:7px 6px}
 .nrn-total div{text-align:center}
@@ -1159,11 +1184,6 @@ onUnmounted(()=>{
 .nrn-city-detail p{margin:0;display:grid;grid-template-columns:48px 1fr;gap:6px}
 .nrn-city-detail span{color:#7d9cb3}
 .nrn-city-detail b{font-weight:500;color:#d9eefb}
-.nrn-border-card{border:1px solid rgba(200,120,80,.35);border-radius:7px;padding:4px 8px;background:rgba(60,28,16,.35)}
-.nrn-border-card summary{font-size:11px;color:#ffc0a0;cursor:pointer;list-style:none}
-.nrn-border-card summary::-webkit-details-marker{display:none}
-.nrn-border-card p{margin:0;font-size:10.5px;color:#e8b9a2;line-height:1.6}
-.nrn-border-card small{color:#a98a7a;font-size:10px}
 
 .nrn-table{display:flex;flex-direction:column;gap:8px;min-height:0}
 .nrn-table-hd h3{margin:0;font-size:13px;color:#eaf6ff}

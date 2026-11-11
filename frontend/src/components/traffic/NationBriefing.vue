@@ -14,6 +14,10 @@ const props=defineProps({
   density:{type:String,default:'full'},
   selfFetch:{type:Boolean,default:false},
   selectedId:{type:String,default:''},
+  // 'ledger'  = 调度台账：看"这一班什么时候飞、批没批"
+  // 'briefing'= 班次情报：看"这一班为什么这么判"，按风险从高到低排
+  // 两者共用一份数据与一张表，但排序与表头不同 —— 否则两个入口看到的是同一个页面。
+  variant:{type:String,default:'ledger'},
 })
 const emit=defineEmits(['select'])
 
@@ -76,10 +80,19 @@ onUnmounted(()=>{
 })
 
 const data=computed(()=>props.payload||local.value)
-const rows=computed(()=>props.payload?props.flights:(local.value?.flights||[]))
+const baseRows=computed(()=>props.payload?props.flights:(local.value?.flights||[]))
+const rows=computed(()=>{
+  const list=[...baseRows.value]
+  if(props.variant==='briefing'){
+    // 情报的读法是"先看最危险的那几班"，不是"先看最早起飞的那班"
+    list.sort((a,b)=>(b.riskP||0)-(a.riskP||0))
+  }
+  return list
+})
 const upcoming=computed(()=>data.value?.upcoming||[])
 const intel=computed(()=>data.value?.intel||[])
 const summary=computed(()=>data.value?.summary||{})
+const zones=computed(()=>data.value?.zones||{available:false,counts:{}})
 const model=computed(()=>data.value?.modelCard||null)
 const modelTest=computed(()=>model.value?.nationalModel?.metrics?.test||null)
 
@@ -101,6 +114,13 @@ function visText(vis){
   return (km>=10?Math.round(km):km.toFixed(1))+' km'
 }
 function shortName(name){return (name||'').replace(/(市|地区|盟|自治州)$/,'')}
+
+// 纳入范围（口径，不是实时态势）。
+// 主页右栏原本挂着一张"边境 50 km 内 N 城已退出通航"的折叠卡 —— N 和名单都随数据变，
+// 摆在首页右下角会被读成"有一条正在发生的告警"。它其实是**建网规则**，
+// 所以放到这里：机场情报讲的是"网络里有哪些点"，规则跟着网络走才对。
+const borderKm=computed(()=>data.value?.border?.excludeKm||0)
+const excluded=computed(()=>data.value?.border?.excludedCities||[])
 function clock(m){
   // 同 NationPanel：跨零点加 +Nd，否则 00:40 分不清是哪一天。
   const raw=8*60+Math.round(m||0)
@@ -119,8 +139,8 @@ function clock(m){
       <input type="range" min="0" max="180" step="1" v-model.number="localMinute" aria-label="全国数据时刻"/>
       <b>{{ clock(localMinute) }}</b>
     </fieldset>
-    <span class="nb-scope">全国 · {{ summary.cities }} 市 · {{ summary.corridors }} 条航线</span>
-    <span class="nb-note">交通为模拟（SIM）；气象与雷达为公开源实况。</span>
+    <!-- 这里不再重复"全国 N 市 · M 条航线"和口径句：
+         页面顶栏已经写了作用域与口径，同一屏两处一样的话只是噪声。 -->
   </div>
 
   <p class="nb-state" v-if="loading">正在加载全国数据…{{ elapsed>2?`（已用 ${elapsed} 秒）`:'' }}</p>
@@ -130,13 +150,23 @@ function clock(m){
     <!-- ============ 调度台账 ============ -->
     <div class="nb-table" v-if="view==='ledger'">
       <div class="nb-hd">
-        <h3>全国班次台账 <small>{{ rows.length }} 架在飞 · {{ upcoming.length }} 班待起飞</small></h3>
-        <p>申请、计划、实际分列；每行是一架独立班次。数据时刻 {{ clock(localMinute) }}。</p>
+        <template v-if="variant==='evidence'">
+          <h3>选取证对象 <small>{{ rows.length }} 架在飞</small></h3>
+          <p>点一行选中班次，再在下方详情里点「取证」，得到从实况、判据到裁决的逐行来源链。</p>
+        </template>
+        <template v-else-if="variant==='briefing'">
+          <h3>在飞班次情报 <small>{{ rows.length }} 架 · 按风险从高到低</small></h3>
+          <p>每行一架飞行汽车：风险分、判据来源与放行裁决。申请 / 计划 / 实际三个时刻见「处置 · 调度台账」。</p>
+        </template>
+        <template v-else>
+          <h3>全国班次台账 <small>{{ rows.length }} 架在飞 · {{ upcoming.length }} 班待起飞</small></h3>
+          <p>申请、计划、实际分列；每行是一架独立班次，点行选中后在详情里可取证。</p>
+        </template>
       </div>
       <div class="nb-scroll">
         <table class="ledger">
           <thead><tr>
-            <th>班次 / 机型</th><th>起讫与航线</th><th>申请 / 计划 / 实际</th>
+            <th>班次 / 类型</th><th>起讫与航线</th><th>申请 / 计划 / 实际</th>
             <th>高度 / 许可</th><th>风险 / 裁决</th><th>限制</th>
           </tr></thead>
           <tbody>
@@ -147,7 +177,7 @@ function clock(m){
               <td class="times"><small>申请 {{ f.requestAt }}</small><small>计划 {{ f.planAt }}</small><small>实际 {{ f.actualAt||'—' }}</small></td>
               <td><small>{{ f.altM }} m AGL</small><small>{{ f.clearance?.statusLabel }}</small></td>
               <td>
-                <span class="risk" :class="f.riskLevel">{{ f.riskLevelLabel }} {{ f.riskP.toFixed(2) }}</span>
+                <span class="risk" :class="f.riskLevel">{{ f.riskLevelLabel }}风险 {{ f.riskP.toFixed(2) }}</span>
                 <small>
                   {{ f.decisionLabel }}
                   <template v-if="f.pModel!=null"> · 模型 {{ (f.pModel*100).toFixed(0) }}%</template>
@@ -181,8 +211,12 @@ function clock(m){
       <div class="nb-hd">
         <h3>机场情报 <small>{{ intel.length }} 个机场城市</small></h3>
         <p>实况来自公开源（METAR / open-meteo）；“放行建议”是按能见度门槛算的规则派生值，不是官方结论。</p>
-      </div>
-      <div class="nb-scroll">
+        <p v-if="zones.available" class="nb-zone-line">
+          净空（规则化生成，非官方公布）：<b>{{ zones.counts.airports }}</b> 机场 ·
+          限制区 <b>{{ zones.counts.limitZones }}</b> 个 · 覆盖 <b>{{ ((zones.counts.coverageRatio||0)*100).toFixed(2) }}%</b> 陆域 ·
+          待审穿越 <b>{{ zones.crossings ? zones.crossings.hit+'/'+zones.crossings.corridors : '见「空域视角」' }}</b>
+        </p>
+      </div>      <div class="nb-scroll">
         <table>
           <thead><tr><th>机场</th><th>城市</th><th>能见度</th><th>风</th><th>温度</th><th>建议</th></tr></thead>
           <tbody>
@@ -198,8 +232,16 @@ function clock(m){
           </tbody>
         </table>
       </div>
-      <div class="nb-weather">
-        <h4>逐市实况 <small>{{ summary.weatherCities }} 城</small></h4>
+      <p class="nb-scope-foot" v-if="view==='intel'&&borderKm" data-scope-foot>
+        纳入范围：台湾、西藏、香港、澳门不纳入通航；边境 <b>{{ borderKm }}</b> km 内侧的城市整体退出通航（保守取值，条例只写“一定范围”）。
+        <template v-if="excluded.length">
+          当前共 <b>{{ excluded.length }}</b> 城：{{ excluded.map(row=>row.name.replace(/市$/,'')+' '+row.distanceKm+' km').join('、') }}。
+        </template>
+      </p>
+      <!-- 逐市实况收进折叠块：它和「气象监测」页重复，而上面的机场表有 56 行，
+           两者抢高度时表格只剩 4 行可见 —— 表头写着 56、只看到 4，比不给还糟。 -->
+      <details class="nb-weather">
+        <summary>逐市实况 <small>{{ summary.weatherCities }} 城 · 点开看逐市温度 / 风速 / 能见度</small></summary>
         <ul>
           <li v-for="row in weatherRows" :key="row.name" :class="{bad:row.low}">
             <b>{{ row.short }}</b>
@@ -208,7 +250,7 @@ function clock(m){
             <span>{{ visText(row.vis) }}</span>
           </li>
         </ul>
-      </div>
+      </details>
     </div>
   </template>
 </div>
@@ -222,6 +264,11 @@ function clock(m){
 .nb-bar input[type=range]{flex:1;min-width:100px}
 .nb-bar b{font-variant-numeric:tabular-nums;color:#bfe9ff}
 .nb-scope{color:#cfe6f5}
+.nb-scope-foot{margin:0;font-size:10.5px;line-height:1.7;color:#7d9cb3;
+  border-left:2px solid rgba(120,160,190,.35);padding:2px 0 2px 8px}
+.nb-scope-foot b{color:#bfe9ff;font-weight:500}
+.nb-zone-line{color:#9fb7c8}
+.nb-zone-line b{color:#bfe9ff;font-weight:500}
 .nb-note{color:#6f92a8;margin-left:auto}
 .nb-state{margin:6px 0;font-size:12px;color:#8fb2c8}
 .nb-state.bad{color:#ffa08a}
@@ -237,6 +284,11 @@ function clock(m){
 .nb-hd h3{margin:0;font-size:13px;color:#eaf6ff}
 .nb-hd h3 small{margin-left:8px;font-size:11px;color:#7d9cb3;font-weight:400}
 .nb-hd p{margin:3px 0 0;font-size:11px;color:#7d9cb3}
+.nb-weather summary{cursor:pointer;font-size:12px;color:#a9cde2;padding:1px 0;list-style:none}
+.nb-weather summary::-webkit-details-marker{display:none}
+.nb-weather summary::before{content:'▸ ';color:#7fa5bd}
+.nb-weather[open] summary::before{content:'▾ '}
+.nb-weather[open] summary{margin-bottom:4px}
 .nb-weather h4{margin:2px 0 4px;font-size:12px;color:#a9cde2}
 .nb-weather h4 small{margin-left:6px;font-size:10.5px;color:#7d9cb3;font-weight:400}
 .nb-weather ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(186px,1fr));gap:3px;max-height:128px;overflow:auto}

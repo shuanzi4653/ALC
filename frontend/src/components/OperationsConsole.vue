@@ -914,7 +914,7 @@ async function copyReceipt(row){
     </div>
     <div class="ledger-scroll">
       <table>
-        <thead><tr><th>指标</th><th>定义</th><th>分子</th><th>分母</th><th>来源</th><th>更新</th><th>负责人</th></tr></thead>
+        <thead><tr><th>指标</th><th>定义</th><th>分子</th><th>分母</th><th>来源</th><th>更新</th><th title="这个数字由哪一层算出来：后端 / 规则引擎 / 模型">计算方</th></tr></thead>
         <tbody>
           <tr v-for="row in CALIBER_LEDGER" :key="row.key" :data-ledge="row.key">
             <td><b>{{ row.name }}</b></td>
@@ -981,7 +981,7 @@ async function copyReceipt(row){
   </template>
   <template v-else-if="view==='history'">
   <div class="operations-heading"><h2>运行操作与决策日志 <small>{{cityName}} · {{journal.length}} 条</small></h2><p>人工干预、系统决策、数据源变更与导出记在同一本日志里，可按类型筛选、按关键词搜索、整表导出 CSV。<b>只有「人工干预」会改变班次状态</b>——其余三类只记录事实，不参与时间轴回放。</p></div>
-  <div class="assistant-context"><span>计划 {{session?.sessionId}}</span><span>算法 {{session?.version}}</span><span>指纹 {{session?.fingerprint}}</span></div>
+  <div class="assistant-context"><span title="本次运行计划的唯一编号">计划标识 {{session?.sessionId||'—'}}</span><span title="调度算法的版本号">算法版本 {{session?.version||'—'}}</span><span title="算法 + 快照 + 气象通道的联合指纹，三者相同则重跑逐字节一致">快照指纹 {{session?.fingerprint||'—'}}</span></div>
   <div class="journal-bar">
     <div class="journal-filters">
       <button v-for="k in JOURNAL_KINDS" :key="k.key||'all'" class="journal-chip" :class="{on:journalKind===k.key}" @click="journalKind=k.key">
@@ -1037,14 +1037,14 @@ async function copyReceipt(row){
         {{row.actionLabel}} · {{journalTarget(row)}}<template v-if="row.detail"> · {{row.detail}}</template>
       </li>
     </ul>
-    <p class="operations-muted" v-else>这一刻没有发生任何记录。时间轴上的 <b>四态合计</b>始终等于带分钟的条目总数——分段计数与这一步的读数来自同一个切分。</p>
+    <p class="operations-muted" v-else>这一刻没有发生任何记录。时间轴上方四个状态的合计，始终等于带分钟的条目总数。</p>
     <div class="replay-weather" :data-replay-weather="replayWeather.state">
       <header><b>当时气象帧</b><span>{{replayWeather.label}}</span></header>
       <div class="replay-weather-grid">
         <article><small>帧分钟</small><strong>{{replayWeather.minute==null?'未取得':'T+'+replayWeather.minute}}</strong></article>
         <article><small>回放指针</small><strong>{{replayWeather.requested==null?'未取得':'T+'+replayWeather.requested}}</strong></article>
-        <article><small>网格单元</small><strong>{{replayWeather.cells}}</strong></article>
-        <article><small>逐站观测</small><strong>{{replayWeather.observations}}<i> 站</i></strong></article>
+        <article><small>网格单元</small><strong>{{replayWeather.minute==null?'—':replayWeather.cells}}</strong></article>
+        <article><small>逐站观测</small><strong>{{replayWeather.minute==null?'—':replayWeather.observations}}<i v-if="replayWeather.minute!=null"> 站</i></strong></article>
         <article><small>雷达槽号</small><strong>{{replayWeather.radarSlot||'未取得'}}</strong></article>
         <article><small>数据源</small><strong>{{replayWeather.provider||'未取得'}}</strong></article>
       </div>

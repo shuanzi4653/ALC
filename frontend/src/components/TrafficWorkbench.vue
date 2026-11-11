@@ -21,8 +21,9 @@ const nationScopeKey=computed(()=>scopeKey(store.scope.level,store.scope.id))
 // 气象与走廊都用态势图（右栏的气象实况与点航线出的剖面就是它们的内容）。
 // 这些页面共用一张图/一张表，不给一句"该做什么"，用户看到的只是空地图。
 const NATION_HINTS={
-  profile:'点地图上任意一条航线，右侧会给出逐公里回波剖面与绕飞段',
-  card:'点地图上任意一架飞机（或右栏城市），查看该班次从实况、判据到裁决的完整链路',
+  weather:'逐市实况按「低能见概率」排序，概率来自 ml-v3；点地图任意城市可下钻，右上「空域视角」可切到净空边界',
+  profile:'点地图上任意一条航线，下方会给出逐公里回波剖面与绕飞段',
+  card:'先选城市或班次，再看这一班从实况、判据到裁决的完整链路',
   assistant:'在表里点一行班次选中它，再在下方详情里点「取证」，得到逐行带来源的证据链',
 }
 function nationViewOf(section){
@@ -426,6 +427,11 @@ const nationScopeView=computed(()=>{
   return scope.value==='nation'&&(activeSection.value==='briefing'||activeSection.value==='schedule')
 })
 const buildProgress=computed(()=>progressView.value.percent)
+// 建场进度条只出现在"会用到这份计划"的页面上。
+// 之前判据只有 `busy && !nationScopeView`，于是日志页顶上压着一条 86% 的蓝条 ——
+// 既盖住了正文，又和这一页的内容（操作留痕）毫无关系。
+const BUILD_STRIP_SECTIONS=new Set(['home','overview','national','weather','profile','alerts','assistant','card','briefing','schedule'])
+const showBuildStrip=computed(()=>busy.value&&!nationScopeView.value&&BUILD_STRIP_SECTIONS.has(activeSection.value))
 const buildLabel=computed(()=>{
   if(buildProgress.value===null)return '正在调度 · 排队中'
   const s=session.value||{}
@@ -536,8 +542,8 @@ function applyHash(){
 }
 
 const TOUR_STEPS=[
-  {key:'brief',label:'结论条',text:'这里是当前气象条件下的运行结论。第一句就是"所以呢"，右边两个按钮是下一步动作。'},
-  {key:'nav',label:'五个功能区',text:'看态势 → 查走廊 → 处置事件 → 验模型 → 看效果。点一次换页，没有先后顺序。'},
+  {key:'brief',label:'结论条',text:'页首是当前作用域的一句话结论：多少条航线、几架在飞、几架绕飞或暂缓。下面的地图和右栏是它的明细。'},
+  {key:'nav',label:'五个功能区',text:'态势 / 走廊 / 处置 / 推演 / 日志。点一次换页，没有先后顺序；每一页都能下钻到省和市。'},
   {key:'present',label:'投影模式',text:'答辩/会场演示请在右上开「投影模式」：字号放大一档，后排也能看清。'},
 ]
 const RAIL_KEY='alc.railCollapsed'
@@ -661,7 +667,7 @@ onUnmounted(()=>{
     <b>运行总览</b>
     <button :class="{on:scope==='nation'}" @click="scope='nation'">全国</button>
     <button :class="{on:scope==='ne'}" @click="scope='ne'">东北</button>
-    <span class="scope-note">{{ scope==='nation'?'全国 319 市 · 点区块逐级下钻':'东北三省 · V1.0.0 原运行图' }}</span>
+    <span class="scope-note">{{ scope==='nation'?'全国 · 点区块逐级下钻，数字随作用域变':'东北三省 · V1.0.0 原运行图' }}</span>
   </div>
   <!-- 运行总览同样四级：全国走全国台，切到东北才用 V1.0.0 那张 maplibre 运行图。
        两者共用同一个 scope 变量，避免"总览是东北、情报是全国"的错位。 -->
@@ -686,7 +692,7 @@ onUnmounted(()=>{
   <section class="traffic-page national-page"
            v-if="scope==='nation'&&['weather','profile','alerts','assistant','card'].includes(activeSection)">
     <NationPanel :scope-key="nationScopeKey" :initial-view="nationViewOf(activeSection)"
-                 :mode="activeSection==='weather'?'weather':(activeSection==='card'?'card':'')"
+                 :mode="activeSection==='weather'?'weather':(activeSection==='card'?'card':(activeSection==='assistant'?'evidence':''))"
                  :hint="NATION_HINTS[activeSection]||''"
                  :hide-tabs="activeSection!=='home'" @scope-change="onScopeChange"/>
   </section>
@@ -701,11 +707,13 @@ onUnmounted(()=>{
       </template>
       <button :class="{on:scope==='nation'}" @click="scope='nation'">全国</button>
       <button :class="{on:scope==='ne'}" @click="scope='ne'">东北</button>
-      <span class="scope-note">{{ scope==='nation'?'全国 319 市 · 气象与雷达为公开源实况，交通为模拟':'东北三省 · V1.0.0 原页' }}</span>
+      <span class="scope-note">{{ scope==='nation'?'气象与雷达为公开源实况；交通为模拟（SIM），不参与运行计划':'东北三省 · V1.0.0 原页' }}</span>
     </div>
     <!-- 给组件一个确定高度的槽位：它内部靠 flex:1 让表体滚动，父级不给高度就不滚 -->
     <div class="scope-body">
-      <NationBriefing :view="activeSection==='briefing'?(intelTab==='flight'?'ledger':'intel'):'ledger'" self-fetch/>
+      <NationBriefing :view="activeSection==='briefing'?(intelTab==='flight'?'ledger':'intel'):'ledger'"
+                      :variant="activeSection==='briefing'&&intelTab==='flight'?'briefing':'ledger'"
+                      self-fetch/>
     </div>
   </section>
   <section class="traffic-table-panel" v-show="activeSection==='schedule'&&scope==='ne'"><div class="traffic-table-heading"><div><h2>{{cityName}}调度台账 <small>{{filtered.length}} 条</small><small v-if="caseMode" class="case-scope-hint" data-case-scope>班次状态来自实时推演，与回放案例的观测不对应</small></h2><p>申请、计划和实际事件分列；未来班次不会提前显示“实际放行”。</p></div><div><input aria-label="搜索城市或班次" placeholder="搜索城市 / 班次编号" v-model="search"><select aria-label="筛选运行状态" v-model="status"><option value="ALL">全部状态</option><option v-for="(name,key) in stateNames" :value="key" :key="key">{{name}}</option></select></div></div><details class="density-fold table-fold" :open="densityPolicy(density).ledger" data-density="ledger"><summary>台账表体 <span>共 {{filtered.length}} 条</span></summary><div class="traffic-table-scroll"><table><thead><tr><th>呼号 / 机型</th><th>起降点与任务</th><th>运行阶段</th><th>申请 / 计划 / 实际</th><th>高度与资源</th><th>限制与处理</th></tr></thead><tbody><tr v-for="f in rows" :key="f.id" :class="{selected:f.id===selectedId}" @click="chooseFlight(f)"><td><button class="flight-link" @click.stop="chooseFlight(f)"><span :class="f.mode==='CAR'?'cyan':'amber'">{{modeNames[f.mode]}}</span><small>{{f.id}}</small></button></td><td>{{f.name}}<small>{{f.fromPad}} → {{f.toPad}} · {{f.mode==='CAR'?(f.payload??'—')+' 位模拟乘客':(f.orderStatus||'待分配')+' · '+(f.payload??'—')+' 份订单'}}</small></td><td><span class="flight-state" :class="flightState(f,minute)">{{rowPhase(f)}}</span><small>{{stateNames[flightState(f,minute)]}}</small></td><td><small>申请 {{clock(f.requestedDepartureMinute)}}</small><small>计划 {{f.plannedReleaseAt?clock(f.departureMinute):'—'}}</small><small>实际 {{rowActual(f).actualReleaseAt?clock(f.departureMinute):'—'}}</small></td><td><small>{{f.maxAltitudeM??'—'}} m AGL</small><small>{{f.separationAction==='NONE'?'未分配':actionNames[f.separationAction]}}</small></td><td>{{reasonNames[f.reason]||f.reason}}<small>{{clearanceStatusName(f.clearanceStatus)}}</small></td></tr><tr v-if="!rows.length"><td colspan="6" class="traffic-no-results">{{busy?'正在生成并复核运行计划…':'当前筛选无班次'}}</td></tr></tbody></table></div></details><div class="traffic-pagination"><span>每页 20 条 · 同一快照、目录与算法指纹可复现</span><button @click="page--" :disabled="page<=1">上一页</button><b>{{page}} / {{Math.max(1,Math.ceil(filtered.length/20))}}</b><button @click="page++" :disabled="page*20>=filtered.length">下一页</button></div></section>
@@ -735,7 +743,7 @@ onUnmounted(()=>{
 </main>
 <!-- 建场进度条只属于东北那套（会按气象重建计划）；全国网是 SIM，不参与建场，
      全国页上挂着一条 0% 的进度条只会让人以为卡死了。 -->
-<div class="traffic-build-strip" v-if="busy && !nationScopeView" role="status" aria-live="polite" data-build-strip>
+<div class="traffic-build-strip" v-if="showBuildStrip" role="status" aria-live="polite" data-build-strip>
   <div class="tbs-track" :class="{pending:buildProgress===null}" role="progressbar"
        :aria-valuenow="buildProgress===null?undefined:buildProgress"
        :aria-valuetext="buildProgress===null?'暂无数值进度，等待前面的计划完成':undefined"
@@ -745,7 +753,7 @@ onUnmounted(()=>{
   <p class="tbs-text">
     <strong class="tbs-num">{{buildProgress===null?'—':buildProgress+'%'}}</strong>
     <span class="tbs-stage">{{buildStage}}</span>
-    <span class="tbs-note">{{buildElapsedText}} · 首次加载约 20 秒，之后同一情景与快照编号直接命中缓存</span>
+    <span class="tbs-note">{{buildElapsedText}} · 之后同一情景与快照编号直接命中缓存</span>
   </p>
 </div>
 </template>

@@ -418,7 +418,8 @@ def alerts(corridors: List[Dict[str, Any]], flights: List[Dict[str, Any]],
                 'id': f"EV-BORDER-{row['id']}", 'code': 'BORDER_HOLD', 'kind': '边境受限',
                 'severity': 'bad', 'place': f"{row['fromName']} → {row['toName']}",
                 'province': row['fromProvince'],
-                'detail': '航路落在我方一侧 10 km 管制带内，绕飞后仍越界',
+                'detail': '航路落在我方一侧 10 km 管制带内；'
+                          + ('绕飞后仍越界' if row.get('detour') else '没有可用的绕飞方案'),
                 'action': '该航线停飞，不进入排班；恢复需空管批准',
                 'status': '已停飞', 'auto': True,
             })
@@ -433,12 +434,24 @@ def alerts(corridors: List[Dict[str, Any]], flights: List[Dict[str, Any]],
             })
     for flight in flights:
         if flight['decision'] == 'HOLD':
+            # 判据要写"到底是哪一条"触发的。
+            # 以前这里固定写"风险概率 X，高于 0.75 暂不放行"，而 HOLD 还可能是
+            # 模型概率 ≥0.60 触发的 —— 于是页面上出现过"风险概率 0.05，高于 0.75 暂不放行"
+            # 这种自相矛盾的句子（0.05 当然不高于 0.75）。
+            rule = float(flight.get('riskP') or 0.0)
+            p_model = flight.get('pModel')
+            if rule >= RISK_HOLD:
+                why = f'规则风险 {rule:.2f} ≥ {RISK_HOLD:.2f}'
+            elif p_model is not None and p_model >= MODEL_HOLD:
+                why = f'模型低能见概率 {p_model:.0%} ≥ {MODEL_HOLD:.0%}'
+            else:
+                why = '放行条件未满足'
             out.append({
                 'id': f"EV-HOLD-{flight['id']}", 'code': 'FLIGHT_HOLD', 'kind': '放行暂缓',
                 'severity': 'bad', 'place': f"{flight['fromName']} → {flight['toName']}",
                 'province': flight['fromProvince'],
-                'detail': '风险概率 ' + f"{flight['riskP']:.2f}" + '，高于 0.75 暂不放行',
-                'action': '留在地面等待下一个时隙；风险回落后自动恢复',
+                'detail': f'{why}，暂不放行',
+                'action': '留在地面等待下一个时隙；判据回落后自动恢复',
                 'status': '待处置', 'auto': False, 'flightId': flight['id'],
             })
     # 聚合：同一类事件在同一省里合成一条，卡内列影响清单。
@@ -516,7 +529,7 @@ def border_monitor(corridors: List[Dict[str, Any]], flights: List[Dict[str, Any]
         'blockedCorridors': len(blocked),
         'blockedNames': [f"{row['fromName']} → {row['toName']}" for row in blocked],
         'scope': '国界/实际控制线向我方一侧 10 km 管制带（本项目保守口径）；30 km 为预警带',
-        'note': '这个 0 是**逐架按几何算出来的**：每条航路都量了到境外的最近距离。',
+        'note': '越界数逐架按几何算出：每条航路都量了到境外的最近距离。',
     }
 
 

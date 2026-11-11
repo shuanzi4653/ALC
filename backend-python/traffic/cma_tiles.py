@@ -191,7 +191,7 @@ def relay_instructions(zoom=3, grid=None):
         'tileBytes': RELAY_TILE_BYTES,
         'postTo': '/api/traffic/radar/tiles',
         'note': '服务器出口被源站按 IP 拒绝（整站 403），而浏览器在住宅网络上可直取。'
-                '取到后请**原样回传字节**，不要在浏览器里做任何换算或裁剪。',
+                '取到后请「原样回传字节」，不要在浏览器里做任何换算或裁剪。',
     }
 
 def _parse_slot(payload):

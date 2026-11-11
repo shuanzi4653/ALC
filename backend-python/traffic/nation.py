@@ -1094,7 +1094,7 @@ def _evidence_locked(flight_id: str, minute: int = 60) -> Dict[str, Any]:
                     'riskP', 'riskLevel', 'riskLevelLabel', 'decision', 'decisionLabel', 'altM')},
         'steps': steps,
         'conclusion': conclusion,
-        'discipline': '本链为**规则派生**：实况来自公开源、回波来自公开拼图、概率由本系统阈值算出，'
+        'discipline': '本链为「规则派生」：实况来自公开源、回波来自公开拼图、概率由本系统阈值算出，'
                       '不是训练模型输出，也不是官方管制结论。',
     }
 
