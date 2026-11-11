@@ -168,7 +168,7 @@ function ringPolygon(ring){
   return {type:'Polygon',coordinates:[coords]}
 }
 const radarFC=computed(()=>{
-  if(!props.radarOn) return EMPTY
+  if(!props.radarOn||props.data?.radar?.image) return EMPTY
   const bands=props.data?.radar?.bands||{}
   const features=[]
   for(const name of ['WEAK','CONVECTIVE','STRONG']){
@@ -296,19 +296,16 @@ function buildStyle(){
     layers:[
       {id:'bg',type:'background',paint:{'background-color':PAL.background}},
       {id:'land',type:'fill',source:'provinces',paint:{'fill-color':PAL.land,'fill-opacity':PAL.landOpacity}},
-      {id:'province-line',type:'line',source:'provinces',paint:{
-        'line-color':PAL.provinceLine,'line-width':['interpolate',['linear'],['zoom'],3,.7,7,1.6]}},
-      {id:'jiuduan-line',type:'line',source:'jiuduan',paint:{
-        'line-color':PAL.boundaryLine,'line-width':['interpolate',['linear'],['zoom'],3,.9,7,1.8]}},
       {id:'fog-fill',type:'fill',source:'fog',paint:{
         'fill-color':['match',['get','band'],'BAN','rgba(228,242,255,.40)','rgba(198,224,246,.26)'],
         'fill-opacity':.9}},
       {id:'radar-fill',type:'fill',source:'radar',paint:{
-        'fill-color':['match',['get','band'],'STRONG','#ee483c','CONVECTIVE','#f5be3c','#28be6e'],
-        'fill-opacity':['match',['get','band'],'STRONG',.46,'CONVECTIVE',.28,.14]}},
-      {id:'radar-edge',type:'line',source:'radar',paint:{
-        'line-color':['match',['get','band'],'STRONG','rgba(255,150,110,.7)','CONVECTIVE','rgba(255,214,120,.45)','rgba(60,210,140,.35)'],
-        'line-width':['match',['get','band'],'STRONG',1.1,.8],'line-opacity':.85}},
+        'fill-color':['match',['get','band'],'STRONG','#e81812','CONVECTIVE','#f8c810','#18cd3c'],
+        'fill-opacity':['match',['get','band'],'STRONG',.64,'CONVECTIVE',.48,.34]}},
+      {id:'province-line',type:'line',source:'provinces',paint:{
+        'line-color':PAL.provinceLine,'line-width':['interpolate',['linear'],['zoom'],3,.7,7,1.6]}},
+      {id:'jiuduan-line',type:'line',source:'jiuduan',paint:{
+        'line-color':PAL.boundaryLine,'line-width':['interpolate',['linear'],['zoom'],3,.9,7,1.8]}},
       {id:'zone-wall',type:'fill-extrusion',source:'zones',paint:{
         'fill-extrusion-color':zoneColor,
         'fill-extrusion-height':['get','h'],'fill-extrusion-base':0,
@@ -418,6 +415,32 @@ function mountTerrain(want){
 let nodeKey=''
 let networkKey=''
 let zoneKey=''
+let radarImgKey=''
+function syncRadarImage(){
+  if(!map||!map.isStyleLoaded()) return
+  const r=props.data?.radar
+  const b=r?.imageBbox
+  const url=props.radarOn?r?.image:null
+  if(!url||!b||b.length<4||b[2]<=b[0]||b[3]<=b[1]){
+    if(map.getLayer('radar-raster')) map.setLayoutProperty('radar-raster','visibility','none')
+    return
+  }
+  const coords=[[b[0],b[3]],[b[2],b[3]],[b[2],b[1]],[b[0],b[1]]]
+  const nextKey=`${r?.ts||''}|${b.join(',')}`
+  const existing=map.getSource('radar-img')
+  if(!existing){
+    map.addSource('radar-img',{type:'image',url,coordinates:coords})
+    map.addLayer({id:'radar-raster',type:'raster',source:'radar-img',
+      paint:{'raster-opacity':.9,'raster-fade-duration':0}},'province-line')
+    radarImgKey=nextKey
+  }else{
+    if(nextKey!==radarImgKey&&typeof existing.updateImage==='function'){
+      existing.updateImage({url,coordinates:coords})
+      radarImgKey=nextKey
+    }
+    if(map.getLayer('radar-raster')) map.setLayoutProperty('radar-raster','visibility','visible')
+  }
+}
 function applyData(force){
   if(!map||!map.getSource('flights')) return
   const put=(id,data)=>{const source=map.getSource(id); if(source) source.setData(data)}
@@ -431,6 +454,7 @@ function applyData(force){
     put('detours',detourFC.value)
   }
   put('radar',radarFC.value)
+  syncRadarImage()
   put('fog',fogFC.value)
 
   const nextZone=`${level.value}|${props.audience}|${(props.zones?.bands?.LIMIT||[]).length}`

@@ -12,6 +12,7 @@ idna==3.19
 iniconfig==2.3.0
 numpy==2.5.3
 packaging==26.3
+pillow==13.0.0
 pluggy==1.6.0
 pydantic==2.13.5
 pydantic_core==2.46.5

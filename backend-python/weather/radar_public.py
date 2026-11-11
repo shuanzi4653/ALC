@@ -19,20 +19,26 @@ ring 是 [[lon,lat], ...] 的闭合环，已抽稀（0.03°），可直接画 SV
 """
 from __future__ import annotations
 
+import base64
 import concurrent.futures
+import io as _io
 import json
 import math
 import threading
 import time
 from datetime import datetime, timezone
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
+import numpy as np
 
 META_URL = 'https://api.rainviewer.com/public/weather-maps.json'
-CACHE_DIR = Path(__file__).resolve().parents[2] / '.run' / 'radar'
-TILE_ZOOM = 5                    # 5 级：单瓦片 1.25°，回波边缘才有细节
+ROOT_DIR = Path(__file__).resolve().parents[2]
+CACHE_DIR = ROOT_DIR / '.run' / 'radar'
+CHINA_GEOJSON = ROOT_DIR / 'frontend' / 'src' / 'assets' / 'china.json'
+TILE_ZOOM = 5                    # 5 级：单瓦片 11.25°，回波边缘才有细节
 # 聚合网格：原来是 0.14°（≈15 km）。一个格子在全国缩放下就是 8 px 的方块，
 # 放大后是明显的大锯齿 —— 用户 2026-11-11 明确要求"不要锯齿、要高精度"。
 # 0.04°（≈4.4 km）接近单个回波胞的尺度，格子数约 12 倍，union 仍在几十毫秒量级。
@@ -44,10 +50,28 @@ SIMPLIFY_DEG = 0.008
 SMOOTH_DEG = 0.042
 ALPHA_FLOOR = 40
 TTL_SECONDS = 600.0
+FAIL_TTL_SECONDS = 15.0
 TIMEOUT_SECONDS = 20.0
 USER_AGENT = 'ALC-tianchuang/1.0.1 (radar echo; contact: project maintainer)'
 BBOX = (73.0, 15.5, 136.0, 54.5)  # 与全国视图一致
 ROUND_PIXELS = 2.0                # 每 2 像素取一个点
+
+# NEXRAD 标准基本反射率（Base Reflectivity）12 级色表（dBZ 下界 -> RGBA）：
+# 外围浅绿 → 亮绿 → 中绿 → 深绿 → 亮黄 → 金黄 → 橙色 → 橙红 → 亮红 → 深红 → 品红核
+NEXRAD_LUT: Tuple[Tuple[float, Tuple[int, int, int, int]], ...] = (
+    (12.5, (18, 188, 196, 115)),   # 12.5–15 dBZ: 边缘浅青过渡
+    (15.0, (64, 228, 110, 165)),   # 15–19 dBZ: 浅绿（弱降水外缘）
+    (19.0, (24, 215, 48, 190)),    # 19–24 dBZ: 亮绿
+    (24.0, (8, 180, 24, 210)),     # 24–28 dBZ: 中绿
+    (28.0, (2, 138, 12, 224)),     # 28–32 dBZ: 深绿
+    (32.0, (250, 242, 16, 234)),   # 32–36 dBZ: 亮黄（对流初生）
+    (36.0, (235, 192, 0, 240)),    # 36–39 dBZ: 金黄
+    (39.0, (255, 144, 0, 245)),    # 39–42.5 dBZ: 橙色（中等对流）
+    (42.5, (255, 72, 0, 249)),     # 42.5–45.5 dBZ: 橙红（强对流）
+    (45.5, (232, 0, 0, 253)),      # 45.5–49 dBZ: 亮红（强回波核）
+    (49.0, (180, 0, 24, 255)),     # 49–53 dBZ: 深红
+    (53.0, (224, 0, 220, 255)),    # 53+ dBZ: 品红（极端强对流核）
+)
 
 _lock = threading.Lock()
 _memory: Dict[str, Any] = {'value': None, 'expires': 0.0}
@@ -55,14 +79,14 @@ _memory: Dict[str, Any] = {'value': None, 'expires': 0.0}
 
 # ---------------------------------------------------------------- 瓦片与像素
 
-def _lonlat_of(z: int, x: int, y: int, px: int, py: int, size: int = 256) -> Tuple[float, float]:
+def _lonlat_of(z: int, x: int, y: int, px: float, py: float, size: int = 256) -> Tuple[float, float]:
     n = 2 ** z
     lon = (x + px / size) / n * 360.0 - 180.0
     lat_rad = math.atan(math.sinh(math.pi * (1 - 2 * (y + py / size) / n)))
     return lon, math.degrees(lat_rad)
 
 
-def _tile_range(z: int, bbox: Tuple[float, float, float, float]) -> List[Tuple[int, int]]:
+def _tile_bounds(z: int, bbox: Tuple[float, float, float, float]) -> Tuple[int, int, int, int]:
     lon0, lat0, lon1, lat1 = bbox
     n = 2 ** z
 
@@ -73,50 +97,185 @@ def _tile_range(z: int, bbox: Tuple[float, float, float, float]) -> List[Tuple[i
         rad = math.radians(lat)
         return max(0, min(n - 1, int((1 - math.asinh(math.tan(rad)) / math.pi) / 2 * n)))
 
-    xs = range(xt(lon0), xt(lon1) + 1)
-    ys = range(yt(lat1), yt(lat0) + 1)
-    return [(x, y) for x in xs for y in ys]
+    return xt(lon0), yt(lat1), xt(lon1), yt(lat0)
+
+
+def _tile_range(z: int, bbox: Tuple[float, float, float, float]) -> List[Tuple[int, int]]:
+    x0, y0, x1, y1 = _tile_bounds(z, bbox)
+    return [(x, y) for x in range(x0, x1 + 1) for y in range(y0, y1 + 1)]
+
+
+def _pixel_dbz(rgb: Tuple[int, int, int]) -> float:
+    """将 RainViewer Universal Blue 瓦片 RGB 像素反算为连续等效反射率 dBZ。
+
+    RainViewer 公共瓦片实际色阶：
+      - 外围灰/米色云团晕（<15 dBZ）：r >= g > b（如 (208,192,128)、(158,147,117)），属非降水云边，滤除；
+      - 弱到强降水（15–47 dBZ）：浅青 (136,221,238) → 天蓝 (27,174,226) → 中蓝 (0,136,191) → 深藏青 (0,71,104)，
+        满足 b > g 且 (b - r) >= 50，颜色越深 dBZ 越高；
+      - 极端强对流核（48–62 dBZ）：亮黄 (255,238,0) → 橙红 (255,68,0) → 品红。
+    """
+    r, g, b = rgb
+    if b > g and (b - r) >= 50:
+        if r > 0:
+            return 15.0 + max(0.0, min(1.0, (140.0 - r) / 140.0)) * 10.0
+        return 25.0 + max(0.0, min(1.0, (165.0 - g) / 96.0)) * 22.0
+    if r >= 170 and b < 100:
+        return 48.0 + max(0.0, min(1.0, (255.0 - g) / 255.0)) * 12.0
+    if r >= 160 and b >= 140 and g < 100:
+        return 62.0
+    return 0.0
 
 
 def _band_of(rgb: Tuple[int, int, int]) -> Optional[str]:
-    r, g, b = rgb
-    # 反射率标准配色：绿→黄→橙→红。白色（云顶/雪）不算回波主体，按弱回波处理。
-    if r < 60 and g < 90 and b < 90:
-        return None
-    if r >= 200 and g >= 200 and b >= 200:
-        return 'WEAK'
-    if r >= 180:
+    dbz = _pixel_dbz(rgb)
+    if dbz >= 41.0:
         return 'STRONG'
-    if r >= 140 and g >= 110:
+    if dbz >= 32.0:
         return 'CONVECTIVE'
-    if g >= 110:
+    if dbz >= 15.0:
         return 'WEAK'
-    if b >= 120 and r < 120:
-        return None      # 蓝色是降水外的杂波，不计
     return None
 
 
-def _cells_from_tile(image, z: int, x: int, y: int) -> List[Tuple[float, float, str]]:
-    """把一张瓦片里"有回波"的像素聚成 GRID_DEG 网格，返回 [(lon, lat, band)]。"""
-    width, height = image.size
-    step = max(1, int(ROUND_PIXELS))
-    buckets: Dict[Tuple[int, int], Tuple[int, int, int]] = {}
-    pixels = image.load()
-    for py in range(0, height, step):
-        for px in range(0, width, step):
-            r, g, b, a = pixels[px, py]
-            if a < ALPHA_FLOOR:
-                continue
-            band = _band_of((r, g, b))
-            if band is None:
-                continue
-            lon, lat = _lonlat_of(z, x, y, px, py, width)
-            key = (int(lon // GRID_DEG), int(lat // GRID_DEG))
-            current = buckets.get(key)
-            rank = {'WEAK': 1, 'CONVECTIVE': 2, 'STRONG': 3}
-            if current is None or rank[band] > rank[current[2]]:
-                buckets[key] = (key[0], key[1], band)
-    return [(cx * GRID_DEG, cy * GRID_DEG, band) for cx, cy, band in buckets.values()]
+def _tile_dbz_array(image) -> np.ndarray:
+    """向量化反算单张 RGBA 瓦片的 dBZ 矩阵（256×256 float32）。"""
+    arr = np.asarray(image, dtype=np.float32)
+    r, g, b, a = arr[:, :, 0], arr[:, :, 1], arr[:, :, 2], arr[:, :, 3]
+    valid = a >= ALPHA_FLOOR
+    dbz = np.zeros(r.shape, dtype=np.float32)
+
+    is_blue = valid & (b > g) & ((b - r) >= 50.0)
+    light_blue = is_blue & (r > 0.0)
+    dbz[light_blue] = 15.0 + np.clip((140.0 - r[light_blue]) / 140.0, 0.0, 1.0) * 10.0
+    deep_blue = is_blue & (r == 0.0)
+    dbz[deep_blue] = 25.0 + np.clip((165.0 - g[deep_blue]) / 96.0, 0.0, 1.0) * 22.0
+
+    is_warm = valid & (r >= 170.0) & (b < 100.0)
+    dbz[is_warm] = 48.0 + np.clip((255.0 - g[is_warm]) / 255.0, 0.0, 1.0) * 12.0
+
+    is_magenta = valid & (r >= 160.0) & (b >= 140.0) & (g < 100.0)
+    dbz[is_magenta] = 62.0
+    return dbz
+
+
+def _despeckle_dbz(dbz: np.ndarray) -> np.ndarray:
+    """剔除 8 邻域内孤立的 1–2 像素杂波点，保留真实降水回波胞结构。"""
+    mask = (dbz >= 15.0).astype(np.int32)
+    if not mask.any():
+        return dbz
+    padded = np.pad(mask, 1, mode='constant')
+    h, w = mask.shape
+    nbrs = sum(
+        padded[1 + dy:1 + dy + h, 1 + dx:1 + dx + w]
+        for dy in (-1, 0, 1)
+        for dx in (-1, 0, 1)
+        if not (dx == 0 and dy == 0)
+    )
+    cleaned = dbz.copy()
+    cleaned[nbrs <= 1] = 0.0
+    return cleaned
+
+
+@lru_cache(maxsize=2)
+def _china_raster_mask(z: int, x0: int, y0: int, x1: int, y1: int) -> Optional[np.ndarray]:
+    """在墨卡托拼图栅格上生成国界掩膜（含 2px 边缘余量，配合前端 SVG clipPath 精确裁剪）。"""
+    try:
+        from PIL import Image, ImageDraw
+        china = json.loads(CHINA_GEOJSON.read_text(encoding='utf-8'))
+    except Exception:  # noqa: BLE001
+        return None
+    n = 2 ** z
+    w = (x1 - x0 + 1) * 256
+    h = (y1 - y0 + 1) * 256
+
+    def to_px(lon: float, lat: float) -> Tuple[float, float]:
+        px = ((lon + 180.0) / 360.0 * n - x0) * 256.0
+        rad = math.radians(max(-85.0, min(85.0, lat)))
+        py = ((1.0 - math.asinh(math.tan(rad)) / math.pi) / 2.0 * n - y0) * 256.0
+        return (px, py)
+
+    mask_im = Image.new('L', (w, h), 0)
+    draw = ImageDraw.Draw(mask_im)
+    for feat in china.get('features') or []:
+        props = feat.get('properties') or {}
+        if not props.get('name') or props.get('adchar') == 'JD':
+            continue
+        geom = feat.get('geometry') or {}
+        polys = [geom['coordinates']] if geom.get('type') == 'Polygon' else (geom.get('coordinates') or [])
+        for poly in polys:
+            if poly and len(poly[0]) >= 3:
+                pts = [to_px(pt[0], pt[1]) for pt in poly[0]]
+                draw.polygon(pts, fill=255, outline=255, width=3)
+    return np.asarray(mask_im, dtype=np.uint8) > 0
+
+
+def _encode_nexrad_png(crop_dbz: np.ndarray, upscale: float = 2.0) -> Optional[str]:
+    """将裁剪后的连续 dBZ 矩阵做双线性插值超分并映射为 12 级 NEXRAD 索引色透明 PNG（Data URI）。"""
+    from PIL import Image
+
+    if crop_dbz.size == 0 or float(crop_dbz.max()) < 15.0:
+        return None
+    h, w = crop_dbz.shape
+    scale = min(float(upscale), 1280.0 / max(1, max(w, h)))
+    w_out = max(1, int(round(w * scale)))
+    h_out = max(1, int(round(h * scale)))
+    if (w_out, h_out) != (w, h):
+        up_dbz = np.asarray(
+            Image.fromarray(crop_dbz.astype(np.float32), mode='F').resize((w_out, h_out), Image.BILINEAR),
+            dtype=np.float32,
+        )
+    else:
+        up_dbz = crop_dbz
+
+    idx = np.zeros(up_dbz.shape, dtype=np.uint8)
+    for k, (threshold, _rgba) in enumerate(NEXRAD_LUT, start=1):
+        idx[up_dbz >= threshold] = k
+    if not idx.any():
+        return None
+
+    palette = [0, 0, 0]
+    trans = [0]
+    for _threshold, (cr, cg, cb, ca) in NEXRAD_LUT:
+        palette.extend((cr, cg, cb))
+        trans.append(ca)
+    palette.extend([0] * (768 - len(palette)))
+
+    pim = Image.fromarray(idx, mode='P')
+    pim.putpalette(palette)
+    buf = _io.BytesIO()
+    pim.save(buf, format='PNG', optimize=True, transparency=bytes(trans))
+    b64 = base64.b64encode(buf.getvalue()).decode('ascii')
+    return f'data:image/png;base64,{b64}'
+
+
+def virtual_nexrad_image(bucket: int, cells_spec: Tuple[Tuple[str, float, float, float, float], ...]) -> Tuple[Optional[str], Optional[List[float]]]:
+    """为虚拟恶劣天气模式生成同口径的墨卡托 NEXRAD 多级反射率贴图与经纬框。"""
+    lon0, lat0, lon1, lat1 = 101.0, 19.5, 130.5, 48.5
+    w, h = 520, 440
+    lons = np.linspace(lon0, lon1, w, dtype=np.float32)[None, :]
+    merc0 = math.log(math.tan(math.pi / 4.0 + math.radians(lat0) / 2.0))
+    merc1 = math.log(math.tan(math.pi / 4.0 + math.radians(lat1) / 2.0))
+    mercs = np.linspace(merc1, merc0, h, dtype=np.float32)[:, None]
+    lats = np.degrees(np.arctan(np.sinh(mercs)))
+
+    dbz = np.zeros((h, w), dtype=np.float32)
+    for index, (_region, lon, lat, rx, ry) in enumerate(cells_spec):
+        phase = (bucket * 0.37 + index * 1.13) % (2.0 * math.pi)
+        cx = lon + 0.55 * math.cos(phase)
+        cy = lat + 0.32 * math.sin(phase * 0.8)
+        dx = (lons - cx) / rx
+        dy = (lats - cy) / ry
+        theta = np.arctan2(dy, dx)
+        wobble = (1.0 + 0.16 * np.sin(3.0 * theta + phase)
+                  + 0.09 * np.cos(5.0 * theta - phase)
+                  + 0.05 * np.sin(9.0 * theta + 1.7 * phase))
+        r_norm = np.hypot(dx, dy) / np.maximum(0.3, wobble)
+        texture = 2.6 * np.sin(dx * 5.2 + phase) * np.cos(dy * 5.2 - phase)
+        cell_dbz = np.where(r_norm <= 1.04, 54.5 - 39.5 * (r_norm ** 1.15) + texture, 0.0)
+        dbz = np.maximum(dbz, cell_dbz)
+
+    data_uri = _encode_nexrad_png(dbz, upscale=1.2)
+    return data_uri, [lon0, lat0, lon1, lat1] if data_uri else None
 
 
 
@@ -265,7 +424,7 @@ def fetch(force: bool = False) -> Dict[str, Any]:
         return _empty(f'取帧失败：{str(exc)[:90]}')
 
     stamp = datetime.fromtimestamp(frame['time'], tz=timezone.utc).strftime('%Y%m%d%H%M')
-    cache_file = CACHE_DIR / f'{stamp}-z{TILE_ZOOM}-g{GRID_DEG}-geo4.json'
+    cache_file = CACHE_DIR / f'{stamp}-z{TILE_ZOOM}-g{GRID_DEG}-nexrad1.json'
     if cache_file.exists() and not force:
         try:
             cached = json.loads(cache_file.read_text(encoding='utf-8'))
@@ -277,12 +436,14 @@ def fetch(force: bool = False) -> Dict[str, Any]:
 
     try:
         from PIL import Image
-        import io as _io
     except Exception as exc:  # noqa: BLE001
         return _empty(f'缺少图像库：{str(exc)[:60]}')
 
-    tiles = _tile_range(TILE_ZOOM, BBOX)
-    cells: Dict[str, List[Tuple[float, float]]] = {'WEAK': [], 'CONVECTIVE': [], 'STRONG': []}
+    x0, y0, x1, y1 = _tile_bounds(TILE_ZOOM, BBOX)
+    tiles = [(x, y) for x in range(x0, x1 + 1) for y in range(y0, y1 + 1)]
+    w_mosaic = (x1 - x0 + 1) * 256
+    h_mosaic = (y1 - y0 + 1) * 256
+    mosaic_dbz = np.zeros((h_mosaic, w_mosaic), dtype=np.float32)
     fetched = 0
 
     def grab(pair: Tuple[int, int]):
@@ -293,23 +454,66 @@ def fetch(force: bool = False) -> Dict[str, Any]:
             if response.status_code != 200 or not response.content:
                 return None
             image = Image.open(_io.BytesIO(response.content)).convert('RGBA')
-            return _cells_from_tile(image, TILE_ZOOM, x, y)
+            return x, y, _tile_dbz_array(image)
         except Exception:  # noqa: BLE001 - 单瓦片失败跳过
             return None
 
-    # 12 张瓦片串行要 8–11 s，并发取能压到 2 s 内
+    # 35 张瓦片并发拉取，拼成无缝墨卡托 dBZ 场
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
-        for rows in pool.map(grab, tiles):
-            if rows is None:
+        for item in pool.map(grab, tiles):
+            if item is None:
                 continue
+            tx, ty, tile_dbz = item
             fetched += 1
-            for lon, lat, band in rows:
-                cells[band].append((lon, lat))
+            oy = (ty - y0) * 256
+            ox = (tx - x0) * 256
+            mosaic_dbz[oy:oy + 256, ox:ox + 256] = tile_dbz
+
+    mosaic_dbz = _despeckle_dbz(mosaic_dbz)
+    china_mask = _china_raster_mask(TILE_ZOOM, x0, y0, x1, y1)
+    if china_mask is not None and china_mask.shape == mosaic_dbz.shape:
+        mosaic_dbz = np.where(china_mask, mosaic_dbz, 0.0)
+
+    # 聚合到经纬网格（累积嵌套：STRONG ⊂ CONVECTIVE ⊂ WEAK，消除外环镂空）
+    step = max(1, int(ROUND_PIXELS))
+    sampled = mosaic_dbz[::step, ::step]
+    sy_idx, sx_idx = np.where(sampled >= 15.0)
+    grid_max: Dict[Tuple[int, int], float] = {}
+    for sy, sx in zip(sy_idx.tolist(), sx_idx.tolist()):
+        py = sy * step
+        px = sx * step
+        val = float(mosaic_dbz[py, px])
+        lon, lat = _lonlat_of(TILE_ZOOM, x0, y0, px, py, 256)
+        key = (int(lon // GRID_DEG), int(lat // GRID_DEG))
+        prev = grid_max.get(key, 0.0)
+        if val > prev:
+            grid_max[key] = val
+
+    cells: Dict[str, List[Tuple[float, float]]] = {
+        'WEAK': [(cx * GRID_DEG, cy * GRID_DEG) for (cx, cy), v in grid_max.items() if v >= 15.0],
+        'CONVECTIVE': [(cx * GRID_DEG, cy * GRID_DEG) for (cx, cy), v in grid_max.items() if v >= 32.0],
+        'STRONG': [(cx * GRID_DEG, cy * GRID_DEG) for (cx, cy), v in grid_max.items() if v >= 41.0],
+    }
+
+    # 生成裁剪后的墨卡托 NEXRAD 基本反射率透明贴图（Data URI）及精确经纬边界
+    image_uri: Optional[str] = None
+    image_bbox: Optional[List[float]] = None
+    active_y, active_x = np.where(mosaic_dbz >= 15.0)
+    if active_y.size > 0:
+        py0 = max(0, int(active_y.min()) - 4)
+        py1 = min(h_mosaic, int(active_y.max()) + 5)
+        px0 = max(0, int(active_x.min()) - 4)
+        px1 = min(w_mosaic, int(active_x.max()) + 5)
+        image_uri = _encode_nexrad_png(mosaic_dbz[py0:py1, px0:px1], upscale=2.0)
+        if image_uri:
+            crop_lon0, crop_lat1 = _lonlat_of(TILE_ZOOM, x0, y0, px0, py0, 256)
+            crop_lon1, crop_lat0 = _lonlat_of(TILE_ZOOM, x0, y0, px1, py1, 256)
+            image_bbox = [round(crop_lon0, 4), round(crop_lat0, 4), round(crop_lon1, 4), round(crop_lat1, 4)]
 
     # 先补栅格孔洞，再成环：一片雨就应该是一个环，而不是一片雨加几百个洞。
     closed_cells = {band: _close_cells(rows) for band, rows in cells.items()}
     bands = {band: _rings_of(rows) for band, rows in closed_cells.items()}
-    total_cells = sum(len(rows) for rows in cells.values())
+    total_cells = len(cells['WEAK'])
     value = {
         'available': True,
         'source': '公开雷达拼图（RainViewer 公共接口，免密钥；瓦片为墨卡托，像素直接反算经纬度）',
@@ -320,6 +524,8 @@ def fetch(force: bool = False) -> Dict[str, Any]:
         # 瓦片直链（墨卡托，透明底，只有回波）：前端按贴图铺，边界是原始像素，
         # 比"聚网格再并多边形"锐利得多 —— 这是回波边界糊的根因。
         'tiles_url': f"{frame['host']}{frame['path']}/256/{{z}}/{{x}}/{{y}}/4/1_1.png",
+        'image': image_uri,
+        'imageBbox': image_bbox,
         'cells': total_cells,
         'bands': bands,
         'counts': {band: len(rings) for band, rings in bands.items()},
@@ -342,6 +548,10 @@ def _bbox_area(bbox: Tuple[float, float, float, float]) -> float:
 
 
 def _empty(reason: str) -> Dict[str, Any]:
-    return {'available': False, 'error': reason, 'ts': None,
-            'bands': {'WEAK': [], 'CONVECTIVE': [], 'STRONG': []},
-            'counts': {'WEAK': 0, 'CONVECTIVE': 0, 'STRONG': 0}, 'cells': 0, 'coverage': 0.0}
+    out = {'available': False, 'error': reason, 'ts': None,
+           'image': None, 'imageBbox': None,
+           'bands': {'WEAK': [], 'CONVECTIVE': [], 'STRONG': []},
+           'counts': {'WEAK': 0, 'CONVECTIVE': 0, 'STRONG': 0}, 'cells': 0, 'coverage': 0.0}
+    with _lock:
+        _memory.update({'value': out, 'expires': time.monotonic() + FAIL_TTL_SECONDS})
+    return out

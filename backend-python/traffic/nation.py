@@ -164,8 +164,8 @@ def _corridor_rows() -> List[Dict[str, Any]]:
     return list(_network().get('corridors') or [])
 
 
-@lru_cache(maxsize=1)
 def _radar() -> Dict[str, Any]:
+    """取全国公开雷达拼图（内部自带 10 分钟内存+磁盘缓存；异常短期冷却，不永久锁死）。"""
     try:
         from weather import radar_public
         return radar_public.fetch()
@@ -381,11 +381,22 @@ def _virtual_radar(bucket: int) -> Dict[str, Any]:
     if bands is None:
         bands = _virtual_bands(bucket)
         _VIRTUAL_CACHE[('bands', bucket)] = bands
+    image_pair = _VIRTUAL_CACHE.get(('image', bucket))
+    if image_pair is None:
+        try:
+            from weather import radar_public
+            image_pair = radar_public.virtual_nexrad_image(bucket, _VIRTUAL_CELLS)
+        except Exception:  # noqa: BLE001
+            image_pair = (None, None)
+        _VIRTUAL_CACHE[('image', bucket)] = image_pair
+    image_uri, image_bbox = image_pair
     return {
         'available': True,
         'ts': f'VIRTUAL-{bucket * 600}',      # 600 秒一档，形如时间戳，前端按字符串比较即可
         'source': 'VIRTUAL（演示包：合成回波，非实况）',
         'virtual': True,
+        'image': image_uri,
+        'imageBbox': image_bbox,
         'bands': bands,
         'counts': {k: len(v) for k, v in bands.items()},
     }
@@ -912,6 +923,8 @@ def _payload_locked(level: str = 'nation', ident: Optional[str] = None,
                     'source': radar.get('source'),
                     'counts': {band: len(rings) for band, rings in radar.get('bands', {}).items()},
                     'bands': radar.get('bands', {}),
+                    'image': radar.get('image'),
+                    'imageBbox': radar.get('imageBbox'),
                     'coverage': None,
                     'tiles': None,
                     'virtual': True,
@@ -922,6 +935,8 @@ def _payload_locked(level: str = 'nation', ident: Optional[str] = None,
                     'counts': {band: len(rings) for band, rings
                                in _radar_clipped(radar.get('ts') or 'none').items()},
                     'bands': _radar_clipped(radar.get('ts') or 'none'),
+                    'image': radar.get('image'),
+                    'imageBbox': radar.get('imageBbox'),
                     'coverage': radar.get('coverage'),
                     # 瓦片直链：前端按墨卡托贴图，边界比矢量多边形更像真实回波
                     'tiles': radar.get('tiles_url'),

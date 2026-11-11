@@ -128,9 +128,20 @@ const terrainTiles=computed(()=>{
   if(!props.terrainOn) return []
   return tilesFor('https://tiles.openfreemap.org/natural_earth/ne2sr/{z}/{x}/{y}.png',5,5)
 })
-// —— 回波环 ——
-// 几何在后端已经做过栅格闭运算（补孔）+ 几何闭运算（磨角）+ Chaikin（成曲线），
-// 前端只负责上色。不再按屏幕尺寸分流画"填实小方块"：那是瓦片位图时代的补丁。
+// —— 雷达回波（NEXRAD 多级基本反射率贴图 + 累积嵌套多边形兜底） ——
+const radarImage=computed(()=>{
+  if(!props.radarOn) return null
+  const r=props.data?.radar
+  const href=r?.image
+  const b=r?.imageBbox
+  if(!href||!b||b.length<4||b[2]<=b[0]||b[3]<=b[1]) return null
+  const [x0,y0]=project(b[0],b[3])
+  const [x1,y1]=project(b[2],b[1])
+  const w=x1-x0, h=y1-y0
+  if(!(w>0&&h>0)) return null
+  const frame=String(r?.ts||props.minute||'')
+  return {href,x:x0,y:y0,w,h,frame}
+})
 const radarRings=computed(()=>{
   if(!props.radarOn) return []
   const bands=props.data?.radar?.bands||{}
@@ -754,39 +765,7 @@ function clickNode(node){
     <!-- 世界层用 CSS transform 而不是 SVG transform 属性：
          属性变化浏览器不做插值，聚焦时会"啪"地跳过去；CSS 能过渡。 -->
     <g class="nmap-world" :style="{transform:`translate(${pan.x.toFixed(2)}px, ${pan.y.toFixed(2)}px) scale(${zoom})`}">
-      <!-- 1 地形：真实晕渲瓦片（墨卡托，与投影一致） -->
-      <g v-if="terrainTiles.length" class="nmap-terrain" :clip-path="'url(#nmap-china-clip)'">
-        <image v-for="t in terrainTiles" :key="'t'+t.key" :x="t.x" :y="t.y"
-               :width="t.size" :height="t.size" :href="t.href"
-               preserveAspectRatio="none"/>
-      </g>
-
-      <!-- 2 雷达：**只画矢量轮廓**，不再叠原始瓦片位图。
-           两套画法并存时，位图的像素块会和矢量边界互相打架，看着就是锯齿。
-           几何由后端做过闭运算平滑（radar_field._smooth），这里只负责上色。 -->
-      <g v-if="radarRings.length" :clip-path="'url(#nmap-china-clip)'">
-        <!-- 回波：淡填充 + 清晰描边（专业雷达的读法：绿→黄→红）。
-             几何在后端已经做过闭运算平滑，这里描边才不会把台阶放大成锯齿。
-             换帧时旧环淡出 260ms、新环淡入 260ms —— 逐分钟变化是连续的，不是硬切。 -->
-        <g v-if="echoGhost.length" class="nmap-echo-ghost">
-          <path v-for="(ring,index) in echoGhost" :key="'g'+index" :d="ring.d"
-                :class="'echo-out echo-'+ring.level.toLowerCase()"
-                :style="{strokeWidth:(virtualMode?2.2:1.5)*inv}"/>
-        </g>
-        <template v-for="(ring,index) in radarRings" :key="'rr'+index+'-'+ring.frame">
-          <path :d="ring.d" :class="'echo-in echo-'+ring.level.toLowerCase()"
-                :style="{strokeWidth:(virtualMode?2.2:1.5)*inv}"/>
-        </template>
-      </g>
-
-      <!-- 2.5 雾区：低能见度面（DERIVED） -->
-      <g v-if="fogPolys.length" class="nmap-fog" filter="url(#nmap-fog-blur)">
-        <path v-for="(poly,i) in fogPolys" :key="'fg'+i" :d="poly.d"
-              :fill="poly.level==='BAN'?'rgba(226,240,252,.34)':'rgba(196,222,244,.22)'"
-              stroke="rgba(206,232,255,.35)" stroke-width=".8"/>
-      </g>
-
-      <!-- 3 行政区 -->
+      <!-- 1 行政区底色（放在回波层之下，避免陆地填充色遮挡或冲淡雷达回波） -->
       <g>
         <path v-for="shape in shapes" :key="shape.key" :d="shape.d"
               :style="{fill: shape.boundary?'var(--map-boundary)':'var(--map-land)',
@@ -796,6 +775,47 @@ function clickNode(node){
               @click="clickShape(shape)">
           <title>{{ shape.name }}{{ shape.boundary?' · 南海诸岛界线':(shape.live?'':(level==='nation'?' · 未纳入通航范围（台湾、西藏、香港、澳门）':' · 不在本级范围')) }}</title>
         </path>
+      </g>
+
+      <!-- 1.5 地形：真实晕渲瓦片（墨卡托，与投影一致） -->
+      <g v-if="terrainTiles.length" class="nmap-terrain" :clip-path="'url(#nmap-china-clip)'" pointer-events="none">
+        <image v-for="t in terrainTiles" :key="'t'+t.key" :x="t.x" :y="t.y"
+               :width="t.size" :height="t.size" :href="t.href"
+               preserveAspectRatio="none"/>
+      </g>
+
+      <!-- 2 雷达：优先渲染后端合成的 NEXRAD 12 级基本反射率墨卡托贴图（绿→黄→橙→红→品红嵌套色阶），
+           无贴图时回退到累积嵌套矢量面（无描边，避免出现空心包围圈）。 -->
+      <g v-if="radarImage||radarRings.length" :clip-path="'url(#nmap-china-clip)'" pointer-events="none">
+        <image v-if="radarImage" :key="'ri-'+radarImage.frame"
+               :x="radarImage.x" :y="radarImage.y"
+               :width="radarImage.w" :height="radarImage.h"
+               :href="radarImage.href" preserveAspectRatio="none"
+               class="echo-in nmap-radar-img"/>
+        <template v-else>
+          <g v-if="echoGhost.length" class="nmap-echo-ghost">
+            <path v-for="(ring,index) in echoGhost" :key="'g'+index" :d="ring.d"
+                  :class="'echo-out echo-'+ring.level.toLowerCase()"/>
+          </g>
+          <template v-for="(ring,index) in radarRings" :key="'rr'+index+'-'+ring.frame">
+            <path :d="ring.d" :class="'echo-in echo-'+ring.level.toLowerCase()"/>
+          </template>
+        </template>
+      </g>
+
+      <!-- 2.5 雾区：低能见度面（DERIVED） -->
+      <g v-if="fogPolys.length" class="nmap-fog" filter="url(#nmap-fog-blur)" pointer-events="none">
+        <path v-for="(poly,i) in fogPolys" :key="'fg'+i" :d="poly.d"
+              :fill="poly.level==='BAN'?'rgba(226,240,252,.34)':'rgba(196,222,244,.22)'"
+              stroke="rgba(206,232,255,.35)" stroke-width=".8"/>
+      </g>
+
+      <!-- 3 省界线：叠在雷达回波与雾区之上，使省界在回波区内依然清晰可辨 -->
+      <g pointer-events="none">
+        <path v-for="bshape in shapes" :key="'b-'+bshape.key" :d="bshape.d"
+              fill="none" :stroke="bshape.boundary?'none':'var(--map-line)'"
+              :opacity="bshape.boundary||bshape.live||level==='nation'?1:.55"
+              stroke-width=".7" vector-effect="non-scaling-stroke"/>
       </g>
 
       <!-- 3.5 南海诸岛小图：全国层才显示，保证地图完整 -->
@@ -997,12 +1017,14 @@ function clickNode(node){
 @media (prefers-reduced-motion: reduce){
   .echo-in,.echo-out{animation:none}
 }
-.echo-weak{fill:rgba(74,189,134,.22);stroke:rgba(96,214,158,.55)}
-.echo-convective{fill:rgba(245,190,60,.40);stroke:rgba(255,206,90,.88)}
-.echo-strong{fill:rgba(232,60,48,.58);stroke:rgba(255,120,95,.95)}
-html[data-theme="light"] .echo-weak{fill:rgba(47,158,106,.18);stroke:rgba(31,122,80,.62)}
-html[data-theme="light"] .echo-convective{fill:rgba(214,148,10,.26);stroke:rgba(166,110,0,.82)}
-html[data-theme="light"] .echo-strong{fill:rgba(200,40,30,.34);stroke:rgba(176,26,18,.92)}
+.nmap-radar-img{image-rendering:auto;opacity:.92;pointer-events:none}
+html[data-theme="light"] .nmap-radar-img{opacity:.86}
+.echo-weak{fill:rgba(24,205,60,.36);stroke:none}
+.echo-convective{fill:rgba(248,200,16,.52);stroke:none}
+.echo-strong{fill:rgba(232,24,18,.68);stroke:none}
+html[data-theme="light"] .echo-weak{fill:rgba(16,178,48,.34);stroke:none}
+html[data-theme="light"] .echo-convective{fill:rgba(235,172,0,.48);stroke:none}
+html[data-theme="light"] .echo-strong{fill:rgba(212,18,12,.64);stroke:none}
 .cap-star{fill:#ff4d4f;stroke:rgba(8,20,32,.85);stroke-width:.7;pointer-events:none}
 .cap-ring{stroke:rgba(186,218,255,.42);pointer-events:none}
 .no-fly-box{fill:rgba(224,49,49,.06);stroke:#e03131;pointer-events:stroke;cursor:help}
