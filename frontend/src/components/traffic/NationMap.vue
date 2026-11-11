@@ -23,8 +23,6 @@ const props=defineProps({
   dataMinute:{type:Number,default:-1},
   radarOn:{type:Boolean,default:true},
   fogOn:{type:Boolean,default:true},
-  terrainOn:{type:Boolean,default:true},
-  tilt:{type:Boolean,default:false},
   density:{type:String,default:'full'},
   selectedId:{type:String,default:''},
   selectedCorridor:{type:String,default:''},
@@ -63,11 +61,24 @@ function fitView(){
     // 画布尺寸一变（最典型：选中班次后详情卡张开，把地图压矮一半），
     // 旧的 pan 就不再对应新的 viewBox，整幅图会飞出画布。
     // 选中态下重新聚焦；否则保持原样，别把用户手动缩放的视野偷偷重置。
-    if(changed) requestAnimationFrame(()=>{
-      if(props.selectedId&&pickedLine.value) focusPts(pickedLine.value.pts)
-    })
+    // 尺寸一变就要重算 pan，否则旧 pan 对应新 viewBox，整幅图会飞出画布。
+    // 以前这里只处理"选中班次"，漏了走廊页（soloCorridor 且没有 selectedId）——
+    // 从列表切到走廊时地图高度会变，fit 用的是变之前的尺寸，航线就被推到视野下方
+    // （实测容器 462 高、航线包围盒 top=509，整条线在可视区外）。
+    if(changed) requestAnimationFrame(refitCurrent)
   }
 }
+// 当前视野该聚焦谁：单条走廊 > 选中班次。两处（尺寸变化 / 数据到达）共用，
+// 避免"只在某一个入口调一次"这种漏。
+function refitCurrent(){
+  if(props.soloCorridor){
+    const line=(corridors.value||[])[0]
+    if(line&&line.pts) focusPts(line.pts)
+    return
+  }
+  if(props.selectedId&&pickedLine.value) focusPts(pickedLine.value.pts)
+}
+
 onMounted(()=>{
   fitView()
   if(typeof ResizeObserver!=='undefined'&&host.value){
@@ -129,10 +140,6 @@ function tilesFor(template,minZoom,maxZoom){
   }
   return out
 }
-const terrainTiles=computed(()=>{
-  if(!props.terrainOn) return []
-  return tilesFor('https://tiles.openfreemap.org/natural_earth/ne2sr/{z}/{x}/{y}.png',5,5)
-})
 // —— 回波环 ——
 // 几何在后端已经做过栅格闭运算（补孔）+ 几何闭运算（磨角）+ Chaikin（成曲线），
 // 前端只负责上色。不再按屏幕尺寸分流画"填实小方块"：那是瓦片位图时代的补丁。
@@ -507,9 +514,10 @@ const labels=computed(()=>{
     if(only){ ends.add(only.fromName); ends.add(only.toName) }
   }
   const rankOf=(node)=>ends.has(node.name)?0:(node.rank||3)
-  // 全国层现在也标（只标本级之外有连线的端点与省会，约 40 个）：
-  // 一个地名都不给，等于让读者自己数城市点。
-  const limit=props.density==='slim'?18:(level.value==='nation'?44:40)
+  // V1.0.5：**不再按密度截断**。以前的 limit（18/40/44）会让"为什么这个城市有名字、
+  // 那个没有"变成一道猜谜；现在池子里的全部参与排布，放不下就降级形态（见 flightLabels），
+  // 不再整条删掉。全国层池子实测 80 个（30 省会 + 57 跨省端点，有重叠）。
+  const limit=999
   const ordered=list.filter(node=>level.value!=='nation'||rankOf(node)===0||node.capital)
     .sort((a,b)=>rankOf(a)-rankOf(b))
   // 避让判据用**真实胶囊矩形**，不再用"离点 48×10 的方框"。
@@ -520,15 +528,24 @@ const labels=computed(()=>{
   const placed=[]
   const boxes=[]
   const overlaps=(a,b,pad)=>!(a.x1+pad<b.x0||a.x0-pad>b.x1||a.y1+pad<b.y0||a.y0-pad>b.y1)
+  // 两轮放置：先试"胶囊"（有底、好读），放不下再试"裸字"（无底、面积小一半）。
+  // 全显之后必须允许降级形态，否则密集区会整片丢名 —— 用户要的是"都能看见"，
+  // 不是"都能带框"。
   for(const node of ordered){
     const tag=tagBox(node.short,'city')
-    const w=tag.w*k,h=tag.h*k
     const side=node.x>VIEW.w-90?-1:1
-    const cx=node.x+side*(w/2+6)
-    const box={x0:cx-w/2,x1:cx+w/2,y0:node.y-h/2,y1:node.y+h/2}
-    if(boxes.some(b=>overlaps(box,b,2))) continue
+    let box=null, bare=false
+    for(const attempt of [false,true]){
+      const w=(attempt?tag.w*0.84:tag.w)*k
+      const h=(attempt?tag.h*0.94:tag.h)*k
+      const cx=node.x+side*(w/2+5)
+      const cand={x0:cx-w/2,x1:cx+w/2,y0:node.y-h/2,y1:node.y+h/2}
+      if(boxes.some(b=>overlaps(cand,b,attempt?1:2))) continue
+      box=cand; bare=attempt; break
+    }
+    if(!box) continue
     boxes.push(box)
-    placed.push({...node,tag})
+    placed.push({...node,tag,bare})
     if(placed.length>=limit) break
   }
   return placed
@@ -739,7 +756,12 @@ const flightLabels=computed(()=>{
   const hit=(a,b,pad)=>a.x0<b.x1+pad&&a.x1>b.x0-pad&&a.y0<b.y1+pad&&a.y1>b.y0-pad
   const out=[]
   for(const f of list){
-    const text=`${f.callsign} · ${f.altM}m`
+    // 密度决定"写多少"，不决定"写不写"（写不写由可见性与避让决定）。
+    // 精简：不写航班标签，只留城市与航线；标准：编号 + 高度；详细：再加速度。
+    if(props.density==='min') continue
+    const text = props.density==='slim'
+      ? `${f.callsign} · ${f.altM}m · ${Math.round(f.speedKmh||0)}km/h`
+      : `${f.callsign} · ${f.altM}m`
     const tag=tagBox(text,'flight')
     const w=tag.w*k,h=tag.h*k
     // 四个候选：上 / 下 / 右 / 左。间距都是 10 个世界单位 —— 机身外接半径 6，
@@ -817,8 +839,11 @@ function focusPts(pts){
     minX=Math.min(minX,x);maxX=Math.max(maxX,x)
     minY=Math.min(minY,y);maxY=Math.max(maxY,y)
   }
+  // 留边：左右各 6%、上下各 14%（底部有图例、顶部有工具条），
+  // 以前用 62%/50% 的实际比例，短航线会被放大到贴边，长航线又偏到一侧。
   const w=Math.max(26,maxX-minX), h=Math.max(26,maxY-minY)
-  const next=Math.max(1,Math.min(4.2,Math.min(VIEW.w*.62/w,VIEW.h*.5/h)))
+  const padX=.88, padY=.72
+  const next=Math.max(1,Math.min(4.2,Math.min(VIEW.w*padX/w,VIEW.h*padY/h)))
   const cx=(minX+maxX)/2, cy=(minY+maxY)/2
   zoom.value=next
   pan.value={x:VIEW.w/2-cx*next,y:VIEW.h/2-cy*next}
@@ -889,11 +914,16 @@ watch([()=>props.followId,()=>props.flights],()=>{
 // 过渡只会让"点左边换右边"变成一段漂移）。
 watch(()=>props.soloCorridor,(id)=>{
   if(!id) return
-  nextTick(()=>{
-    const line=(corridors.value||[])[0]
-    if(line&&line.pts) focusPts(line.pts)
-  })
+  // 数据可能还没到（组件先挂、payload 后到）：等两帧再看一次，仍没有就交给
+  // 下面那条"走廊数据变化"的重试。
+  nextTick(()=>{ requestAnimationFrame(refitCurrent) })
 },{immediate:true})
+
+// 走廊页的数据是异步来的：soloCorridor 先到、corridors 后到，
+// 只在 id 变化时 fit 会扑空（实测进入页面后视野停在全国中心）。
+watch(()=>corridors.value.length,()=>{
+  if(props.soloCorridor) nextTick(()=>requestAnimationFrame(refitCurrent))
+})
 
 // 选中即聚焦：只跟 selectedId 走。若跟着 computed 走，飞机会每帧挪动零点几像素，
 // 视野就会被每帧重算，画面像被人一直按住不放。
@@ -918,7 +948,7 @@ function clickNode(node){
 </script>
 
 <template>
-<div class="nmap" :class="{tilt}" ref="host">
+<div class="nmap" ref="host">
   <svg :viewBox="`0 0 ${VIEW.w} ${VIEW.h}`" role="img" aria-label="全国航线网"
        :class="{dragging}" @wheel.prevent="onWheel" @mousedown="onDown"
        @mousemove="onMove" @mouseup="onUp" @mouseleave="onUp">
@@ -954,13 +984,6 @@ function clickNode(node){
     <!-- 世界层用 CSS transform 而不是 SVG transform 属性：
          属性变化浏览器不做插值，聚焦时会"啪"地跳过去；CSS 能过渡。 -->
     <g class="nmap-world" :style="{transform:`translate(${pan.x.toFixed(2)}px, ${pan.y.toFixed(2)}px) scale(${zoom})`}">
-      <!-- 1 地形：真实晕渲瓦片（墨卡托，与投影一致） -->
-      <g v-if="terrainTiles.length" class="nmap-terrain" :clip-path="'url(#nmap-china-clip)'">
-        <image v-for="t in terrainTiles" :key="'t'+t.key" :x="t.x" :y="t.y"
-               :width="t.size" :height="t.size" :href="t.href"
-               preserveAspectRatio="none"/>
-      </g>
-
       <!-- 3 行政区 -->
       <g>
         <path v-for="shape in shapes" :key="shape.key" :d="shape.d"
@@ -1030,18 +1053,12 @@ function clickNode(node){
         </path>
       </g>
 
-      <!-- 4 建筑：城市体块。立体模式下才立起来，平面模式只留底影 -->
+      <!-- 4 建筑：城市点的底影（立体体块随三维一起下线了） -->
       <g class="nmap-towers">
         <g v-for="node in nodes" :key="'b'+node.name">
-          <rect v-if="tilt" :x="node.x-1.8" :y="node.y-node.tower*2.6" width="3.6"
-                :height="node.tower*2.6" fill="url(#towerFace)" opacity=".5"/>
-          <ellipse v-else :cx="node.x" :cy="node.y" :rx="2.6*inv" :ry="1.4*inv" class="node-shadow"/>
+          <ellipse :cx="node.x" :cy="node.y" :rx="2.6*inv" :ry="1.4*inv" class="node-shadow"/>
         </g>
       </g>
-
-      <!-- 4.5 地面：倾斜时铺一层，避免透视看穿 -->
-      <rect v-if="tilt" x="-400" y="-300" :width="VIEW.w+800" :height="VIEW.h+900"
-            style="fill:var(--map-ground)" pointer-events="none"/>
 
       <!-- 5 航线：全国层不画。
            492 条线在全国缩放下平均只有 20–40 px，画出来就是一张蜘蛛网，
@@ -1176,7 +1193,8 @@ function clickNode(node){
       <g class="nmap-labels">
         <g v-for="node in labels" :key="'l'+node.name" class="map-tag"
            :transform="`translate(${node.x+((node.x>VIEW.w-90?-1:1)*(node.tag.w/2+6)*inv)} ${node.y})`">
-          <rect :x="-node.tag.w*inv/2" :y="-node.tag.h*inv/2" :width="node.tag.w*inv" :height="node.tag.h*inv"
+          <rect v-if="!node.bare" :x="-node.tag.w*inv/2" :y="-node.tag.h*inv/2"
+                :width="node.tag.w*inv" :height="node.tag.h*inv"
                 :rx="node.tag.h*inv/2" :ry="node.tag.h*inv/2" class="tag-bg"/>
           <text class="city" :y="node.tag.fs*inv*.36" text-anchor="middle"
                 :style="{fontSize:(node.tag.fs*inv)+'px'}">{{ node.short }}</text>
@@ -1196,9 +1214,6 @@ function clickNode(node){
   background:radial-gradient(120% 90% at 50% 0%,var(--map-bg-1) 0%,var(--map-bg-2) 70%)}
 .nmap svg{display:block;width:100%;height:100%;cursor:grab;transition:transform .45s ease}
 .nmap svg.dragging{cursor:grabbing;transition:none}
-.nmap.tilt svg{transform:perspective(1150px) rotateX(39deg) scale(1.2) translateY(3%);transform-origin:50% 82%}
-.nmap-terrain{opacity:.13;filter:grayscale(1) brightness(.75) contrast(1.1)}
-.nmap-terrain image{mix-blend-mode:screen}
 .nmap .clickable{cursor:pointer}
 .nmap path.hit{filter:drop-shadow(0 0 2px rgba(255,206,90,.55))}
 .nmap path.virt-alarm{filter:drop-shadow(0 0 4px rgba(255,90,60,.85))}

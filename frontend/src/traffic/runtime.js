@@ -3542,8 +3542,9 @@ const NAV_SPEC = [
     // V1.0.1：全国视图**不新开入口**（W-21b 的 8 个入口是产品决定），
     // 挂在「运行总览」这个入口下，作为它的一个 tab：全国 → 东北全域。
     subs: ['home', { key: 'overview', members: ['overview', 'national'] }, 'weather'] },
+  // V1.0.5：情报已并入「气象监测」，走廊组只剩"这条线本身"。
   { key: 'corridor', no: 2, label: '走廊', subtitle: '这条走廊几点能飞，凭什么',
-    subs: ['profile', 'briefing'] },
+    subs: ['profile'] },
   { key: 'dispatch', no: 3, label: '处置', subtitle: 'AI 与规则谁说了算',
     subs: [{ key: 'alerts', label: ENTRY_LABELS.alerts, hint: '一批事件该怎么做、谁在什么时候飞',
               members: ['alerts', 'schedule', 'assistant'] }] },

@@ -7,11 +7,8 @@ import CorridorBrowser from './CorridorBrowser.vue'
 import NationMap from './NationMap.vue'
 import NationBriefing from './NationBriefing.vue'
 import {parseScope,scopeKey} from '../../traffic/scope.js'
-import {probeGPU,gpuLabel} from '../../traffic/gpu.js'
 
-// 三维单独切包：maplibre + 地形瓦片只在真进三维时才加载。
 // 首页首屏用不到它，没必要为它多等一个 chunk。
-const NationGlobe=defineAsyncComponent(()=>import('./NationGlobe.vue'))
 
 // 全国运行台：态势 / 台账 / 情报 / 处置 四个视图共用同一份 `payload`。
 //
@@ -37,12 +34,11 @@ const props=defineProps({
   // 从左侧导航进入时隐藏内部 tab 条：导航已经表达了"我在哪一页"，
   // 再挂一条「态势/台账/情报/处置」只会和导航打架
   // （例如从「大模型取证」进来却看到「台账」高亮）。
-  hideTabs:{type:Boolean,default:false},
   // 从导航进来时的一句"该做什么"。这些页面共用一张图，
   // 不给提示的话用户看到的就是一张空地图，不知道从哪下手。
   hint:{type:String,default:''},
 })
-const emit=defineEmits(['scope-change','open-corridor'])
+const emit=defineEmits(['scope-change','open-corridor','tick'])
 
 const level=ref('nation')
 const ident=ref('')
@@ -80,8 +76,6 @@ const speed=ref(1)                    // 分钟/秒：0.25≈15×、1=60×、5=3
 const frameMinute=ref(60)
 const radarOn=ref(true)
 const fogOn=ref(true)
-const terrainOn=ref(false)
-const tilt=ref(false)
 const virtualMode=ref(false)
 const density=ref('full')
 const selectedId=ref('')
@@ -89,11 +83,7 @@ const selectedCorridor=ref('')
 const followId=ref('')
 
 // —— 视角：平面 / 倾斜（SVG 透视）/ 三维（maplibre 真透视） ——
-// 三维之前先问 GPU 能不能扛。软件渲染（SwiftShader）下进去就是拖死页面，
 // 所以按钮点了也会被挡回来，并说清"为什么不能看"，而不是默默什么都不发生。
-const gpu=probeGPU()
-const threeD=ref(false)
-const liftNote=ref('')
 const fps=ref(0)
 // —— 双受众视角 ——
 // 同一套几何两种读法：运行视角看航线与班次，空域视角看净空边界与等级。
@@ -200,10 +190,10 @@ async function loadEvidence(){
 }
 function clearEvidence(){evidence.value=null;evidenceErr.value=''}
 
-// 立体与平面是两套渲染，但"定位/复位"对用户是同一个动作：按当前模式找对那个组件。
-const globeRef=ref(null)
+// 定位/复位只对平面图这一套。
+const globeRef=ref(null)   // 已下线三维，保留 ref 只为兼容模板里的旧引用
 function activeMap(){
-  return threeD.value?globeRef.value:(mapRef.value||null)
+  return mapRef.value||null
 }
 function locateLayer(kind){
   followId.value=''
@@ -214,41 +204,6 @@ function resetMap(){
   followId.value=''
   activeMap()?.resetView?.()
 }
-
-// —— 视角切换（含 WebGL 护栏） ——
-function toggle3d(){
-  if(threeD.value){threeD.value=false;liftNote.value='';return}
-  const probe=gpu||probeGPU()
-  if(!probe.ok){
-    // 不进三维，直接给倾斜视图 + 原因。静默失败是最糟的选择：
-    // 用户会以为是按钮坏了，然后反复点。
-    tilt.value=true
-    threeD.value=false
-    liftNote.value=`本机没开硬件加速，真实三维会拖死页面：${probe.reason}。已切到倾斜视图（同样的俯角，不依赖 GPU）`
-    return
-  }
-  threeD.value=true
-  tilt.value=false
-  liftNote.value=''
-  ensureZones()
-}
-function toggleTilt(){
-  tilt.value=!tilt.value
-  if(tilt.value){threeD.value=false}
-  liftNote.value=''
-}
-function onGlobeDegrade(info){
-  // ③ 看门狗触发：退出三维，落到倾斜视图，并说明是帧率问题而不是数据问题
-  threeD.value=false
-  tilt.value=true
-  liftNote.value=`三维帧率只有 ${info?.fps ?? '?'} fps（连续 3 秒低于 20），已自动降级为倾斜视图。多半是显卡驱动没走上硬件加速`
-}
-function onGlobeUnsupported(probe){
-  threeD.value=false
-  tilt.value=true
-  liftNote.value=`真实三维不可用：${probe?.reason||'本机 WebGL 未启用'}。已切到倾斜视图`
-}
-function onGlobeFps(value){fps.value=value}
 
 // —— 净空几何按需取 ——
 // 287 个 28 点环约 250 KB，放进主载荷会让首屏多 0.2 秒，所以走独立接口、按需取。
@@ -472,9 +427,26 @@ function startClock(){
 // 拖时间轴：连续时钟要跟着跳，否则会被下一帧拉回去
 function onSeek(){ frameMinute.value=minute.value; loadFlights() }
 
+// 顶栏要显示"推演时刻"，但全国台有自己的 minute（0–1440），和东北那套（0–480）
+// 不是一个量，所以由这里把真实状态报上去，不让顶栏去猜。
+let tickAt=0
+watch([minute,playing],([m,on])=>{
+  const now=Date.now()
+  if(now-tickAt<500&&on) return
+  tickAt=now
+  emit('tick',{minute:Number(m)||0,playing:!!on})
+},{immediate:true})
+
+// 打开任何对象（班次 / 事件 / 走廊）之前先停表。
+// 时间在跑的时候点开一架飞机，选中的瞬间它在 A 点，读两行字它已经飘到 B 点；
+// 推演结论里的"当前时刻"也会跟着变，同一句话读两次不一样。
+// 只停推演时钟，右上角北京时间（nav-timebase）走的是真实时间，不受影响。
+function pauseForInspect(){ playing.value=false }
+
 // 事件卡片的点击：一条事件聚合了多个城市，点开时先进第一个成员城市，
 // 该班次若还在飞就同时选中它 —— 否则读者只能对着"青海省 · 2 处"猜是哪两处。
 function openAlert(row){
+  pauseForInspect()
   const places=row.places||[]
   // 用户要的落点变了：处置点开不再"切到城市让用户自己找"，而是**直接进那个班次的走廊**，
   // 在那里做人工裁决。走廊号就藏在班次 id 里（NC-0270#-1 → NC-0270），不用再查表。
@@ -509,6 +481,7 @@ function openAlert(row){
 }
 
 function pickFlight(flight){
+  pauseForInspect()
   if(selectedId.value!==flight.id){followId.value='';clearEvidence()}
   selectedId.value=flight.id
   selectedCorridor.value=''
@@ -517,6 +490,7 @@ function toggleFollow(){
   followId.value=followId.value===selectedId.value?'':selectedId.value
 }
 function pickCorridor(line){
+  pauseForInspect()
   selectedCorridor.value=line.id
   selectedId.value=''
   followId.value=''
@@ -776,7 +750,18 @@ onUnmounted(()=>{
           {{ zonePolicy==='PROHIBITED'?'一律禁飞':'可申请穿越' }}</button>
       </div>
     </div>
-    <p class="nrn-headline" data-nation-headline>{{ headline }}</p>
+    <!-- 指标块代替"492 条航线 · 在飞 111 架 · 绕飞 2 架…"那一长串。
+         以前五个数用间隔号串成一句，哪个数对应哪个指标要靠位置猜；
+         数字位数一变整行还会左右挪，读起来像在动。现在一块一个指标：
+         上面是数字（等宽、定宽），下面是名称，变动时给 ▲/▼。 -->
+    <div class="nrn-metrics" data-nation-headline>
+      <div class="m"><b>{{ num(total.corridors) }}</b><span>航线</span></div>
+      <div class="m"><b>{{ num(total.airborne) }}</b><span>在飞</span></div>
+      <div class="m" :class="{warn:total.delayed>0}"><b>{{ num(total.delayed) }}</b><span>绕飞</span></div>
+      <div class="m" :class="{bad:total.blocked>0}"><b>{{ num(total.blocked) }}</b><span>停飞</span></div>
+      <div class="m" :class="{warn:total.hold>0}"><b>{{ num(total.hold) }}</b><span>延期</span></div>
+      <div class="m"><b>{{ num(total.lowVisCities) }}</b><span>低能见度城市</span></div>
+    </div>
     <p class="nrn-sub">
       纳入 <b>{{ num(summary.provinces) }}</b> 省 · <b>{{ num(summary.cities) }}</b> 市 ·
       <b>{{ num(summary.airports) }}</b> 机场 · <b>{{ num(summary.feedCities) }}</b> 市无机场（专用接驳）·
@@ -788,13 +773,6 @@ onUnmounted(()=>{
       </em>
     </p>
   </header>
-
-  <nav class="nrn-tabs" data-nation-tabs v-if="!hideTabs">
-    <button :class="{on:view==='map'}" @click="view='map'">态势</button>
-    <button :class="{on:view==='ledger'}" @click="view='ledger'">台账 <em>{{ flights.length }}</em></button>
-    <button :class="{on:view==='intel'}" @click="view='intel'">情报 <em>{{ intel.length }}</em></button>
-    <button :class="{on:view==='alerts'}" @click="view='alerts'">处置 <em :class="{bad:alerts.length}">{{ alerts.length }}</em></button>
-  </nav>
 
   <!-- 推演页的"立题"行：先选对象，再看链路。不给选择器的话，
        这一页只能靠在地图上盲点，点不中就什么都没发生。 -->
@@ -842,21 +820,16 @@ onUnmounted(()=>{
         <button :class="{on:lineStats.shown>0}" @click="linePanel=!linePanel"
                 :title="`显示哪些航线：跨省主干 / 机场接驳 / 省内短途；条数可以自己拖${lineStats.forced?`。其中 ${lineStats.forced} 条因为此刻有班次在飞而强制显示`:''}`">
           航线 {{ lineStats.shown }}/{{ lineStats.total }}</button>
-        <button :class="{on:virtualWx}" @click="toggleVirtual"
-                :title="'虚拟气象演示包：在后端生成合成回波，并按同一套判定重算绕飞与停飞；非实况'">
-          虚拟气象</button>
+        <button :class="{on:virtualWx}" @click="toggleVirtual" data-virtual-toggle
+                :title="'虚拟气象：只替换雷达回波与雾，气温/风/能见度仍是实况；按同一套判据重算绕飞与停飞'">
+          {{ virtualWx?'虚拟气象 · 开':'实测气象' }}</button>
         <button :class="{on:zoneOn}" @click="zoneOn=!zoneOn; zoneOn&&ensureZones()"
                 :title="'禁飞区：机场净空 + 强回波，红色多边形框；关掉连绕飞一起隐藏'">禁飞</button>
-        <button :class="{on:terrainOn}" @click="terrainOn=!terrainOn">地形</button>
-        <button :class="{on:tilt}" @click="toggleTilt">倾斜</button>
-        <button :class="{on:threeD}" @click="toggle3d"
-                :title="gpu.ok?('真实三维 · '+gpuLabel(gpu)):(gpu.reason||'本机 WebGL 不可用')">三维</button>
-        <button :class="{on:virtualMode}" @click="virtualMode=!virtualMode"
-                :title="'虚拟增强：回波与绕飞/停飞在图上更醒目，用于演示'">{{ virtualMode?'虚拟':'实测' }}</button>
-        <select v-model="density" aria-label="信息密度">
+        <select v-model="density" aria-label="信息密度"
+                title="精简：只有航线和城市名；标准：城市胶囊 + 航班编号与高度；详细：再加速度与状态">
+          <option value="min">精简</option>
           <option value="full">标准</option>
-          <option value="slim">精简</option>
-          <option value="min">极简</option>
+          <option value="slim">详细</option>
         </select>
         <button :disabled="!radarBBox" @click="locateLayer('radar')">定位回波</button>
         <button :disabled="!fog.bbox" @click="locateLayer('fog')">定位雾区</button>
@@ -878,23 +851,14 @@ onUnmounted(()=>{
         <button class="nrn-lineall" @click="lineLimit=0">全部关闭</button>
       </div>
 
-      <p class="nrn-lift" v-if="liftNote" data-lift-note>{{ liftNote }}</p>
 
-      <!-- 三维＝maplibre 真透视（俯角/旋转/DEM/体块），但先进能力探测：
-           软件渲染（SwiftShader）一律不进，直接退到倾斜视图并说明原因。
-           这是 V1.0.1 两次把 Edge 拖死的教训 —— 卡死的是浏览器 GPU，不是服务器。
-           倾斜＝不依赖 WebGL 的 CSS 透视，轻、稳、切页不卡，代价是没有真实高程。 -->
+      <!-- V1.0.5：三维 / 倾斜 / 地形三档全部下线，只保留平面矢量图。
+           理由是那三档各有各的别扭（透视下标签要反向缩放、地形色带和回波抢注意力），
+           而这一页要回答的是"哪片天不能飞"，不是"山有多高"。 -->
       <div class="nrn-canvas">
-      <NationGlobe v-if="threeD" ref="globeRef" :data="data" :flights="flights"
-                   :minute="minute" :frame-minute="frameMinute"
-                   :radar-on="radarOn" :fog-on="fogOn" :density="density"
-                   :selected-id="selectedId" :selected-corridor="selectedCorridor"
-                   :follow-id="followId" :zones="zoneOn?zoneGeom:null" :audience="audience"
-                   @drill="drill" @select-flight="pickFlight" @select-corridor="pickCorridor"
-                   @degrade="onGlobeDegrade" @unsupported="onGlobeUnsupported" @fps="onGlobeFps"/>
-      <NationMap v-else ref="mapRef" :data="data" :flights="flights" :minute="minute"
+      <NationMap ref="mapRef" :data="data" :flights="flights" :minute="minute"
                  :frame-minute="frameMinute" :data-minute="flightsMinute"
-                 :radar-on="radarOn" :fog-on="fogOn" :terrain-on="terrainOn" :tilt="tilt"
+                 :radar-on="radarOn" :fog-on="fogOn"
                  :density="density" :virtual-mode="virtualMode" :audience="audience"
                  :zone-bands="zoneOn&&zoneGeom?zoneGeom.bands:null"
                  :line-kinds="lineKinds" :line-limit="lineLimit" :zone-policy="zonePolicy"
@@ -953,8 +917,13 @@ onUnmounted(()=>{
                       :minute="minute" :density="density" :selected-id="selectedId"
                       @select="pickFlight"/>
     </div>
+    <!-- 情报 = 两张表：先"在飞班次情报"（这一班为什么这么判），再"空域情报"（机场与净空）。
+         两段都吃同一份 payload，不再各自发一次请求。 -->
     <div class="nrn-table" v-show="view==='intel'">
-      <NationBriefing view="intel" :payload="data" :density="density"/>
+      <NationBriefing view="ledger" variant="briefing"
+                      :payload="data" :flights="flights" :minute="minute" :density="density"/>
+      <NationBriefing view="intel" :payload="data" :flights="flights"
+                      :minute="minute" :density="density"/>
     </div>
 
     <!-- ================= 处置 ================= -->
@@ -1160,6 +1129,12 @@ onUnmounted(()=>{
             <b>取证链</b>
             <span>{{ evidence.conclusion }}</span>
             <em>{{ evidence.steps.length }} 步 · {{ evidence.generatedAt }}</em>
+            <!-- 模型状态做成一枚小标：已配置就只报"能用 + 走的哪个文件"，不占正文；
+                 未配置才展开那段可执行的说明（琥珀色，属于"要你动手"的话）。 -->
+            <i class="ev-llm" :class="{off:!evidence.llm?.configured}"
+               :title="evidence.llm?.note">
+              {{ evidence.llm?.configured ? '大模型就绪 · '+(evidence.llm?.model||'') : '大模型未配置' }}
+            </i>
           </div>
           <div class="ev-steps">
             <div class="ev-step" v-for="step in evidence.steps" :key="step.n">
@@ -1171,7 +1146,7 @@ onUnmounted(()=>{
               </p>
             </div>
           </div>
-          <p class="ev-note">{{ evidence.llm?.note }}</p>
+          <p class="ev-note" v-if="evidence.llm && !evidence.llm.configured">{{ evidence.llm.note }}</p>
           <p class="ev-note quiet">{{ evidence.discipline }}</p>
         </template>
       </div>
@@ -1234,15 +1209,17 @@ onUnmounted(()=>{
 .nrn-crumb button:hover{text-decoration:underline}
 .nrn-crumb .sep{color:#4f7288}
 .nrn-crumb .back{margin-left:8px;border:1px solid #2c4a60;border-radius:5px;padding:2px 8px;color:#a8cee6}
-.nrn-headline{margin:0;font-size:13.5px;color:#eaf6ff;letter-spacing:.2px}
+.nrn-metrics{display:flex;gap:0;margin:2px 0 1px;flex-wrap:wrap}
+.nrn-metrics .m{display:flex;flex-direction:column;gap:1px;padding:0 14px;min-width:74px;
+  border-left:1px solid rgba(70,110,140,.3)}
+.nrn-metrics .m:first-child{padding-left:0;border-left:0}
+.nrn-metrics b{font-size:19px;line-height:1.15;color:#eaf6ff;font-weight:600;
+  font-variant-numeric:tabular-nums;letter-spacing:.5px}
+.nrn-metrics span{font-size:10.5px;color:#82a6bd;white-space:nowrap}
+.nrn-metrics .m.warn b{color:#ffc857}
+.nrn-metrics .m.bad b{color:#ff8d78}
 .nrn-sub{margin:0;font-size:11.5px;color:#82a6bd}
 .nrn-sub b{color:#cfe9f8;font-variant-numeric:tabular-nums}
-
-.nrn-tabs{display:flex;gap:6px;border-bottom:1px solid rgba(70,110,140,.35);padding-bottom:6px}
-.nrn-tabs button{background:transparent;border:1px solid transparent;color:#8fb2c8;padding:5px 13px;border-radius:6px;cursor:pointer;font-size:12.5px}
-.nrn-tabs button.on{background:#17394d;border-color:#2e6b85;color:#bfe9ff}
-.nrn-tabs em{font-style:normal;opacity:.75;margin-left:4px;font-size:11px}
-.nrn-tabs em.bad{color:#ffb38a}
 
 /* 双受众切换：和 tab 条同一视觉语言，但靠右，表示"换个读法"而不是"换一页" */
 .nrn-aud{margin-left:auto;display:flex;gap:4px;align-items:center}
@@ -1572,6 +1549,9 @@ html[data-theme="light"] .nrn-alert-go{color:#0b7ea6}
 .ev-step code.DERIVED{color:#ffd479;background:rgba(245,190,60,.14)}
 .ev-step code.OFFICIAL{color:#c6b4ff;background:rgba(160,140,255,.14)}
 .ev-note{margin:6px 0 0;font-size:10.5px;color:#ffcf7a;line-height:1.6}
+.ev-llm{margin-left:auto;font-style:normal;font-size:9.5px;padding:1px 6px;border-radius:999px;
+  color:#6fe0a8;border:1px solid rgba(80,200,140,.45);background:rgba(40,140,95,.14);white-space:nowrap}
+.ev-llm.off{color:#ffcf7a;border-color:rgba(220,170,60,.5);background:rgba(180,130,30,.14)}
 .ev-note.quiet{color:#6f92a8}
 .ev-err{color:#ffa08a;font-size:11px}
 .nrn-state{margin:6px 0;color:#8fb2c8;font-size:12px;line-height:1.6;
@@ -1584,7 +1564,15 @@ html[data-theme="light"] .nrn-alert-go{color:#0b7ea6}
 html[data-theme="light"] .nrn-state{color:#31556f !important;background:#fff !important;
   border-color:#dbe6f1 !important;border-left-color:#2a7fb8 !important}
 html[data-theme="light"] .nrn-state::before{background:#2a7fb8}
+html[data-theme="light"] .nrn-metrics b{color:#0f3550 !important}
+html[data-theme="light"] .nrn-metrics span{color:#5b7a92 !important}
+html[data-theme="light"] .nrn-metrics .m{border-left-color:#dbe6f1 !important}
+html[data-theme="light"] .nrn-metrics .m.warn b{color:#8a5a00 !important}
+html[data-theme="light"] .nrn-metrics .m.bad b{color:#a8321f !important}
 html[data-theme="light"] .nrn-state b{color:#14567d !important}
+html[data-theme="light"] .ev-llm{color:#0f7a52 !important;border-color:#8ecbb0 !important;background:#e6f6ee !important}
+html[data-theme="light"] .ev-llm.off{color:#7a5200 !important;border-color:#e6cf9c !important;background:#fdf6e7 !important}
+html[data-theme="light"] .ev-note{color:#7a5200 !important}
 .nrn-state.bad{color:#ffa08a}
 .nrn-state button{margin-left:8px;background:#17394d;border:1px solid #2e6b85;color:#bfe9ff;border-radius:5px;padding:2px 8px;cursor:pointer}
 
@@ -1599,7 +1587,6 @@ html[data-theme="light"] .nrn-state b{color:#14567d !important}
   .nrn-block-hd em,.nrn-prov em,.nrn-city-list em{font-size:11px}
   .nrn-tools{gap:5px}
   .nrn-tools button,.nrn-tools select{font-size:11px;padding:3px 7px}
-  .nrn-tabs button{font-size:11.5px;padding:4px 10px}
   .nrn-detail p,.nrn-detail p>b{font-size:11px}
   .nrn-detail header b{font-size:12.5px}
   .nrn-side h3{font-size:11.5px}
