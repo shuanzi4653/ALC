@@ -92,6 +92,24 @@ body {
   --alc-radius: 6px;
 
   --alc-ease: cubic-bezier(.2, .8, .2, 1);
+
+  /* 地图调色板（NationMap 的 SVG 直接吃这些变量；浅色值在 theme-light.css 里覆盖） */
+  --map-bg-1: #0b2033;
+  --map-bg-2: #061019;
+  --map-land: rgba(96, 140, 180, .13);
+  --map-land-dim: rgba(96, 132, 170, .05);
+  --map-line: rgba(132, 180, 220, .52);
+  --map-boundary: rgba(150, 200, 235, .55);
+  --map-inset-bg: rgba(6, 18, 28, .72);
+  --map-inset-line: rgba(120, 165, 205, .45);
+  --map-ground: rgba(6, 16, 25, .55);
+  --map-node: #eaf6ff;
+  --map-node-dim: rgba(214, 236, 255, .55);
+  --map-node-stroke: rgba(8, 20, 32, .85);
+  --map-label: #9ec4e0;
+  --map-corridor: rgba(126, 206, 255, .62);
+  --map-corridor-blocked: rgba(226, 92, 74, .55);
+  --map-detour: rgba(255, 206, 90, .9);
 }
 
 /* ---- 投影模式（快捷键 P）---------------------------------------------------
@@ -173,4 +191,29 @@ html[data-projection="on"] svg text {
   border: 1px dashed rgba(194, 65, 12, .45);
   border-radius: 4px;
   vertical-align: 2px;
+}
+
+/* ---- 微交互与焦点（2026-11-11 美化轮） -------------------------------------
+ * 只做三件事：统一过渡曲线、给键盘焦点一个可见环、给地图画布一层极轻投影。
+ * 不动布局、不改配色 —— 美化不应该让任何一屏重新排版。
+ */
+.traffic-workbench button,
+.traffic-workbench select,
+.traffic-workbench [role="button"] {
+  transition: background .15s var(--alc-ease), border-color .15s var(--alc-ease),
+              color .15s var(--alc-ease), box-shadow .15s var(--alc-ease);
+}
+.traffic-workbench button:focus-visible,
+.traffic-workbench select:focus-visible,
+.traffic-workbench input:focus-visible,
+.traffic-workbench a:focus-visible,
+.traffic-workbench [role="button"]:focus-visible {
+  outline: 2px solid var(--alc-info);
+  outline-offset: 1px;
+}
+.nrn-canvas {
+  box-shadow: 0 18px 32px -26px rgba(0, 0, 0, .9), inset 0 0 0 1px rgba(120, 180, 230, .04);
+}
+html[data-theme="light"] .nrn-canvas {
+  box-shadow: 0 14px 26px -22px rgba(20, 50, 80, .45), inset 0 0 0 1px rgba(255, 255, 255, .6);
 }

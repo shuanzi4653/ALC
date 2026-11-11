@@ -5,12 +5,13 @@ import mapWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import china from '../../assets/china.json'
 import {probeGPU,gpuLabel,startFpsWatch} from '../../traffic/gpu.js'
+import {mapPalette} from '../../theme.js'
 
 // 全国图 · 三维视图（真实透视，不是把平面图斜过来）。
 //
 // 为什么另起一个组件而不是在 SVG 上加 CSS 变换：之前的"立体"是
 // `perspective + rotateX`，没有视差、没有高程、放大后像素被拉伸 —— 那是斜着的二维。
-// 这里用 maplibre 的真透视：俯角可调、可旋转、城市体块是真实的 fill-extrusion、
+// 这里用 maplibre 的真透视：俯角可调、可旋转、省界与航路按真实经纬度铺开、
 // 省/市层挂 raster-dem 地形。
 //
 // 四条护栏（V1.0.1 两次把 Edge 拖死的直接教训，缺一条就会重演）：
@@ -19,8 +20,9 @@ import {probeGPU,gpuLabel,startFpsWatch} from '../../traffic/gpu.js'
 //   ③ 帧率看门狗：连续 3 秒 < 20 fps 就回调父组件降级，不在卡死里耗；
 //   ④ DEM 只在省/市层挂：全国层的高程起伏在屏幕上不到 2 px，纯耗带宽。
 //
-// 诚实口径：**地形是真的（DEM），体块是示意柱（没有全国建筑足迹数据），
-// 净空圈是规则化生成的几何（DERIVED）**。三条都写在界面提示里。
+// 诚实口径：**地形是真的（DEM），净空柱是规则化生成的几何（DERIVED）且垂直放大 10 倍**。
+// 曾经给每个城市起过体块柱，但全国缩放下它只是一片半透明方块，读者会当成 UI 残影 ——
+// 于是全部撤掉，城市只用点+环标记。
 setWorkerUrl(mapWorkerUrl)
 
 const props=defineProps({
@@ -134,7 +136,7 @@ const detourFC=computed(()=>{
   return fc(features)
 })
 
-// —— 节点 / 体块 ——
+// —— 节点 ——
 const nodeFC=computed(()=>{
   const features=[]
   for(const node of props.data?.nodes||[]){
@@ -147,50 +149,6 @@ const nodeFC=computed(()=>{
         p:node.pLowVis==null?0:node.pLowVis,
       },
       geometry:{type:'Point',coordinates:[node.lon,node.lat]},
-    })
-  }
-  return fc(features)
-})
-
-// 体块按层级裁剪 —— 这是"不卡"的关键。
-// 全国层给 319 个城市都起柱，屏幕上就是一片棋盘，既看不出城市也更耗 GPU；
-// 只保留 31 个省会，柱子加粗加高，才在国家级缩放下读得出"这是哪"。
-//
-// 尺寸是**像素倒推**出来的，不是拍脑袋：z3.5 时 1 px ≈ 16 km、1°≈6.4 px，
-// 想让柱子占到 3–8 px，宽就得给到 0.5°、高给到 5–11 万米（约 55–110 km）。
-// 这个高度当然不是楼高，所以：
-//   ① 高度按缩放归一（拉近时自动缩回去，见 towerHeight），
-//   ② 界面提示里写明"柱高为示意量级，不代表真实高度"。
-// 柱高另外叠加能见度概率：p 越高柱越高＝风险堆积，这是编码不是装饰。
-const TOWER={
-  nation:{maxRank:1,size:0.55,base:55000,var:60000},
-  region:{maxRank:2,size:0.30,base:22000,var:26000},
-  province:{maxRank:3,size:0.09,base:6000,var:9000},
-  city:{maxRank:3,size:0.030,base:2500,var:4000},
-}
-// 拉近时把示意高度收回去，否则 0.5° 宽的柱子会在省层变成一堵墙。
-// 注意：maplibre 的 `zoom` 只能出现在**顶层** interpolate/step 里，
-// 写成 `['*',['get','h'],['interpolate',...,['zoom'],...]]` 会让整份样式编译失败 ——
-// 而失败的表现不是报错，是 'load' 永不触发、界面一直停在"初始化"。
-const TOWER_ZOOM_CURVE=['interpolate',['linear'],['zoom'],
-  3,['*',['get','h'],1],5,['*',['get','h'],.45],7,['*',['get','h'],.16],10,['*',['get','h'],.06]]
-const towerFC=computed(()=>{
-  const cfg=TOWER[level.value]||TOWER.nation
-  const features=[]
-  for(const node of props.data?.nodes||[]){
-    if(node.lon==null||node.lat==null) continue
-    const rank=node.rank||3
-    if(rank>cfg.maxRank) continue
-    const p=node.pLowVis||0
-    const height=Math.round(cfg.base+p*cfg.var)
-    const size=rank===1?cfg.size:(cfg.size*0.72)
-    const [lon,lat]=[node.lon,node.lat]
-    features.push({
-      type:'Feature',
-      properties:{name:node.name,h:height,p,rank},
-      geometry:{type:'Polygon',coordinates:[[
-        [lon-size,lat-size],[lon+size,lat-size],[lon+size,lat+size],[lon-size,lat+size],[lon-size,lat-size],
-      ]]},
     })
   }
   return fc(features)
@@ -287,6 +245,8 @@ function planeImage(color){
 
 // —— 样式 ——
 function buildStyle(){
+  // 调色板：深/浅两套，paint 只能吃具体颜色，所以从 theme.js 取
+  const PAL=mapPalette()
   const zoneColor=zonePolicy.value==='PROHIBITED'
     ?['match',['get','kind'],'LIMIT','rgba(226,74,58,.62)','rgba(226,120,74,.5)']
     :['match',['get','kind'],'LIMIT','rgba(245,190,60,.42)','rgba(245,190,60,.28)']
@@ -298,19 +258,18 @@ function buildStyle(){
       corridors:{type:'geojson',data:corridorFC.value},
       detours:{type:'geojson',data:detourFC.value},
       nodes:{type:'geojson',data:nodeFC.value},
-      towers:{type:'geojson',data:towerFC.value},
       radar:{type:'geojson',data:radarFC.value},
       fog:{type:'geojson',data:fogFC.value},
       zones:{type:'geojson',data:zoneFC.value},
       flights:{type:'geojson',data:flightFC.value},
     },
     layers:[
-      {id:'bg',type:'background',paint:{'background-color':'#04101a'}},
-      {id:'land',type:'fill',source:'provinces',paint:{'fill-color':'#0b1d2a','fill-opacity':.88}},
+      {id:'bg',type:'background',paint:{'background-color':PAL.background}},
+      {id:'land',type:'fill',source:'provinces',paint:{'fill-color':PAL.land,'fill-opacity':PAL.landOpacity}},
       {id:'province-line',type:'line',source:'provinces',paint:{
-        'line-color':'rgba(126,176,214,.62)','line-width':['interpolate',['linear'],['zoom'],3,.7,7,1.6]}},
+        'line-color':PAL.provinceLine,'line-width':['interpolate',['linear'],['zoom'],3,.7,7,1.6]}},
       {id:'jiuduan-line',type:'line',source:'jiuduan',paint:{
-        'line-color':'rgba(200,232,255,.75)','line-width':['interpolate',['linear'],['zoom'],3,.9,7,1.8]}},
+        'line-color':PAL.boundaryLine,'line-width':['interpolate',['linear'],['zoom'],3,.9,7,1.8]}},
       {id:'fog-fill',type:'fill',source:'fog',paint:{
         'fill-color':['match',['get','band'],'BAN','rgba(228,242,255,.40)','rgba(198,224,246,.26)'],
         'fill-opacity':.9}},
@@ -328,24 +287,19 @@ function buildStyle(){
         'line-color':zonePolicy.value==='PROHIBITED'?'rgba(255,120,90,.8)':'rgba(255,208,120,.6)',
         'line-width':.8,'line-opacity':.7},
        layout:{'line-join':'round'}},
-      {id:'towers',type:'fill-extrusion',source:'towers',minzoom:2.4,paint:{
-        // 亮一档：深青柱压在深青底上等于没画（实测截图里几乎看不出柱子）
-        'fill-extrusion-color':['interpolate',['linear'],['get','p'],0,'#63bcd8',1,'#eafcff'],
-        'fill-extrusion-height':TOWER_ZOOM_CURVE,'fill-extrusion-base':0,
-        'fill-extrusion-opacity':.78,'fill-extrusion-vertical-gradient':true}},
       {id:'corridor-line',type:'line',source:'corridors',paint:{
-        'line-color':['case',['==',['get','blocked'],1],'rgba(226,92,74,.75)','rgba(126,206,255,.66)'],
+        'line-color':['case',['==',['get','blocked'],1],PAL.corridorBlocked,PAL.corridor],
         'line-width':['case',['==',['get','blocked'],1],1.1,1.4],
         'line-opacity':.92}},
       {id:'detour-line',type:'line',source:'detours',paint:{
-        'line-color':'rgba(255,206,90,.95)','line-width':1.8,'line-opacity':.95}},
+        'line-color':PAL.detour,'line-width':1.8,'line-opacity':.95}},
       {id:'node-dot',type:'circle',source:'nodes',paint:{
         'circle-radius':['case',['==',['get','rank'],1],4.2,['==',['get','rank'],2],2.9,1.9],
-        'circle-color':['case',['==',['get','rank'],3],'rgba(214,236,255,.62)','#eaf6ff'],
-        'circle-stroke-color':'rgba(8,20,32,.85)','circle-stroke-width':.6}},
+        'circle-color':['case',['==',['get','rank'],3],PAL.nodeDim,PAL.node],
+        'circle-stroke-color':PAL.nodeStroke,'circle-stroke-width':.6}},
       {id:'node-ring',type:'circle',source:'nodes',filter:['==',['get','capital'],1],paint:{
         'circle-radius':7.6,'circle-color':'rgba(0,0,0,0)',
-        'circle-stroke-color':'rgba(186,218,255,.42)','circle-stroke-width':1}},
+        'circle-stroke-color':PAL.capitalRing,'circle-stroke-width':1}},
       {id:'node-low',type:'circle',source:'nodes',filter:['==',['get','low'],1],paint:{
         'circle-radius':6.4,'circle-color':'rgba(0,0,0,0)',
         'circle-stroke-color':'rgba(232,84,72,.9)','circle-stroke-width':1.2}},
@@ -422,7 +376,7 @@ function mountTerrain(want){
   }
 }
 
-// 增量更新：航班每分钟都变，但省界、航线、节点、体块不变。
+// 增量更新：航班每分钟都变，但省界、航线、节点不变。
 // 一个 applyData 把九份数据全 setData 一遍，在三维下足以把主线程堵住。
 let nodeKey=''
 let networkKey=''
@@ -452,7 +406,6 @@ function applyData(force){
   if(force||nextNode!==nodeKey){
     nodeKey=nextNode
     put('nodes',nodeFC.value)
-    put('towers',towerFC.value)
     syncMarkers()
   }
   put('flights',flightFC.value)
@@ -492,6 +445,23 @@ function fitToData(animate){
     padding:{top:44,bottom:36,left:44,right:44},
     pitch:50,bearing:-10,duration:animate?900:0,animate:!!animate,
   })
+}
+
+// 主题切换：只改 paint，不重建样式 —— 重建会丢图层顺序与相机，还会闪一帧白
+function applyPalette(){
+  if(!map) return
+  const PAL=mapPalette()
+  const set=(layer,prop,value)=>{try{if(map.getLayer(layer)) map.setPaintProperty(layer,prop,value)}catch(_){}}
+  set('bg','background-color',PAL.background)
+  set('land','fill-color',PAL.land)
+  set('land','fill-opacity',PAL.landOpacity)
+  set('province-line','line-color',PAL.provinceLine)
+  set('jiuduan-line','line-color',PAL.boundaryLine)
+  set('node-dot','circle-color',['case',['==',['get','rank'],3],PAL.nodeDim,PAL.node])
+  set('node-dot','circle-stroke-color',PAL.nodeStroke)
+  set('node-ring','circle-stroke-color',PAL.capitalRing)
+  set('corridor-line','line-color',['case',['==',['get','blocked'],1],PAL.corridorBlocked,PAL.corridor])
+  set('detour-line','line-color',PAL.detour)
 }
 
 function applyAudience(){
@@ -556,6 +526,7 @@ onMounted(()=>{
     if(!map.getLayer('flight-icon')) map.addLayer(FLIGHT_LAYER)
     ready.value=true
     applyData(true)
+    applyPalette()
     applyAudience()
     // 先挂地形再取景：terrain 会把相机抬起来，先取景后挂地形会让版图缩成一小块
     mountTerrain(true)
@@ -618,6 +589,7 @@ onMounted(()=>{
     map.on('mouseleave',layer,()=>{if(map) map.getCanvas().style.cursor=''})
   }
 
+  window.addEventListener('alc-theme',applyPalette)
   if(typeof ResizeObserver!=='undefined'){
     resizeObserver=new ResizeObserver(()=>{if(map) map.resize()})
     resizeObserver.observe(host.value)
@@ -626,6 +598,7 @@ onMounted(()=>{
 
 onUnmounted(()=>{
   disposed=true
+  window.removeEventListener('alc-theme',applyPalette)
   if(watchdog) watchdog.stop()
   for(const marker of markers) marker.remove()
   markers.length=0
@@ -704,10 +677,10 @@ const insetShapes=computed(()=>{
 })
 const levelLabel=computed(()=>({nation:'全国',region:'大区',province:'省域',city:'城市'}[level.value]||level.value))
 const scaleNote=computed(()=>({
-  nation:'省会柱：只标 31 个省会，柱高为示意量级',
-  region:'本区省会与机场城市起柱',
-  province:'本省地级市起柱 + 地形高程（DEM z≤6）',
-  city:'起降点起柱 + 地形高程 + 净空柱（垂直放大 10×）',
+  nation:'省界与航路按真实经纬度铺开；城市用点+环标记，不画体块',
+  region:'本区省界与航路；城市用点+环标记',
+  province:'地形高程（DEM，z≤6）+ 机场净空柱（垂直放大 10×）',
+  city:'地形高程 + 机场净空柱（垂直放大 10×）',
 }[level.value]||''))
 </script>
 
@@ -729,7 +702,6 @@ const scaleNote=computed(()=>({
   <div class="nglobe-note">
     {{ levelLabel }} · 俯角 {{ Math.round(pitchNow) }}° 可旋转 · <template v-if="fpsNow">{{ fpsNow }} fps · </template>{{ scaleNote }}
     <template v-if="terrainOn"> · 地形 {{ demInfo }}</template>
-    · 体块为示意柱，非真实楼高
   </div>
   <div class="nglobe-gpu" :title="gpuLabel(gpu)">{{ gpuLabel(gpu) }}</div>
 </div>

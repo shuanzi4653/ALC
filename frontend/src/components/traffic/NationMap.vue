@@ -480,8 +480,8 @@ function clickNode(node){
       <!-- 3 行政区 -->
       <g>
         <path v-for="shape in shapes" :key="shape.key" :d="shape.d"
-              :fill="shape.boundary?'rgba(150,200,235,.55)':(shape.live?'rgba(96,140,180,.13)':'rgba(96,132,170,.05)')"
-              :stroke="shape.boundary?'none':'rgba(132,180,220,.52)'"
+              :style="{fill: shape.boundary?'var(--map-boundary)':(shape.live?'var(--map-land)':'var(--map-land-dim)'),
+                       stroke: shape.boundary?'none':'var(--map-line)'}"
               stroke-width=".7" :class="{clickable:shape.live&&!shape.boundary}"
               @click="clickShape(shape)">
           <title>{{ shape.name }}{{ shape.boundary?' · 南海诸岛界线':(shape.live?'':' · 不在本级范围') }}</title>
@@ -496,10 +496,10 @@ function clickNode(node){
           </clipPath>
         </defs>
         <rect :x="insetBox.x" :y="insetBox.y" :width="insetBox.w" :height="insetBox.h" rx="4"
-              fill="rgba(6,18,28,.72)" stroke="rgba(120,165,205,.45)" stroke-width=".8"/>
+              style="fill:var(--map-inset-bg)" stroke="var(--map-inset-line)" stroke-width=".8"/>
         <g :clip-path="'url(#nmap-inset-clip)'">
           <path v-for="shape in insetShapes" :key="'i'+shape.key" :d="shape.d"
-                :fill="shape.boundary?'rgba(150,200,235,.55)':'rgba(96,132,170,.12)'"
+                :style="{fill: shape.boundary?'var(--map-boundary)':'var(--map-land-dim)'}"
                 :stroke="shape.boundary?'none':'rgba(120,165,205,.45)'" stroke-width=".6"/>
         </g>
         <text :x="insetBox.x+7" :y="insetBox.y+insetBox.h-7" class="inset-lbl">南海诸岛</text>
@@ -530,17 +530,17 @@ function clickNode(node){
 
       <!-- 4.5 地面：倾斜时铺一层，避免透视看穿 -->
       <rect v-if="tilt" x="-400" y="-300" :width="VIEW.w+800" :height="VIEW.h+900"
-            fill="rgba(6,16,25,.55)" pointer-events="none"/>
+            style="fill:var(--map-ground)" pointer-events="none"/>
 
       <!-- 5 航线：空域视角下让位给净空，不删只淡 -->
       <g fill="none" stroke-linecap="round" :opacity="audience==='airspace'?.38:1">
         <path v-for="line in corridors" :key="'c'+line.id" :d="line.d"
-              :stroke="line.blocked?(virtualMode?'rgba(255,96,70,.95)':'rgba(226,92,74,.55)'):'rgba(126,206,255,.62)'"
+              :stroke="line.blocked?(virtualMode?'rgba(255,96,70,.95)':'var(--map-corridor-blocked)'):'var(--map-corridor)'"
               :stroke-width="line.blocked?lineWidth*(virtualMode?2.2:.8):lineWidth"
               :class="{hit:line.selected,clickable:true,'virt-alarm':virtualMode&&line.blocked}"
               @click="!moved&&emit('select-corridor',line)"/>
         <path v-for="line in corridors.filter(l=>l.detour)" :key="'d'+line.id" :d="line.detour"
-              :stroke="virtualMode?'rgba(255,214,120,1)':'rgba(255,206,90,.9)'"
+              :stroke="virtualMode?'rgba(255,214,120,1)':'var(--map-detour)'"
               :stroke-width="lineWidth*(virtualMode?2.4:1.3)" class="hit"
               @click="!moved&&emit('select-corridor',line)"/>
       </g>
@@ -552,8 +552,8 @@ function clickNode(node){
                   fill="none" stroke="rgba(160,200,235,.75)" stroke-width="1.1"/>
           <template v-else>
             <circle :cx="node.x" :cy="node.y" :r="node.rank===1?3.1:(node.rank===2?2.2:1.5)"
-                    :fill="node.rank===3?'rgba(214,236,255,.55)':'#eaf6ff'"
-                    :stroke="node.rank===3?'none':'rgba(8,20,32,.85)'" stroke-width=".55"/>
+                    :style="{fill: node.rank===3?'var(--map-node-dim)':'var(--map-node)',
+                            stroke: node.rank===3?'none':'var(--map-node-stroke)'}" stroke-width=".55"/>
             <circle v-if="node.capital" :cx="node.x" :cy="node.y" r="5.8" fill="none"
                     stroke="rgba(186,218,255,.40)" stroke-width=".9"/>
             <circle v-if="node.weather&&node.weather.low" :cx="node.x" :cy="node.y" r="4.8"
@@ -595,7 +595,7 @@ function clickNode(node){
 
 <style scoped>
 .nmap{position:absolute;inset:0;border-radius:10px;overflow:hidden;
-  background:radial-gradient(120% 90% at 50% 0%,#0b2033 0%,#061019 70%)}
+  background:radial-gradient(120% 90% at 50% 0%,var(--map-bg-1) 0%,var(--map-bg-2) 70%)}
 .nmap svg{display:block;width:100%;height:100%;cursor:grab;transition:transform .45s ease}
 .nmap svg.dragging{cursor:grabbing;transition:none}
 .nmap.tilt svg{transform:perspective(1150px) rotateX(39deg) scale(1.2) translateY(3%);transform-origin:50% 82%}
@@ -605,6 +605,6 @@ function clickNode(node){
 .nmap path.hit{filter:drop-shadow(0 0 2px rgba(255,206,90,.55))}
 .nmap path.virt-alarm{filter:drop-shadow(0 0 4px rgba(255,90,60,.85))}
 .nmap .inset-lbl{font-size:7.5px;fill:rgba(170,205,230,.85)}
-.nmap .prov{font-size:9px;letter-spacing:.6px;fill:rgba(158,196,224,.72);pointer-events:none}
+.nmap .prov{font-size:9px;letter-spacing:.6px;fill:var(--map-label);opacity:.82;pointer-events:none}
 .nmap .city{font-size:8.6px;fill:#dceefb;paint-order:stroke;stroke:rgba(4,12,20,.85);stroke-width:2.4px;pointer-events:none}
 </style>

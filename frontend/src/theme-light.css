@@ -1,0 +1,609 @@
+/* 浅色主题覆盖层（2026-11-11）
+ *
+ * 为什么不重写组件：这套界面有 236 KB 的 scoped 样式，颜色是散落的字面量。
+ * 重写等于把 V1.0.0 以来所有排版判断重做一遍，风险远大于收益。
+ * 这里按「面 / 线 / 字」三类做覆盖，覆盖不到的地方下一轮再补 ——
+ * 但**任何新增组件都只允许用 style.css 里的 --alc-* 令牌**，不要再写字面量。
+ *
+ * 触发条件统一是 `html[data-theme="light"]`，开关在右上角「浅色/深色」。
+ */
+
+html[data-theme="light"] {
+  --alc-bg-0: #eef3f9;
+  --alc-bg-1: #ffffff;
+  --alc-bg-2: #f3f7fb;
+  --alc-line: rgba(22, 50, 80, .12);
+  --alc-text: #16324a;
+  --alc-text-dim: #4a6a85;
+  --alc-text-mute: #6b8399;
+  --alc-danger: #d4380d;
+  --alc-watch: #ad6800;
+  --alc-ok: #237804;
+  --alc-info: #1668dc;
+
+  /* 地图调色板（NationMap 的 SVG 直接吃这些变量） */
+  --map-bg-1: #e7eef6;
+  --map-bg-2: #f4f8fc;
+  --map-land: rgba(255, 255, 255, .92);
+  --map-land-dim: rgba(210, 224, 238, .55);
+  --map-line: rgba(84, 124, 166, .55);
+  --map-boundary: rgba(40, 90, 130, .75);
+  --map-inset-bg: rgba(255, 255, 255, .94);
+  --map-inset-line: rgba(84, 124, 166, .45);
+  --map-ground: rgba(236, 243, 250, .82);
+  --map-node: #16384f;
+  --map-node-dim: rgba(38, 76, 104, .62);
+  --map-node-stroke: rgba(255, 255, 255, .92);
+  --map-label: #2c5270;
+  --map-corridor: rgba(30, 110, 170, .58);
+  --map-corridor-blocked: rgba(198, 58, 38, .7);
+  --map-detour: rgba(186, 124, 8, .95);
+}
+
+/* ---------- 外壳 ---------- */
+html[data-theme="light"] body,
+html[data-theme="light"] #app {
+  background: #e9f0f7 !important;
+  color: #16324a !important;
+}
+
+html[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: rgba(70, 120, 170, .28) !important;
+}
+html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(70, 120, 170, .45) !important;
+}
+
+html[data-theme="light"] .traffic-workbench {
+  background: #e9f0f7 !important;
+  color: #16324a !important;
+}
+
+html[data-theme="light"] .wb-top {
+  background: #ffffff !important;
+  border-color: #d7e3ef !important;
+  box-shadow: 0 1px 0 rgba(20, 50, 80, .04) !important;
+}
+html[data-theme="light"] .wb-brand b { color: #0f3550; }
+html[data-theme="light"] .wb-brand em { color: #5f7d94; }
+html[data-theme="light"] .wb-scope {
+  background: #e8f2fb !important;
+  color: #14567d !important;
+  border-color: #c3dcef !important;
+}
+html[data-theme="light"] .nav-timebase { color: #55738a; }
+html[data-theme="light"] .wb-rail-toggle,
+html[data-theme="light"] .nav-toggle {
+  background: #ffffff !important;
+  border-color: #d7e3ef !important;
+  color: #3c5c76 !important;
+}
+html[data-theme="light"] .nav-toggle.on {
+  background: #e3f0fb !important;
+  border-color: #7fb3d8 !important;
+  color: #0d4f74 !important;
+}
+
+/* 左侧导航 */
+html[data-theme="light"] .operations-nav {
+  background: #ffffff !important;
+  border-color: #d7e3ef !important;
+}
+html[data-theme="light"] .nav-group { color: #4a6a85; }
+html[data-theme="light"] .nav-group em { color: #8aa2b6; }
+html[data-theme="light"] .nav-group:hover { color: #0f3550; }
+html[data-theme="light"] .nav-group.active {
+  color: #0f3550 !important;
+  border-bottom-color: var(--alc-info);
+}
+html[data-theme="light"] .nav-subs button {
+  color: #4a6a85 !important;
+  border-color: transparent !important;
+}
+html[data-theme="light"] .nav-subs button:hover { background: #eef6fd; color: #0d4f74; }
+html[data-theme="light"] .nav-subs button.active {
+  background: #e3f0fb !important;
+  border-color: #9cc7e8 !important;
+  color: #0d4f74 !important;
+}
+html[data-theme="light"] .nav-subs button.active.group-active {
+  background: #eef6fd !important;
+  border-color: #cfe3f3 !important;
+  color: #1b628c !important;
+}
+
+/* ---------- 全国台（NationPanel） ---------- */
+html[data-theme="light"] .nrn { color: #16324a; }
+html[data-theme="light"] .nrn-crumb button { color: #1668dc; }
+html[data-theme="light"] .nrn-crumb .back {
+  border-color: #cfdcea !important;
+  color: #31556f !important;
+  background: #fff !important;
+}
+html[data-theme="light"] .nrn-headline { color: #0f3550; }
+html[data-theme="light"] .nrn-sub { color: #5f7d94; }
+html[data-theme="light"] .nrn-sub b { color: #1b4767; }
+
+html[data-theme="light"] .nrn-tabs { border-bottom-color: #dbe6f1; }
+html[data-theme="light"] .nrn-tabs button { color: #4a6a85; }
+html[data-theme="light"] .nrn-tabs button.on {
+  background: #e3f0fb !important;
+  border-color: #9cc7e8 !important;
+  color: #0d4f74 !important;
+}
+
+html[data-theme="light"] .nrn-tools button,
+html[data-theme="light"] .nrn-tools select {
+  background: #ffffff !important;
+  border-color: #d7e3ef !important;
+  color: #31556f !important;
+}
+html[data-theme="light"] .nrn-tools button:hover { background: #eef6fd; }
+html[data-theme="light"] .nrn-tools button.on {
+  background: #e3f0fb !important;
+  border-color: #7fb3d8 !important;
+  color: #0d4f74 !important;
+}
+html[data-theme="light"] .nrn-tools .play {
+  background: #1668dc !important;
+  border-color: #1668dc !important;
+  color: #fff !important;
+}
+html[data-theme="light"] .nrn-tools .clock { color: #0f3550; }
+html[data-theme="light"] .nrn-lift {
+  background: #fff7e6 !important;
+  border-color: #ffd591 !important;
+  color: #ad6800 !important;
+}
+
+html[data-theme="light"] .nrn-canvas {
+  background: var(--map-bg-1) !important;
+  border-color: #dbe6f1 !important;
+}
+
+html[data-theme="light"] .nrn-total {
+  background: #ffffff !important;
+  border-color: #dbe6f1 !important;
+}
+html[data-theme="light"] .nrn-total b { color: #0f3550; }
+html[data-theme="light"] .nrn-total span { color: #6b8399; }
+
+html[data-theme="light"] .nrn-blocks h3,
+html[data-theme="light"] .nrn-side h3 { color: #31556f; }
+html[data-theme="light"] .nrn-blocks h3 small { color: #8aa2b6; }
+
+html[data-theme="light"] .nrn-region,
+html[data-theme="light"] .nrn-city {
+  background: #ffffff !important;
+  border-color: #dbe6f1 !important;
+  color: #16324a !important;
+}
+html[data-theme="light"] .nrn-region span,
+html[data-theme="light"] .nrn-city span { color: #6b8399; }
+html[data-theme="light"] .nrn-region em,
+html[data-theme="light"] .nrn-city em { color: #3f6a8c; }
+html[data-theme="light"] .nrn-region em.warn,
+html[data-theme="light"] .nrn-city em.warn { color: #0b7285; }
+html[data-theme="light"] .nrn-region:hover,
+html[data-theme="light"] .nrn-city:hover {
+  background: #eef6fd !important;
+  border-color: #9cc7e8 !important;
+}
+
+html[data-theme="light"] .nrn-wx {
+  background: #ffffff !important;
+  border-color: #dbe6f1 !important;
+}
+html[data-theme="light"] .nrn-wx h4 { color: #31556f; }
+html[data-theme="light"] .nrn-wx h4 small { color: #7d97ad; }
+html[data-theme="light"] .nrn-wx li {
+  background: #f4f8fc !important;
+  color: #33556f !important;
+}
+html[data-theme="light"] .nrn-wx li b { color: #12314a; }
+html[data-theme="light"] .nrn-wx li em { color: #537a96; }
+html[data-theme="light"] .nrn-wx li em.warn { color: #ad6800; }
+html[data-theme="light"] .nrn-wx li em.bad { color: #c0392b; }
+html[data-theme="light"] .nrn-wx li.head b,
+html[data-theme="light"] .nrn-wx li.head em,
+html[data-theme="light"] .nrn-wx li.head span { color: #7d97ad; }
+html[data-theme="light"] .nrn-wx li.bad { outline-color: rgba(198, 58, 38, .45); }
+
+html[data-theme="light"] .nrn-monitor {
+  background: rgba(255, 255, 255, .92) !important;
+  border-color: #dbe6f1 !important;
+  color: #33556f !important;
+}
+html[data-theme="light"] .nrn-monitor strong { color: #12314a; }
+html[data-theme="light"] .nrn-monitor .quiet { color: #6b8399; }
+
+html[data-theme="light"] .nrn-legend {
+  background: rgba(255, 255, 255, .9) !important;
+  color: #4a6a85 !important;
+  border-color: #dbe6f1 !important;
+}
+html[data-theme="light"] .nrn-legend .quiet { color: #7891a7; }
+
+html[data-theme="light"] .nrn-zone {
+  background: #f4faf0 !important;
+  border-color: #cfe3c2 !important;
+}
+html[data-theme="light"] .nrn-zone h4 { color: #2f5d2a; }
+html[data-theme="light"] .nrn-zone h4 small { color: #6f8a63; }
+html[data-theme="light"] .nrn-zone p > span { color: #6f8a63; }
+html[data-theme="light"] .nrn-zone p > b { color: #24421f; }
+html[data-theme="light"] .nrn-zone li { background: #e9f4e2; }
+html[data-theme="light"] .nrn-zone li b { color: #24421f; }
+html[data-theme="light"] .nrn-zone li span { color: #6f8a63; }
+
+html[data-theme="light"] .nrn-pick {
+  background: #f4f8fc !important;
+  border-color: #d7e3ef !important;
+}
+html[data-theme="light"] .nrn-pick label { color: #4a6a85; }
+html[data-theme="light"] .nrn-pick select {
+  background: #fff !important;
+  border-color: #cfdcea !important;
+  color: #16324a !important;
+}
+
+html[data-theme="light"] .nrn-detail {
+  background: #ffffff !important;
+  border-color: #dbe6f1 !important;
+  color: #16324a !important;
+}
+html[data-theme="light"] .nrn-detail header { background: #f4f8fc; }
+html[data-theme="light"] .nrn-detail code { color: #5f7d94; }
+
+html[data-theme="light"] .nrn-table-hd h3 { color: #0f3550; }
+html[data-theme="light"] .nrn-table-hd p { color: #5f7d94; }
+html[data-theme="light"] .nrn-alerts li {
+  background: #ffffff !important;
+  border-color: #dbe6f1 !important;
+}
+html[data-theme="light"] .nrn-alerts li p { color: #4a6a85; }
+
+html[data-theme="light"] .nrn-hint {
+  background: #eef6fd !important;
+  border-color: #cfe3f3 !important;
+  color: #1b628c !important;
+}
+
+/* ---------- 台账 / 情报（NationBriefing） ---------- */
+html[data-theme="light"] .nb { color: #16324a; }
+html[data-theme="light"] .nb-hd h3 { color: #0f3550; }
+html[data-theme="light"] .nb-hd p { color: #5f7d94; }
+html[data-theme="light"] .nb-scroll {
+  border-color: #dbe6f1 !important;
+  background: #ffffff !important;
+}
+html[data-theme="light"] .nb table th {
+  background: #f2f7fc !important;
+  color: #4a6a85 !important;
+  border-color: #e3ecf4 !important;
+}
+html[data-theme="light"] .nb table td {
+  border-color: #e8eff6 !important;
+  color: #23425c !important;
+}
+html[data-theme="light"] .nb table tbody tr:hover { background: #f0f7fd; }
+html[data-theme="light"] .nb table tbody tr.sel { background: #e3f0fb; }
+html[data-theme="light"] .nb table small { color: #6b8399; }
+html[data-theme="light"] .nb-side-foot { color: #6b8399; }
+
+/* ---------- 通用控件 ---------- */
+html[data-theme="light"] select,
+html[data-theme="light"] input,
+html[data-theme="light"] textarea {
+  background: #ffffff !important;
+  border-color: #cfdcea !important;
+  color: #16324a !important;
+}
+html[data-theme="light"] select:focus,
+html[data-theme="light"] input:focus,
+html[data-theme="light"] textarea:focus {
+  border-color: #7fb3d8 !important;
+  outline-color: rgba(22, 104, 220, .25) !important;
+}
+
+html[data-theme="light"] .tag.quiet { background: rgba(70, 110, 145, .12); color: #4a6a85; }
+html[data-theme="light"] .tag.good { background: rgba(35, 120, 4, .12); color: #237804; }
+html[data-theme="light"] .tag.warn { background: rgba(173, 104, 0, .14); color: #ad6800; }
+html[data-theme="light"] .tag.bad { background: rgba(212, 56, 13, .12); color: #d4380d; }
+
+/* 东北原生页（OperationsConsole 等）里的卡片与表格 */
+html[data-theme="light"] .traffic-page,
+html[data-theme="light"] .traffic-main,
+html[data-theme="light"] .traffic-table-panel { background: transparent; color: #16324a; }
+html[data-theme="light"] .traffic-header,
+html[data-theme="light"] .traffic-map-panel,
+html[data-theme="light"] .traffic-detail,
+html[data-theme="light"] .traffic-table-panel {
+  background: #ffffff !important;
+  border-color: #dbe6f1 !important;
+}
+html[data-theme="light"] .traffic-summary > div { background: #f4f8fc; border-color: #e3ecf4; }
+html[data-theme="light"] .traffic-summary strong { color: #0f3550; }
+html[data-theme="light"] .traffic-summary span { color: #6b8399; }
+html[data-theme="light"] .scope-bar {
+  background: #ffffff !important;
+  border-color: #dbe6f1 !important;
+  color: #23425c !important;
+}
+html[data-theme="light"] .scope-bar button {
+  background: #fff !important;
+  border-color: #cfdcea !important;
+  color: #31556f !important;
+}
+html[data-theme="light"] .scope-bar button.on {
+  background: #e3f0fb !important;
+  border-color: #7fb3d8 !important;
+  color: #0d4f74 !important;
+}
+html[data-theme="light"] .scope-note { color: #6b8399; }
+
+html[data-theme="light"] .operations-heading h2 { color: #0f3550; }
+html[data-theme="light"] .operations-heading p { color: #5f7d94; }
+html[data-theme="light"] .caliber-ledger,
+html[data-theme="light"] .caliber-card,
+html[data-theme="light"] .badge-legend article,
+html[data-theme="light"] .operations-question textarea {
+  background: #ffffff !important;
+  border-color: #dbe6f1 !important;
+}
+html[data-theme="light"] .caliber-ledger table th { background: #f2f7fc; color: #4a6a85; }
+html[data-theme="light"] .caliber-ledger table td { border-color: #e8eff6; color: #23425c; }
+html[data-theme="light"] .caliber-ledger table code { background: #eef6fd; color: #1b4767; }
+html[data-theme="light"] .operation-journal th { color: #4a6a85; }
+html[data-theme="light"] .operation-journal td { border-color: #e8eff6; color: #23425c; }
+html[data-theme="light"] .assistant-context span { background: #f2f7fc; color: #4a6a85; }
+html[data-theme="light"] .operations-muted { color: #5f7d94; }
+html[data-theme="light"] .nav-tour-card,
+html[data-theme="light"] .first-visit {
+  background: #ffffff !important;
+  border-color: #cfdcea !important;
+  color: #16324a !important;
+}
+
+/* ---------- 左侧竖排导航（必须高特异性压过去） ----------
+ * 组件里这几条是 `.traffic-workbench .operations-nav .nav-group{... !important}`，
+ * 三个类 + scoped 属性 + important。普通的 `html[data-theme] .nav-group` 压不住，
+ * 结果是浅色模式下"深底浅字"看不清。这里用 body 再加一级特异性。 */
+html[data-theme="light"] body .traffic-workbench .operations-nav .nav-group {
+  background: #f4f8fc !important;
+  border-color: #e3ecf4 !important;
+  color: #3c5c76 !important;
+}
+html[data-theme="light"] body .traffic-workbench .operations-nav .nav-group:hover {
+  background: #eef6fd !important;
+  border-color: #9cc7e8 !important;
+  color: #0d4f74 !important;
+}
+html[data-theme="light"] body .traffic-workbench .operations-nav .nav-group.active {
+  background: linear-gradient(90deg, #dcecfb, #f0f7fd) !important;
+  border-color: #7fb3d8 !important;
+  color: #0d4f74 !important;
+  box-shadow: none !important;
+}
+html[data-theme="light"] body .traffic-workbench .operations-nav .nav-group.active::before {
+  background: #1668dc !important;
+  box-shadow: none !important;
+}
+html[data-theme="light"] body .traffic-workbench .operations-nav .nav-group em {
+  color: #8aa2b6 !important;
+}
+html[data-theme="light"] body .traffic-workbench .operations-nav .nav-subs {
+  background: transparent !important;
+  border-color: #e8eff6 !important;
+}
+html[data-theme="light"] body .traffic-workbench .operations-nav .nav-subs button {
+  background: transparent !important;
+  border-color: transparent !important;
+  color: #4a6a85 !important;
+}
+html[data-theme="light"] body .traffic-workbench .operations-nav .nav-subs button:hover {
+  background: #eef6fd !important;
+  color: #0d4f74 !important;
+}
+html[data-theme="light"] body .traffic-workbench .operations-nav .nav-subs button.active {
+  background: #e3f0fb !important;
+  border-color: #9cc7e8 !important;
+  color: #0d4f74 !important;
+}
+html[data-theme="light"] body .traffic-workbench .operations-nav .nav-subs button.active.group-active {
+  background: #eef6fd !important;
+  border-color: #cfe3f3 !important;
+  color: #1b628c !important;
+}
+html[data-theme="light"] .relay-pill {
+  background: #f4f8fc !important;
+  border-color: #dbe6f1 !important;
+  color: #4a6a85 !important;
+}
+html[data-theme="light"] .nav-algorithm {
+  background: #eef6fd !important;
+  border-color: #cfe3f3 !important;
+  color: #1b628c !important;
+}
+
+/* 运行视角 / 空域视角 / 禁飞等级 */
+html[data-theme="light"] .nrn-aud button {
+  background: #ffffff !important;
+  border-color: #d7e3ef !important;
+  color: #4a6a85 !important;
+}
+html[data-theme="light"] .nrn-aud button.on {
+  background: #e3f0fb !important;
+  border-color: #7fb3d8 !important;
+  color: #0d4f74 !important;
+}
+html[data-theme="light"] .nrn-aud button.policy {
+  background: #fff8e6 !important;
+  border-color: #ffd591 !important;
+  color: #ad6800 !important;
+}
+html[data-theme="light"] .nrn-tabs button.on {
+  box-shadow: inset 0 -2px 0 #1668dc;
+}
+
+/* ---------- 事件卡与数据标签 ---------- */
+html[data-theme="light"] .nrn-alerts li {
+  background: #ffffff !important;
+  border-color: #e3ecf4 !important;
+}
+html[data-theme="light"] .nrn-alerts b { color: #0f3550 !important; }
+html[data-theme="light"] .nrn-alerts em { color: #6b8399 !important; }
+html[data-theme="light"] .nrn-alerts p { color: #3f5c76 !important; }
+html[data-theme="light"] .nrn-alerts p.act { color: #ad6800 !important; }
+html[data-theme="light"] .nrn-alerts li.empty { color: #8aa2b6 !important; }
+
+html[data-theme="light"] .risk.LOW { background: rgba(35, 120, 4, .12) !important; color: #237804 !important; }
+html[data-theme="light"] .risk.MEDIUM { background: rgba(173, 104, 0, .14) !important; color: #ad6800 !important; }
+html[data-theme="light"] .risk.HIGH { background: rgba(212, 56, 13, .14) !important; color: #c0392b !important; }
+html[data-theme="light"] .src.MODEL { background: rgba(12, 110, 96, .14) !important; color: #0c6e60 !important; }
+html[data-theme="light"] .src.RULE { background: rgba(173, 104, 0, .14) !important; color: #ad6800 !important; }
+html[data-theme="light"] .flight-state { color: #1b4767 !important; }
+html[data-theme="light"] .nrn-wx li em.watch { color: #1b6b2f !important; }
+
+/* ---------- 深浅切换按钮自身（浅色下反相） ---------- */
+html[data-theme="light"] .wb-theme {
+  background: #ffffff !important;
+  border-color: #cfdcea !important;
+  color: #31556f !important;
+}
+html[data-theme="light"] .wb-theme:hover { background: #eef6fd !important; }
+
+/* ---------- 三维城市名：深色底用浅字，浅色底必须反过来 ---------- */
+html[data-theme="light"] body .nglobe .nglobe-lbl {
+  color: #1f3f57 !important;
+  text-shadow: 0 0 3px rgba(255, 255, 255, .96), 0 0 6px rgba(255, 255, 255, .88) !important;
+}
+html[data-theme="light"] .nglobe-note,
+html[data-theme="light"] .nglobe-gpu {
+  background: rgba(255, 255, 255, .86) !important;
+  color: #55738a !important;
+  border-color: #dbe6f1 !important;
+}
+html[data-theme="light"] .nglobe-tip {
+  background: rgba(255, 255, 255, .94) !important;
+  border-color: #dbe6f1 !important;
+  color: #31556f !important;
+}
+
+/* ---------- 卡片投影：浅色下靠"线 + 极轻阴影"分层，不用深色块 ---------- */
+html[data-theme="light"] .nrn-total,
+html[data-theme="light"] .nrn-wx,
+html[data-theme="light"] .nrn-region,
+html[data-theme="light"] .nrn-city,
+html[data-theme="light"] .nrn-monitor,
+html[data-theme="light"] .nrn-detail,
+html[data-theme="light"] .nb-scroll {
+  box-shadow: 0 1px 2px rgba(20, 50, 80, .06) !important;
+}
+
+/* ---------- 作用域条与数据时刻（浅色下这两处原本是白字压白底） ---------- */
+html[data-theme="light"] .scope-bar b { color: #0f3550 !important; }
+html[data-theme="light"] .scope-bar select { color: #16324a !important; }
+html[data-theme="light"] .nb-bar { color: #4a6a85 !important; }
+html[data-theme="light"] .nb-bar b { color: #0f3550 !important; }
+html[data-theme="light"] .nb-bar legend { color: #6b8399 !important; }
+html[data-theme="light"] .nb-scope { color: #23425c !important; }
+html[data-theme="light"] .nb-note { color: #7d97ad !important; }
+html[data-theme="light"] .nb-state { color: #4a6a85 !important; }
+html[data-theme="light"] .nb-hd h3 small { color: #7d97ad !important; }
+html[data-theme="light"] .nb-weather summary { color: #31556f !important; }
+html[data-theme="light"] .nb-weather summary small { color: #7d97ad !important; }
+html[data-theme="light"] .nb-weather li { background: #f4f8fc !important; color: #33556f !important; }
+html[data-theme="light"] .nb-weather li b { color: #12314a !important; }
+html[data-theme="light"] .nb-weather span { color: #537a96 !important; }
+html[data-theme="light"] .nb-scope-foot { color: #6b8399 !important; }
+html[data-theme="light"] .nb-zone-line { color: #5f7d94 !important; }
+
+/* ---------- 原生控制台（日志 / 口径 / 东北处置与气象） ----------
+ * 这一块是 V1.0.0 的老页面，颜色全是字面量、类名几十个。
+ * 这里按"容器 + 文字 + 常见卡片"三层覆盖，目标是"能读、不刺眼"，
+ * 不追求把每一枚小徽标都改成浅色底 —— 徽标本身有语义色，保持原样反而更清楚。 */
+html[data-theme="light"] .operations-console {
+  background: #ffffff !important;
+  border-color: #dbe6f1 !important;
+  color: #23425c !important;
+}
+html[data-theme="light"] .operations-console :is(h1, h2, h3, h4, summary) { color: #0f3550 !important; }
+html[data-theme="light"] .operations-console :is(p, small, dd, dt, li, td, label, legend) { color: #4a6a85 !important; }
+html[data-theme="light"] .operations-console table th {
+  color: #4a6a85 !important;
+  background: #f2f7fc !important;
+  border-color: #e3ecf4 !important;
+}
+html[data-theme="light"] .operations-console table td { border-color: #e8eff6 !important; }
+html[data-theme="light"] .operations-console :is(
+  .replay-weather, .replay-weather article, .replay-tiers li, .replay-marks,
+  .caliber-card, .badge-legend article, .glossary-grid > section,
+  .intel-grid article, .impact-grid article, .coverage-card,
+  .clearance-report, .detour-list article, .case-panels, .disposal-card
+) {
+  background: #ffffff !important;
+  border-color: #e3ecf4 !important;
+  box-shadow: 0 1px 2px rgba(20, 50, 80, .05) !important;
+}
+html[data-theme="light"] .operations-console :is(.replay-weather article small, .replay-tiers small) { color: #6b8399 !important; }
+html[data-theme="light"] .operations-console :is(.replay-weather strong, .replay-tiers b) { color: #12314a !important; }
+html[data-theme="light"] .journal-chip {
+  background: #f2f7fc !important;
+  border-color: #dbe6f1 !important;
+  color: #4a6a85 !important;
+}
+html[data-theme="light"] .journal-chip.on {
+  background: #e3f0fb !important;
+  border-color: #7fb3d8 !important;
+  color: #0d4f74 !important;
+}
+html[data-theme="light"] .journal-bar input {
+  background: #ffffff !important;
+  border-color: #cfdcea !important;
+  color: #16324a !important;
+}
+html[data-theme="light"] .journal-export {
+  background: #f2f7fc !important;
+  border-color: #cfdcea !important;
+  color: #31556f !important;
+}
+html[data-theme="light"] .journal-kind.manual { background: #e6f7fb !important; color: #0b6b7d !important; }
+html[data-theme="light"] .journal-kind.system { background: #eaf0fb !important; color: #2a4a86 !important; }
+html[data-theme="light"] .journal-kind.source { background: #f0ecfb !important; color: #5a4a9a !important; }
+html[data-theme="light"] .journal-kind.export { background: #eef2f7 !important; color: #4a6a85 !important; }
+html[data-theme="light"] .assistant-context span { background: #f2f7fc !important; color: #4a6a85 !important; }
+html[data-theme="light"] .operations-question textarea {
+  background: #ffffff !important;
+  border-color: #cfdcea !important;
+  color: #16324a !important;
+}
+
+/* 复盘回放：这一块是整页里唯一还整体发黑的容器，连时间轴格子一起改 */
+html[data-theme="light"] .operations-console .replay {
+  background: #f7fafd !important;
+  border-color: #e3ecf4 !important;
+}
+html[data-theme="light"] .operations-console .replay-slot {
+  background: #ffffff !important;
+  border-color: #dbe6f1 !important;
+  color: #4a6a85 !important;
+}
+html[data-theme="light"] .operations-console .replay-slot.on,
+html[data-theme="light"] .operations-console .replay-slot.current {
+  background: #e3f0fb !important;
+  border-color: #7fb3d8 !important;
+  color: #0d4f74 !important;
+}
+html[data-theme="light"] .operations-console .replay-slot b { color: #12314a !important; }
+html[data-theme="light"] .operations-console .replay-span {
+  background: #eef6fd !important;
+  color: #31556f !important;
+}
+html[data-theme="light"] .operations-console .replay-span b { color: #0f3550 !important; }
+html[data-theme="light"] .operations-console .replay-bar strong { color: #0f3550 !important; }
+html[data-theme="light"] .operations-console .replay-bar .replay-play {
+  background: #1668dc !important;
+  border-color: #1668dc !important;
+  color: #ffffff !important;
+}

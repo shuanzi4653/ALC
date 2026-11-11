@@ -74,11 +74,15 @@ test('the 3D component refuses to build a map on a failed probe', () => {
   assert.match(source, /terrain/, '省/市层要挂 DEM 地形')
 })
 
-test('towers are culled per level instead of drawing all 319 cities', () => {
+test('no per-city extrusions are drawn on the 3D map', () => {
   const source = read('../src/components/traffic/NationGlobe.vue')
-  // 全国层只留省会（rank 1），否则 319 个方块铺满全国变成棋盘
-  assert.match(source, /nation:\{maxRank:1/, '全国层必须把体块限制在省会一级')
-  assert.match(source, /maxRank/, '塔高/范围要按层级配置')
+  // 曾经给省会起过 fill-extrusion 体块柱。全国缩放下那是一片半透明方块，
+  // 读者会当成 UI 残影（用户 2026-11-11 直接问"每个城市上面的透明方块是什么"），
+  // 所以全部撤掉：城市只用点 + 环标记，三维里保留的体块只有机场净空柱。
+  assert.ok(!/id:'towers'/.test(source), '不应再有城市体块图层')
+  assert.ok(!/towerFC/.test(source), '不应再有体块数据源')
+  assert.match(source, /id:'node-dot'/, '城市仍以点标记存在')
+  assert.match(source, /id:'zone-wall'/, '净空柱是三维里唯一保留的体块')
 })
 
 test('the panel falls back to the tilt view with a stated reason', () => {

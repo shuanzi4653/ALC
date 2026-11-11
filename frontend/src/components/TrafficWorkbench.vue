@@ -10,6 +10,7 @@ import NationPanel from './traffic/NationPanel.vue'
 import NationBriefing from './traffic/NationBriefing.vue'
 import CommandPalette from './traffic/CommandPalette.vue'
 import {relayRadarTiles} from '../traffic/radarRelay.js'
+import {theme,toggleTheme} from '../theme.js'
 import {store} from '../store.js'
 import {readScopeFromUrl,writeScopeToUrl,scopeKey} from '../traffic/scope.js'
 import {atTime,trajectoryOf,flightState,flightPhase,profile,effectiveFlights,filterLedgerRows,reasonNames,actionNames,modeNames,relativeClock,operationalTime,executionTimes,staticCrossingSummary,staticZoneSummary,closureBreakdown,dispositionSummary,delaySpread,clearanceLines,clearanceStatusName,weatherChannelState,weatherChannelLabel,WEATHER_MODE_MEASURED,normalizeWeatherMode,weatherModeIsVirtual,planChannelMismatch,weatherBucket,buildNote,algorithmIdentity,algorithmIdentityTitle,SECTION_NAMES,DENSITY_TIERS,NAV_GROUPS,visibleSubs,entryOf,entryTabs,isOfflineMode,navGroup,groupOfSection,defaultSub,densityTier,densityPolicy,drillTarget,MAP_LAYERS,lowVisibilityRuleBlock,buildProgressView,radarRelayReady,SECTION_CAN_DO,sectionHash,sectionFromHash,SECTION_HASHES,isDemoMode} from '../traffic/runtime.js'
@@ -627,6 +628,11 @@ onUnmounted(()=>{
       雷达 {{ radarRelay.status==='ok' ? (radarRelay.slot||'').slice(11,16) : radarRelay.status==='running' ? '代取中' : '代取失败' }}
     </span>
     <span class="wb-spacer"></span>
+    <!-- 深浅色：答辩现场投影仪普遍偏亮，讲解人要能一键切浅色，
+         所以这个开关放顶栏，不藏在"设置"里。 -->
+    <button class="wb-theme" data-theme-toggle :aria-pressed="theme==='light'"
+            :title="theme==='light'?'切到深色（当前浅色）':'切到浅色（当前深色）'"
+            @click="toggleTheme">{{ theme==='light' ? '深色' : '浅色' }}</button>
     <button class="wb-rail-toggle" data-rail-toggle :aria-pressed="railCollapsed"
             :title="railCollapsed?'展开左侧导航':'收起左侧导航，把宽度让给地图'"
             @click="toggleRail">{{ railCollapsed ? '展开导航' : '收起导航' }}</button>
@@ -813,7 +819,8 @@ onUnmounted(()=>{
 .traffic-summary{overflow:hidden;box-shadow:inset 0 1px 0 rgba(120,180,255,.10),0 4px 18px rgba(0,0,0,.28)}
 .traffic-summary>div{background:linear-gradient(180deg,rgba(61,139,255,.055),transparent 42%)}
 .traffic-playback{background:linear-gradient(180deg,rgba(17,38,72,.92),rgba(9,22,44,.92))!important;box-shadow:inset 0 1px 0 rgba(120,180,255,.09)}
-.operations-nav{box-shadow:inset 0 1px 0 rgba(120,180,255,.09)}.traffic-workbench.page-mode{overflow-y:auto}.traffic-workbench.page-mode .traffic-main,.traffic-workbench.page-mode .traffic-playback,.traffic-workbench.page-mode .traffic-overview-playback,.traffic-workbench.page-mode .traffic-secondary-head,.traffic-workbench.page-mode .traffic-overview-pointer{display:none}
+.operations-nav{box-shadow:inset 0 1px 0 rgba(120,180,255,.09)}
+.wb-theme{border:1px solid #2c4a60;background:rgba(18,38,54,.7);color:#bcd7e8;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;white-space:nowrap}.wb-theme:hover{background:rgba(40,86,112,.7);color:#e6f6ff}.wb-theme[aria-pressed="true"]{background:#e3f0fb;border-color:#7fb3d8;color:#0d4f74}.traffic-workbench.page-mode{overflow-y:auto}.traffic-workbench.page-mode .traffic-main,.traffic-workbench.page-mode .traffic-playback,.traffic-workbench.page-mode .traffic-overview-playback,.traffic-workbench.page-mode .traffic-secondary-head,.traffic-workbench.page-mode .traffic-overview-pointer{display:none}
 .traffic-workbench button,.traffic-workbench select,.traffic-workbench input:not([type=checkbox]):not([type=range]){background:#122334;color:#bcd3e2;border:1px solid #294153;border-radius:6px;padding:8px 11px;font:inherit}.traffic-workbench button{cursor:pointer}.traffic-workbench button:hover{border-color:#65cce5;color:white}.traffic-workbench button:disabled{opacity:.45;cursor:default}.traffic-workbench button.primary{background:#246279;color:#effcff;border-color:#398098}.traffic-workbench input[type=checkbox]{accent-color:#59dffc}.traffic-workbench input[type=range]{accent-color:#59dffc;min-width:100px}
 .traffic-header{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,auto) minmax(0,1fr);gap:20px;align-items:center;margin-bottom:14px}
 .traffic-header>.traffic-brand{grid-column:2;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;min-width:0;max-width:100%;justify-self:center}
