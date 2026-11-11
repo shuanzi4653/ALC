@@ -49,7 +49,9 @@ function openCorridor(payload){
   corridorFocusId.value=''
   // 先清空再赋值：同一条走廊连续点两次，子组件也要能再收到一次
   nextTick(()=>{ corridorFocusId.value=corridorId })
-  activeSection.value='profile'
+  // 处置 → 走廊剖面（人工裁决）；日志 → 推演（六段链路）。
+  // 载荷里带 target:'card' 是日志入口，其余一律落剖面。
+  activeSection.value=(payload&&payload.target==='card')?'card':'profile'
 }
 
 const intelTab=ref('flight'),settings=ref(false),operations=ref([]),operationsReady=ref(false),commandBusy=ref(false),mapExpanded=ref(false)
@@ -515,9 +517,15 @@ function applyHash(){
   // `#/situation/national` → home；`#/corridor/briefing` → weather（V1.0.5 情报并入气象监测）。
   if(section==='national') section='home'
   if(section==='briefing') section='weather'
-  const known = raw === '' || Object.values(SECTION_HASHES).includes(raw)
-  if(!known){ try{ window.location.hash = sectionHash('home') }catch(_){} }
   if(section&&section!==activeSection.value)activeSection.value=section
+  // **地址栏必须与页面一致**，否则刷新一次就回到别的页。
+  // 以前这里只判 `raw` 在不在 SECTION_HASHES 里：`#/corridor/briefing` 不在 → 直接改写 home，
+  // 把上面刚解析出来的 weather 覆盖掉（实测打开旧链接落在运行首页）；
+  // 而 `#/situation/national` 在表里 → 不改写，于是地址写 national、页面是 home，刷新又跳一次。
+  // 现在统一按"解析后的分节"回写：地址永远等于页面，旧地址顺手升级成新地址。
+  const want=sectionHash(section||'home')
+  const wantRaw=want.replace(/^#\//,'')
+  if(raw!==wantRaw){ try{ window.location.hash=want }catch(_){} }
 }
 
 const TOUR_STEPS=[
@@ -645,7 +653,7 @@ onUnmounted(()=>{
          以前用 `entryKey===sub.key` —— 那是"入口"，不是"当前页"，
          于是「推演」和页内「口径与来源」同时亮、点完也不灭。
          合并入口在"当前页是它的兄弟 tab"时只保留"你在这个入口里"的弱标识（entry-context）。 -->
-    <div class="nav-subs" v-if="activeGroup" :data-group="activeGroup.key"><template v-for="group in NAV_GROUPS" :key="group.key"><button v-for="sub in visibleSubs(group)" :key="sub.key" :data-section="sub.key" v-show="group.key===activeGroup?.key" :class="{active:activeSection===sub.key, 'entry-context':sub.merged&&entryKey===sub.key&&activeSection!==sub.key}" @click="activeSection=sub.key">{{ sub.label }}</button></template><template v-if="entryTabList.length"><span class="nav-tab-sep" aria-hidden="true">|</span><button v-for="tab in entryTabList" :key="tab.key" class="nav-entry-tab" :data-entry-tab="tab.key" :class="{active:activeSection===tab.key}" @click="activeSection=tab.key">{{ tab.label }}</button></template></div>
+    <div class="nav-subs" v-if="activeGroup" :data-group="activeGroup.key"><template v-for="group in NAV_GROUPS" :key="group.key"><button v-for="sub in visibleSubs(group)" :key="sub.key" :data-section="sub.key" v-show="group.key===activeGroup?.key" :class="{active:activeSection===sub.key, 'entry-context':sub.merged&&sub.members.includes(activeSection)&&activeSection!==sub.key&&!entryTabList.some(t=>t.key===activeSection)}" @click="activeSection=sub.key">{{ sub.label }}</button></template><template v-if="entryTabList.length"><span class="nav-tab-sep" aria-hidden="true">|</span><button v-for="tab in entryTabList" :key="tab.key" class="nav-entry-tab" :data-entry-tab="tab.key" :class="{active:activeSection===tab.key}" @click="activeSection=tab.key">{{ tab.label }}</button></template></div>
     <div class="nav-fill">
       <!-- 这个下拉只对东北那套（session/network）有效；全国台用 scope 下钻，
          把它挂在首页会显示"东北三省 · 全域"，让人以为全国页还是东北的。 -->

@@ -939,10 +939,11 @@ function focusPts(pts){
   // 以前用 62%/50% 的实际比例，短航线会被放大到贴边，长航线又偏到一侧。
   const w=Math.max(26,maxX-minX), h=Math.max(26,maxY-minY)
   const padX=.88, padY=.72
-  const next=Math.max(1,Math.min(4.2,Math.min(VIEW.w*padX/w,VIEW.h*padY/h)))
+  // 上限从 4.2 提到 6：机场接驳这类 130 km 的短航线，4.2 倍下一个屏只有几十像素宽，
+  // 读者看不出"这是从哪到哪"。长航线由 min() 里的比例项决定，不受这个上限影响。
+  const next=Math.max(1,Math.min(6,Math.min(VIEW.w*padX/w,VIEW.h*padY/h)))
   const cx=(minX+maxX)/2, cy=(minY+maxY)/2
-  zoom.value=next
-  pan.value={x:VIEW.w/2-cx*next,y:VIEW.h/2-cy*next}
+  centerWorld(cx,cy,next)
   return next>1.02
 }
 
@@ -952,6 +953,29 @@ const zoom=ref(1)
 // 否则 8 倍放大后会变成"巨幅广告"（实测起终点地名比地图还大）。
 const inv=computed(()=>1/zoom.value)
 const pan=ref({x:0,y:0})
+/**
+ * 坐标量纲：`.nmap-world` 上的 CSS `translate(Npx)` 是**屏幕像素**，
+ * 而 cx/cy 是 viewBox 坐标（0–1000 / 0–640）。SVG 是等比缩放装进容器的，
+ * 两者相差一个 `显示宽 / VIEW.w` —— 实测容器 940 宽时这个比例是 0.62。
+ *
+ * 以前三处（focusPts / fitBounds / centerOn）直接把 viewBox 坐标当像素写进 pan：
+ * zoom ≤4.2 时误差还能被 `max(26,…)` 之类的余量吃掉，放大到 6 倍就整体偏出屏幕
+ * （实测点选一架飞机后，航线包围盒 top=460、而可视高度只有 396，整条线在视野下方）。
+ * 现在统一走这两个函数，量纲只有一处定义。
+ */
+function viewScale(){
+  const svg=host.value&&host.value.querySelector('svg')
+  if(!svg) return {kx:1,ky:1,w:VIEW.w,h:VIEW.h}
+  const r=svg.getBoundingClientRect()
+  return {kx:(r.width||VIEW.w)/VIEW.w, ky:(r.height||VIEW.h)/VIEW.h,
+          w:r.width||VIEW.w, h:r.height||VIEW.h}
+}
+/** 把 viewBox 坐标 (cx,cy) 放到屏幕中心，并设好缩放。pan 与 zoom 一起写，避免中间态。 */
+function centerWorld(cx,cy,z){
+  const {kx,ky,w,h}=viewScale()
+  zoom.value=z
+  pan.value={x:w/2-cx*z*kx, y:h/2-cy*z*ky}
+}
 const dragging=ref(false)
 let dragStart=null,moved=false
 function onWheel(e){
@@ -960,8 +984,9 @@ function onWheel(e){
   const factor=e.deltaY<0?1.14:1/1.14
   const next=Math.max(1,Math.min(9,zoom.value*factor))
   if(next===zoom.value) return
-  const mx=(e.clientX-rect.left)/rect.width*VIEW.w
-  const my=(e.clientY-rect.top)/rect.height*VIEW.h
+  // 以鼠标位置为不动点缩放：这里的 mx/my 必须是**屏幕像素**（pan 的量纲），
+  // 不能换算成 viewBox —— 换了就会在放大时慢慢偏离鼠标。
+  const mx=e.clientX-rect.left, my=e.clientY-rect.top
   const k=next/zoom.value
   pan.value={x:mx-(mx-pan.value.x)*k,y:my-(my-pan.value.y)*k}
   zoom.value=next
@@ -972,9 +997,9 @@ function onDown(e){
 function onMove(e){
   if(!dragging.value||!dragStart) return
   if(Math.abs(e.clientX-dragStart.x)>3||Math.abs(e.clientY-dragStart.y)>3) moved=true
-  const rect=e.currentTarget.getBoundingClientRect()
-  pan.value={x:dragStart.px+(e.clientX-dragStart.x)/rect.width*VIEW.w,
-             y:dragStart.py+(e.clientY-dragStart.y)/rect.height*VIEW.h}
+  // 拖拽位移就是屏幕位移：不做任何换算（换算是"手感比鼠标快/慢"的根源）
+  pan.value={x:dragStart.px+(e.clientX-dragStart.x),
+             y:dragStart.py+(e.clientY-dragStart.y)}
 }
 function onUp(){dragging.value=false;dragStart=null}
 function resetView(){zoom.value=1;pan.value={x:0,y:0}}
@@ -985,8 +1010,7 @@ function fitBounds(b){
   const w=Math.abs(se[0]-nw[0])||1, h=Math.abs(se[1]-nw[1])||1
   const next=Math.max(1,Math.min(9,Math.min(VIEW.w/w,VIEW.h/h)*0.82))
   const cx=(nw[0]+se[0])/2, cy=(nw[1]+se[1])/2
-  zoom.value=next
-  pan.value={x:VIEW.w/2-cx*next, y:VIEW.h/2-cy*next}
+  centerWorld(cx,cy,next)
   return true
 }
 defineExpose({resetView,fitBounds})
@@ -996,9 +1020,7 @@ defineExpose({resetView,fitBounds})
 // 时间轴每刷新一次（flights 换引用）重新居中一次，所以它看起来是"停在中间、地图在动"。
 function centerOn(lon,lat,scale){
   const [x,y]=project(lon,lat)
-  const z=scale||zoom.value
-  zoom.value=z
-  pan.value={x:VIEW.w/2-x*z, y:VIEW.h/2-y*z}
+  centerWorld(x,y,scale||zoom.value)
 }
 watch([()=>props.followId,()=>props.flights],()=>{
   if(!props.followId) return

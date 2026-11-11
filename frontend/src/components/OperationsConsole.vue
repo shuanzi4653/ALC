@@ -311,7 +311,10 @@ const journalWindowText=computed(()=>journalWindow.value)
 function openJournalRow(row){
   const corridor=row.corridor||String(row.flightId||'').split('#')[0]
   if(!corridor) return
-  emit('open-corridor',{corridor,flightId:row.flightId||''})
+  // 日志点行 → **推演**（用户 2026-11-11 第 7 条：跳到该航线走廊的推演界面，
+  // 且推演结论必须与日志结论一致）。处置点事件才落「走廊剖面」做人工裁决 ——
+  // 两个入口目标不同，混用会出现"点日志要裁决、点事件只看图"的错位。
+  emit('open-corridor',{corridor,flightId:row.flightId||'',target:'card'})
 }
 const journalTime=row=>{
   const at=String(row.at||'')
@@ -1080,6 +1083,49 @@ async function copyReceipt(row){
     </section>
   </div>
 
+  <!-- ===== 评审四问（V1.0.6）=====
+       创新层级 / 与主流方案对比 / 需求从哪来 / 成效是多少 —— 这四件事方案 PDF 里都写了，
+       但评委现场点开系统时看不到。放在口径页而不是新开一页：这一页的定位就是
+       "把话说清楚"，多开一页反而要再解释一遍为什么有这一页。 -->
+  <section class="eval-grid" data-eval-block>
+    <article class="eval-card" data-eval="level">
+      <header><h3>核心创新层级</h3><span class="eval-badge">系统级 + 应用级</span></header>
+      <p><b>不是模型级。</b>能见度/阵风用的是现成的梯度提升树（100 棵、26 维特征、公开的校准方法），
+        模型结构不是我们的贡献。我们的贡献在<b>系统层</b>：把「气象判据 → 绕飞几何 → 时间窗」
+        这条链在同一个界面里贯通，并且每一步都能回到原始报文与回波几何；
+        以及<b>应用层</b>：用同一套判据同时回答"全国哪片天不能飞"和"这一班为什么这么判"。</p>
+    </article>
+    <article class="eval-card" data-eval="compare">
+      <header><h3>与主流方案的分工</h3><span class="eval-badge quiet">用途不同，不是高下</span></header>
+      <dl class="eval-rows">
+        <div><dt>单站气象保障</dt><dd>站级 METAR/TAF 深算，回答"本场能不能起降"。我们做全网可下钻的态势聚合，站级深算不是我们的目标。</dd></div>
+        <div><dt>通用航路规划</dt><dd>给定空域与气象后求最优路径。我们把判据、几何、时间窗整链留痕，结论可被逐行复核。</dd></div>
+        <div><dt>商业 UTM 平台</dt><dd>空域管理与计费。我们不发空域管制指令，只给放行建议与证据，边界写在每一块内容上。</dd></div>
+      </dl>
+    </article>
+    <article class="eval-card" data-eval="demand">
+      <header><h3>需求从哪来</h3><span class="eval-badge quiet">三条线</span></header>
+      <dl class="eval-rows">
+        <div><dt>文献线</dt><dd>低空航路、容量评估、低能见预报三组关键词，累计 259 条命中，筛出 14 篇精读。</dd></div>
+        <div><dt>体系线</dt><dd>唐山、大连、宁德已建低空气象保障 —— 说明"要不要做"不用论证，要论证的是"怎么做得可复核"。</dd></div>
+        <div><dt>自测线</dt><dd>本项目 62 个版本迭代中沉淀的 100 条问题档案，按症状索引，每条都有根因与修法。</dd></div>
+      </dl>
+    </article>
+    <article class="eval-card wide" data-eval="effect">
+      <header><h3>应用成效（稳定组 · 可复算）</h3><span class="eval-badge quiet">口径见上一张总账</span></header>
+      <dl class="eval-rows four">
+        <div><dt>进入不可飞走廊</dt><dd><b>0</b> 架次</dd></div>
+        <div><dt>回波压线改判</dt><dd><b>−100%</b>（改为绕飞或停飞）</dd></div>
+        <div><dt>绕飞架次</dt><dd><b>2848</b> 架次</dd></div>
+        <div><dt>单班追加延误</dt><dd><b>8 班 / 320 min</b>，均值 <b>0.1%</b></dd></div>
+      </dl>
+      <p class="eval-src">四个数只引这一组，不与其它口径混读：它们回答的是"这套判据跑起来之后，
+        安全与效率各付出多少"，不回答"预测准不准"（准不准看上一张的 AUC / Brier / TS）。
+        验证规模：前端单测 <b>507</b> 项、浏览器逐页验收 <b>43</b> 项、后端用例 <b>604</b> 项（当前版本全绿），
+        复现命令见仓库 README。</p>
+    </article>
+  </section>
+
   <div class="briefing-head glossary-head">
     <h3>术语表 · 专业与通俗两读</h3>
     <small>共 {{glossaryTotal}} 条 · 术语本身（dBZ、内核、指纹…）不换词——它是接口、是文档、也是日志里的字段；这里只补一句给人看的话。</small>
@@ -1664,4 +1710,37 @@ html[data-theme="light"] .nation-ledger td small{color:#4a6a85 !important}
 .caliber-ledger td{color:var(--alc-text)}
 .caliber-ledger td code{font-size:12px;color:var(--alc-info);word-break:break-all}
 .caliber-ledger tbody tr:last-child td{border-bottom:0}
+
+/* ===== 评审四问（V1.0.6）===== */
+.eval-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px;margin:6px 0 20px}
+.eval-card{padding:13px 15px;background:#14293a;border:1px solid #274355;border-radius:9px}
+.eval-card.wide{grid-column:1/-1}
+.eval-card header{display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap}
+.eval-card h3{margin:0;font-size:13.5px;color:#d5e7f1;font-weight:600}
+.eval-badge{font-size:10.5px;padding:1px 8px;border-radius:999px;color:#8ef0ff;
+  border:1px solid rgba(80,200,220,.5);background:rgba(30,120,140,.18)}
+.eval-badge.quiet{color:#9fc6dd;border-color:rgba(120,170,200,.42);background:rgba(40,80,110,.2)}
+.eval-card p{margin:0;font-size:12px;line-height:1.72;color:#9db8c9}
+.eval-card p b{color:#d7ecf8;font-weight:600}
+.eval-rows{margin:0}
+.eval-rows > div{display:flex;gap:10px;padding:4px 0;border-top:1px dashed rgba(70,110,140,.28)}
+.eval-rows > div:first-child{border-top:0}
+.eval-rows dt{flex:0 0 96px;font-size:11.5px;color:#7fb6cc}
+.eval-rows dd{margin:0;font-size:11.5px;line-height:1.65;color:#9db8c9}
+.eval-rows dd b{color:#eaf6ff;font-variant-numeric:tabular-nums}
+.eval-rows.four{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px}
+.eval-rows.four > div{border-top:0;padding:0;flex-direction:column;gap:2px}
+.eval-rows.four dt{flex:none;font-size:11px}
+.eval-rows.four dd{font-size:15px;color:#eaf6ff}
+.eval-src{margin:8px 0 0 !important;font-size:10.5px !important;color:#7d9cb3 !important;line-height:1.6}
+html[data-theme="light"] .eval-card{background:#fff !important;border-color:#dbe6f1 !important}
+html[data-theme="light"] .eval-card h3{color:#0f3550 !important}
+html[data-theme="light"] .eval-card p{color:#34516a !important}
+html[data-theme="light"] .eval-card p b{color:#12314a !important}
+html[data-theme="light"] .eval-rows dt{color:#2b5d80 !important}
+html[data-theme="light"] .eval-rows dd{color:#34516a !important}
+html[data-theme="light"] .eval-rows dd b{color:#0f3550 !important}
+html[data-theme="light"] .eval-src{color:#5b7a92 !important}
+html[data-theme="light"] .eval-badge{color:#0b6b7d !important;border-color:#8ecbb0 !important;background:#e6f6ee !important}
+html[data-theme="light"] .eval-badge.quiet{color:#31556f !important;border-color:#b9cfe2 !important;background:#eef1fa !important}
 </style>

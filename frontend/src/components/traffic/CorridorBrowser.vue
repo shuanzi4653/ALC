@@ -289,9 +289,9 @@ function reviewLabel(action) {
 .cb-rows li.empty { cursor: default; color: #6f92a8; font-size: 10.5px; border-left-color: transparent; }
 
 .cb-main { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
-.cb-map { position: relative; flex: 1 1 auto; min-height: 240px; border-radius: 8px; overflow: hidden;
+.cb-map { position: relative; flex: 1 1 auto; min-height: 380px; border-radius: 8px; overflow: hidden;
   border: 1px solid rgba(70,110,140,.3); }
-.cb-map.short { flex: 0 0 300px; min-height: 300px; }
+.cb-map.short { flex: 0 0 360px; min-height: 360px; }
 .cb-mapnote { position: absolute; left: 8px; bottom: 6px; margin: 0; font-size: 9.5px;
   color: #7d9cb3; background: rgba(6,18,28,.7); padding: 2px 6px; border-radius: 3px; }
 

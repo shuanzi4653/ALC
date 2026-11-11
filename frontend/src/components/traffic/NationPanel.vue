@@ -709,18 +709,37 @@ watch(()=>props.scopeKey,(key)=>{
   if(scopeReady) load()
 },{immediate:true})
 
+/**
+ * 键盘：空格播放/暂停、左右键 ±1 分钟。
+ *
+ * 为什么放在这个组件里而不是工作台：这一页的播放与时刻是**本组件自己的** minute
+ * （0–1440），工作台那套是东北会话的 0–480，两边不是一个量，接过去必然错位。
+ *
+ * 输入框内一律跳过 —— 否则在搜索框里按空格会变成"播放"，那是最烦人的一类 bug。
+ */
+function onMapKey(event){
+  if(event.ctrlKey||event.metaKey||event.altKey) return
+  const tag=(event.target&&event.target.tagName||'').toLowerCase()
+  if(tag==='input'||tag==='textarea'||tag==='select'||(event.target&&event.target.isContentEditable)) return
+  if(event.code==='Space'){ event.preventDefault(); playing.value=!playing.value; return }
+  if(event.key==='ArrowLeft'){ event.preventDefault(); playing.value=false; minute.value=Math.max(0,minute.value-1); return }
+  if(event.key==='ArrowRight'){ event.preventDefault(); playing.value=false; minute.value=Math.min(1440,minute.value+1) }
+}
+
 onMounted(()=>{
   scopeReady=true
   frameMinute.value=minute.value
   startClock()
   measureViewport()
   window.addEventListener('resize',measureViewport)
+  window.addEventListener('keydown',onMapKey)
   load()
   // 推送计时用独立定时器：不能和推演播放共用一个变量，否则一开播就把计时器顶掉
   pushTimer=setInterval(()=>{pushAge.value+=1},1000)
 })
 onUnmounted(()=>{
   window.removeEventListener('resize',measureViewport)
+  window.removeEventListener('keydown',onMapKey)
   if(clockRaf) cancelAnimationFrame(clockRaf)
   clockRaf=null
   if(pushTimer) clearInterval(pushTimer)
@@ -812,7 +831,10 @@ onUnmounted(()=>{
     <!-- ================= 态势 ================= -->
     <div class="nrn-map" v-show="view==='map'" v-if="mode!=='corridor'&&mode!=='card'">
       <div class="nrn-tools">
-        <button class="play" @click="togglePlay">{{ playing?'Ⅱ 暂停':'▶ 推演' }}</button>
+        <!-- 文案用"播放/暂停"而不是"推演"：右侧同名入口也叫推演，一个按钮一个页面同名，
+             新人会以为点它跳页。快捷键写在 title 里，不占按钮宽度。 -->
+        <button class="play" @click="togglePlay"
+                :title="playing?'暂停时间轴（空格）· 左右键逐分钟':'播放时间轴（空格）· 左右键逐分钟'">{{ playing?'Ⅱ 暂停':'▶ 播放' }}</button>
         <input type="range" min="0" :max="MINUTES" step="1" v-model.number="minute"
                @input="onSeek" aria-label="推演时间"/>
         <b class="clock">{{ clock(minute) }}</b>
