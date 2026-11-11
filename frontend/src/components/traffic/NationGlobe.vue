@@ -431,7 +431,7 @@ function syncRadarImage(){
   if(!existing){
     map.addSource('radar-img',{type:'image',url,coordinates:coords})
     map.addLayer({id:'radar-raster',type:'raster',source:'radar-img',
-      paint:{'raster-opacity':.98,'raster-resampling':'nearest','raster-fade-duration':0}},'province-line')
+      paint:{'raster-opacity':.95,'raster-resampling':'linear','raster-fade-duration':0}},'province-line')
     radarImgKey=nextKey
   }else{
     if(nextKey!==radarImgKey&&typeof existing.updateImage==='function'){

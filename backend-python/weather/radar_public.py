@@ -212,8 +212,8 @@ def _china_raster_mask(z: int, x0: int, y0: int, x1: int, y1: int) -> Optional[n
 
 
 def _encode_nexrad_png(crop_dbz: np.ndarray, upscale: float = 2.0) -> Optional[str]:
-    """将裁剪后的连续 dBZ 矩阵做双线性插值超分并映射为 14 级 NEXRAD 索引色透明 PNG（Data URI）。"""
-    from PIL import Image
+    """将裁剪后的连续 dBZ 矩阵做高斯保形平滑与双三次插值，映射为 14 级 NEXRAD 索引色透明 PNG（Data URI）。"""
+    from PIL import Image, ImageFilter
 
     if crop_dbz.size == 0 or float(crop_dbz.max()) < 15.0:
         return None
@@ -222,11 +222,11 @@ def _encode_nexrad_png(crop_dbz: np.ndarray, upscale: float = 2.0) -> Optional[s
     w_out = max(1, int(round(w * scale)))
     h_out = max(1, int(round(h * scale)))
     if (w_out, h_out) != (w, h):
-        up_dbz = np.asarray(
-            Image.fromarray(crop_dbz.astype(np.float32), mode='F').resize((w_out, h_out), Image.BICUBIC),
-            dtype=np.float32,
-        )
-        up_dbz = np.clip(up_dbz, 0.0, 75.0)
+        # 气象场高斯保形平滑：消除底层离散栅格网格台阶，还原流体大气的自然有机流线形态
+        norm = np.clip(crop_dbz * 3.4, 0.0, 255.0).astype(np.uint8)
+        blurred = Image.fromarray(norm, mode='L').filter(ImageFilter.GaussianBlur(radius=1.0))
+        up_l = blurred.resize((w_out, h_out), Image.BICUBIC)
+        up_dbz = np.asarray(up_l, dtype=np.float32) / 3.4
     else:
         up_dbz = crop_dbz
 
@@ -427,7 +427,7 @@ def fetch(force: bool = False) -> Dict[str, Any]:
         return _empty(f'取帧失败：{str(exc)[:90]}')
 
     stamp = datetime.fromtimestamp(frame['time'], tz=timezone.utc).strftime('%Y%m%d%H%M')
-    cache_file = CACHE_DIR / f'{stamp}-z{TILE_ZOOM}-g{GRID_DEG}-nexrad3.json'
+    cache_file = CACHE_DIR / f'{stamp}-z{TILE_ZOOM}-g{GRID_DEG}-nexrad4.json'
     if cache_file.exists() and not force:
         try:
             cached = json.loads(cache_file.read_text(encoding='utf-8'))

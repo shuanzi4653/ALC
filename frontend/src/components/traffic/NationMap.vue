@@ -1038,8 +1038,8 @@ function clickNode(node){
 @media (prefers-reduced-motion: reduce){
   .echo-in,.echo-out{animation:none}
 }
-.nmap-radar-img{image-rendering:pixelated;image-rendering:-moz-crisp-edges;image-rendering:-webkit-optimize-contrast;image-rendering:crisp-edges;opacity:.98;pointer-events:none}
-html[data-theme="light"] .nmap-radar-img{opacity:.92}
+.nmap-radar-img{image-rendering:auto;opacity:.95;pointer-events:none}
+html[data-theme="light"] .nmap-radar-img{opacity:.90}
 .nmap-radar-scale{position:absolute;left:14px;top:16px;z-index:25;pointer-events:none;
   background:rgba(4,14,24,.82);border:1px solid rgba(64,136,192,.35);
   backdrop-filter:blur(6px);border-radius:4px;padding:6px 7px;
