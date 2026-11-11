@@ -48,9 +48,11 @@ const mapSource = () => read('src/components/traffic/NationPanel.vue') + '\n' + 
 
 test('省级单元一律实线：面板里不许给省界加虚线', () => {
   const source = mapSource()
-  // 省界必须实线。但"选中班次的未飞行段"用虚线是有意的（FR24 的通用读法：
-  // 已飞实线、未飞虚线），所以只查行政区渲染那一段，不查整份文件。
-  const adminPart = source.slice(0, Math.max(0, source.indexOf('选中班次的航线')))
+  // 省界必须实线。但有两处虚线是有意的：① 选中班次的未飞行段（已飞实线/未飞虚线）；
+  // ② 绕飞航段（琥珀虚线，V1.0.3 起）。所以只查**行政区渲染那一小段**。
+  const shapeAt = source.indexOf('v-for="shape in shapes"')
+  assert.ok(shapeAt > 0, '找不到行政区渲染段，护栏失效')
+  const adminPart = source.slice(Math.max(0, shapeAt - 400), shapeAt + 800)
   assert.ok(!/stroke-dasharray/.test(adminPart), '行政区画图段出现了 stroke-dasharray —— 省界被画成虚线了')
   assert.ok(!/未纳入（不通航）|未通航/.test(source), '仍在单独标注"未通航"省份')
   // 判定按渲染层算：NationPanel 里的 border.excludedCities 是"边境退出通航"的数据，

@@ -33,8 +33,15 @@ import httpx
 META_URL = 'https://api.rainviewer.com/public/weather-maps.json'
 CACHE_DIR = Path(__file__).resolve().parents[2] / '.run' / 'radar'
 TILE_ZOOM = 5                    # 5 级：单瓦片 1.25°，回波边缘才有细节
-GRID_DEG = 0.14                  # 聚合网格：0.14° ≈ 15 km，接近回波胞的真实尺度
-SIMPLIFY_DEG = 0.05              # 多边形抽稀，避免几百个点的锯齿
+# 聚合网格：原来是 0.14°（≈15 km）。一个格子在全国缩放下就是 8 px 的方块，
+# 放大后是明显的大锯齿 —— 用户 2026-11-11 明确要求"不要锯齿、要高精度"。
+# 0.04°（≈4.4 km）接近单个回波胞的尺度，格子数约 12 倍，union 仍在几十毫秒量级。
+GRID_DEG = 0.04
+# 简化容差：0.05°（≈5.5 km）会把平滑后的圆弧又削成方块，降到 0.008°（≈0.9 km）。
+# 真正的去锯齿靠下面的闭运算，简化只负责丢掉冗余顶点。
+SIMPLIFY_DEG = 0.008
+# 闭运算半径：先外扩再回缩，把格子拼出来的直角磨成圆弧（≈3.2 km）
+SMOOTH_DEG = 0.042
 ALPHA_FLOOR = 40
 TTL_SECONDS = 600.0
 TIMEOUT_SECONDS = 20.0
@@ -117,6 +124,28 @@ def _cells_from_tile(image, z: int, x: int, y: int) -> List[Tuple[float, float, 
 
 # ---------------------------------------------------------------- 多边形
 
+def _chaikin(ring, iterations=2):
+    """Chaikin 割角：每条边取 1/4、3/4 两点，折线逐轮收敛到平滑曲线。
+
+    闭运算只能把直角磨成圆角矩形，直边还是直边；真正让轮廓像雷达图的是这一步。
+    顶点数每轮翻倍：2 轮会让全国载荷从 0.6 MB 涨到 2.4 MB，所以只跑 1 轮（约 2 倍），
+    再 round 到 3 位（≈110 m）——保留曲线观感，又不把首屏拖慢。
+    """
+    if len(ring) < 4:
+        return ring
+    pts = list(ring)
+    for _ in range(iterations):
+        out = []
+        for i in range(len(pts) - 1):
+            x1, y1 = pts[i]
+            x2, y2 = pts[i + 1]
+            out.append((0.75 * x1 + 0.25 * x2, 0.75 * y1 + 0.25 * y2))
+            out.append((0.25 * x1 + 0.75 * x2, 0.25 * y1 + 0.75 * y2))
+        out.append(out[0])
+        pts = out
+    return pts
+
+
 def _rings_of(cells: List[Tuple[float, float]]) -> List[List[List[float]]]:
     import shapely
     from shapely.geometry import box
@@ -125,19 +154,30 @@ def _rings_of(cells: List[Tuple[float, float]]) -> List[List[List[float]]]:
         return []
     boxes = [box(lon, lat, lon + GRID_DEG, lat + GRID_DEG) for lon, lat in cells]
     merged = shapely.union_all(boxes)
+    # 闭运算：格子的直角在这里被磨圆。不做这一步，再小的网格也还是"由方块拼成的多边形"。
+    try:
+        grown = merged.buffer(SMOOTH_DEG, join_style=1, mitre_limit=1.2)
+        back = grown.buffer(-SMOOTH_DEG, join_style=1, mitre_limit=1.2)
+        if not back.is_empty and back.is_valid:
+            merged = back
+    except Exception:  # noqa: BLE001
+        pass
     merged = merged.simplify(SIMPLIFY_DEG, preserve_topology=True)
     parts = getattr(merged, 'geoms', [merged])
     rings: List[List[List[float]]] = []
     for part in parts:
         if part.is_empty or part.area <= 0:
             continue
-        if part.area < 0.08:          # 丢掉单个格子的碎点，图上才不是满屏芝麻
+        # 面积下限 0.08 平方度（≈30×30 km）会把整片小雨团丢掉 —— 改成 0.004（≈6×6 km）。
+        # 碎点靠"最小 3 个格子"控制，而不是靠一个很大的面积阈值。
+        if part.area < 0.004:
             continue
-        coords = [[round(x, 3), round(y, 3)] for x, y in part.exterior.coords]
+        smooth = _chaikin(list(part.exterior.coords), 1)
+        coords = [[round(x, 3), round(y, 3)] for x, y in smooth]
         if len(coords) >= 4:
             rings.append(coords)
     rings.sort(key=lambda ring: -abs(_ring_area(ring)))
-    return rings[:45]
+    return rings[:200]
 
 
 def _ring_area(ring: List[List[float]]) -> float:
@@ -181,7 +221,7 @@ def fetch(force: bool = False) -> Dict[str, Any]:
         return _empty(f'取帧失败：{str(exc)[:90]}')
 
     stamp = datetime.fromtimestamp(frame['time'], tz=timezone.utc).strftime('%Y%m%d%H%M')
-    cache_file = CACHE_DIR / f'{stamp}-z{TILE_ZOOM}.json'
+    cache_file = CACHE_DIR / f'{stamp}-z{TILE_ZOOM}-g{GRID_DEG}-geo2.json'
     if cache_file.exists() and not force:
         try:
             cached = json.loads(cache_file.read_text(encoding='utf-8'))

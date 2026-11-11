@@ -39,7 +39,7 @@ function onScopeChange(next){
 const activeSection=ref('home'),scope=ref('nation')
 // 运行情报的两个视图：班次情报（默认，看飞行汽车）| 空域情报（机场与净空）。
 // 原来的「民航情报」名不副实——它展示的是机场城市气象，而情报的对象该是飞行汽车。
-const intelTab=ref('flight'),settings=ref(false),operations=ref([]),operationsReady=ref(false),commandBusy=ref(false),mapExpanded=ref(false),fullscreen=ref(false)
+const intelTab=ref('flight'),settings=ref(false),operations=ref([]),operationsReady=ref(false),commandBusy=ref(false),mapExpanded=ref(false)
 const demoMode=isDemoMode()
 const workbench=ref(null)
 const sections=SECTION_NAMES
@@ -48,14 +48,6 @@ function gotoGroup(key){
   const next=defaultSub(key)
   if(next)activeSection.value=next
 }
-const PROJECTION_KEY='alc.traffic.projection'
-function readProjection(){try{return localStorage.getItem(PROJECTION_KEY)==='on'}catch(_){return false}}
-const projection=ref(readProjection())
-watch(projection,on=>{
-  try{localStorage.setItem(PROJECTION_KEY,on?'on':'off')}catch(_){}
-  try{document.documentElement.dataset.projection=on?'on':'off'}catch(_){}
-},{immediate:true})
-function toggleProjection(){projection.value=!projection.value}
 function keyGuard(event){
   const tag=(event.target?.tagName||'').toLowerCase()
   return tag==='input'||tag==='textarea'||tag==='select'||event.target?.isContentEditable
@@ -65,8 +57,7 @@ function onGlobalKey(event){
     event.preventDefault();paletteOpen.value=!paletteOpen.value;return
   }
   if(event.key==='Escape'&&paletteOpen.value){paletteOpen.value=false;return}
-  if(keyGuard(event)||event.ctrlKey||event.metaKey||event.altKey)return
-  if(event.key.toLowerCase()==='p')toggleProjection()
+  // 投影模式已下线（2026-11-11），P 键不再绑定任何动作
 }
 const paletteOpen=ref(false)
 const paletteRoutes=computed(()=>(network.value?.routes||[]).map(r=>({id:r.id,name:r.name,fromCity:r.fromCity,toCity:r.toCity})))
@@ -170,7 +161,6 @@ const firstVisit=ref(false)
 onBeforeUnmount(()=>{
   window.removeEventListener('hashchange',applyHash)
   window.removeEventListener('popstate',onPopState)
-  window.removeEventListener('keydown',onPresentKey)
 })
 const playbackMax=computed(()=>{
   const meta=caseMeta()
@@ -190,7 +180,6 @@ onMounted(()=>{
   applyHash()
   window.addEventListener('hashchange',applyHash)
   window.addEventListener('popstate',onPopState)
-  window.addEventListener('keydown',onPresentKey)
   try{ firstVisit.value=!localStorage.getItem('alc.visited') }catch(e){ firstVisit.value=false }
   if(firstVisit.value)startTour(false)
   if(firstVisit.value)window.setTimeout(()=>dismissFirstVisit(),4000)
@@ -494,31 +483,6 @@ async function initialize(){
   try{network.value=await requestJson('/api/traffic/network');if(!disposed)await generate()}
   catch(e){error.value=e.message}
 }
-const presentFallback=ref(false)
-const presenting=computed(()=>fullscreen.value||presentFallback.value)
-const presentNote=computed(()=>{
-  if(fullscreen.value)return '演示中：全屏 + 投影字号。按 ESC 或再点一次退出'
-  if(presentFallback.value)return '演示（投影模式）：浏览器拒绝了全屏请求（常见于嵌入页面/无用户手势），已按投影字号放大；数据不变'
-  return '演示模式：全屏并放大字号（适合会场）。浏览器拒绝全屏时会自动降级为投影模式'
-})
-async function toggleFullscreen(){
-  try{
-    if(!document.fullscreenElement){
-      await workbench.value?.requestFullscreen()
-      fullscreen.value=true;presentFallback.value=false
-    }else{
-      await document.exitFullscreen();fullscreen.value=false;presentFallback.value=false
-    }
-  }catch(e){
-    projection.value=true
-    presentFallback.value=true
-    console.warn('全屏不可用，已降级为投影模式：',e&&e.message)
-  }
-}
-function onPresentKey(event){
-  if(event.key!=='Escape')return
-  if(presentFallback.value){presentFallback.value=false}
-}
 
 const HASH_GUARD=ref(true)
 function writeHash(section){
@@ -545,7 +509,6 @@ function applyHash(){
 const TOUR_STEPS=[
   {key:'brief',label:'结论条',text:'页首是当前作用域的一句话结论：多少条航线、几架在飞、几架绕飞或暂缓。下面的地图和右栏是它的明细。'},
   {key:'nav',label:'五个功能区',text:'态势 / 走廊 / 处置 / 推演 / 日志。点一次换页，没有先后顺序；每一页都能下钻到省和市。'},
-  {key:'present',label:'投影模式',text:'答辩/会场演示请在右上开「投影模式」：字号放大一档，后排也能看清。'},
 ]
 const RAIL_KEY='alc.railCollapsed'
 const railCollapsed=ref(false)
@@ -615,7 +578,7 @@ onUnmounted(()=>{
   if(relayRetryTimer)clearTimeout(relayRetryTimer);disposed=true;++generation;++weatherGeneration;window.removeEventListener('keydown',onGlobalKey);clearTimeout(poll);clearInterval(timer);clearInterval(buildClock)})
 </script>
 <template>
-<main ref="workbench" class="traffic-workbench" :class="{'map-expanded':mapExpanded&&activeSection==='overview','is-fullscreen':fullscreen,'overview-mode':activeSection==='overview','page-mode':activeSection!=='overview'}">
+<main ref="workbench" class="traffic-workbench" :class="{'map-expanded':mapExpanded&&activeSection==='overview','overview-mode':activeSection==='overview','page-mode':activeSection!=='overview'}">
   <p class="wb-demo-bar" v-if="demoMode" data-demo-bar>
     演示模式（<code>?demo=1</code>）：底图与雷达瓦片不再外取，气象以本帧快照为准；页面上的“实时”字样本次不成立。
   </p>
@@ -645,11 +608,7 @@ onUnmounted(()=>{
       <!-- 这个下拉只对东北那套（session/network）有效；全国台用 scope 下钻，
          把它挂在首页会显示"东北三省 · 全域"，让人以为全国页还是东北的。 -->
       <label class="nav-region" v-if="!nationScopeView" title="运行区域"><select aria-label="运行区域" v-model="city" @change="selectedId='';page=1"><option value="">东北三省 · 全域</option><optgroup v-for="p in provinces" :label="p" :key="p"><option v-for="c in network?.cities.filter(c=>c.province===p)||[]" :key="c.id" :value="c.id">{{c.capital?'省会 · ':''}}{{c.name}}</option></optgroup></select></label>
-      <button class="nav-toggle" data-projection-toggle :class="{on:projection}" :aria-pressed="projection"
-              title="投影模式（快捷键 P）：正文 12/13 → 16 px（放大一档），适合会场投屏；不改数据"
-              data-projection-hint @click="toggleProjection">投影模式</button>
-      <button class="nav-toggle" data-present-toggle :class="{on:presenting}" :aria-pressed="presenting"
-              :title="presentNote" @click="toggleFullscreen">{{ fullscreen?'退出演示':(presentFallback?'演示·投影':'演示') }}</button>
+
       <button class="nav-toggle" data-settings-toggle :class="{on:settings}" :aria-pressed="settings" title="运行设置：情景、重新调度、信息密度、本页可做" @click="settings=!settings">设置</button>
     </div>
   </nav>
@@ -740,8 +699,8 @@ onUnmounted(()=>{
       </div>
     </div>
   </div>
-  <div class="first-visit" v-if="firstVisit&&!fullscreen&&tourStep<0" role="status" data-first-visit @click="dismissFirstVisit">
-    提示：按 <b>Ctrl+K</b> 可直接搜索走廊号或班次号；按 <b>P</b> 切投影模式。
+  <div class="first-visit" v-if="firstVisit&&tourStep<0" role="status" data-first-visit @click="dismissFirstVisit">
+    提示：按 <b>Ctrl+K</b> 可直接搜索走廊号或班次号。
     <button class="first-visit-again" @click.stop="startTour(true)">再看一遍引导</button>
   </div>
   <CommandPalette :open="paletteOpen" :groups="NAV_GROUPS" :routes="paletteRoutes" :flights="paletteFlights"
@@ -932,7 +891,6 @@ onUnmounted(()=>{
 .traffic-workbench.home-mode .traffic-header,.traffic-workbench.home-mode .traffic-summary{display:none}
 .traffic-workbench.home-mode .hstage-wrap{flex:1 1 auto;min-height:0}
 .traffic-workbench .traffic-main{flex:1 1 auto;grid-template-rows:minmax(0,1fr);min-height:620px}
-.traffic-workbench.is-fullscreen{height:100vh;padding:12px 18px}
 .traffic-workbench.map-expanded .traffic-main{grid-template-columns:minmax(0,1fr)!important;min-height:460px}
 .traffic-workbench.map-expanded .traffic-detail{display:none}
 .traffic-workbench.map-expanded .traffic-layer-row{display:none}.traffic-workbench .traffic-map-panel{min-height:520px}.traffic-workbench :deep(.city-map-shell){min-height:0}.traffic-workbench .traffic-detail{overflow:auto;min-height:0}.traffic-playback{position:sticky;bottom:0;z-index:3;background:#0e2131}.traffic-workbench.map-expanded .traffic-header,.traffic-workbench.map-expanded .traffic-summary,.traffic-workbench.map-expanded .traffic-detail{display:none}.traffic-build-strip{position:fixed;left:0;right:0;top:0;z-index:60;pointer-events:none;
@@ -1000,8 +958,6 @@ onUnmounted(()=>{
 .nav-subs-tip{margin-left:auto;font-size:12px;color:#5d6f86}
 .settings-density{display:flex;align-items:center;gap:6px}
 .settings-density>span{font-size:12px;color:#6f92a8}
-:global(html[data-projection="on"] .traffic-repro){display:none}
-:global(html[data-projection="on"] .nav-subs-tip){display:none}
 
 .nav-help{position:relative}
 .nav-help-body{position:absolute;right:0;top:34px;z-index:60;width:300px;padding:12px 14px;border-radius:8px;background:var(--alc-bg-2);border:1px solid #294354;box-shadow:0 14px 30px rgba(0,0,0,.5)}

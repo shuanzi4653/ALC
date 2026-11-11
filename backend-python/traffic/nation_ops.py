@@ -231,7 +231,13 @@ def flight_objects(corridors: Iterable[Dict[str, Any]], minute: int,
             'fromProvince': row['fromProvince'], 'toProvince': row['toProvince'],
             'fromLonLat': row['fromLonLat'], 'toLonLat': row['toLonLat'],
             'kind': row['kind'], 'kindLabel': row.get('kindLabel'),
-            'lon': round(lon, 4), 'lat': round(lat, 4), 'heading': round(heading, 1),
+            'lon': round(lon, 4), 'lat': round(lat, 4),
+            # heading 是数学角（0=东，正=北，atan2 的自然结果）；
+            # 图标要的是屏幕角（0=东，正=顺时针/向南），两者差一个负号。
+            # 以前前端拿 heading 直接塞进 rotate，等于把机头镜像了一次，飞机还会被外推反方向。
+            # 这里两个都给，前端不用再猜角度约定。
+            'heading': round(heading, 1),
+            'headingScreen': round(-heading, 1),
             'progress': round(progress, 3),
             'altM': int(cruise * (1 - abs(progress - 0.5) * 1.4)) if progress < 0.15 or progress > 0.85 else cruise,
             'speedKmh': int(sched['speed']),

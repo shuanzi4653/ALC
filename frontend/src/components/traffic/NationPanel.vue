@@ -80,6 +80,8 @@ const fps=ref(0)
 // 不做第二套数据，只是图层显隐 + 侧栏内容切换。
 const audience=ref('ops')
 const zoneGeom=ref(null)
+// 禁飞区在首页默认开（用户 2026-11-11 要求：气象与非气象都要在首页看得到）
+const zoneOn=ref(true)
 const zoneBusy=ref(false)
 const zoneErr=ref('')
 const zonePolicy=ref('APPROVAL_REQUIRED')
@@ -185,8 +187,9 @@ function onGlobeUnsupported(probe){
 function onGlobeFps(value){fps.value=value}
 
 // —— 净空几何按需取 ——
-// 287 个 28 点环约 250 KB，首页不画它，所以不放进主载荷；只有切到空域视角
-// 或进了三维的省/市层才取。取过一次就留着，切换视角不再重复请求。
+// 287 个 28 点环约 250 KB，放进主载荷会让首屏多 0.2 秒，所以走独立接口、按需取。
+// 现在首页默认就要画禁飞区（用户 2026-11-11 定），所以进页面后自动取一次；
+// 取过一次就留着，切视角/切层级不再重复请求。
 function ensureZones(){
   if(zoneGeom.value||zoneBusy.value) return
   zoneBusy.value=true
@@ -282,6 +285,7 @@ async function load(){
     byProvince.value={}
     byCity.value={}
     resetMap()
+    if(zoneOn.value) ensureZones()
   }catch(e){error.value=e.message||String(e)}
   finally{loading.value=false}
 }
@@ -698,6 +702,8 @@ onUnmounted(()=>{
         </select>
         <button :class="{on:radarOn}" @click="radarOn=!radarOn">回波</button>
         <button :class="{on:fogOn}" @click="fogOn=!fogOn" :disabled="!fog.available">雾区</button>
+        <button :class="{on:zoneOn}" @click="zoneOn=!zoneOn; zoneOn&&ensureZones()"
+                :title="'禁飞区：机场净空 + 强回波，红色多边形框；关掉连绕飞一起隐藏'">禁飞</button>
         <button :class="{on:terrainOn}" @click="terrainOn=!terrainOn">地形</button>
         <button :class="{on:tilt}" @click="toggleTilt">倾斜</button>
         <button :class="{on:threeD}" @click="toggle3d"
@@ -725,14 +731,14 @@ onUnmounted(()=>{
                    :minute="minute" :frame-minute="frameMinute"
                    :radar-on="radarOn" :fog-on="fogOn" :density="density"
                    :selected-id="selectedId" :selected-corridor="selectedCorridor"
-                   :follow-id="followId" :zones="zoneGeom" :audience="audience"
+                   :follow-id="followId" :zones="zoneOn?zoneGeom:null" :audience="audience"
                    @drill="drill" @select-flight="pickFlight" @select-corridor="pickCorridor"
                    @degrade="onGlobeDegrade" @unsupported="onGlobeUnsupported" @fps="onGlobeFps"/>
       <NationMap v-else ref="mapRef" :data="data" :flights="flights" :minute="minute"
                  :frame-minute="frameMinute"
                  :radar-on="radarOn" :fog-on="fogOn" :terrain-on="terrainOn" :tilt="tilt"
                  :density="density" :virtual-mode="virtualMode" :audience="audience"
-                 :zone-bands="zoneGeom&&zoneGeom.bands" :zone-policy="zonePolicy"
+                 :zone-bands="zoneOn&&zoneGeom?zoneGeom.bands:null" :zone-policy="zonePolicy"
                  :selected-id="selectedId" :selected-corridor="selectedCorridor"
                  :follow-id="followId"
                  @drill="drill" @select-flight="pickFlight" @select-corridor="pickCorridor"/>

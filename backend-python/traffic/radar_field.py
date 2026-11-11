@@ -17,9 +17,13 @@ BAND_ORDER = tuple(name for name, _low, _high in BAND_EDGES)
 CORE_BAND = 'STRONG'
 RING_BANDS = ('CONVECTIVE',)
 
-SIMPLIFY_TOLERANCE_M = 2500.0
+# 平滑优先于简化：先做闭运算把栅格直角磨圆，再按 900 m 简化。
+# 原来直接 simplify(2500 m) —— 简化的顶点就是格子的角点，画出来还是台阶。
+SIMPLIFY_TOLERANCE_M = 900.0
+SMOOTH_RADIUS_M = 7000.0       # 约 2–3 个格距；小于格距磨不圆，大于 3 倍会把两片小雨并成一片
 MIN_COMPONENT_CELLS = 1
-MAX_COMPONENTS = 40
+# 组件上限：40 会在大范围降水时截掉一整半（实测"图上有回波、判定里没有"）
+MAX_COMPONENTS = 220
 
 def band_of(value):
     if value is None:
@@ -74,6 +78,31 @@ def _components(cells):
         found.append((band, group))
     return found
 
+def _smooth(geometry):
+    """闭运算：先按半径外扩再回缩，把格子拼出来的直角磨成圆弧。
+
+    为什么不用"提高 simplify 容差"代替：简化的输入是台阶，容差再大也只是台阶变少，
+    形状依旧是折线；闭运算改的是**边界本身**。
+    面积变化控制在 15% 以内，超出就放弃平滑（宁可保留原样，也不要凭空多出一片雨）。
+    """
+    if geometry is None or geometry.is_empty:
+        return geometry
+    try:
+        grown = geometry.buffer(SMOOTH_RADIUS_M, join_style=1, mitre_limit=1.2)
+        back = grown.buffer(-SMOOTH_RADIUS_M, join_style=1, mitre_limit=1.2)
+        if back.is_empty:
+            return geometry
+        if not back.is_valid:
+            back = back.buffer(0)
+        if back.is_empty:
+            return geometry
+        if not (0.85 <= (back.area / geometry.area) <= 1.15):
+            return geometry
+        return back
+    except Exception:  # noqa: BLE001
+        return geometry
+
+
 def _tier_geometry(component_rows, cell_lookup, zoom, clip, min_cells):
     if len(component_rows) < min_cells:
         return GeometryCollection()
@@ -87,8 +116,11 @@ def _tier_geometry(component_rows, cell_lookup, zoom, clip, min_cells):
     clipped = unary_union(quads).intersection(clip)
     if clipped.is_empty or clipped.area <= 0.0:
         return GeometryCollection()
-    simplified = clipped.simplify(SIMPLIFY_TOLERANCE_M, preserve_topology=True)
-    return simplified if not simplified.is_empty else clipped
+    smoothed = _smooth(clipped)
+    simplified = smoothed.simplify(SIMPLIFY_TOLERANCE_M, preserve_topology=True)
+    if simplified.is_empty:
+        return smoothed if not smoothed.is_empty else clipped
+    return simplified
 
 def _polygon_parts(geometry):
     if geometry is None or geometry.is_empty:

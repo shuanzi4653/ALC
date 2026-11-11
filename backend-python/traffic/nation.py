@@ -219,14 +219,18 @@ def _radar_clipped(radar_ts: str) -> Dict[str, Any]:
                     continue
                 parts = getattr(piece, 'geoms', [piece])
                 for part in parts:
-                    if part.is_empty or part.area < 0.02:
+                    # 面积下限 0.02 平方度 ≈ 20×20 km：小雨团被整片丢掉，
+                    # 于是"图上有回波、判定里没有"。降到 0.004（≈6×6 km）。
+                    if part.is_empty or part.area < 0.004:
                         continue
                     coords = [[round(x, 3), round(y, 3)] for x, y in part.exterior.coords]
                     if len(coords) >= 4:
-                        kept.append(coords)
+                        kept.append((part.area, coords))
             except Exception:  # noqa: BLE001
                 continue
-        out[band] = kept[:45]
+        # 按面积降序取前 200：极端天气也不会把整片主雨带截掉（原先是 [:45] 顺序截断）
+        kept.sort(key=lambda item: item[0], reverse=True)
+        out[band] = [coords for _area, coords in kept[:200]]
     return out
 
 

@@ -248,7 +248,9 @@ const flightFC=computed(()=>fc((props.flights||[])
   .map(f=>({
   type:'Feature',
   properties:{
-    id:f.id,callsign:f.callsign,heading:f.heading||0,
+    id:f.id,callsign:f.callsign,
+    // icon-rotate 是顺时针、0 指北的"图上角"，用后端算好的屏幕角，别拿数学角硬塞
+    heading:(f.headingScreen!=null?f.headingScreen:-(f.heading||0)),
     // 绕飞用颜色标（琥珀），停飞/应急才换图标
     detour:f.status==='DELAYED'?1:0,
     detail:`${f.fromName} → ${f.toName} · ${f.decisionLabel}`,

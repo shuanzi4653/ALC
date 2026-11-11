@@ -83,6 +83,9 @@ const proj=computed(()=>{
   const k=Math.min(VIEW.w/w,VIEW.h/h)
   return {k,ox:(VIEW.w-w*k)/2,oy:(VIEW.h-h*k)/2,v,lon0:rad(v.lon0),lat1:merc(v.lat1)}
 })
+// 五角星（中心在原点，外接半径 6）：省会用，别拿它做别的标记
+const STAR='M0,-6 L1.76,-2.43 L5.71,-1.85 L2.85,0.94 L3.53,4.85 L0,2.9 L-3.53,4.85 L-2.85,0.94 L-5.71,-1.85 L-1.76,-2.43 Z'
+
 function project(lon,lat){
   const p=proj.value
   return [p.ox+(rad(lon)-p.lon0)*p.k, p.oy+(p.lat1-merc(lat))*p.k]
@@ -133,7 +136,7 @@ const radarRings=computed(()=>{
   if(!props.radarOn) return []
   const bands=props.data?.radar?.bands||{}
   const out=[]
-  for(const level of ['CONVECTIVE','STRONG']){
+  for(const level of ['WEAK','CONVECTIVE','STRONG']){
     for(const ring of bands[level]||[]){
       if(!ring||ring.length<3) continue
       let minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9
@@ -169,9 +172,9 @@ const fogPolys=computed(()=>{
   return out
 })
 
-// —— 净空层：287 个限制区 + 10 条跑道梯形（DERIVED，规则化生成） ——
-// 只有切到空域视角、或三维省/市层才取几何，取不到就返回空数组：
-// 空图层和"没有净空"是两回事，界面上另有 zoneErr 说明，不在这里编。
+// —— 禁飞区：287 个机场限制区 + 10 条跑道梯形（非气象） ——
+// 与气象禁飞（强回波轮廓）共用"红框"这一种标记：用户 2026-11-11 定"禁飞区就是红框"。
+// 取不到几何就返回空数组：空图层和"没有禁飞区"是两回事，界面上另有 zoneErr 说明。
 const zonePolys=computed(()=>{
   const bands=props.zoneBands
   if(!bands) return []
@@ -187,9 +190,20 @@ const zonePolys=computed(()=>{
         if(lon>=v.lon0-.4&&lon<=v.lon1+.4&&lat>=v.lat0-.4&&lat<=v.lat1+.4){hit=true;break}
       }
       if(!hit) continue
-      if(count>=160) break
+      if(count>=400) break
       count+=1
-      out.push({kind,d:toPath({type:'Polygon',coordinates:[ring]},project)})
+      const pts=ring.map(([lon,lat])=>project(lon,lat))
+      let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9
+      for(const [x,y] of pts){
+        if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y
+      }
+      const w=x1-x0,h=y1-y0
+      // 屏幕尺寸分流：287 个限制区在全国层大多只有 1–2 px，
+      // 全画成框就是一片红（实测把整张图盖住）。小于 9 px 一律退化成点，
+      // 放大/下钻后自然变回框 —— 与雷达环的处理同一套逻辑。
+      const small=Math.max(w,h)<9
+      out.push({kind,small,cx:(x0+x1)/2,cy:(y0+y1)/2,
+        d:small?null:toPath({type:'Polygon',coordinates:[ring]},project)})
     }
   }
   push(bands.LIMIT,'LIMIT')
@@ -395,8 +409,10 @@ const flightDots=computed(()=>{
     // （航路是弯的，直线插值在转弯段会明显错位）。
     if(adv>0&&Number.isFinite(lon)&&Number.isFinite(lat)&&f.speedKmh){
       const dKm=f.speedKmh*adv/60
+      // heading 是数学角（0=东，正=北）：sin 为正就是往北，纬度要加。
+      // 之前写成 `lat -=` —— 飞机被往反方向推，每次快照又拉回来，看着就是在原地抖。
       const h=(f.heading||0)*Math.PI/180
-      lat-=dKm*Math.sin(h)/110.574
+      lat+=dKm*Math.sin(h)/110.574
       lon+=dKm*Math.cos(h)/(111.32*Math.max(.2,Math.cos(lat*Math.PI/180)))
     }
     const [x,y]=project(lon,lat)
@@ -415,6 +431,35 @@ const flightDots=computed(()=>{
 // —— 选中的班次：把它那一条航线与起终点摊开 ——
 // 全国层平时不画航线，但"我点了这架，它从哪来到哪去"必须答得出来，
 // 所以这是唯一的例外：只为这一架画一条。
+// —— 悬停：不点也能看这一架是谁 ——
+// 用 clientX/clientY 定位一个 fixed 浮层，不去换算 SVG 坐标：
+// 换算要乘 pan/zoom，还要处理 viewBox 缩放，容易差几个像素，而这里只要"跟着鼠标"。
+const hover=ref(null)
+function hoverEnter(f,event){
+  hover.value={f, x:event.clientX, y:event.clientY}
+}
+function hoverMove(event){
+  if(hover.value){ hover.value.x=event.clientX; hover.value.y=event.clientY }
+}
+function hoverLeave(){ hover.value=null }
+// 模板里不能直接写 window（表达式作用域只有组件实例），算在 computed 里
+const tipFlip=computed(()=>!!hover.value&&hover.value.x>((typeof window!=='undefined'?window.innerWidth:1920)-260))
+
+// 常显的文字标签：全国层只给"值得看的几架"（选中/绕飞/高风险），
+// 下钻到大区及以下才全标 —— 106 行小字会把地图盖住，这是上一轮刚清理过的问题。
+const flightLabels=computed(()=>{
+  const all=flightDots.value.filter(f=>f.fade>.4)
+  const key=all.filter(f=>f.selected||f.detour||f.bad)
+  const list=level.value==='nation'?key.slice(0,12):all
+  const out=[]
+  for(const f of list){
+    // 简单避让：与已放置标签在 46×11 的盒内相交就跳过
+    if(out.some(p=>Math.abs(p.x-f.x)<46&&Math.abs(p.y-f.y)<11)) continue
+    out.push({id:f.id,x:f.x,y:f.y,text:`${f.callsign} · ${f.altM}m`,important:f.selected||f.detour||f.bad})
+  }
+  return out
+})
+
 const pickedFlight=computed(()=>flightDots.value.find(f=>f.selected)||null)
 const pickedLine=computed(()=>{
   const f=pickedFlight.value
@@ -573,25 +618,15 @@ function clickNode(node){
                preserveAspectRatio="none"/>
       </g>
 
-      <!-- 2 雷达：原始瓦片，边界就是像素边界；**按国界裁掉境外回波** -->
-      <g v-if="radarTiles.length" :opacity="virtualMode?1:.92" :clip-path="'url(#nmap-china-clip)'">
-        <image v-for="t in radarTiles" :key="'r'+t.key" :x="t.x" :y="t.y"
-               :width="t.size" :height="t.size" :href="t.href"
-               preserveAspectRatio="none"/>
-      </g>
-      <!-- 分档：屏幕上一眼能看出形状的环画等值线（外淡内实），小到只剩几个像素的直接填实 -->
+      <!-- 2 雷达：**只画矢量轮廓**，不再叠原始瓦片位图。
+           两套画法并存时，位图的像素块会和矢量边界互相打架，看着就是锯齿。
+           几何由后端做过闭运算平滑（radar_field._smooth），这里只负责上色。 -->
       <g v-if="radarRings.length" :clip-path="'url(#nmap-china-clip)'">
+        <!-- 回波：淡填充 + 清晰描边（专业雷达的读法：绿→黄→红）。
+             几何在后端已经做过闭运算平滑，这里描边才不会把台阶放大成锯齿。 -->
         <template v-for="(ring,index) in radarRings" :key="'rr'+index">
-          <path v-if="ring.small" :d="ring.d" stroke="none"
-                :fill="ring.level==='STRONG'?'rgba(238,72,60,.58)':'rgba(245,190,60,.42)'"/>
-          <template v-else>
-            <path :d="ring.d" fill="none"
-                  :stroke="ring.level==='STRONG'?'rgba(255,120,90,.30)':'rgba(245,190,60,.24)'"
-                  :stroke-width="virtualMode?5:3.4"/>
-            <path :d="ring.d" fill="none"
-                  :stroke="ring.level==='STRONG'?'rgba(255,150,110,.85)':'rgba(255,214,120,.70)'"
-                  :stroke-width="virtualMode?1.8:1.1"/>
-          </template>
+          <path :d="ring.d" :class="'echo-'+ring.level.toLowerCase()"
+                :style="{strokeWidth:(virtualMode?2.2:1.5)*inv}"/>
         </template>
       </g>
 
@@ -633,16 +668,14 @@ function clickNode(node){
 
       <!-- 3.8 净空（DERIVED）：空域视角下是主体，运行视角只在省/市层做底图 -->
       <g v-if="zonePolys.length" class="nmap-zones">
-        <path v-for="(zone,index) in zonePolys" :key="'z'+index" :d="zone.d"
-              :fill="zone.kind==='LIMIT'
-                ?(zonePolicy==='PROHIBITED'?'rgba(226,74,58,.20)':'rgba(245,190,60,.13)')
-                :'rgba(160,220,120,.15)'"
-              :stroke="zone.kind==='LIMIT'
-                ?(zonePolicy==='PROHIBITED'?'rgba(255,110,85,.85)':'rgba(245,200,90,.66)')
-                :'rgba(160,220,120,.55)'"
-              stroke-width=".65">
-          <title>{{ zone.kind==='LIMIT'?'机场净空限制区（规则化生成，非官方公布）':'跑道梯形净空（仅 10 站有跑道方位）' }}</title>
-        </path>
+        <template v-for="(zone,index) in zonePolys" :key="'z'+index">
+          <circle v-if="zone.small" class="no-fly-dot" :cx="zone.cx" :cy="zone.cy"
+                  :r="1.3*inv" :style="{opacity:level==='nation'?.55:.8}"/>
+          <path v-else :d="zone.d" class="no-fly-box"
+                :style="{strokeWidth:(level==='nation'?1.1:1.6)*inv, opacity:level==='nation'?.62:.9}">
+            <title>禁飞区：机场净空限制区（规则化生成，非官方公布）；跑道梯形仅 10 站有方位</title>
+          </path>
+        </template>
       </g>
 
       <!-- 4 建筑：城市体块。立体模式下才立起来，平面模式只留底影 -->
@@ -671,7 +704,9 @@ function clickNode(node){
               @click="!moved&&emit('select-corridor',line)"/>
         <path v-for="line in corridors.filter(l=>l.detour)" :key="'d'+line.id" :d="line.detour"
               :stroke="virtualMode?'rgba(255,214,120,1)':'var(--map-detour)'"
-              :stroke-width="lineWidth*(virtualMode?2.4:1.3)" class="hit"
+              class="hit detour-line"
+              :style="{strokeWidth:lineWidth*(virtualMode?2.4:1.3)}"
+              :stroke-dasharray="`${5*inv} ${3.5*inv}`"
               @click="!moved&&emit('select-corridor',line)"/>
       </g>
 
@@ -698,8 +733,11 @@ function clickNode(node){
             <circle :cx="node.x" :cy="node.y" :r="(node.rank===1?3:(node.rank===2?2:1))*inv"
                     :style="{fill: node.rank===3?'var(--map-node-dim)':'var(--map-node)',
                             stroke: node.rank===3?'none':'var(--map-node-stroke)'}" stroke-width=".55"/>
-            <circle v-if="node.capital" :cx="node.x" :cy="node.y" :r="5.8*inv" fill="none"
-                    stroke="rgba(186,218,255,.40)" stroke-width=".9"/>
+            <!-- 只有**北京**用红色五角星（用户 2026-11-11 定）；其余省会维持"点 + 浅环" -->
+            <path v-if="node.name==='北京市'" :d="STAR" class="cap-star"
+                  :transform="`translate(${node.x.toFixed(1)} ${node.y.toFixed(1)}) scale(${1.5*inv})`"/>
+            <circle v-else-if="node.capital" class="cap-ring" :cx="node.x" :cy="node.y"
+                    :r="5.4*inv" fill="none" stroke-width=".9"/>
             <circle v-if="node.weather&&node.weather.low" :cx="node.x" :cy="node.y" :r="4.8*inv"
                     fill="none" stroke="rgba(226,75,74,.92)" stroke-width="1"/>
           </template>
@@ -724,8 +762,9 @@ function clickNode(node){
       <g class="nmap-flights" :opacity="audience==='airspace'?.3:1">
         <g v-for="f in flightDots" :key="f.id"
            :opacity="f.fade*(f.selected||f.detour||f.bad?1:.82)"
-           :transform="`translate(${f.x.toFixed(1)} ${f.y.toFixed(1)}) rotate(${f.heading.toFixed(0)}) scale(${(f.selected?1:(level==='nation'?0.6:0.92))*inv})`"
-           @click.stop="!moved&&emit('select-flight',f)">
+           :transform="`translate(${f.x.toFixed(1)} ${f.y.toFixed(1)}) rotate(${(f.headingScreen!=null?f.headingScreen:-f.heading).toFixed(0)}) scale(${(f.selected?1.15:(level==='nation'?0.92:1.05))*inv})`"
+           @mouseenter="hoverEnter(f,$event)" @mousemove="hoverMove"
+           @mouseleave="hoverLeave" @click.stop="!moved&&emit('select-flight',f)">
           <circle v-if="f.selected" class="pick-halo" r="9" fill="none"
                   stroke="#8ef0ff" stroke-width="1.6"/>
           <circle v-if="f.selected" r="9" fill="none" stroke="#8ef0ff" stroke-width="1.4" filter="url(#glow)"/>
@@ -740,6 +779,14 @@ function clickNode(node){
           </template>
           <title>{{ f.callsign }} · {{ f.fromName }} → {{ f.toName }} · {{ f.altM }} m · {{ f.decisionLabel }}</title>
         </g>
+      </g>
+
+      <!-- 7.2 班次常显标签：编号 + 高度。速度与裁决放悬停，标签只保留能一眼读完的两段 -->
+      <g class="nmap-flight-labels" pointer-events="none">
+        <text v-for="row in flightLabels" :key="'fl'+row.id"
+              :x="row.x" :y="row.y-7*inv" :class="{key:row.important}"
+              :style="{fontSize:(7.6*inv)+'px'}"
+              text-anchor="middle">{{ row.text }}</text>
       </g>
 
       <!-- 7.5 选中班次的起终点：这是全图唯一会出现的"地名"。
@@ -770,6 +817,13 @@ function clickNode(node){
       </g>
     </g>
   </svg>
+  <div v-if="hover" class="nmap-tip" :style="{left:hover.x+'px', top:hover.y+'px'}"
+       :class="{flip:tipFlip}">
+    <b>{{ hover.f.callsign }}</b>
+    <span>{{ hover.f.fromName }} → {{ hover.f.toName }}</span>
+    <span>{{ hover.f.altM }} m · {{ hover.f.speedKmh }} km/h · 已飞 {{ Math.round((hover.f.progressNow||0)*100) }}%</span>
+    <span :class="hover.f.bad?'bad':''">{{ hover.f.decisionLabel }} · 风险 {{ hover.f.riskLevelLabel }}</span>
+  </div>
 </div>
 </template>
 
@@ -786,6 +840,39 @@ function clickNode(node){
 .nmap path.virt-alarm{filter:drop-shadow(0 0 4px rgba(255,90,60,.85))}
 .nmap .inset-lbl{font-size:7.5px;fill:rgba(170,205,230,.85)}
 .nmap .node-shadow{fill:rgba(8,20,32,.5)}
+.echo-weak{fill:rgba(74,189,134,.22);stroke:rgba(96,214,158,.55)}
+.echo-convective{fill:rgba(245,190,60,.40);stroke:rgba(255,206,90,.88)}
+.echo-strong{fill:rgba(232,60,48,.58);stroke:rgba(255,120,95,.95)}
+html[data-theme="light"] .echo-weak{fill:rgba(47,158,106,.18);stroke:rgba(31,122,80,.62)}
+html[data-theme="light"] .echo-convective{fill:rgba(214,148,10,.26);stroke:rgba(166,110,0,.82)}
+html[data-theme="light"] .echo-strong{fill:rgba(200,40,30,.34);stroke:rgba(176,26,18,.92)}
+.cap-star{fill:#ff4d4f;stroke:rgba(8,20,32,.85);stroke-width:.7;pointer-events:none}
+.cap-ring{stroke:rgba(186,218,255,.42);pointer-events:none}
+.no-fly-box{fill:rgba(224,49,49,.06);stroke:#e03131;pointer-events:none}
+.no-fly-dot{fill:#e03131;stroke:none;pointer-events:none;opacity:.34}
+html[data-theme="light"] .no-fly-dot{opacity:.26}
+html[data-theme="light"] .no-fly-box{fill:rgba(224,49,49,.05);stroke:#c92a2a}
+html[data-theme="light"] .cap-star{fill:#c92a2a;stroke:#ffffff}
+html[data-theme="light"] .cap-ring{stroke:rgba(40,90,130,.5)}
+.detour-line{stroke-opacity:.95}
+.nmap-flight-labels text{fill:#dff3ff;paint-order:stroke;stroke:rgba(3,12,20,.9);
+  stroke-width:2.2px;letter-spacing:.2px;opacity:.9}
+.nmap-flight-labels text.key{fill:#8ef0ff;opacity:1;font-weight:600}
+.nmap-tip{position:fixed;z-index:30;transform:translate(14px,14px);pointer-events:none;
+  min-width:170px;max-width:240px;padding:7px 9px;border-radius:7px;
+  background:rgba(8,22,34,.95);border:1px solid rgba(90,150,190,.55);
+  box-shadow:0 8px 22px -12px rgba(0,0,0,.9);font-size:11px;line-height:1.55;color:#cfe6f5}
+.nmap-tip.flip{transform:translate(-100%,14px);margin-left:-14px}
+.nmap-tip b{display:block;color:#eaf8ff;font-size:12px;letter-spacing:.4px}
+.nmap-tip span{display:block;color:#9fc0d6}
+.nmap-tip span.bad{color:#ff9c86}
+html[data-theme="light"] .nmap-tip{background:rgba(255,255,255,.97);border-color:#cfdcea;
+  box-shadow:0 8px 20px -12px rgba(20,50,80,.5);color:#3f5c76}
+html[data-theme="light"] .nmap-tip b{color:#0f3550}
+html[data-theme="light"] .nmap-tip span{color:#5b7a92}
+html[data-theme="light"] .nmap-tip span.bad{color:#c0392b}
+html[data-theme="light"] .nmap-flight-labels text{fill:#12314a;stroke:rgba(255,255,255,.95)}
+html[data-theme="light"] .nmap-flight-labels text.key{fill:#0b7ea6}
 .nmap .city{font-size:8.6px;fill:#dceefb;paint-order:stroke;stroke:rgba(4,12,20,.85);stroke-width:2.4px;pointer-events:none}
 
 /* 选中班次：已飞实线、未飞虚线；起终点用"环+点+地名"标出来 */
