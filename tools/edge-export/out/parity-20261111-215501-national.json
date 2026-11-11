@@ -1,0 +1,54 @@
+{
+ "generatedAt": "2026-11-11T21:55:01",
+ "cases": 1000,
+ "casesFile": "cases.csv",
+ "edgeSource": "edge_x86_log.txt",
+ "edgeHeader": {
+  "model": "alc-forest-v1 ml-v2-vis3k fp=7a7fc34a92babc78",
+  "check": "model=ml-v2-vis3k fp=7a7fc34a92babc78 trees=100 features=26 nodes=24111 leaves=24211 calib=92 bytes=509106 checks=OK",
+  "summary": "SUMMARY N=1000 SKIP=1 US_MIN=2.7 US_MAX=12.2 US_MEAN=4.0 CHECKSUM=557.520912"
+ },
+ "tolerance": 0.0001,
+ "deltaRaw": {
+  "max": 6.952852982244906e-07,
+  "mean": 2.509955706368888e-07,
+  "rms": 2.9194814830289313e-07,
+  "p50": 2.537826317289271e-07,
+  "p95": 4.870382565747011e-07,
+  "over": 0
+ },
+ "deltaCalibrated": {
+  "max": 1.6336749858181232e-05,
+  "mean": 4.638496325795605e-08,
+  "over": 0
+ },
+ "levelAgreement": {
+  "threshold": 0.3,
+  "agree": 1000,
+  "rate": 1.0,
+  "positivePy": 728,
+  "positiveEdge": 728
+ },
+ "pDistribution": {
+  "min": 0.03746482630993757,
+  "p50": 0.5478799201317448,
+  "p95": 0.9528255788585773,
+  "max": 0.9803860674708176,
+  "mean": 0.557520908124925
+ },
+ "timingEdgeUs": {
+  "min": 3.0,
+  "p50": 4.0,
+  "p95": 4.0,
+  "max": 12.0,
+  "mean": 3.933
+ },
+ "timingPythonUs": {
+  "min": 113.60000644344836,
+  "p50": 144.6999958716333,
+  "p95": 208.34999959333794,
+  "max": 584.0999947395176,
+  "mean": 152.36360003473237
+ },
+ "overTolerance": []
+}

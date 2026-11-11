@@ -303,12 +303,12 @@ function buildStyle(){
       {id:'fog-fill',type:'fill',source:'fog',paint:{
         'fill-color':['match',['get','band'],'BAN','rgba(228,242,255,.40)','rgba(198,224,246,.26)'],
         'fill-opacity':.9}},
+      // V1.0.4：与平面图同一套画法 —— 实心填充、不描边。
+      // features 按 WEAK→CONVECTIVE→STRONG 顺序入列，叠色后就是真实的嵌套结构；
+      // 描边层（radar-edge）已删除：三档各描一圈会变成等高线地图。
       {id:'radar-fill',type:'fill',source:'radar',paint:{
-        'fill-color':['match',['get','band'],'STRONG','#ee483c','CONVECTIVE','#f5be3c','#28be6e'],
-        'fill-opacity':['match',['get','band'],'STRONG',.46,'CONVECTIVE',.28,.14]}},
-      {id:'radar-edge',type:'line',source:'radar',paint:{
-        'line-color':['match',['get','band'],'STRONG','rgba(255,150,110,.7)','CONVECTIVE','rgba(255,214,120,.45)','rgba(60,210,140,.35)'],
-        'line-width':['match',['get','band'],'STRONG',1.1,.8],'line-opacity':.85}},
+        'fill-color':['match',['get','band'],'STRONG','#d93a2b','CONVECTIVE','#e8c33a','#2e9e5b'],
+        'fill-opacity':['match',['get','band'],'STRONG',.8,'CONVECTIVE',.66,.5]}},
       {id:'zone-wall',type:'fill-extrusion',source:'zones',paint:{
         'fill-extrusion-color':zoneColor,
         'fill-extrusion-height':['get','h'],'fill-extrusion-base':0,
@@ -743,38 +743,38 @@ const scaleNote=computed(()=>({
 <div class="nglobe">
   <div class="nglobe-map" ref="host"></div>
 
+  <!-- 底色/线色交给 CSS 类，不写死 rgba：写死以后浅色主题下这块就是"深色方块贴在白地图上" -->
   <svg class="nglobe-inset" :viewBox="`0 0 ${INSET.w} ${INSET.h}`" aria-label="南海诸岛">
-    <rect :width="INSET.w" :height="INSET.h" rx="4" fill="rgba(6,18,28,.72)"
-          stroke="rgba(120,165,205,.45)" stroke-width=".8"/>
+    <rect class="inset-bg" :width="INSET.w" :height="INSET.h" rx="4" stroke-width=".8"/>
     <path v-for="shape in insetShapes" :key="shape.key" :d="shape.d"
-          :fill="shape.boundary?'rgba(150,200,235,.6)':'rgba(96,132,170,.16)'"
-          :stroke="shape.boundary?'none':'rgba(120,165,205,.45)'" stroke-width=".6"/>
+          :class="shape.boundary?'inset-boundary':'inset-land'" stroke-width=".6"/>
     <text :x="6" :y="INSET.h-6" class="inset-lbl">南海诸岛</text>
   </svg>
 
   <div class="nglobe-tip" v-if="!ready&&!failed">三维视图初始化（首次约 2–4 秒）…</div>
   <div class="nglobe-tip bad" v-if="failed&&!ready">三维不可用：{{ failed }}（已可退回倾斜/平面视图）</div>
-  <div class="nglobe-note">
+  <div class="nglobe-note" :title="gpuLabel(gpu)">
     {{ levelLabel }} · 俯角 {{ Math.round(pitchNow) }}° 可旋转 · <template v-if="fpsNow">{{ fpsNow }} fps · </template>{{ scaleNote }}
     <template v-if="terrainOn"> · 地形 {{ demInfo }}</template>
   </div>
-  <div class="nglobe-gpu" :title="gpuLabel(gpu)">{{ gpuLabel(gpu) }}</div>
+
 </div>
 </template>
 
 <style scoped>
-.nglobe{position:absolute;inset:0;z-index:2;border-radius:10px;overflow:hidden;background:#04101a}
+.nglobe{position:absolute;inset:0;z-index:2;border-radius:10px;overflow:hidden;background:var(--nglobe-bg,#04101a)}
 .nglobe-map{position:absolute;inset:0}
 .nglobe-inset{position:absolute;right:8px;bottom:8px;width:132px;height:132px;pointer-events:none}
-.inset-lbl{font-size:8.5px;fill:rgba(170,205,230,.85)}
+/* 南海小图：深色主题是"暗底浅线"，浅色主题在 theme-light.css 里换成"白底蓝线" */
+.inset-bg{fill:var(--nglobe-inset-bg,rgba(6,18,28,.72));stroke:var(--nglobe-inset-line,rgba(120,165,205,.45))}
+.inset-land{fill:var(--nglobe-inset-land,rgba(96,132,170,.16));stroke:var(--nglobe-inset-line,rgba(120,165,205,.45))}
+.inset-boundary{fill:var(--nglobe-inset-edge,rgba(150,200,235,.6));stroke:none}
+.inset-lbl{font-size:8.5px;fill:var(--nglobe-inset-lbl,rgba(170,205,230,.85))}
 .nglobe-tip{position:absolute;left:10px;top:10px;font-size:11.5px;color:#9fc4da;
   background:rgba(8,22,34,.82);border:1px solid rgba(70,110,140,.45);border-radius:6px;padding:4px 9px}
 .nglobe-tip.bad{color:#ffb59f;border-color:rgba(200,90,60,.5)}
 .nglobe-note{position:absolute;left:10px;bottom:8px;right:150px;font-size:10.5px;color:#7d9cb3;
   background:rgba(6,16,25,.72);border-radius:5px;padding:2px 8px;pointer-events:none;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.nglobe-gpu{position:absolute;right:10px;top:10px;max-width:220px;font-size:10px;color:#6f92a8;
-  background:rgba(6,16,25,.7);border-radius:5px;padding:2px 7px;pointer-events:none;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .nglobe :deep(.nglobe-lbl){font-size:10.5px;color:#cbdfef;white-space:nowrap;pointer-events:none;
   text-shadow:0 0 3px rgba(3,10,18,.95),0 0 6px rgba(3,10,18,.8);letter-spacing:.3px}

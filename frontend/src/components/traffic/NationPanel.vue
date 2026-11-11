@@ -50,6 +50,21 @@ const trail=ref([{level:'nation',id:'',label:'全国'}])
 const data=ref(null)
 const view=ref(props.initialView||'map')
 const error=ref(''),loading=ref(false)
+// 首屏"到底是在转圈还是卡住了"：冷启动实测要 30 秒左右（进程刚起、雷达帧/319 城实况/模型概率
+// 都要联网算），只写一句"正在加载"会让人以为坏了。这里记开始时间，每秒更新一次已等待秒数。
+const loadingSince=ref(0)
+const waitedSeconds=ref(0)
+let waitTimer=0
+watch(loading,(on)=>{
+  clearInterval(waitTimer)
+  if(!on){ waitedSeconds.value=0; return }
+  loadingSince.value=Date.now()
+  waitedSeconds.value=0
+  waitTimer=setInterval(()=>{
+    waitedSeconds.value=Math.round((Date.now()-loadingSince.value)/1000)
+  },1000)
+})
+onUnmounted(()=>clearInterval(waitTimer))
 const busy=ref('')
 const evidence=ref(null)
 const evidenceBusy=ref(false)
@@ -114,7 +129,18 @@ const lineStats=computed(()=>{
   const pick=rows.filter(r=>(r.kind==='CROSS'&&lineKinds.value.cross)
     ||(r.kind==='AIRPORT_FEED'&&lineKinds.value.feed)
     ||(r.kind==='INTRA'&&lineKinds.value.intra))
-  return {total:rows.length,matched:pick.length,shown:Math.min(pick.length,Math.max(0,lineLimit.value))}
+  // 图上"在飞必画"：地图会把在飞班次所在的走廊并进显示集合（不管筛选与上限）。
+  // 这里的 shown 必须与地图同口径，否则按钮上写 291、图上却有 328 条。
+  const base=pick.slice().sort((a,b)=>(b.lengthKm||0)-(a.lengthKm||0))
+    .slice(0,Math.max(0,lineLimit.value))
+  const shown=new Set(base.map(r=>r.id))
+  const flying=new Set(flights.value.filter(f=>f.decision!=='HOLD').map(f=>f.corridor))
+  let forced=0
+  for(const row of rows){
+    if(shown.has(row.id)||!flying.has(row.id)) continue
+    shown.add(row.id);forced+=1
+  }
+  return {total:rows.length,matched:pick.length,shown:shown.size,forced}
 })
 const zoneBusy=ref(false)
 const zoneErr=ref('')
@@ -254,7 +280,13 @@ const alerts=computed(()=>data.value?.alerts||[])
 const intel=computed(()=>data.value?.intel||[])
 const upcoming=computed(()=>data.value?.upcoming||[])
 
+// 数字占位：载荷未到时显示"——"，而不是 0。0 是"算过，确实没有"，两者不能混。
+function num(v){ return data.value ? (v??0) : '—' }
+
 const headline=computed(()=>{
+  // 还没拿到本级载荷时**不能**输出"0 条航线 · 在飞 0 架"：
+  // 冷启动要等 30 秒左右，这行 0 会被读成"系统说全国没有航线"。
+  if(!data.value) return '正在读取本级航线网…'
   const t=total.value
   // 不再以"全国/华北"开头：面包屑上一行已经写明在哪一级，
   // 两行连着读会变成"全国 全国 492 条航线…"。这里只讲这一刻的数字。
@@ -289,6 +321,10 @@ function shortName(name){
     .replace(/(朝鲜族|蒙古族|藏族|苗族|侗族|彝族|哈尼族|壮族|傣族|白族|土家族|布依族|傈僳族|景颇族|羌族|回族|维吾尔族)$/,'')
 }
 
+// 这批 flights 数据"自己是哪一分钟"的（后端 payload.minute）。
+// 地图的本地推进以它为基准，不再以"请求的分钟"为基准 ——
+// 否则分钟一翻、新数据还在路上，adv 归零 → 飞机倒退一分钟再被弹回（V1.0.4 #5）。
+const flightsMinute=ref(-1)
 async function loadFlights(){
   const now=Date.now()
   if(now<fetchAt) return
@@ -300,6 +336,7 @@ async function loadFlights(){
       {timeoutMs:20000})
     if(my!==seq) return
     flights.value=payload.flights||[]
+    flightsMinute.value=Number.isFinite(payload.minute)?payload.minute:Math.round(minute.value)
     byProvince.value=payload.byProvince||{}
     byCity.value=payload.byCity||{}
     live.value={...live.value,...(payload.traffic||{})}
@@ -322,8 +359,18 @@ async function load(){
   try{
     data.value=await requestJson(
       `/api/traffic/v2/nation?level=${encodeURIComponent(level.value)}&id=${encodeURIComponent(ident.value)}&minute=${Math.round(minute.value)}${virtualWx.value?'&virtual=1':''}`,
-      {timeoutMs:45000})
+      // 冷启动实测 30 秒上下（进程刚起时的第一次全国载荷），45 秒的旧上限会把"正在预热"
+      // 直接判成失败；抬到 90 秒，并靠上面的"已等待 Ns"让人知道它还在动。
+      {timeoutMs:90000})
     flights.value=data.value?.flights||[]
+    flightsMinute.value=Number.isFinite(data.value?.minute)?data.value.minute:Math.round(minute.value)
+    // 层级以服务端为准：请求的是 city、后端兜底成 province 时，界面必须跟着回落，
+    // 不能一边显示"临沧市"的面包屑、一边给全省的数字与城市列表。
+    if(data.value?.level&&data.value.level!==level.value) level.value=data.value.level
+    const gotId=data.value?.id==null?'':String(data.value.id)
+    if(gotId!==ident.value&&['region','province','city'].includes(level.value)) ident.value=gotId
+    trail.value=trailFrom(data.value)
+    emitScope()
     live.value={...(data.value?.traffic||{})}
     byProvince.value={}
     byCity.value={}
@@ -333,15 +380,32 @@ async function load(){
   finally{loading.value=false}
 }
 
+// —— 面包屑 = 层级链，不是点击历史（V1.0.4）——
+// 以前 `go()` 把点击目标 append 到 trail 尾部：在市级点一下地图空白（底图多边形是背景）
+// 就会拼出「全国 › 临沧市 › 云南省」这种不存在的路径，页面还停在省口径 ——
+// 用户看到的是"我点了临沧，右边却在讲云南别的机场"。
+// 现在 trail 由**服务端返回的层级字段**重建（nation→region→province→city 恒为一条链），
+// 后端把 city 兜底成 province 时，链也自动只到省，不会多出一个假的市级。
+function trailFrom(d){
+  const chain=[{level:'nation',id:'',label:'全国'}]
+  if(!d) return chain
+  // 只认 payload 里**当前层级**的 province 字段。
+  // 不能拿 `provinces[0]` 兜底：大区层的 `provinces` 是"本区所有省"，
+  // 取第一个会把「华北」错拼成「全国›华北›北京市」（实测就是这样退不回去的）。
+  const prov=d.province||null
+  if(d.region&&d.region.name) chain.push({level:'region',id:d.region.id||'',label:d.region.name})
+  else if(prov&&prov.regionLabel) chain.push({level:'region',id:prov.region||'',label:prov.regionLabel})
+  if(prov&&prov.name) chain.push({level:'province',id:prov.name,label:prov.name})
+  if(d.level==='city'&&d.city&&d.city.name) chain.push({level:'city',id:d.city.name,label:d.city.name})
+  return chain
+}
 function go(nextLevel,nextId,nextLabel){
   level.value=nextLevel
   ident.value=nextId||''
-  if(nextLevel==='nation') trail.value=[{level:'nation',id:'',label:'全国'}]
-  else{
-    const cut=trail.value.findIndex(item=>item.level===nextLevel)
-    if(cut>=0) trail.value=trail.value.slice(0,cut)
-    trail.value=[...trail.value,{level:nextLevel,id:nextId||'',label:nextLabel||nextId}]
-  }
+  // 先把链改成"到目标为止"的合理前缀，等载荷回来再用 trailFrom 校正
+  const rank={nation:0,region:1,province:2,city:3}
+  const keep=trail.value.filter(item=>rank[item.level]<rank[nextLevel])
+  trail.value=[...keep,{level:nextLevel,id:nextId||'',label:nextLabel||nextId}]
   emitScope()
   load()
 }
@@ -364,7 +428,9 @@ function back(){
   load()
 }
 function drill(nextLevel,nextId,label){
-  if(nextLevel==='province'&&level.value==='province') return
+  // 市级是本项目最低一级：到了市，点底图多边形（它在市级只是背景）不应该往上跳。
+  // 以前会跳回省，还留下一条「全国›临沧市›云南省」的假路径。
+  if(nextLevel==='province'&&(level.value==='province'||level.value==='city')) return
   if(nextLevel==='city'&&level.value==='city') return
   go(nextLevel,nextId,label)
 }
@@ -559,6 +625,20 @@ const wxRows=computed(()=>{
   return rows.slice(0,level.value==='nation'?40:60)
 })
 const wxTotal=computed(()=>(data.value?.nodes||[]).filter(n=>n.weather).length)
+// 市级右栏只讲这一座城（V1.0.4，用户第 4 条）：
+// 省 / 机场 / 航线 / 在飞 / 相邻 + 该市自己的实况 + 与它相连的走廊。
+// 以前这一屏会退回"本省城市 13 个节点"，用户点了临沧却在读云南别的机场。
+const cityCard=computed(()=>{
+  if(level.value!=='city') return null
+  const c=data.value?.city
+  if(!c||!c.name) return null
+  const wx=wxRows.value.find(row=>row.name===c.name)||null
+  const lines=(data.value?.corridors||[]).map(row=>({
+    id:row.id,fromName:row.fromName,toName:row.toName,lengthKm:row.lengthKm,
+    kindLabel:row.kindLabel||'',blocked:!!row.borderBlocked,detour:!!row.detour,
+  }))
+  return {city:c,wx,lines}
+})
 // 实况从哪来、是不是旧的、是不是还在补 —— "0/0" 必须能解释成"补数中"而不是"没有"
 const weatherMeta=computed(()=>data.value?.weatherMeta||{})
 const wxRefreshing=computed(()=>!!weatherMeta.value.refreshing)
@@ -698,9 +778,9 @@ onUnmounted(()=>{
     </div>
     <p class="nrn-headline" data-nation-headline>{{ headline }}</p>
     <p class="nrn-sub">
-      纳入 <b>{{ summary.provinces }}</b> 省 · <b>{{ summary.cities }}</b> 市 ·
-      <b>{{ summary.airports }}</b> 机场 · <b>{{ summary.feedCities }}</b> 市无机场（专用接驳）·
-      <b>{{ summary.weatherCities }}</b> 市有实况
+      纳入 <b>{{ num(summary.provinces) }}</b> 省 · <b>{{ num(summary.cities) }}</b> 市 ·
+      <b>{{ num(summary.airports) }}</b> 机场 · <b>{{ num(summary.feedCities) }}</b> 市无机场（专用接驳）·
+      <b>{{ num(summary.weatherCities) }}</b> 市有实况
       <!-- 演示包必须自带角标：合成回波看起来和实况一模一样，
            不在页头挂一个"虚拟"，任何人截图出去都会当成真实天气。 -->
       <em class="nrn-virt" v-if="wxVirtual" data-virtual-badge>
@@ -718,7 +798,14 @@ onUnmounted(()=>{
 
   <!-- 推演页的"立题"行：先选对象，再看链路。不给选择器的话，
        这一页只能靠在地图上盲点，点不中就什么都没发生。 -->
-  <p class="nrn-state" v-if="loading">正在加载本级数据…</p>
+  <p class="nrn-state" v-if="loading">
+    <template v-if="waitedSeconds<4">正在加载本级数据…</template>
+    <template v-else>
+      正在预热 <b>{{ waitedSeconds }}s</b> —— 服务刚启动时要把雷达回波、逐市实况与概率算完，
+      首次通常 30 秒左右；算完这一次之后都是秒开。
+      <button v-if="waitedSeconds>=60" @click="load">仍要重试</button>
+    </template>
+  </p>
   <p class="nrn-state bad" v-else-if="error">本级不可用 · {{ error }}<button @click="load">重试</button></p>
 
   <!-- 注意：这两条必须是**各自独立**的 v-if。
@@ -753,7 +840,7 @@ onUnmounted(()=>{
           回波<em v-if="echoStats.keptRings" class="nrn-cnt">{{ echoStats.keptRings }}</em></button>
         <button :class="{on:fogOn}" @click="fogOn=!fogOn" :disabled="!fog.available">雾区</button>
         <button :class="{on:lineStats.shown>0}" @click="linePanel=!linePanel"
-                :title="'显示哪些航线：跨省主干 / 机场接驳 / 省内短途；条数可以自己拖'">
+                :title="`显示哪些航线：跨省主干 / 机场接驳 / 省内短途；条数可以自己拖${lineStats.forced?`。其中 ${lineStats.forced} 条因为此刻有班次在飞而强制显示`:''}`">
           航线 {{ lineStats.shown }}/{{ lineStats.total }}</button>
         <button :class="{on:virtualWx}" @click="toggleVirtual"
                 :title="'虚拟气象演示包：在后端生成合成回波，并按同一套判定重算绕飞与停飞；非实况'">
@@ -787,7 +874,7 @@ onUnmounted(()=>{
                  v-model.number="lineLimit" aria-label="航线显示条数"/>
           <b>{{ lineStats.shown }}</b>
         </div>
-        <p class="nrn-linehint">按航程从长到短截取：只开 50 条时看到的是骨架，不是随机 50 条。</p>
+        <p class="nrn-linehint">按航程从长到短截取：只开 50 条时看到的是骨架，不是随机 50 条。<template v-if="lineStats.forced">另有 <b>{{ lineStats.forced }}</b> 条因为此刻有班次在飞而强制显示 —— 天上出现一架飞机，它脚下就必须有那条走廊。</template></p>
         <button class="nrn-lineall" @click="lineLimit=0">全部关闭</button>
       </div>
 
@@ -806,7 +893,7 @@ onUnmounted(()=>{
                    @drill="drill" @select-flight="pickFlight" @select-corridor="pickCorridor"
                    @degrade="onGlobeDegrade" @unsupported="onGlobeUnsupported" @fps="onGlobeFps"/>
       <NationMap v-else ref="mapRef" :data="data" :flights="flights" :minute="minute"
-                 :frame-minute="frameMinute"
+                 :frame-minute="frameMinute" :data-minute="flightsMinute"
                  :radar-on="radarOn" :fog-on="fogOn" :terrain-on="terrainOn" :tilt="tilt"
                  :density="density" :virtual-mode="virtualMode" :audience="audience"
                  :zone-bands="zoneOn&&zoneGeom?zoneGeom.bands:null"
@@ -840,6 +927,9 @@ onUnmounted(()=>{
         </span>
         <i class="star"></i>北京
         <i class="dot"></i>城市
+        <!-- V1.0.4：城市点外面那圈红环以前在图上没有任何出处，用户直接问"这是什么"。
+             现在进图例，措辞与顶部结论条的"低能见 N 城"同一口径。 -->
+        <i class="ring"></i>低能见城市
         <i class="line"></i>航线
         <i class="line warn"></i>绕飞
         <i class="box"></i>{{ level==='province'||level==='city' ? '禁飞区' : '禁飞区（下钻可见）' }}
@@ -953,6 +1043,18 @@ onUnmounted(()=>{
             <p><span>航线</span><b>{{ data.city?.links }} 条</b></p>
             <p><span>在飞</span><b>{{ data.city?.airborne }}</b></p>
             <p><span>相邻</span><b>{{ (data.city?.neighbours||[]).map(shortName).join('、') }}</b></p>
+            <p v-if="cityCard?.wx"><span>低能见概率</span><b :class="{warn:(cityCard.wx.p||0)>=.35}">{{ cityCard.wx.p==null?'—':(cityCard.wx.p*100).toFixed(0)+'%' }}</b></p>
+            <p v-if="cityCard?.wx"><span>实况</span><b>{{ cityCard.wx.temp==null?'—':cityCard.wx.temp+'°' }} · {{ cityCard.wx.wind==null?'—':cityCard.wx.wind+' m/s' }} · 能见 {{ visText(cityCard.wx.vis) }}</b></p>
+          </div>
+          <!-- 市级是本项目最低一级：这一屏只讲这一座城，不列本省别的机场。
+               与它相连的走廊在这里可以直接点开（落到走廊页做推演/裁决）。 -->
+          <div class="nrn-city-lines" v-if="cityCard?.lines?.length">
+            <button v-for="row in cityCard.lines" :key="row.id" :data-city-corridor="row.id"
+                    :title="`${row.kindLabel||'航线'} · ${row.lengthKm} km · 点开这条走廊`"
+                    @click="emit('open-corridor',{corridor:row.id})">
+              <b>{{ shortName(row.fromName) }} ↔ {{ shortName(row.toName) }}</b>
+              <span>{{ row.lengthKm }} km<template v-if="row.detour"> · 绕飞</template><template v-if="row.blocked"> · 停飞</template></span>
+            </button>
           </div>
         </template>
       </div>
@@ -1236,6 +1338,8 @@ html[data-theme="light"] .nrn-lineall{background:#f2f7fc;border-color:#cfdcea;co
   background:rgba(8,18,28,.86);border-radius:6px;padding:3px 8px;pointer-events:none}
 .nrn-legend i{display:inline-block;width:14px;height:2px;background:var(--map-corridor);margin-right:4px;vertical-align:middle}
 .nrn-legend i.dot{width:6px;height:6px;border-radius:50%;background:#eaf6ff}
+.nrn-legend i.ring{width:8px;height:8px;border-radius:50%;background:transparent;
+  border:1.5px solid rgba(226,75,74,.92)}
 .nrn-legend i.warn{background:rgba(255,206,90,.9)}
 .nrn-legend i.bad{background:rgba(226,92,74,.75)}
 .nrn-legend i.emergency{background:#ff3b30}
@@ -1254,8 +1358,12 @@ html[data-theme="light"] .nrn-legend i.box{border-color:#c92a2a}
 /* 空域视角侧栏 */
 .nrn-zone{border:1px solid rgba(120,150,90,.35);border-radius:8px;background:rgba(18,34,22,.55);
   padding:6px 8px;display:flex;flex-direction:column;gap:2px;max-height:38%;min-height:0;overflow:auto}
-.nrn-zone h4{margin:0 0 3px;font-size:11.5px;color:#cfe6b5;display:flex;gap:6px;align-items:baseline}
-.nrn-zone h4 small{font-size:10px;color:#8a9c72;font-weight:400}
+/* 标题 + 一句副标在同一行：1366 下侧栏只有 400 宽，
+   "规则化生成 · 可申请穿越" 会被挤出面板（右边缘直接裁掉）。
+   允许换行，宁可占两行，也不要半句。 */
+.nrn-zone h4{margin:0 0 3px;font-size:11.5px;color:#cfe6b5;display:flex;gap:6px;
+  align-items:baseline;flex-wrap:wrap;line-height:1.45}
+.nrn-zone h4 small{font-size:10px;color:#8a9c72;font-weight:400;white-space:normal;min-width:0}
 .nrn-zone p{margin:1px 0;display:grid;grid-template-columns:64px 1fr;gap:6px;font-size:11px}
 .nrn-zone p>span{color:#8a9c72}
 .nrn-zone p>b{font-weight:400;color:#dbeccb;font-variant-numeric:tabular-nums}
@@ -1363,6 +1471,15 @@ html[data-theme="light"] .nrn-legend i.box{border-color:#c92a2a}
 .nrn-city-detail p{margin:0;display:grid;grid-template-columns:48px 1fr;gap:6px}
 .nrn-city-detail span{color:#7d9cb3}
 .nrn-city-detail b{font-weight:500;color:#d9eefb}
+.nrn-city-detail b.warn{color:#ffb59a}
+/* 市级最低一级：右栏只讲这一座城，下面挂上"与它相连的这几条走廊"，点一条就去推演 */
+.nrn-city-lines{display:flex;flex-direction:column;gap:3px;margin-top:6px}
+.nrn-city-lines button{display:flex;justify-content:space-between;gap:8px;align-items:baseline;
+  text-align:left;padding:5px 8px;border-radius:6px;border:1px solid rgba(70,110,140,.3);
+  background:rgba(12,38,54,.5);color:#cfe6f5;font-size:11.5px;cursor:pointer}
+.nrn-city-lines button:hover{background:rgba(89,223,252,.12);border-color:rgba(89,223,252,.35)}
+.nrn-city-lines button b{font-weight:500;color:#e6f8ff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nrn-city-lines button span{font-size:10.5px;color:#7d9cb3;flex:0 0 auto}
 
 .nrn-table{display:flex;flex-direction:column;gap:8px;min-height:0}
 .nrn-table-hd h3{margin:0;font-size:13px;color:#eaf6ff}
@@ -1457,7 +1574,17 @@ html[data-theme="light"] .nrn-alert-go{color:#0b7ea6}
 .ev-note{margin:6px 0 0;font-size:10.5px;color:#ffcf7a;line-height:1.6}
 .ev-note.quiet{color:#6f92a8}
 .ev-err{color:#ffa08a;font-size:11px}
-.nrn-state{margin:6px 0;color:#8fb2c8;font-size:12px}
+.nrn-state{margin:6px 0;color:#8fb2c8;font-size:12px;line-height:1.6;
+  background:rgba(14,32,48,.6);border:1px solid rgba(70,110,140,.35);
+  border-left:3px solid #59dffc;border-radius:0 6px 6px 0;padding:6px 10px;max-width:760px}
+.nrn-state::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;
+  background:#59dffc;margin-right:7px;vertical-align:middle;animation:nrn-pulse 1.1s ease-in-out infinite}
+@keyframes nrn-pulse{0%,100%{opacity:.25}50%{opacity:1}}
+.nrn-state b{color:#cfe6f5;font-weight:500;font-variant-numeric:tabular-nums}
+html[data-theme="light"] .nrn-state{color:#31556f !important;background:#fff !important;
+  border-color:#dbe6f1 !important;border-left-color:#2a7fb8 !important}
+html[data-theme="light"] .nrn-state::before{background:#2a7fb8}
+html[data-theme="light"] .nrn-state b{color:#14567d !important}
 .nrn-state.bad{color:#ffa08a}
 .nrn-state button{margin-left:8px;background:#17394d;border:1px solid #2e6b85;color:#bfe9ff;border-radius:5px;padding:2px 8px;cursor:pointer}
 

@@ -615,7 +615,11 @@ onUnmounted(()=>{
   <div class="wb-shell">
   <nav class="operations-nav" :class="{'rail-collapsed':railCollapsed}" data-nav-groups>
     <div class="nav-groups"><button v-for="group in NAV_GROUPS" :key="group.key" :data-group="group.key" class="nav-group" :class="{active:activeGroup?.key===group.key}" @click="gotoGroup(group.key)"><em>{{ group.no }}</em>{{ group.label }}</button></div>
-    <div class="nav-subs" v-if="activeGroup" :data-group="activeGroup.key"><template v-for="group in NAV_GROUPS" :key="group.key"><button v-for="sub in visibleSubs(group)" :key="sub.key" :data-section="sub.key" v-show="group.key===activeGroup?.key" :class="{active:entryKey===sub.key,'group-active':entryKey===sub.key&&sub.merged}" @click="activeSection=sub.key">{{ sub.label }}</button></template><template v-if="entryTabList.length"><span class="nav-tab-sep" aria-hidden="true">|</span><button v-for="tab in entryTabList" :key="tab.key" class="nav-entry-tab" :data-entry-tab="tab.key" :class="{active:activeSection===tab.key}" @click="activeSection=tab.key">{{ tab.label }}</button></template></div>
+    <!-- 点亮规则只有一条：**当前页是谁就亮谁**（V1.0.4）。
+         以前用 `entryKey===sub.key` —— 那是"入口"，不是"当前页"，
+         于是「推演」和页内「口径与来源」同时亮、点完也不灭。
+         合并入口在"当前页是它的兄弟 tab"时只保留"你在这个入口里"的弱标识（entry-context）。 -->
+    <div class="nav-subs" v-if="activeGroup" :data-group="activeGroup.key"><template v-for="group in NAV_GROUPS" :key="group.key"><button v-for="sub in visibleSubs(group)" :key="sub.key" :data-section="sub.key" v-show="group.key===activeGroup?.key" :class="{active:activeSection===sub.key, 'entry-context':sub.merged&&entryKey===sub.key&&activeSection!==sub.key}" @click="activeSection=sub.key">{{ sub.label }}</button></template><template v-if="entryTabList.length"><span class="nav-tab-sep" aria-hidden="true">|</span><button v-for="tab in entryTabList" :key="tab.key" class="nav-entry-tab" :data-entry-tab="tab.key" :class="{active:activeSection===tab.key}" @click="activeSection=tab.key">{{ tab.label }}</button></template></div>
     <div class="nav-fill">
       <!-- 这个下拉只对东北那套（session/network）有效；全国台用 scope 下钻，
          把它挂在首页会显示"东北三省 · 全域"，让人以为全国页还是东北的。 -->
@@ -635,8 +639,10 @@ onUnmounted(()=>{
 
   <!-- V1.0.2：首页就是全国四级态势（全国 → 大区 → 省 → 市）。
        `national` 是旧地址，applyHash 已把它归到 home，这里一并渲染同一组件，
-       所以不存在"两套全国页"。东北那张 maplibre 运行图（HomeStage）
-       不再当首屏 —— 它会以四级通用的形式在三维里回来（T19）。 -->
+       所以不存在"两套全国页"。旧的首屏组件 `HomeStage.vue`（东北 maplibre 运行图）
+       在 9aafd7f 之后**已经没有任何地方引用**，只剩测试还在读它的源码；
+       三维能力以 NationGlobe.vue 的形式回来了。是否删除 HomeStage 取决于要不要
+       保留那批只针对它的用例（删了用例数会从 506 掉下来，材料里的数字要跟着改）。 -->
   <section class="traffic-page national-page" v-if="activeSection==='home'||activeSection==='national'">
     <!-- 首页这一份也要接 open-corridor：处置事件在首页的「处置」页签里点开，
          没有这个监听就只会原地不动（实测点了没反应）。 -->
@@ -741,10 +747,13 @@ onUnmounted(()=>{
 </template>
 <style scoped>
 .traffic-page{display:flex;flex-direction:column;padding:14px 20px 16px;min-height:0}
-/* 全国台是一屏运行台，不是一段可滚的长文：占满可视高度，内部各自滚动 */
-.traffic-page.national-page{padding:10px 16px 12px;min-height:0;height:calc(100vh - 168px)}
-/* 全国范围的民航情报 / 调度台账：和全国台同样的"一屏"高度 */
-.traffic-page.scope-page{padding:10px 16px 12px;min-height:0;height:calc(100vh - 168px)}
+/* 全国台是一屏运行台，不是一段可滚的长文：占满可视高度，内部各自滚动。
+   以前写死 `calc(100vh - 168px)` —— 168 是旧版"顶部栏 + 二级 tab"两层的估计值，
+   现在二级 tab 并进了左侧导航，实际只剩顶部栏（约 70px），于是每屏底部空出 80–100px，
+   1366×768 下地图被白压一圈。改成 flex 填满：父级 .wb-body 已是 flex 列，不需要再估高度。 */
+.traffic-page.national-page,
+.traffic-page.scope-page{padding:10px 16px 12px;min-height:0;
+  flex:1 1 auto;height:auto;min-height:min(560px,calc(100vh - 96px))}
 .scope-body{flex:1;min-height:0;display:flex;flex-direction:column}
 .scope-bar{display:flex;align-items:center;gap:8px;padding:0 2px 8px;font-size:12px;color:#82a6bd}
 .scope-bar b{font-size:13px;color:#eaf6ff;font-weight:600}
@@ -906,7 +915,6 @@ onUnmounted(()=>{
 .traffic-workbench>*{flex:none}
 .traffic-workbench.home-mode{padding:10px 12px 12px}
 .traffic-workbench.home-mode .traffic-header,.traffic-workbench.home-mode .traffic-summary{display:none}
-.traffic-workbench.home-mode .hstage-wrap{flex:1 1 auto;min-height:0}
 .traffic-workbench .traffic-main{flex:1 1 auto;grid-template-rows:minmax(0,1fr);min-height:620px}
 .traffic-workbench.map-expanded .traffic-main{grid-template-columns:minmax(0,1fr)!important;min-height:460px}
 .traffic-workbench.map-expanded .traffic-detail{display:none}
@@ -960,11 +968,13 @@ onUnmounted(()=>{
 .nav-subs button{padding:5px 12px;border-radius:6px;border:1px solid transparent;background:transparent;color:#93a4bc;font-size:13px;cursor:pointer}
 .nav-subs button:hover{background:rgba(147,164,188,.10);color:#dce6f5}
 .nav-subs button.active{background:rgba(76,141,255,.16);border-color:rgba(76,141,255,.5);color:#ffffff}
-/* 多成员入口（处置/推演/运行总览）的左侧按钮只表示「你在这个分组」，不是「当前页面」。
-   真正的当前视图由页内 tab 表达。用左侧竖条 + 浅字，不再实心高亮 ——
-   否则「处置」和页内「调度台账」会同时亮，看着像前者没暗下去。 */
-.nav-subs button.active.group-active{background:transparent;border-color:transparent;
-  color:#dce6f5;box-shadow:inset 2px 0 0 rgba(76,141,255,.75);border-radius:4px 6px 6px 4px}
+/* 多成员入口（处置/推演/运行总览）的按钮在"当前页是它的兄弟 tab"时只表示
+   「你在这个分组里」，不是「当前页面」——真正的当前视图由页内 tab 表达。
+   V1.0.4：这条规则以前叫 group-active，且被后面 `.nav-subs button.active` 覆盖，
+   于是入口和 tab 一起亮、点完不灭。现在改成独立的 entry-context 类，
+   与 active 互斥，不再靠"同特异性抢顺序"。 */
+.nav-subs button.entry-context{background:transparent;border-color:transparent;
+  color:#a8bdd0;box-shadow:inset 2px 0 0 rgba(76,141,255,.55);border-radius:4px 6px 6px 4px}
 
 .nav-tab-sep{color:#2f4257;margin:0 2px;font-size:12px;user-select:none}
 .nav-entry-tab{padding:4px 10px;border-radius:5px;border:1px solid transparent;
@@ -1118,6 +1128,13 @@ onUnmounted(()=>{
   background:rgba(89,223,252,.13)!important;border-color:rgba(89,223,252,.26)!important;color:#eaf8ff!important}
 .traffic-workbench .operations-nav .nav-subs button.active::before{
   background:#59dffc;box-shadow:0 0 7px rgba(89,223,252,.85)}
+/* 入口上下文：不点亮，只让那个圆点比常态亮一点（连左侧竖条也不给，
+   否则看起来仍像"第二盏灯"）。 */
+.traffic-workbench .operations-nav .nav-subs button.entry-context{
+  background:transparent!important;border-color:transparent!important;box-shadow:none!important;
+  color:#93aebf!important}
+.traffic-workbench .operations-nav .nav-subs button.entry-context::before{
+  background:rgba(89,223,252,.55)}
 
 .traffic-workbench .operations-nav .nav-fill{
   border-top:1px solid rgba(255,255,255,.08);padding-top:10px;gap:5px}

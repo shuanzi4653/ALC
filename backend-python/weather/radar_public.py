@@ -43,6 +43,10 @@ SIMPLIFY_DEG = 0.008
 # 闭运算半径：先外扩再回缩，把格子拼出来的直角磨成圆弧（≈3.2 km）
 SMOOTH_DEG = 0.042
 ALPHA_FLOOR = 40
+# 三档的累计阈值（V1.0.4）：WEAK=全部回波，CONVECTIVE=中强以上，STRONG=强回波。
+# 语义从"每格归一个档"改成"每格过一个阈值"，三档因此**天然嵌套**，
+# 前端按 绿→黄→红 叠色就是真实雷达的洋葱结构。
+BAND_RANK = {'WEAK': 1, 'CONVECTIVE': 2, 'STRONG': 3}
 TTL_SECONDS = 600.0
 TIMEOUT_SECONDS = 20.0
 USER_AGENT = 'ALC-tianchuang/1.0.1 (radar echo; contact: project maintainer)'
@@ -265,7 +269,9 @@ def fetch(force: bool = False) -> Dict[str, Any]:
         return _empty(f'取帧失败：{str(exc)[:90]}')
 
     stamp = datetime.fromtimestamp(frame['time'], tz=timezone.utc).strftime('%Y%m%d%H%M')
-    cache_file = CACHE_DIR / f'{stamp}-z{TILE_ZOOM}-g{GRID_DEG}-geo4.json'
+    # 缓存键带几何版本号：改了分级口径（-geo5：累计掩膜）就必须换键，
+    # 否则还在读上一版"互斥三档"的旧缓存，改了等于没改。
+    cache_file = CACHE_DIR / f'{stamp}-z{TILE_ZOOM}-g{GRID_DEG}-geo5.json'
     if cache_file.exists() and not force:
         try:
             cached = json.loads(cache_file.read_text(encoding='utf-8'))
@@ -307,9 +313,7 @@ def fetch(force: bool = False) -> Dict[str, Any]:
                 cells[band].append((lon, lat))
 
     # 先补栅格孔洞，再成环：一片雨就应该是一个环，而不是一片雨加几百个洞。
-    closed_cells = {band: _close_cells(rows) for band, rows in cells.items()}
-    bands = {band: _rings_of(rows) for band, rows in closed_cells.items()}
-    total_cells = sum(len(rows) for rows in cells.values())
+    bands, total_cells = bands_from_cells(cells)
     value = {
         'available': True,
         'source': '公开雷达拼图（RainViewer 公共接口，免密钥；瓦片为墨卡托，像素直接反算经纬度）',
@@ -334,6 +338,31 @@ def fetch(force: bool = False) -> Dict[str, Any]:
     with _lock:
         _memory.update({'value': value, 'expires': now + TTL_SECONDS})
     return value
+
+
+def bands_from_cells(cells: Dict[str, List[Tuple[float, float]]]):
+    """三档环 + 有效栅格数。**累计掩膜**，不是"每格只归一个档"（V1.0.4）。
+
+    以前三档互斥，画出来是红、黄、绿三片并排相邻；真实雷达的强度分级是嵌套的
+    （红核一定在黄里、黄一定在绿里）。互斥几何无论怎么调色都不像雷达 ——
+    这是"看起来不像回波图"的根因，不是配色问题。
+
+    现在 WEAK=全部回波、CONVECTIVE=中强以上、STRONG=强回波，
+    前端按 绿→黄→红 叠色就得到真实回波的"洋葱"结构。
+    返回 ``(bands, total_cells)``：total_cells 是去重后的有效栅格数，
+    用于覆盖率的分子（以前是把三档相加，互斥时等价，累计后会重复计数）。
+    """
+    ranked: Dict[Tuple[float, float], int] = {}
+    for band, rows in cells.items():
+        rank = BAND_RANK[band]
+        for cell in rows:
+            if ranked.get(cell, 0) < rank:
+                ranked[cell] = rank
+    bands: Dict[str, List[Any]] = {}
+    for band, need in BAND_RANK.items():
+        rows = [cell for cell, rank in ranked.items() if rank >= need]
+        bands[band] = _rings_of(_close_cells(rows)) if rows else []
+    return bands, len(ranked)
 
 
 def _bbox_area(bbox: Tuple[float, float, float, float]) -> float:

@@ -16,6 +16,11 @@ const props=defineProps({
   // 本地连续时刻（浮点分钟）。播放时它比 minute 大零点几分钟，用来把"每分钟一跳"
   // 的班次位置补成连续移动；不播放时等于 minute（-1 表示不启用本地推进）。
   frameMinute:{type:Number,default:-1},
+  // 当前 flights 数组**自己对应的分钟**（后端回传的 payload.minute）。
+  // V1.0.4：以前推进量按 `minute` 算，而 minute 是"请求的分钟"，比数据早一拍 ——
+  // 分钟一翻、新数据还没到，advanceMin 就归零，飞机先倒退一分钟再被弹回来（录屏抖动）。
+  // 以数据自己的时刻为基准，advanceMin 才会跨分钟连续。
+  dataMinute:{type:Number,default:-1},
   radarOn:{type:Boolean,default:true},
   fogOn:{type:Boolean,default:true},
   terrainOn:{type:Boolean,default:true},
@@ -306,23 +311,29 @@ const insetShapes=computed(()=>{
 })
 
 // —— 航线 ——
-function arcPoints(a,b,bulgeIn){
-  const dx=b[0]-a[0],dy=b[1]-a[1]
-  const len=Math.hypot(dx,dy)
-  if(len<10) return [a,b]
-  const bulge=(bulgeIn===undefined||bulgeIn===null)?0.02:bulgeIn
-  const mx=(a[0]+b[0])/2,my=(a[1]+b[1])/2
-  let px=-dy/len,py=dx/len
-  if(py>0){px=-px;py=-py}
-  const cx=mx+px*len*bulge,cy=my+py*len*bulge
-  const steps=Math.max(20,Math.min(80,Math.round(len/4)))
-  const pts=[]
-  for(let i=0;i<=steps;i++){
-    const t=i/steps,u=1-t
-    pts.push([u*u*a[0]+2*u*t*cx+t*t*b[0],u*u*a[1]+2*u*t*cy+t*t*b[1]])
-  }
-  return pts
+// 走廊几何**只有一个来源：后端给的 path**。两点就是直线（后端 NationBasis 的约定：
+// "两点直飞不重复传 path，前端用两端点"）。
+//
+// V1.0.4 删掉了这里原来的 `arcPoints(...)` 造弧：492 条走廊里 484 条只有端点，
+// 前端按 bulge 画成二次弧，而后端 `flight_objects` 是按弦插值的 ——
+// 画的是弯线、飞机走的是直线，越放大偏得越远（用户第 6 条：走廊和飞行汽车不匹配）。
+// 现在的铁律：屏幕上这一条线，就是飞机脚下那一条线。
+function linePath(row){
+  const path=row?.path
+  if(path&&path.length>1) return path
+  if(row?.fromLonLat&&row?.toLonLat) return [row.fromLonLat,row.toLonLat]
+  return null
 }
+// 在飞班次所在的走廊：这些线不受"三档筛选 / 条数上限"约束。
+// 否则省内短途（INTRA 默认关）上的 37 架会变成"凭空出现的小箭头"。
+const flyingCorridorIds=computed(()=>{
+  const out=new Set()
+  for(const f of props.flights||[]){
+    if(f.decision==='HOLD') continue
+    if(f.corridor) out.add(f.corridor)
+  }
+  return out
+})
 // 显示条数决定线宽与透明度：开得越多，单条越轻，避免"开全部就糊成蜘蛛网"
 const lineStyle=computed(()=>{
   const n=props.lineLimit
@@ -338,9 +349,8 @@ const lineWidth=computed(()=>lineStyle.value.w)
 // 一条走廊 → 可渲染的形状。抽成函数是因为"走廊页只画一条"要复用它：
 // 之前 solo 分支想直接 map 一个新对象，字段一缺就画不出来（箭头/绕飞全丢）。
 function toLineShape(row){
-  const path=row.path&&row.path.length>1?row.path:[row.fromLonLat,row.toLonLat]
-  const coords=path.map(([lon,lat])=>project(lon,lat))
-  const points=coords.length===2?arcPoints(coords[0],coords[1],row.bulge):coords
+  const path=linePath(row)||[]
+  const points=path.map(([lon,lat])=>project(lon,lat))
   const d='M'+points.map(p=>p[0].toFixed(1)+' '+p[1].toFixed(1)).join('L')
   let detour=null
   if(row.detour?.path?.length>1){
@@ -383,6 +393,14 @@ const corridors=computed(()=>{
     // 按航程降序截取：只开 50 条时看到的是骨架，而不是随机 50 条
     rows=[...rows].sort((a,b)=>(b.lengthKm||0)-(a.lengthKm||0)).slice(0,Math.max(0,props.lineLimit))
   }
+  // 在飞必画（并集，不受筛选与上限约束）：屏幕上出现一架飞机，它脚下就必须有那条线。
+  const shown=new Set(rows.map(r=>r.id))
+  const flying=flyingCorridorIds.value
+  for(const row of all){
+    if(shown.has(row.id)||!flying.has(row.id)) continue
+    shown.add(row.id)
+    rows.push(row)
+  }
   return rows.map(toLineShape)
 })
 
@@ -420,6 +438,41 @@ const nodes=computed(()=>{
       tower:node.rank===1?17:(node.rank===2?11:7)}
   })
 })
+// —— 地图文字统一成「椭圆底胶囊」（V1.0.4）——
+// 以前城市名/航班参数/起终点名都用 `paint-order:stroke` 描边当底。字号被 inv 压到 2px 时，
+// 2.4px 的描边比字还宽，几个字连成一坨、笔画末端伸出两个尖角 —— 用户看到的
+// "带箭头的黑气泡"就是它，不是气泡，是字晕。现在改成地图标注最基础的画法：
+// 实心底 + 无描边文字，短名字（≤4 字）看起来就是标准椭圆。
+// 宽度用**估算**而不是 getBBox：每帧几十个标签量文字会掉帧，中文一律按一字宽、
+// 拉丁数字按 0.56 字宽，再左右各留 0.6 字的内边距，误差 1–2px，肉眼无感。
+// 标签规格（单位=SVG 世界单位，zoom=1 时 1 单位=1px）。
+// 原来城市 8.6 / 航班 7.6：在 1366 和 1920 下都是这个值（缩放没参与），
+// 也就是"地图文字本来就偏小"，不是某个分辨率的问题。8.6px 的中文在地图上是"能看出有字、读不出来"，
+// 一律抬到 10 以上；胶囊宽高由 fs 推导（w=units*fs+pad*fs*2），改 fs 不会撑破底。
+const TAG={city:{fs:10.2,pad:.55,h:1.5},flight:{fs:9.8,pad:.5,h:1.55},end:{fs:11.2,pad:.55,h:1.45}}
+function textUnits(text){
+  let units=0
+  for(const ch of String(text||'')){
+    units+=/[0-9A-Za-z·.．:：+\-/()（）\s]/.test(ch)?0.56:1
+  }
+  return units
+}
+function tagBox(text,kind){
+  const spec=TAG[kind]||TAG.city
+  return {w:textUnits(text)*spec.fs+spec.pad*spec.fs*2,h:spec.fs*spec.h,fs:spec.fs}
+}
+
+// 底图上"本来就该有名字"的城市：跨省航线端点 + 省会。
+// 全国层标谁的名额是紧的，超出这个集合的名字不该为了标飞机而被塞进来。
+const baseEndNames=computed(()=>{
+  const out=new Set()
+  for(const line of corridors.value){
+    if(line.kind==='CROSS'){ out.add(line.fromName); out.add(line.toName) }
+  }
+  for(const node of props.data?.nodes||[]) if(node.capital) out.add(node.name)
+  return out
+})
+
 const labels=computed(()=>{
   const list=(props.data?.nodes||[]).map(node=>{
     const [x,y]=project(node.lon,node.lat)
@@ -432,33 +485,114 @@ const labels=computed(()=>{
   for(const line of corridors.value){
     if(line.kind==='CROSS'){ ends.add(line.fromName); ends.add(line.toName) }
   }
+  // V1.0.4：带参数标签的那几架（notableFlights）的起降城市也要在地图上。
+  // 全国层只**沿用**已有的名字（省会/跨省端点），不额外塞新的：
+  // 实测给 8 架补 16 个地名会把全国层的城市名从 15 个顶到 36 个，
+  // 图立刻变糊 —— 而全国层的读法是"看骨架"，不是"逐城读名"。
+  // 下钻到大区/省/市才把端点全部提权，那一层一条线占几十上百像素，名字放得下。
+  if(level.value!=='nation'){
+    for(const f of notableFlights.value){
+      if(f.fromName) ends.add(f.fromName)
+      if(f.toName) ends.add(f.toName)
+    }
+  }
   // 悬停某条航线时，它两端的名字必须出现：只给一条线、不给两个地名，
   // 读者没法知道这条线连的是哪两座城。这是"强制显示"，不吃密度限制。
   const hl=(corridors.value||[]).find(l=>l.id===hoverLineId.value)
   if(hl){ ends.add(hl.fromName); ends.add(hl.toName) }
+  // 走廊页（只画一条）同理：这一页讲的就是"这两座城之间怎么飞"，
+  // 起降城市名必须在图上，否则右边的数据卡写着双鸭山、图上只有一个点。
+  if(props.soloCorridor){
+    const only=(corridors.value||[])[0]
+    if(only){ ends.add(only.fromName); ends.add(only.toName) }
+  }
   const rankOf=(node)=>ends.has(node.name)?0:(node.rank||3)
   // 全国层现在也标（只标本级之外有连线的端点与省会，约 40 个）：
   // 一个地名都不给，等于让读者自己数城市点。
   const limit=props.density==='slim'?18:(level.value==='nation'?44:40)
   const ordered=list.filter(node=>level.value!=='nation'||rankOf(node)===0||node.capital)
     .sort((a,b)=>rankOf(a)-rankOf(b))
+  // 避让判据用**真实胶囊矩形**，不再用"离点 48×10 的方框"。
+  // 方框是旧字号（8.6px）时估出来的：名字两字和四字一样宽、高矮也不随字号变，
+  // 字号抬到 10.2 之后要么放过近的、要么错杀远处能放下的（实测同屏 8 处重叠）。
+  // 现在按 实际宽×实际高 判断，且把"离锚点 6 个单位"的偏移也算进去。
+  const k=inv.value
   const placed=[]
+  const boxes=[]
+  const overlaps=(a,b,pad)=>!(a.x1+pad<b.x0||a.x0-pad>b.x1||a.y1+pad<b.y0||a.y0-pad>b.y1)
   for(const node of ordered){
-    // 避让盒从 54×12 收到 48×10：多留几个位置，跨省端点才排得下
-    if(placed.some(p=>Math.abs(p.y-node.y)<10&&Math.abs(p.x-node.x)<48)) continue
-    placed.push(node)
+    const tag=tagBox(node.short,'city')
+    const w=tag.w*k,h=tag.h*k
+    const side=node.x>VIEW.w-90?-1:1
+    const cx=node.x+side*(w/2+6)
+    const box={x0:cx-w/2,x1:cx+w/2,y0:node.y-h/2,y1:node.y+h/2}
+    if(boxes.some(b=>overlaps(box,b,2))) continue
+    boxes.push(box)
+    placed.push({...node,tag})
     if(placed.length>=limit) break
   }
   return placed
 })
 // —— 航班 ——
 // 本地推进量（分钟）：把两次后端快照之间的空档补上，位置才连续。
-// 上限 6 分钟 —— 再多就是外推，不是数据了；超过就让后端快照接管。
+// V1.0.4 两个改动：
+//   ①基准从"请求的分钟"改成"这批数据自己的分钟"（dataMinute）。
+//     以前 minute 一翻、新快照还在路上，adv 就从 0.99 归零 → 飞机倒退一分钟再弹回；
+//   ②上限从 6 分钟压到 1.6 分钟：再多就是外推，不是数据，宁可站住等快照。
 const advanceMin=computed(()=>{
   const base=props.frameMinute>=0?props.frameMinute:props.minute
-  const adv=base-props.minute
-  return adv>0?Math.min(6,adv):0
+  const from=props.dataMinute>=0?props.dataMinute:props.minute
+  let adv=base-from
+  if(adv<-720) adv+=1440
+  else if(adv>720) adv-=1440
+  return adv>0?Math.min(1.6,adv):0
 })
+
+// —— 走廊折线表：位置与绘制共用同一份顶点（V1.0.4）——
+// 后端 `nation_ops.flight_objects` 的进度是"按顶点均分"（pos = progress*(n-1)），
+// 前端照抄同一条规则。这样位置与画出来的那条线重合，误差是 0 而不是"大概齐"，
+// 转弯处也不会漂出去再被快照拉回来（那是第二种抖动）。
+const corridorById=computed(()=>{
+  const map=new Map()
+  for(const row of props.data?.corridors||[]) map.set(row.id,row)
+  return map
+})
+function flightPathOf(f){
+  const row=corridorById.value.get(f.corridor)
+  if(row){
+    // 绕飞的班次跟着绕飞航迹走（后端也是这么算的）：琥珀虚线画在哪，飞机就飞在哪
+    if(f.status==='DELAYED'&&row.detour?.path?.length>1) return row.detour.path
+    const p=linePath(row)
+    if(p) return p
+  }
+  if(f.fromLonLat&&f.toLonLat) return [f.fromLonLat,f.toLonLat]
+  return null
+}
+// t∈[0,1] → [lon,lat,方位角(数学角)]。按顶点均分，与后端逐位对齐。
+function pointAt(path,t){
+  const n=path.length
+  if(!n) return null
+  if(n===1) return [path[0][0],path[0][1],0]
+  const pos=Math.max(0,Math.min(1,t))*(n-1)
+  const i=Math.min(n-2,Math.floor(pos))
+  const frac=pos-i
+  const a=path[i],b=path[i+1]
+  return [a[0]+(b[0]-a[0])*frac,a[1]+(b[1]-a[1])*frac,
+    Math.atan2(b[1]-a[1],b[0]-a[0])*180/Math.PI]
+}
+// 机头角度：取前后各一小段的方向做**向量平均**。
+// 直接用当前段的方位角的话，过顶点会瞬间转几十度（绕飞航迹尤其明显），
+// 向量平均让转角在顶点附近平滑过渡；跨 ±180° 也不会翻跟头。
+function headingAt(path,t,eps=.01){
+  const a=pointAt(path,Math.max(0,t-eps)),b=pointAt(path,Math.min(1,t+eps)),c=pointAt(path,t)
+  if(!c) return 0
+  if(!a||!b) return c[2]
+  const r=Math.PI/180
+  const vx=Math.cos(a[2]*r)+Math.cos(b[2]*r)
+  const vy=Math.sin(a[2]*r)+Math.sin(b[2]*r)
+  if(Math.hypot(vx,vy)<1e-6) return c[2]
+  return Math.atan2(vy,vx)/r
+}
 
 const flightDots=computed(()=>{
   const out=[]
@@ -467,31 +601,52 @@ const flightDots=computed(()=>{
     // 延期的班次**不画**：它还没起飞，画在航路上等于告诉人"这架已经在飞"。
     // 它仍然在台账与处置页里，也仍然计入"延期 N 架"。
     if(f.decision==='HOLD') continue
-    let lon=f.lon,lat=f.lat
-    // 沿当前航向按速度外推：比"起点→终点直线插值"准，飞机不会飘离真实航路
-    // （航路是弯的，直线插值在转弯段会明显错位）。
-    if(adv>0&&Number.isFinite(lon)&&Number.isFinite(lat)&&f.speedKmh){
-      const dKm=f.speedKmh*adv/60
-      // heading 是数学角（0=东，正=北）：sin 为正就是往北，纬度要加。
-      // 之前写成 `lat -=` —— 飞机被往反方向推，每次快照又拉回来，看着就是在原地抖。
-      const h=(f.heading||0)*Math.PI/180
-      lat+=dKm*Math.sin(h)/110.574
-      lon+=dKm*Math.cos(h)/(111.32*Math.max(.2,Math.cos(lat*Math.PI/180)))
+    const dur=Math.max(1,f.durationMin||1)
+    // 当前进度 = 后端 progress + 本地推进的那一段（同一个 duration，单位一致）
+    const p=(f.progress||0)+adv/dur
+    const path=flightPathOf(f)
+    let lon=f.lon,lat=f.lat,screen=-(f.heading||0)
+    const at=path?pointAt(path,p):null
+    if(at){
+      lon=at[0];lat=at[1]
+      // heading 是数学角（0=东、正=北），图标要屏幕角（0=东、正=南）→ 取负
+      screen=-headingAt(path,p)
     }
     const [x,y]=project(lon,lat)
-    // 当前进度：后端给的 progress + 本地推进的那一段
-    const p=(f.progress||0)+adv/Math.max(1,f.durationMin||1)
     // 进站淡出、离站淡入 —— "飞出去就没了"，而不是从图上突然跳掉，
     // 这是 Flightradar24 那种"活的"观感的来源。命中判据只在这一小段里失效。
     const fade=p>=.985?Math.max(0,(1-p)/.015):(p<=.02?Math.max(.25,p/.02):1)
     // 已经淡到看不见的班次直接不生成 DOM：只把 opacity 设 0 的话，
     // 每帧仍要重建这些节点（实测多出 10–20 个死节点），命中判据也还认它们。
     if(fade<=0.02) continue
-    out.push({...f,x,y,progressNow:Math.max(0,Math.min(1,p)),fade,
+    out.push({...f,x,y,lon,lat,headingScreen:screen,progressNow:Math.max(0,Math.min(1,p)),fade,
       selected:props.selectedId===f.id,
       detour:f.status==='DELAYED',bad:f.riskLevel==='HIGH'})
   }
   return out
+})
+
+// 值得标出来的几架：全国层只标"关键的那几架"，下钻到大区及以下才全标。
+// 抽成 computed 是因为**城市名标注也要用它**（带标签的飞机必须有起降城市）。
+//
+// V1.0.4：补位时优先挑"起降城市本来就有名字"的那几架。
+// 否则标出来的是 8 个随机地名上的飞机，为了给它配两个地名，
+// 全国层的城市名会从 15 个涨到 40 多个 —— 把地图糊住的正是"标注互相追着长"。
+const notableFlights=computed(()=>{
+  const all=flightDots.value.filter(f=>f.fade>.4)
+  const key=all.filter(f=>f.selected||f.detour||f.bad)
+  let picked=key.slice()
+  // 全国层只标"值得看的几架"，但**不能一个都没有**：
+  // 实测 6 个时刻里有 4 个时刻绕飞 0 架、高风险的基本都在延期里（延期不画），
+  // 于是标签长期为空 —— 用户要的"每个箭头旁边有高度/速度/编号"就落空了。
+  if(level.value==='nation'&&picked.length<8){
+    const rest=all.filter(f=>!key.includes(f))
+    const named=(f)=>baseEndNames.value.has(f.fromName)||baseEndNames.value.has(f.toName)
+    const prefer=rest.filter(named).sort((a,b)=>(b.riskP||0)-(a.riskP||0))
+    const others=rest.filter(f=>!named(f)).sort((a,b)=>(b.riskP||0)-(a.riskP||0))
+    picked=picked.concat(prefer,others).slice(0,8)
+  }
+  return level.value==='nation'?picked.slice(0,12):all
 })
 
 // 换帧过渡：新环淡入 260ms、旧环淡出 260ms 后销毁。
@@ -566,26 +721,45 @@ const tipFlip=computed(()=>!!tip.value&&tip.value.x>((typeof window!=='undefined
 // 常显的文字标签：全国层只给"值得看的几架"（选中/绕飞/高风险），
 // 下钻到大区及以下才全标 —— 106 行小字会把地图盖住，这是上一轮刚清理过的问题。
 const flightLabels=computed(()=>{
-  const all=flightDots.value.filter(f=>f.fade>.4)
-  const key=all.filter(f=>f.selected||f.detour||f.bad)
-  // 全国层只标"值得看的几架"，但**不能一个都没有**：
-  // 实测 6 个时刻里有 4 个时刻绕飞 0 架、高风险的基本都在延期里（延期不画），
-  // 于是标签长期为空 —— 用户要的"每个箭头旁边有高度/速度/编号"就落空了。
-  // 兜底：关键的那几架排前面，不够 8 架就按风险降序补足到 8 架。
-  let picked=key
-  if(level.value==='nation'&&key.length<8){
-    const rest=all.filter(f=>!key.includes(f)).sort((a,b)=>(b.riskP||0)-(a.riskP||0))
-    picked=key.concat(rest.slice(0,8-key.length))
-  }
-  const list=level.value==='nation'?picked.slice(0,12):all
+  const list=notableFlights.value
+  const k=inv.value
   // 与城市名互相避让：航班标签压在"西宁"上，两个都读不清。
   // 城市名先画，航班标签让路（城市名是底图，飞机数据是浮层）。
-  const cityBoxes=(labels.value||[]).map(n=>({x:n.x+14,y:n.y}))
+  //
+  // V1.0.4：判据从"离城市点 44×10 的方框"改成**真实矩形相交**，并给出四个候选位置。
+  // 旧判据是围绕城市**点**画一个 88×20 的禁区，而城市名现在有胶囊底、
+  // 飞机标签又抬到了机身正上方 —— 按点算会把大半飞机判成"压住了城市名"
+  // （实测 8 架只剩 1 架有标签）。现在四个方向依次试，第一个不压别人的就用：
+  // 既不压飞机、不压城市名，又能多标几架。
+  const cityBoxes=(labels.value||[]).map(n=>{
+    const right=n.x<=VIEW.w-90
+    const x0=right?n.x+6*k:n.x-6*k-n.tag.w*k
+    return {x0,x1:x0+n.tag.w*k,y0:n.y-n.tag.h*k/2,y1:n.y+n.tag.h*k/2}
+  })
+  const hit=(a,b,pad)=>a.x0<b.x1+pad&&a.x1>b.x0-pad&&a.y0<b.y1+pad&&a.y1>b.y0-pad
   const out=[]
   for(const f of list){
-    if(out.some(p=>Math.abs(p.x-f.x)<46&&Math.abs(p.y-f.y)<11)) continue
-    if(cityBoxes.some(c=>Math.abs(c.x-f.x)<44&&Math.abs(c.y-f.y)<10)) continue
-    out.push({id:f.id,x:f.x,y:f.y,text:`${f.callsign} · ${f.altM}m`,important:f.selected||f.detour||f.bad})
+    const text=`${f.callsign} · ${f.altM}m`
+    const tag=tagBox(text,'flight')
+    const w=tag.w*k,h=tag.h*k
+    // 四个候选：上 / 下 / 右 / 左。间距都是 10 个世界单位 —— 机身外接半径 6，
+    // 留 4 的通气；以前基线只抬 7，文字下沿正好压在机头上（用户第 2 条）。
+    const spots=[
+      {x0:-w/2,y0:-(10+h)},
+      {x0:-w/2,y0:10},
+      {x0:10,y0:-h/2},
+      {x0:-10-w,y0:-h/2},
+    ]
+    let box=null
+    for(const spot of spots){
+      const cand={x0:f.x+spot.x0,x1:f.x+spot.x0+w,y0:f.y+spot.y0,y1:f.y+spot.y0+h}
+      if(cityBoxes.some(c=>hit(cand,c,2))) continue
+      if(out.some(o=>hit(cand,o.box,3))) continue
+      box=cand;break
+    }
+    if(!box) continue
+    out.push({id:f.id,x:f.x,y:f.y,text,important:f.selected||f.detour||f.bad,tag,box,
+      cxOff:(box.x0-f.x+w/2)/k,cyOff:(box.y0-f.y+h/2)/k})
   }
   return out
 })
@@ -596,10 +770,11 @@ const pickedLine=computed(()=>{
   if(!f) return null
   const line=(corridors.value||[]).find(l=>l.id===f.corridor)
   if(line) return line
-  // 库里查不到这条航路（改线/越界等极端情况）就退化成起终点直线，不假装有航路
+  // 库里查不到这条航路（改线/越界等极端情况）就退化成起终点直线，不假装有航路。
+  // 也不在这里造弧：飞机是按弦走的，画一条弧又会变成"线和飞机不重合"。
   const a=f.fromLonLat,b=f.toLonLat
   if(!a||!b) return null
-  const pts=arcPoints(project(a[0],a[1]),project(b[0],b[1]),.02)
+  const pts=[project(a[0],a[1]),project(b[0],b[1])]
   return {id:'pick-'+f.id,pts,d:pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ')}
 })
 const pickedMarks=computed(()=>{
@@ -608,10 +783,16 @@ const pickedMarks=computed(()=>{
   const [ax,ay]=line.pts[0]
   const [bx,by]=line.pts[line.pts.length-1]
   const gap=Math.hypot(bx-ax,by-ay)
+  // 终点那行小字（到达时刻 · 裁决 · 回波暴露）现在也走胶囊底，
+  // 与城市名同一套画法 —— 地图上不再有"描边糊出来的字"。
+  const subText=`${f.arriveAt} 到达 · ${f.decisionLabel}`+
+    (f.exposure&&f.exposure.directMin>0?` · 回波暴露 ${Math.round(f.exposure.directMin)} 分`:'')
+  const subTag=tagBox(subText,'endsub')
   // 起点和终点同名（州内接驳航线）时只标一个点：
   // 两个一模一样的名字叠在一起，读者会以为是渲染错了。
   const sameName=f.fromName===f.toName||gap<6
-  const a={key:'a',x:ax,y:ay,name:f.fromName,sub:sameName}
+  const a={key:'a',x:ax,y:ay,name:f.fromName,sub:sameName,tag:tagBox(f.fromName,'end'),
+    subText,subTag}
   if(sameName){
     Object.assign(a,{lx:-18,ly:-18,anchor:'end',line:true})
     return [a]
@@ -619,10 +800,12 @@ const pickedMarks=computed(()=>{
   // 两点在屏幕上挨得近时把标签往外拉，用引线连回原点 —— 宁可多一根线，不要两行字糊在一起
   if(gap<76){
     Object.assign(a,{lx:-20,ly:-16,anchor:'end',line:true})
-    return [a,{key:'b',x:bx,y:by,name:f.toName,sub:true,lx:20,ly:22,anchor:'start',line:true}]
+    return [a,{key:'b',x:bx,y:by,name:f.toName,sub:true,lx:20,ly:22,anchor:'start',line:true,
+      tag:tagBox(f.toName,'end'),subText,subTag}]
   }
   Object.assign(a,{lx:0,ly:-10,anchor:'middle',line:false})
-  return [a,{key:'b',x:bx,y:by,name:f.toName,sub:true,lx:0,ly:14,anchor:'middle',line:false}]
+  return [a,{key:'b',x:bx,y:by,name:f.toName,sub:true,lx:0,ly:14,anchor:'middle',line:false,
+    tag:tagBox(f.toName,'end'),subText,subTag}]
 })
 
 // 选中一架就把它那条航线摊到视野里：全国层一条航路只有十几像素，
@@ -748,6 +931,23 @@ function clickNode(node){
       <filter id="nmap-fog-blur" x="-20%" y="-20%" width="140%" height="140%">
         <feGaussianBlur stdDeviation="3.2"/>
       </filter>
+      <!-- 回波颗粒（V1.0.4）：真实雷达的色块内部是"杂色"的，不是一块纯色。
+           做法是把噪声按 SourceGraphic 的形状裁进去，只留在回波内部；
+           回波一分钟才换一帧，滤镜结果会被浏览器缓存，不吃 30fps 的预算。 -->
+      <filter id="nmap-echo-grain" x="-3%" y="-3%" width="106%" height="106%"
+              color-interpolation-filters="sRGB">
+        <feGaussianBlur in="SourceGraphic" stdDeviation=".3" result="soft"/>
+        <feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" seed="9" result="noise"/>
+        <feColorMatrix in="noise" type="saturate" values="0" result="gray"/>
+        <feComponentTransfer in="gray" result="speck">
+          <feFuncA type="linear" slope=".16"/>
+        </feComponentTransfer>
+        <feComposite in="speck" in2="soft" operator="in" result="grain"/>
+        <feMerge>
+          <feMergeNode in="soft"/>
+          <feMergeNode in="grain"/>
+        </feMerge>
+      </filter>
       <clipPath id="nmap-china-clip"><path :d="chinaClipD"/></clipPath>
     </defs>
 
@@ -761,31 +961,6 @@ function clickNode(node){
                preserveAspectRatio="none"/>
       </g>
 
-      <!-- 2 雷达：**只画矢量轮廓**，不再叠原始瓦片位图。
-           两套画法并存时，位图的像素块会和矢量边界互相打架，看着就是锯齿。
-           几何由后端做过闭运算平滑（radar_field._smooth），这里只负责上色。 -->
-      <g v-if="radarRings.length" :clip-path="'url(#nmap-china-clip)'">
-        <!-- 回波：淡填充 + 清晰描边（专业雷达的读法：绿→黄→红）。
-             几何在后端已经做过闭运算平滑，这里描边才不会把台阶放大成锯齿。
-             换帧时旧环淡出 260ms、新环淡入 260ms —— 逐分钟变化是连续的，不是硬切。 -->
-        <g v-if="echoGhost.length" class="nmap-echo-ghost">
-          <path v-for="(ring,index) in echoGhost" :key="'g'+index" :d="ring.d"
-                :class="'echo-out echo-'+ring.level.toLowerCase()"
-                :style="{strokeWidth:(virtualMode?2.2:1.5)*inv}"/>
-        </g>
-        <template v-for="(ring,index) in radarRings" :key="'rr'+index+'-'+ring.frame">
-          <path :d="ring.d" :class="'echo-in echo-'+ring.level.toLowerCase()"
-                :style="{strokeWidth:(virtualMode?2.2:1.5)*inv}"/>
-        </template>
-      </g>
-
-      <!-- 2.5 雾区：低能见度面（DERIVED） -->
-      <g v-if="fogPolys.length" class="nmap-fog" filter="url(#nmap-fog-blur)">
-        <path v-for="(poly,i) in fogPolys" :key="'fg'+i" :d="poly.d"
-              :fill="poly.level==='BAN'?'rgba(226,240,252,.34)':'rgba(196,222,244,.22)'"
-              stroke="rgba(206,232,255,.35)" stroke-width=".8"/>
-      </g>
-
       <!-- 3 行政区 -->
       <g>
         <path v-for="shape in shapes" :key="shape.key" :d="shape.d"
@@ -796,6 +971,35 @@ function clickNode(node){
               @click="clickShape(shape)">
           <title>{{ shape.name }}{{ shape.boundary?' · 南海诸岛界线':(shape.live?'':(level==='nation'?' · 未纳入通航范围（台湾、西藏、香港、澳门）':' · 不在本级范围')) }}</title>
         </path>
+      </g>
+
+      <!-- 3.2 回波：**只画矢量轮廓**，不再叠原始瓦片位图。
+           两套画法并存时，位图的像素块会和矢量边界互相打架，看着就是锯齿。
+           几何由后端做过闭运算平滑（radar_field._smooth），这里只负责上色。
+           V1.0.4：位置从"行政区下面"挪到"行政区上面" —— 之前回波被陆地填充盖住，
+           深色主题下压掉一层（--map-land 13%），浅色主题下是 92% 的白，
+           绿/黄/红几乎被冲干净（实测浅色下只剩一圈浅粉）。天气是主体，必须压在底图之上。 -->
+      <g v-if="radarRings.length" :clip-path="'url(#nmap-china-clip)'">
+        <!-- 回波（V1.0.4）：**实心填充、不描边**。
+             以前每档都描一圈高亮边，三档又互不嵌套 → 画成了"等高线地图"。
+             后端改成累计掩膜后，红⊂黄⊂绿是真的嵌套，只要按 绿→黄→红 的顺序叠色，
+             就是真实雷达的读法。换帧时旧环淡出 260ms、新环淡入 260ms。 -->
+        <g class="nmap-echo" :class="{'echo-virt':virtualMode}" filter="url(#nmap-echo-grain)">
+          <g v-if="echoGhost.length" class="nmap-echo-ghost">
+            <path v-for="(ring,index) in echoGhost" :key="'g'+index" :d="ring.d"
+                  :class="'echo-out echo-'+ring.level.toLowerCase()"/>
+          </g>
+          <template v-for="(ring,index) in radarRings" :key="'rr'+index+'-'+ring.frame">
+            <path :d="ring.d" :class="'echo-in echo-'+ring.level.toLowerCase()"/>
+          </template>
+        </g>
+      </g>
+
+      <!-- 3.3 雾区：低能见度面（DERIVED）。与回波同样压在底图之上 -->
+      <g v-if="fogPolys.length" class="nmap-fog" filter="url(#nmap-fog-blur)">
+        <path v-for="(poly,i) in fogPolys" :key="'fg'+i" :d="poly.d"
+              :fill="poly.level==='BAN'?'rgba(226,240,252,.34)':'rgba(196,222,244,.22)'"
+              stroke="rgba(206,232,255,.35)" stroke-width=".8"/>
       </g>
 
       <!-- 3.5 南海诸岛小图：全国层才显示，保证地图完整 -->
@@ -845,7 +1049,7 @@ function clickNode(node){
            下钻到大区/省/市再画，那时一条线才占几十上百像素，方向也才读得出来。 -->
       <g v-if="corridors.length" fill="none" stroke-linecap="butt"
          :opacity="audience==='airspace'?.3:lineStyle.op">
-        <path v-for="line in corridors" :key="'c'+line.id" :d="line.d"
+        <path v-for="line in corridors" :key="'c'+line.id" :d="line.d" :data-line="line.id"
               :stroke="line.blocked?(virtualMode?'rgba(255,96,70,.95)':'var(--map-corridor-blocked)'):'var(--map-corridor)'"
               :stroke-width="(line.blocked?lineWidth*(virtualMode?2.2:.8):lineWidth)*inv"
               :class="{hit:line.selected,clickable:true,'virt-alarm':virtualMode&&line.blocked}"
@@ -912,7 +1116,7 @@ function clickNode(node){
            每架按自己的 fade 单独淡出 —— 到站的那一架会慢慢消失，
            而不是在整分钟刷新时从图上跳掉。 -->
       <g class="nmap-flights" :opacity="audience==='airspace'?.3:1">
-        <g v-for="f in flightDots" :key="f.id"
+        <g v-for="f in flightDots" :key="f.id" :data-flight="f.id" :data-corridor="f.corridor"
            :opacity="f.fade*(f.selected||f.detour||f.bad?1:.82)"
            :transform="`translate(${f.x.toFixed(1)} ${f.y.toFixed(1)}) rotate(${(f.headingScreen!=null?f.headingScreen:-f.heading).toFixed(0)}) scale(${(f.selected?1.15:(level==='nation'?0.92:1.05))*inv})`"
            @mouseenter="hoverEnter(f,$event)" @mousemove="hoverMove"
@@ -933,12 +1137,16 @@ function clickNode(node){
         </g>
       </g>
 
-      <!-- 7.2 班次常显标签：编号 + 高度。速度与裁决放悬停，标签只保留能一眼读完的两段 -->
+      <!-- 7.2 班次常显标签：编号 + 高度。位置由 flightLabels 四向避让算好（上/下/右/左） -->
       <g class="nmap-flight-labels" pointer-events="none">
-        <text v-for="row in flightLabels" :key="'fl'+row.id"
-              :x="row.x" :y="row.y-7*inv" :class="{key:row.important}"
-              :style="{fontSize:(7.6*inv)+'px'}"
-              text-anchor="middle">{{ row.text }}</text>
+        <g v-for="row in flightLabels" :key="'fl'+row.id" class="map-tag"
+           :transform="`translate(${row.x+row.cxOff*inv} ${row.y+row.cyOff*inv})`">
+          <rect :x="-row.tag.w*inv/2" :y="-row.tag.h*inv/2" :width="row.tag.w*inv" :height="row.tag.h*inv"
+                :rx="row.tag.h*inv/2" :ry="row.tag.h*inv/2"
+                class="tag-bg" :class="{key:row.important}"/>
+          <text :y="row.tag.fs*inv*.36" text-anchor="middle" :class="{key:row.important}"
+                :style="{fontSize:(row.tag.fs*inv)+'px'}">{{ row.text }}</text>
+        </g>
       </g>
 
       <!-- 7.5 选中班次的起终点：这是全图唯一会出现的"地名"。
@@ -950,22 +1158,29 @@ function clickNode(node){
                 :x2="end.lx" :y2="end.ly-(end.key==='a'?4:-4)"/>
           <circle class="end-ring" r="6.4" fill="none" stroke-width=".8"/>
           <circle class="end-dot" r="3" stroke-width=".7"/>
+          <rect class="tag-bg" :x="end.anchor==='start'?end.lx:(end.anchor==='end'?end.lx-end.tag.w:end.lx-end.tag.w/2)"
+                :y="end.ly-end.tag.h*.74" :width="end.tag.w" :height="end.tag.h"
+                :rx="end.tag.h/2" :ry="end.tag.h/2"/>
           <text class="end-lbl" :text-anchor="end.anchor"
                 :x="end.lx" :y="end.ly">{{ end.name }}</text>
-          <text v-if="end.sub&&pickedFlight" class="end-sub" :text-anchor="end.anchor"
-                :x="end.lx" :y="end.ly+11.6">
-            {{ pickedFlight.arriveAt }} 到达 · {{ pickedFlight.decisionLabel }}
-            <template v-if="pickedFlight.exposure&&pickedFlight.exposure.directMin>0"> · 回波暴露 {{ Math.round(pickedFlight.exposure.directMin) }} 分</template>
-          </text>
+          <rect v-if="end.sub" class="tag-bg sub"
+                :x="end.anchor==='start'?end.lx:(end.anchor==='end'?end.lx-end.subTag.w:end.lx-end.subTag.w/2)"
+                :y="end.ly+11.6-end.subTag.h*.78" :width="end.subTag.w" :height="end.subTag.h"
+                :rx="end.subTag.h/2" :ry="end.subTag.h/2"/>
+          <text v-if="end.sub" class="end-sub" :text-anchor="end.anchor"
+                :x="end.lx" :y="end.ly+11.6">{{ end.subText }}</text>
         </g>
       </g>
 
-      <!-- 8 标注 -->
+      <!-- 8 标注：城市名走"胶囊底 + 无描边字"，短名看起来就是标准椭圆 -->
       <g class="nmap-labels">
-        <text v-for="node in labels" :key="'l'+node.name"
-              :x="node.x+((node.x>VIEW.w-90?-5.5:5.5)*inv)" :y="node.y+3.2*inv"
-              :text-anchor="node.x>VIEW.w-90?'end':'start'" class="city"
-              :style="{fontSize:(8.6*inv)+'px'}">{{ node.short }}</text>
+        <g v-for="node in labels" :key="'l'+node.name" class="map-tag"
+           :transform="`translate(${node.x+((node.x>VIEW.w-90?-1:1)*(node.tag.w/2+6)*inv)} ${node.y})`">
+          <rect :x="-node.tag.w*inv/2" :y="-node.tag.h*inv/2" :width="node.tag.w*inv" :height="node.tag.h*inv"
+                :rx="node.tag.h*inv/2" :ry="node.tag.h*inv/2" class="tag-bg"/>
+          <text class="city" :y="node.tag.fs*inv*.36" text-anchor="middle"
+                :style="{fontSize:(node.tag.fs*inv)+'px'}">{{ node.short }}</text>
+        </g>
       </g>
     </g>
   </svg>
@@ -987,7 +1202,7 @@ function clickNode(node){
 .nmap .clickable{cursor:pointer}
 .nmap path.hit{filter:drop-shadow(0 0 2px rgba(255,206,90,.55))}
 .nmap path.virt-alarm{filter:drop-shadow(0 0 4px rgba(255,90,60,.85))}
-.nmap .inset-lbl{font-size:7.5px;fill:rgba(170,205,230,.85)}
+.nmap .inset-lbl{font-size:9.5px;fill:rgba(178,210,232,.9)}
 .nmap .node-shadow{fill:rgba(8,20,32,.5)}
 .echo-in{animation:echoIn .26s ease-out both}
 .echo-out{animation:echoOut .26s ease-out both;pointer-events:none}
@@ -997,12 +1212,21 @@ function clickNode(node){
 @media (prefers-reduced-motion: reduce){
   .echo-in,.echo-out{animation:none}
 }
-.echo-weak{fill:rgba(74,189,134,.22);stroke:rgba(96,214,158,.55)}
-.echo-convective{fill:rgba(245,190,60,.40);stroke:rgba(255,206,90,.88)}
-.echo-strong{fill:rgba(232,60,48,.58);stroke:rgba(255,120,95,.95)}
-html[data-theme="light"] .echo-weak{fill:rgba(47,158,106,.18);stroke:rgba(31,122,80,.62)}
-html[data-theme="light"] .echo-convective{fill:rgba(214,148,10,.26);stroke:rgba(166,110,0,.82)}
-html[data-theme="light"] .echo-strong{fill:rgba(200,40,30,.34);stroke:rgba(176,26,18,.92)}
+/* 回波配色：按 dBZ 色阶（绿→黄→红）实心填充，**不描边**。
+   描边会让三档变成"等高线"，而真实雷达是色块。嵌套关系由后端累计掩膜保证，
+   这里只要按 WEAK→CONVECTIVE→STRONG 叠色（模板顺序已固定）就是红⊂黄⊂绿。
+   不透明度调高到 .72/.85/.95：三档是**叠**出来的，半透明叠色会把黄压成橄榄绿
+   （实测 0.66 的黄压在 0.5 的绿上 → rgb(169,182,69)），而真实雷达的每一格是一个实色。 */
+.echo-weak{fill:rgba(46,170,110,.72);stroke:none}
+.echo-convective{fill:rgba(255,206,64,.85);stroke:none}
+.echo-strong{fill:rgba(240,60,45,.95);stroke:none}
+/* 虚拟增强：只加深红核的边，不三档全描边 */
+.echo-virt .echo-strong{stroke:rgba(30,6,4,.5);stroke-width:.6}
+/* 浅色底上要更实：白底会把半透明色块冲淡（实测 .34 的绿几乎看不见） */
+html[data-theme="light"] .echo-weak{fill:rgba(46,150,95,.52);stroke:none}
+html[data-theme="light"] .echo-convective{fill:rgba(232,170,26,.64);stroke:none}
+html[data-theme="light"] .echo-strong{fill:rgba(206,44,32,.74);stroke:none}
+html[data-theme="light"] .echo-virt .echo-strong{stroke:rgba(90,10,6,.45);stroke-width:.6}
 .cap-star{fill:#ff4d4f;stroke:rgba(8,20,32,.85);stroke-width:.7;pointer-events:none}
 .cap-ring{stroke:rgba(186,218,255,.42);pointer-events:none}
 .no-fly-box{fill:rgba(224,49,49,.06);stroke:#e03131;pointer-events:stroke;cursor:help}
@@ -1011,9 +1235,19 @@ html[data-theme="light"] .no-fly-box{fill:rgba(224,49,49,.05);stroke:#c92a2a}
 html[data-theme="light"] .cap-star{fill:#c92a2a;stroke:#ffffff}
 html[data-theme="light"] .cap-ring{stroke:rgba(40,90,130,.5)}
 .detour-line{stroke-opacity:.95}
-.nmap-flight-labels text{fill:#dff3ff;paint-order:stroke;stroke:rgba(3,12,20,.9);
-  stroke-width:2.2px;letter-spacing:.2px;opacity:.9}
-.nmap-flight-labels text.key{fill:#8ef0ff;opacity:1;font-weight:600}
+/* —— 地图标注：胶囊底（V1.0.4）——
+   用户两轮都否掉了"描边糊出来的字块"：那是 paint-order:stroke 的副产物。
+   现在统一成"实心半透明底 + 无描边字"，短名（≤4 字）呈标准椭圆。 */
+.nmap .tag-bg{fill:rgba(6,18,28,.72);stroke:none}
+.nmap .tag-bg.key{fill:rgba(8,40,56,.86)}
+.nmap .tag-bg.sub{fill:rgba(6,18,28,.58)}
+.nmap-flight-labels text{fill:#e6f6ff;letter-spacing:.2px;opacity:.94}
+.nmap-flight-labels text.key{fill:#9ff4ff;opacity:1;font-weight:600}
+html[data-theme="light"] .nmap .tag-bg{fill:rgba(255,255,255,.9)}
+html[data-theme="light"] .nmap .tag-bg.key{fill:rgba(233,247,255,.96)}
+html[data-theme="light"] .nmap .tag-bg.sub{fill:rgba(255,255,255,.8)}
+html[data-theme="light"] .nmap-flight-labels text{fill:#12314a}
+html[data-theme="light"] .nmap-flight-labels text.key{fill:#0b6f95}
 /* 用户点名"不要花哨气泡框"：去圆角、去投影、去卡片感，
    只留一条平贴的窄条 —— 它是指示，不是弹窗。 */
 .nmap-tip{position:fixed;z-index:30;transform:translate(12px,10px);pointer-events:none;
@@ -1029,9 +1263,8 @@ html[data-theme="light"] .nmap-tip{background:rgba(255,255,255,.92);
 html[data-theme="light"] .nmap-tip b{color:#0f3550}
 html[data-theme="light"] .nmap-tip span{color:#5b7a92}
 html[data-theme="light"] .nmap-tip span.bad{color:#c0392b}
-html[data-theme="light"] .nmap-flight-labels text{fill:#12314a;stroke:rgba(255,255,255,.95)}
-html[data-theme="light"] .nmap-flight-labels text.key{fill:#0b7ea6}
-.nmap .city{font-size:8.6px;fill:#dceefb;paint-order:stroke;stroke:rgba(4,12,20,.85);stroke-width:2.4px;pointer-events:none}
+.nmap .city{font-size:8.6px;fill:#dceefb;pointer-events:none}
+html[data-theme="light"] .nmap .city{fill:#12314a}
 
 /* 选中班次：已飞实线、未飞虚线；起终点用"环+点+地名"标出来 */
 .nmap-world{transform-origin:0 0;transition:transform .55s cubic-bezier(.22,.85,.2,1)}
@@ -1041,10 +1274,10 @@ html[data-theme="light"] .nmap-flight-labels text.key{fill:#0b7ea6}
   filter:drop-shadow(0 0 3px rgba(120,235,255,.6))}
 .nmap-pick-ends .end-dot{fill:#8ef0ff;stroke:rgba(6,20,32,.85)}
 .nmap-pick-ends .end-ring{stroke:rgba(142,240,255,.55)}
-.nmap-pick-ends .end-lbl{font-size:9.6px;font-weight:600;fill:#e6f9ff;paint-order:stroke;
-  stroke:rgba(3,12,20,.92);stroke-width:2.8px;pointer-events:none}
-.nmap-pick-ends .end-sub{font-size:8px;fill:#8fd8ea;paint-order:stroke;
-  stroke:rgba(3,12,20,.9);stroke-width:2.6px;pointer-events:none}
+.nmap-pick-ends .end-lbl{font-size:9.6px;font-weight:600;fill:#e6f9ff;pointer-events:none}
+.nmap-pick-ends .end-sub{font-size:8px;fill:#a7e2f0;pointer-events:none}
+html[data-theme="light"] .nmap-pick-ends .end-lbl{fill:#0f3550}
+html[data-theme="light"] .nmap-pick-ends .end-sub{fill:#3f6a80}
 .nmap-pick-ends .end-lead{stroke:rgba(142,240,255,.45);stroke-width:.7;stroke-dasharray:2 2}
 
 /* 选中飞机的呼吸环：transform-box 必须给，否则 SVG 里 scale 会绕错原点 */

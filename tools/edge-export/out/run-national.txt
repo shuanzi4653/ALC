@@ -1,0 +1,28 @@
+
+端侧数据来源   : edge_x86_log.txt
+端侧自报模型   : alc-forest-v1 ml-v2-vis3k fp=7a7fc34a92babc78
+端侧自检       : model=ml-v2-vis3k fp=7a7fc34a92babc78 trees=100 features=26 nodes=24111 leaves=24211 calib=92 bytes=509106 checks=OK
+端侧汇总       : SUMMARY N=1000 SKIP=1 US_MIN=2.7 US_MAX=12.2 US_MEAN=4.0 CHECKSUM=557.520912
+用例数         : 1000
+
+原始概率 p(POS) 一致性（容差 1e-04）：
+  max|Δp|      : 6.953e-07   PASS
+  mean|Δp|     : 2.510e-07
+  rms|Δp|      : 2.919e-07
+  p50 / p95    : 2.538e-07 / 4.870e-07
+  超差组数     : 0 / 1000
+
+校准后概率一致性（nowcast._interp 口径）：
+  max|Δp_cal|  : 1.634e-05   超差 0 组
+
+判决一致率（p >= 0.3 视为 POS）：1000/1000 = 100.0000%
+  Python 侧 POS 组数 728，端侧 POS 组数 728
+
+p 分布（Python 侧）：min 0.037465 / p50 0.547880 / p95 0.952826 / max 0.980386
+单次耗时（端侧）：min 3 / p50 4 / mean 3.9 / max 12 us
+单次耗时（Python 参考，同一台 PC）：mean 152.4 us
+
+明细       : C:\Users\12921\Desktop\ALC\tools\edge-export\out\parity-20261111-215501-national.csv
+汇总 JSON  : C:\Users\12921\Desktop\ALC\tools\edge-export\out\parity-20261111-215501-national.json
+
+[PASS] 端云同源：1000 组用例全部在 1e-04 容差内。

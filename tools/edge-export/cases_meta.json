@@ -1,0 +1,106 @@
+{
+ "model": "ml-v2-vis3k",
+ "modelFeatures": [
+  "visM",
+  "gustMs",
+  "windMs",
+  "wdirSin",
+  "wdirCos",
+  "tempC",
+  "dewC",
+  "dewSpread",
+  "cloudBaseM",
+  "qnhHpa",
+  "visMin3h",
+  "visMin6h",
+  "gustMax3h",
+  "windChange3h",
+  "qnhTendency3h",
+  "visChange3h",
+  "tempTendency3h",
+  "spreadTendency3h",
+  "stationCode",
+  "hourSin",
+  "hourCos",
+  "month",
+  "miss_vis",
+  "miss_gust",
+  "miss_cloud",
+  "miss_temp"
+ ],
+ "seed": 20261113,
+ "cases": 1000,
+ "source": {
+  "file": "dataset.json",
+  "sha256": "64fa1ef2236382cc",
+  "rowsScanned": 227447,
+  "rowsUsable": 225533,
+  "strata": [
+   {
+    "name": "vis<1000",
+    "quota": 120,
+    "candidates": 3599,
+    "taken": 120
+   },
+   {
+    "name": "1000-2999",
+    "quota": 180,
+    "candidates": 8399,
+    "taken": 180
+   },
+   {
+    "name": "3000-5999",
+    "quota": 200,
+    "candidates": 18820,
+    "taken": 200
+   },
+   {
+    "name": "6000-9999",
+    "quota": 200,
+    "candidates": 27259,
+    "taken": 200
+   },
+   {
+    "name": "vis>=10000",
+    "quota": 300,
+    "candidates": 167456,
+    "taken": 300
+   }
+  ]
+ },
+ "precomputedDiff": {
+  "qnhTendency3h": 3.6000000000000227
+ },
+ "missingFilled": {},
+ "stationScanned": {
+  "OTHER": 214928,
+  "ZYTX": 4949,
+  "ZYCC": 2828,
+  "ZYHB": 2828
+ },
+ "stationSampled": {
+  "OTHER": 975,
+  "ZYTX": 16,
+  "ZYCC": 6,
+  "ZYHB": 3
+ },
+ "probability": {
+  "min": 0.037465,
+  "p01": 0.084367,
+  "p10": 0.15226,
+  "p25": 0.276998,
+  "p50": 0.54788,
+  "p75": 0.872287,
+  "p90": 0.920299,
+  "p95": 0.952826,
+  "p99": 0.974535,
+  "max": 0.980386,
+  "mean": 0.557521,
+  "tiers": {
+   "p>=0.2(WATCH)": 823,
+   "p>=0.3(operatingThreshold)": 728,
+   "p>=0.5(CAUTION)": 525,
+   "p>=0.8(BAN)": 330
+  }
+ }
+}

@@ -22,9 +22,15 @@ test('地图不再渲染省名（这是用户点名要去掉的东西）', () =>
 test('飞行汽车按本地连续时刻外推，而不是整分钟跳一格', () => {
   assert.ok(/frameMinute:\{type:Number/.test(map), '缺 frameMinute prop')
   assert.ok(/const advanceMin=computed/.test(map), '缺 advanceMin')
-  // 用航向 + 速度外推，不用"起点→终点直线插值"（航路是弯的，插值会飘）
-  assert.ok(/f\.speedKmh\*adv\/60/.test(map), '外推算法不在（应含 speedKmh*adv/60）')
-  assert.ok(/Math\.sin\(h\)\/110\.574/.test(map), '缺纬度增量换算')
+  // V1.0.4：推进量的基准从"请求的分钟"改成"数据自己的分钟"（dataMinute）。
+  // 拿请求分钟当基准时，分钟一翻、新快照还在路上，adv 就归零 → 飞机倒退一分钟再弹回。
+  assert.ok(/dataMinute:\{type:Number/.test(map), '缺 dataMinute prop')
+  assert.ok(/props\.dataMinute/.test(map), '推进量没有以数据自身的分钟为基准')
+  // 位置沿**这条走廊自己的折线**取点（按顶点均分，与后端同一条规则），
+  // 不再用"航向 + 速度"直线外推：那是飞机漂出走廊、再被快照拉回来的根因。
+  assert.ok(/function pointAt/.test(map), '缺参数化取点 pointAt')
+  assert.ok(/pointAt\(path,p\)/.test(map), '位置没有沿走廊折线取点')
+  assert.ok(/function headingAt/.test(map), '机头角度没有取自折线当前段')
   // 进站淡出、离站淡入
   assert.ok(/p>=\.985/.test(map), '缺进站淡出')
   assert.ok(/f\.fade/.test(map), 'fade 没接到模板')
@@ -57,7 +63,8 @@ test('点选即聚焦，且画布尺寸变化后要重算', () => {
 
 test('放大时标记物保持屏幕尺寸（否则地名会比版图还大）', () => {
   assert.ok(/const inv=computed\(\(\)=>1\/zoom\.value\)/.test(map), '缺反向缩放因子')
-  assert.ok(/8\.6\*inv/.test(map), '城市名字号没有反向缩放')
+  // V1.0.4：城市名走"胶囊底 + 无描边字"，字号来自 tagBox，仍按 inv 反向缩放
+  assert.ok(/node\.tag\.fs\*inv/.test(map), '城市名字号没有反向缩放')
   assert.ok(/scale\(\$\{inv\}\)/.test(map), '起终点组没有反向缩放')
 })
 
