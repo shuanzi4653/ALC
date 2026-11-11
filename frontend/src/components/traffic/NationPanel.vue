@@ -375,6 +375,35 @@ function startClock(){
 // 拖时间轴：连续时钟要跟着跳，否则会被下一帧拉回去
 function onSeek(){ frameMinute.value=minute.value; loadFlights() }
 
+// 事件卡片的点击：一条事件聚合了多个城市，点开时先进第一个成员城市，
+// 该班次若还在飞就同时选中它 —— 否则读者只能对着"青海省 · 2 处"猜是哪两处。
+function openAlert(row){
+  const places=row.places||[]
+  // places 里的字符串是"起点 → 终点"（走廊端点），不是城市名：
+  // 直接拿它去切城市会切到"克拉玛依市 → 阿勒泰地区"这种不存在的 id。
+  const raw=String(places[0]||'')
+  const city=raw.split('→')[0].trim()
+  const cityHit=(data.value?.nodes||[]).some(n=>n.name===city)
+  if(row.flightId){
+    const hit=flights.value.find(f=>f.id===row.flightId)
+    if(hit){ pickFlight(hit); return }
+  }
+  if(cityHit&&city!==ident.value){
+    go('city',city,city)
+    // 切城市会重新取数；等它回来再选中这条事件指向的班次，否则会被 load() 清掉
+    if(row.flightId) setTimeout(()=>{
+      const hit=flights.value.find(f=>f.id===row.flightId)
+      if(hit) pickFlight(hit)
+    },1300)
+    return
+  }
+  if(!cityHit&&row.province&&trail.value.length<2){ go('province',row.province,row.province); return }
+  // 已经在那个城市：把关联班次选出来
+  const ids=row.memberIds||[]
+  const hit=flights.value.find(f=>ids.includes(f.id))
+  if(hit) pickFlight(hit)
+}
+
 function pickFlight(flight){
   if(selectedId.value!==flight.id){followId.value='';clearEvidence()}
   selectedId.value=flight.id
@@ -837,12 +866,22 @@ onUnmounted(()=>{
         <p>四类：低能见度、空域受限、回波绕飞、延期起飞。规则动作自动给出处置建议，需人工确认的标为待处置。</p>
       </div>
       <ul class="nrn-alerts">
-        <li v-for="row in alerts" :key="row.id" :class="row.severity">
+        <li v-for="row in alerts" :key="row.id" :class="row.severity"
+            role="button" tabindex="0" data-alert-row
+            :title="'点开：定位到' + ((row.places&&row.places[0])||'该事件所在城市')"
+            @click="openAlert(row)" @keydown.enter.prevent="openAlert(row)"
+            @keydown.space.prevent="openAlert(row)">
           <b>{{ row.kind }}</b>
           <em>{{ row.place }}</em>
           <p>{{ row.detail }}</p>
           <p class="act">处置：{{ row.action }}</p>
-          <span class="tag" :class="row.auto?'good':'warn'">{{ row.status }}</span>
+          <div class="nrn-alert-foot">
+            <span class="tag" :class="row.auto?'good':'warn'">{{ row.status }}</span>
+            <span class="nrn-alert-go" v-if="(row.places||[]).length||row.flightId">定位 ›</span>
+            <span class="nrn-alert-more" v-if="(row.places||[]).length>1">
+              成员：{{ (row.places||[]).slice(0,3).join('、') }}{{ (row.places||[]).length>3?' 等':'' }}
+            </span>
+          </div>
         </li>
         <li v-if="!alerts.length" class="empty">本级暂无需要处置的事件</li>
       </ul>
@@ -1328,7 +1367,15 @@ html[data-theme="light"] .nrn-legend i.box{border-color:#c92a2a}
      auto-fill 会保留空列、卡片挤在左边，右边空一大片。 */
   grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));
   align-content:start}
-.nrn-alerts li{border:1px solid rgba(70,110,140,.35);border-left-width:3px;border-radius:7px;padding:7px 9px;background:rgba(10,26,38,.62)}
+.nrn-alerts li{border:1px solid rgba(70,110,140,.35);border-left-width:3px;border-radius:7px;padding:7px 9px;
+  background:rgba(10,26,38,.62);cursor:pointer;transition:border-color .15s,background .15s}
+.nrn-alerts li:hover,.nrn-alerts li:focus-visible{background:rgba(22,52,74,.8);border-color:rgba(110,180,215,.6)}
+.nrn-alerts li.empty{cursor:default}
+.nrn-alert-foot{display:flex;align-items:center;gap:8px;margin-top:3px;flex-wrap:wrap}
+.nrn-alert-go{margin-left:auto;font-size:10.5px;color:#8ef0ff}
+.nrn-alert-more{font-size:10.5px;color:#7d9cb3}
+html[data-theme="light"] .nrn-alerts li:hover{background:#eef6fd;border-color:#9cc7e8}
+html[data-theme="light"] .nrn-alert-go{color:#0b7ea6}
 .nrn-alerts li.bad{border-left-color:#ee5040}
 .nrn-alerts li.warn{border-left-color:#f5be3c}
 .nrn-alerts li.empty{grid-column:1/-1;text-align:center;color:#6f92a8;padding:20px}
