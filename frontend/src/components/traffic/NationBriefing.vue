@@ -336,7 +336,11 @@ function clock(m){
       </section>
       <div class="nb-hd">
         <h3>机场情报 <small>{{ intel.length }} 个机场城市</small></h3>
-        <p>实况来自公开源（METAR / open-meteo）；“放行建议”是按能见度门槛算的规则派生值，不是官方结论。</p>
+        <p>实况来自公开源（METAR / open-meteo）；“放行建议”是按能见度门槛算的规则派生值，不是官方结论。
+          <template v-if="payload?.weatherMode?.virtual">
+            <b class="vvis-note">虚拟气象开启中：能见度与放行建议按合成雾区重算，温度与风仍是实况。</b>
+          </template>
+        </p>
         <p v-if="zones.available" class="nb-zone-line">
           净空（规则化生成，非官方公布）：<b>{{ zones.counts.airports }}</b> 机场 ·
           限制区 <b>{{ zones.counts.limitZones }}</b> 个 · 覆盖 <b>{{ ((zones.counts.coverageRatio||0)*100).toFixed(2) }}%</b> 陆域 ·
@@ -356,7 +360,7 @@ function clock(m){
             <tr v-for="row in intelRows.slice(0,props.density==='slim'?16:80)" :key="row.city+row.icao">
               <td><b>{{ row.icao||'—' }}</b><small>{{ row.station||'—' }}</small></td>
               <td>{{ row.city }}<small>{{ row.province }}</small></td>
-              <td :class="{bad:row.low}">{{ visText(row.visM) }}</td>
+              <td :class="{bad:row.low}">{{ visText(row.visM) }}<em v-if="row.virtualVis" class="vvis" title="虚拟气象：这个能见度来自合成雾区，不是实况">虚拟</em></td>
               <td>{{ row.windMps==null?'—':row.windMps+' m/s' }}</td>
               <td>{{ row.tempC==null?'—':row.tempC+' °C' }}</td>
               <td><span class="tag" :class="row.tone">{{ row.status }}</span></td>
@@ -496,4 +500,11 @@ td.empty{text-align:center;color:#6f92a8;padding:18px}
   table{font-size:11px}
   th,td{padding:4px 6px}
 }
+
+/* 虚拟气象下能见度是合成值：一枚小标，避免"620 m"被当成实况读数抄进材料 */
+.vvis{margin-left:4px;font-style:normal;font-size:9px;padding:0 4px;border-radius:999px;
+  color:#ffd08a;background:rgba(200,140,30,.18);border:1px solid rgba(220,170,60,.5);vertical-align:1px}
+.vvis-note{color:#ffd08a;display:block;margin-top:2px}
+html[data-theme="light"] .vvis{color:#7a5200;background:#fdf3e0;border-color:#e0bb78}
+html[data-theme="light"] .vvis-note{color:#7a5200}
 </style>

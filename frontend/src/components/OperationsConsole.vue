@@ -359,6 +359,58 @@ async function exportJournal(){
 
 const policy=computed(()=>densityPolicy(props.density))
 
+// —— 全国层口径（V1.0.5） ——
+// 这一页以前只有东北那套总账（53 条城际 / 216 条货运 / vis3k 62 个事件），
+// 而界面上到处写的是 319 市、492 条航线 —— 读者对不上号，还会以为"36 城"是覆盖范围。
+// 现在分两层写清楚：全国态势聚合层（本页现算）+ 裁决引擎层（东北运行网，裁决真正跑的地方）。
+const nationFacts=ref(null)
+const nationFactsError=ref('')
+let nationFetched=false
+async function loadNationFacts(){
+  if(nationFetched) return
+  nationFetched=true
+  try{
+    nationFacts.value=await requestJson(
+      `/api/traffic/v2/nation?level=nation&minute=${Math.round(props.minute||60)}`,{timeoutMs:90000})
+  }catch(e){
+    nationFetched=false            // 允许下次进入本页重试
+    nationFactsError.value=String(e?.message||e)
+  }
+}
+watch(()=>props.view,v=>{ if(v==='reference') loadNationFacts() },{immediate:true})
+
+/** 全国层的每一行：值全部来自后端当前载荷，不在这里写死任何数字。 */
+const nationLedger=computed(()=>{
+  const d=nationFacts.value
+  if(!d) return []
+  const s=d.summary||{}, t=d.traffic||{}, r=d.radar||{}, fg=d.fog||{}, z=d.zones?.counts||{}
+  const k=d.summary?.byKind||{}
+  const bands=r.counts||{}
+  const fmt=n=>n==null?'—':n
+  return [
+    {name:'覆盖城市 / 省级单元', value:`${fmt(s.cities)} 市 / ${fmt(s.provinces)} 省`,
+     note:'`data/traffic/nation-network.json` 的 counts；台湾、西藏、香港、澳门明确排除，距境外不足 50 km 的 11 城整体退出通航'},
+    {name:'机场 / 无机场市', value:`${fmt(s.airports)} / ${fmt(s.feedCities)}`,
+     note:'aviationweather.gov 站点总表；无机场市由"专用接驳"航线接入，不是没有通航'},
+    {name:'航线总数与构成', value:`${fmt(s.corridors)} 条`,
+     note:`省内 ${fmt(k.INTRA)} + 机场接驳 ${fmt(k.AIRPORT_FEED)} + 跨省 ${fmt(k.CROSS)}；为模拟派生（SIM），只做态势聚合，不参与运行计划`},
+    {name:'在飞 / 绕飞 / 停飞', value:`${fmt(t.airborne)} / ${fmt(t.delayed)} / ${fmt(t.hold)}`,
+     note:'在飞=当前分钟在航路上且未停飞；停飞=决定为 HOLD（天气或边界），与"距境外过近受限的走廊"分开计'},
+    {name:'雷达回波片数', value:`${fmt((r.stats||{}).totalRings)} 片`,
+     note:`弱 ${fmt(bands.WEAK)} / 中 ${fmt(bands.CONVECTIVE)} / 强 ${fmt(bands.STRONG)}；累计掩膜成环，三档是嵌套关系。虚拟气象下为合成几何`},
+    {name:'雾区', value:`${fmt(fg.counts?.cities)} 城 / ${fmt((fg.counts?.BAN||0)+(fg.counts?.LOW||0))} 片`,
+     note:'由逐市能见度按半径外扩合并（DERIVED），不是雾场观测；半径是工程估值'},
+    {name:'低能见度城市', value:`${fmt(s.lowVisCities)} 市`,
+     note:'能见度 <3000 m；虚拟气象开启时这一格与雾区同源，所以会一起变'},
+    {name:'逐市实况覆盖', value:`${fmt(s.weatherCities)} / ${fmt(s.cities)} 市`,
+     note:'open-meteo 逐市实况（公开、免密钥）；缺报城市在界面上显示为"无实况"，不以默认值填补'},
+    {name:'机场净空', value:`${fmt(z.airports)} 机场 / ${fmt(z.limitZones)} 限制区`,
+     note:`规则化生成（DERIVED），覆盖 ${fmt(z.coverageSqKm)} km²、陆域 ${((z.coverageRatio||0)*100).toFixed(2)}%；与东北 69 站点法定管制区（OFFICIAL）分开计数，永不合并`},
+    {name:'距境外过近退出通航', value:`${fmt(d.border?.excludedCities?.length)} 城`,
+     note:`距境外不足 ${fmt(d.border?.excludeKm)} km 整体退出，城市与航线一并删除；界面上不留"半条"`},
+  ]
+})
+
 const caliber=computed(()=>caliberBlocks(props.session,props.weather,props.network))
 const sourceRows=computed(()=>caliber.value.flatMap(block=>block.rows.map(row=>({...row,block:block.title}))))
 const glossaryQuery=ref('')
@@ -956,12 +1008,33 @@ async function copyReceipt(row){
   </template>
   <template v-else-if="view==='reference'">
   <div class="operations-heading">
-    <h2>数据口径与边界 <small>{{cityName}}</small></h2>
-    <p>本系统里每一块内容都带一枚来源角标，含义只在这里定义一次。<b>「边界」一项说的是它不意味着什么</b>——前两项（谁产的、覆盖什么）在别的页面已经零散说过，唯独边界从来没有集中的、可引用的出处。</p>
+    <h2>数据口径与边界 <small>全国 · 两层口径</small></h2>
+    <p><b>两层要分开读</b>：上面一张是<b>全国态势聚合层</b>（319 市、492 条模拟航线，只做态势与示意）；下面一张是<b>裁决引擎层</b>（东北 36 城 53 条城际 + 216 条城内配送，判定真正跑在这一层）。把两层数字混读，就会出现"36 城"和"319 市"并列的错位。每一块内容都带来源角标，含义只在这里定义一次。</p>
   </div>
+  <section class="caliber-ledger nation-ledger" data-nation-ledger>
+    <div class="ledger-hd">
+      <h3>① 全国态势聚合层 <small>当前载荷实测值</small></h3>
+      <p>这一层的数字<b>随载荷实时变</b>，下面每一行都指得出字段。交通为模拟（SIM），只做态势聚合与示意，不参与运行计划与裁决。</p>
+    </div>
+    <p class="operations-error" v-if="nationFactsError">全国载荷读取失败：{{nationFactsError}} —— 这一层留空，不代表全国没有数据。</p>
+    <p class="ledger-loading" v-else-if="!nationLedger.length">正在读取全国载荷…</p>
+    <div class="ledger-scroll" v-else>
+      <table>
+        <thead><tr><th>指标</th><th>当前取值</th><th>定义、来源与边界</th></tr></thead>
+        <tbody>
+          <tr v-for="row in nationLedger" :key="row.name" :data-nation-ledge="row.name">
+            <td><b>{{ row.name }}</b></td>
+            <td class="num">{{ row.value }}</td>
+            <td><small>{{ row.note }}</small></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
   <section class="caliber-ledger" data-caliber-ledger>
     <div class="ledger-hd">
-      <h3>口径总账</h3>
+      <h3>② 裁决引擎层 <small>东北运行网 · 36 城 53 + 216 条</small></h3>
       <p>每个数字都在这里能查到定义、分子分母、出处与更新节奏。<b>分母写"—"表示它不是一个比值</b>，不是"还没填"。</p>
     </div>
     <div class="ledger-scroll">
@@ -1369,12 +1442,12 @@ html[data-theme="light"] tbody tr.jump:hover{background:#eef6fd}
 .source-badge.official{background:#1a2438;color:#9fb0dd;border-color:#37456b}
 .source-badge.manual{background:#2a1e30;color:#d9a8e4;border-color:#543d5e}
 .source-badge.absent{background:#242a30;color:#9aa6b2;border-color:#4b5560}
-.badge-legend{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-bottom:26px}
-.badge-legend article{padding:13px 15px;background:#14293a;border:1px solid #274355;border-radius:8px}
-.badge-legend p{font-size:12px;color:#8aa8ba;line-height:1.75;margin-top:9px}
+.badge-legend{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;margin-bottom:18px}
+.badge-legend article{padding:10px 12px;background:#14293a;border:1px solid #274355;border-radius:8px}
+.badge-legend p{font-size:11.5px;color:#8aa8ba;line-height:1.65;margin-top:6px}
 
-.caliber-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(390px,1fr));gap:14px;margin-bottom:30px}
-.caliber-card{padding:16px 18px;background:#14293a;border:1px solid #274355;border-radius:9px;min-width:0}
+.caliber-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px;margin-bottom:22px}
+.caliber-card{padding:13px 15px;background:#14293a;border:1px solid #274355;border-radius:9px;min-width:0}
 .caliber-card header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
 .caliber-card h3{font-size:14px;font-weight:500;color:#d5e7f1}
 .caliber-intro{font-size:12px;color:#7d9cb0;line-height:1.75;margin-bottom:13px}
@@ -1568,9 +1641,17 @@ html[data-theme="light"] tbody tr.jump:hover{background:#eef6fd}
   padding:0!important;cursor:pointer;text-align:left;text-decoration:underline;text-underline-offset:3px}
 .link:hover{color:#b8ecfb}
 
-.caliber-ledger{margin:12px 0 16px;border:1px solid var(--alc-line);border-radius:var(--alc-radius);background:var(--alc-bg-1);overflow:hidden}
-.ledger-hd{padding:12px 16px;border-bottom:1px solid var(--alc-line)}
-.ledger-hd h3{margin:0;font-size:18px;font-weight:600;color:var(--alc-text)}
+.caliber-ledger{margin:10px 0 14px;border:1px solid var(--alc-line);border-radius:var(--alc-radius);background:var(--alc-bg-1);overflow:hidden}
+/* 全国层总账：三列（指标 / 取值 / 说明），取值等宽不抖，说明列吃掉剩余宽度 */
+.nation-ledger td.num{font-variant-numeric:tabular-nums;white-space:nowrap;color:#cfe6f5;font-weight:600}
+.nation-ledger td small{font-size:11px;line-height:1.55;color:var(--alc-text-dim)}
+.nation-ledger tbody tr:hover{background:rgba(76,141,255,.06)}
+.ledger-loading{margin:0;padding:14px;font-size:12px;color:var(--alc-text-dim)}
+html[data-theme="light"] .nation-ledger td.num{color:#0f3550 !important}
+html[data-theme="light"] .nation-ledger td small{color:#4a6a85 !important}
+.ledger-hd{padding:10px 14px;border-bottom:1px solid var(--alc-line)}
+.ledger-hd h3{margin:0;font-size:15px;font-weight:600;color:var(--alc-text)}
+.ledger-hd h3 small{margin-left:8px;font-size:11.5px;font-weight:400;color:var(--alc-text-dim)}
 .ledger-hd p{margin:6px 0 0;font-size:12px;line-height:1.6;color:var(--alc-text-dim)}
 .ledger-scroll{overflow-x:auto;scrollbar-width:thin}
 .ledger-scroll::-webkit-scrollbar{height:8px}

@@ -332,14 +332,16 @@ def _radar_polygons(bands: Dict[str, Any]):
 # 固定种子（按 10 分钟一档 + 余弦扰动），同一帧重跑结果一致，方便复核与截图对比。
 _VIRTUAL_CACHE: Dict[Any, Any] = {}
 
-# 六个大区各给一个中心点与半径（经度±、纬度±），覆盖东部沿海与长江中游两条主廊道
+# 六个大区各给一个中心点与半径（经度±、纬度±），覆盖东部沿海与长江中游两条主廊道。
+# 半径比第一版收 18%：原来整片罩得太满，凡是压线的走廊都"绕不开"，于是虚拟模式下
+# 只剩停飞、一架绕飞都没有 —— 真实强对流过程里总有一部分航路是能小绕过去的。
 _VIRTUAL_CELLS = (
-    ('华东', 119.2, 31.6, 3.1, 2.2),
-    ('中南-长江中游', 113.4, 29.6, 2.8, 2.0),
-    ('中南-华南沿海', 112.6, 22.8, 2.4, 1.7),
-    ('华北', 116.6, 37.8, 2.6, 1.9),
-    ('东北', 125.4, 45.2, 2.2, 1.6),
-    ('西南', 105.6, 29.2, 2.0, 1.5),
+    ('华东', 119.2, 31.6, 2.54, 1.80),
+    ('中南-长江中游', 113.4, 29.6, 2.30, 1.64),
+    ('中南-华南沿海', 112.6, 22.8, 1.97, 1.39),
+    ('华北', 116.6, 37.8, 2.13, 1.56),
+    ('东北', 125.4, 45.2, 1.80, 1.31),
+    ('西南', 105.6, 29.2, 1.64, 1.23),
 )
 
 
@@ -361,18 +363,46 @@ def _ellipse_ring(lon: float, lat: float, rx: float, ry: float, phase: float,
     return ring
 
 
+# 每个对流系统里挂几个对流单体。真实回波是"层状罩里长着几个对流胞、胞里有强核"，
+# 以前每个系统只画三个同心椭圆 —— 那是靶心，不是回波。三档各自一片，画出来还互不嵌套。
+_VIRTUAL_CELLS_PER_SYSTEM = 6
+
+
 def _virtual_bands(bucket: int) -> Dict[str, List[List[List[float]]]]:
-    """按 10 分钟一档生成合成回波：STRONG 6 片 + CONVECTIVE 6 片 + WEAK 6 片。"""
-    strong, convective, weak = [], [], []
+    """按 10 分钟一档生成合成回波：**有结构的对流系统群**。
+
+    一个系统 = 1 个层状罩（WEAK）+ N 个对流单体（CONVECTIVE）+ 单体内的强核（STRONG）。
+    这样三档天然是"罩 ⊃ 单体 ⊃ 强核"的嵌套结构，前端按绿→黄→红叠色就是真实回波的样子；
+    以前每档各画一个同心椭圆，三档面积差不多，看着像三个靶心叠在一起。
+
+    片数：6 系统 × (2 罩 + 6 单体 + 6 强核) = 84 片，与实测同量级（实测 45/68/86）。
+    单体位置用固定相位算出来，同一 bucket 重跑结果一致 —— 演示回放才能复现。
+    """
+    strong: List[List[List[float]]] = []
+    convective: List[List[List[float]]] = []
+    weak: List[List[List[float]]] = []
     for index, (_region, lon, lat, rx, ry) in enumerate(_VIRTUAL_CELLS):
         phase = (bucket * 0.37 + index * 1.13) % (2 * 3.14159)
         # 中心随时间缓慢漂移：演示"回波在动"，但不会漂出国境
         drift_lon = 0.55 * math.cos(phase)
         drift_lat = 0.32 * math.sin(phase * 0.8)
         cx, cy = lon + drift_lon, lat + drift_lat
-        strong.append(_ellipse_ring(cx, cy, rx * 0.42, ry * 0.42, phase))
-        convective.append(_ellipse_ring(cx, cy, rx * 0.72, ry * 0.72, phase + 0.9))
+        # 层状罩：整个系统的大边界
         weak.append(_ellipse_ring(cx, cy, rx, ry, phase + 1.7))
+        # 罩外再带一片薄的层状云（真实回波边缘总有衰减带，不是一刀切）
+        weak.append(_ellipse_ring(cx + rx * 0.55, cy - ry * 0.35, rx * 0.62, ry * 0.55, phase + 2.6))
+        for k in range(_VIRTUAL_CELLS_PER_SYSTEM):
+            ang = 2 * math.pi * k / _VIRTUAL_CELLS_PER_SYSTEM + phase * 0.6
+            # 单体沿系统内部一圈排布，半径取系统的 0.45，避免顶到罩边
+            ox = math.cos(ang) * rx * 0.45
+            oy = math.sin(ang) * ry * 0.45
+            cell_r = 0.46 + 0.16 * math.sin(phase + k * 1.9)
+            convective.append(_ellipse_ring(cx + ox, cy + oy, rx * cell_r, ry * cell_r,
+                                            phase + k * 0.8))
+            # 强核偏在单体的一侧（真实强回波不在胞心，在入流侧）
+            strong.append(_ellipse_ring(cx + ox * 1.14, cy + oy * 1.14,
+                                        rx * cell_r * 0.42, ry * cell_r * 0.42,
+                                        phase + k * 1.4))
     return {'STRONG': strong, 'CONVECTIVE': convective, 'WEAK': weak}
 
 
@@ -381,14 +411,81 @@ def _virtual_radar(bucket: int) -> Dict[str, Any]:
     if bands is None:
         bands = _virtual_bands(bucket)
         _VIRTUAL_CACHE[('bands', bucket)] = bands
+    # stats 与真实帧同构（_radar_clipped 之后由 radar_stats 产出）：前端与"口径与来源"页
+    # 读的是同一组字段，虚拟模式不该让它们变成 None —— 那会让"回波 199 片"在切到虚拟后消失。
+    counts = {k: len(v) for k, v in bands.items()}
+    stats = {
+        'bands': {k: {'kept': n, 'total': n} for k, n in counts.items()},
+        'totalRings': sum(counts.values()),
+        'keptRings': sum(counts.values()),
+        'truncated': False,
+        'cap': None,
+    }
     return {
         'available': True,
         'ts': f'VIRTUAL-{bucket * 600}',      # 600 秒一档，形如时间戳，前端按字符串比较即可
         'source': 'VIRTUAL（演示包：合成回波，非实况）',
         'virtual': True,
         'bands': bands,
-        'counts': {k: len(v) for k, v in bands.items()},
+        'counts': counts,
+        'stats': stats,
+        # 覆盖率没有"真实国土面积"分母可言，给 None 比给个假数诚实
+        'coverage': None,
     }
+
+
+# 虚拟雾：东部平原与长江中游两片。中心点取自 _VIRTUAL_CELLS 里靠东的三个系统附近，
+# 画出来是"连成片的雾"，而不是"每个城市一个小圆"。
+_VIRTUAL_FOG_FIELDS = (
+    ('华北平原-黄淮', 116.2, 36.2, 3.4, 1.9, 700),
+    ('长江中下游', 117.4, 30.4, 3.8, 1.7, 900),
+    ('四川盆地', 105.4, 30.2, 2.1, 1.3, 1600),
+)
+
+
+def _virtual_vis_override(cities: List[Dict[str, Any]],
+                          weather: Dict[str, Dict[str, Any]],
+                          bucket: int) -> Dict[str, Dict[str, Any]]:
+    """虚拟气象的**唯一**开关点：返回一份 weather 副本，只改 ``visM``。
+
+    这是"虚拟气象到底影响了什么"的答案：**只有能见度被替换**，其余要素
+    （气温、风、湿度）原样不动。而能见度是雾与低能见判定的唯一输入，所以
+
+      · ``_fog()`` 会因为 visM 变小而自然画出雾区 —— 雾是"算出来的"，不是新画一层；
+      · ``nation_ops.flight_objects()`` 会因此产生 WEATHER_HOLD 与绕飞 —— 判据同一条路径。
+
+    显示侧仍用**真实** weather 的 visM（见 ``_payload_locked`` 里的 ``display_weather``），
+    所以页面上的"能见度 2.4 km"永远是真数，而"因雾停飞"是按虚拟雾算的。
+    这条边界必须两边都守住，否则要么虚数当实况、要么虚拟气象什么也没发生。
+    """
+    out = {name: dict(row) for name, row in weather.items()}
+    phase = (bucket * 0.29) % (2 * math.pi)
+    for index, (_name, lon, lat, rx, ry, base_vis) in enumerate(_VIRTUAL_FOG_FIELDS):
+        # 雾场本身也在缓慢移动/消长：不然拖时间轴时雾一动不动，一眼看出是贴图
+        cx = lon + 0.4 * math.cos(phase + index)
+        cy = lat + 0.25 * math.sin(phase * 0.7 + index)
+        for city in cities:
+            name = city['name']
+            row = out.get(name)
+            if row is None:
+                continue
+            dx = (city['lon'] - cx) / rx
+            dy = (city['lat'] - cy) / ry
+            d = math.hypot(dx, dy)
+            if d > 1.35:
+                continue
+            # 中心 600 m 上下（雾），外圈 1500–2800 m（轻雾/霾）—— 用 base_vis 与距离线性插值
+            if d <= 0.55:
+                vis = base_vis * (0.75 + 0.35 * math.sin(phase + index))
+            else:
+                vis = base_vis + (3000 - base_vis) * min(1.0, (d - 0.55) / 0.8)
+            row['visM'] = int(max(300, min(row.get('visM') or 99999, vis)))
+            # `low` 是 visM<3000 的派生布尔，全库有三处直接读它（页头低能见计数、
+            # 城市红圈、逐市情报状态）。只改 visM 不改 low，就会出现
+            # "雾区 104 城、页头仍写 11 城"这种自相矛盾。
+            row['low'] = row['visM'] < 3000
+            row['virtualVis'] = True
+    return out
 
 
 def _virtual_detour_table(bucket: int) -> Dict[str, Dict[str, Any]]:
@@ -609,7 +706,7 @@ def _live_stations() -> List[Dict[str, Any]]:
     return points
 
 
-def _province_rows() -> List[Dict[str, Any]]:
+def _province_rows(virtual: bool = False, minute: int = 0) -> List[Dict[str, Any]]:
     stations = _live_stations()
     live: Dict[str, int] = {}
     model: Dict[str, int] = {}
@@ -618,7 +715,10 @@ def _province_rows() -> List[Dict[str, Any]]:
         bucket[point['name']] = bucket.get(point['name'], 0) + 1
     by_province = _cities_by_province()
     stats = _corridor_stats()
-    weather = _city_weather()
+    # 省级"低能见城市"是**判据口径**：虚拟气象下必须与雾区同源，否则会出现
+    # "雾区 104 城、省级汇总 11 城"。逐市能见度读数本身也走同一份（见 intel 说明）。
+    weather = (_virtual_vis_override(_city_rows(), _city_weather(), _virtual_bucket(minute))
+               if virtual else _city_weather())
     rows: List[Dict[str, Any]] = []
     for province, cities in by_province.items():
         bucket = stats.get(province) or {'intra': 0, 'feed': 0, 'cross': 0, 'total': 0}
@@ -837,7 +937,12 @@ def _flights_payload_locked(level: str = 'nation', ident: Optional[str] = None,
                 corridors = _slice_corridors({city['province']}, city=ident)
     else:
         corridors = _slice_corridors(set(provinces))
-    flights = nation_ops.flight_objects(corridors, minute, table, _city_weather(), _model_probs(),
+    # 与 _payload_locked 同一套输入：时间轴拖动时，班次裁决的口径不能和整页载荷不一致。
+    # 否则会出现"首页说因雾停飞 14 架、拖一格时间轴变回 0 架"这种自相矛盾。
+    display_weather = _city_weather()
+    judge_weather = (_virtual_vis_override(_city_rows(), display_weather, _virtual_bucket(minute))
+                     if virtual else display_weather)
+    flights = nation_ops.flight_objects(corridors, minute, table, judge_weather, _model_probs(),
                                         blocked_ids=blocked_ids)
     by_province: Dict[str, Dict[str, int]] = {}
     by_city: Dict[str, Dict[str, int]] = {}
@@ -865,11 +970,11 @@ def _flights_payload_locked(level: str = 'nation', ident: Optional[str] = None,
 
 def _payload_locked(level: str = 'nation', ident: Optional[str] = None,
             minute: int = 0, virtual: bool = False) -> Dict[str, Any]:
-    provinces = _province_rows()
+    minute = max(0, min(1440, int(minute or 0)))
+    provinces = _province_rows(virtual, minute)
     stations = _live_stations()
     base = _base(level, ident)
     names = [row['name'] for row in provinces]
-    minute = max(0, min(1440, int(minute or 0)))
     # 虚拟气象：换的是**几何来源**，不是结果 —— 绕飞与停飞仍由同一套 _detour_for 判定，
     # 所以"开演示包"与"真实天气"跑的是同一条代码路径，只是输入不同。
     blocked_ids: set = set()
@@ -889,13 +994,34 @@ def _payload_locked(level: str = 'nation', ident: Optional[str] = None,
         weather_doc = _city_weather_payload()
         weather = weather_doc.get('cities') or {}
         model_probs = _model_probs()
-        flights = nation_ops.flight_objects(corridors, minute, table, weather, model_probs,
+        scoped_cities = cities if cities is not None else _city_rows()
+        # 虚拟气象的唯一落点：**换一份能见度**，其余要素不动（见 _virtual_vis_override）。
+        # judge_weather 给判定用，display_weather 给界面用 —— 两者必须分开：
+        # 合起来就会出现"气温 3℃ 但能见度 600 m"这种半真半假的读数。
+        bucket = _virtual_bucket(minute)
+        judge_weather = _virtual_vis_override(scoped_cities, weather, bucket) if virtual else weather
+        display_weather = weather
+        # 逐市情报：**能见度用判定口径**（它本身就是雾的量化，虚拟雾变了它就该变），
+        # 气温/风速仍取自 display_weather 的实况。每行带 virtualVis，前端加"（虚拟）"。
+        intel_weather = judge_weather if virtual else display_weather
+        if virtual:
+            # 节点上的 weather 只服务"红圈 + 点开看这座城"：能见度与 low 跟着虚拟雾走，
+            # 气温风速原样（它们是实况）。不换这一步，页头会写"低能见 11 城"而雾区盖了 104 城，
+            # 地图上也不会出现红圈 —— 虚拟气象只在表格里生效、图上毫无变化。
+            for node in body.get('nodes') or []:
+                jw = judge_weather.get(node['name']) or {}
+                if node.get('weather') and jw.get('visM') is not None:
+                    node['weather'] = {**node['weather'], 'visM': jw['visM'],
+                                       'low': bool(jw.get('low')), 'virtual': True}
+            if body.get('summary') is not None:
+                body['summary']['lowVisCities'] = sum(
+                    1 for row in scoped_cities if (judge_weather.get(row['name']) or {}).get('low'))
+        flights = nation_ops.flight_objects(corridors, minute, table, judge_weather, model_probs,
                                             blocked_ids=blocked_ids)
         hit = sum(1 for row in corridors if row.get('detour'))
         delayed = sum(1 for row in flights if row['status'] == 'DELAYED')
         blocked = sum(1 for row in corridors if row.get('borderBlocked'))
         border_hit = sum(1 for row in corridors if row.get('borderDetour'))
-        scoped_cities = cities if cities is not None else _city_rows()
         airport_by_city: Dict[str, Dict[str, Any]] = {}
         for station in _airports().get('stationRows') or []:
             if station.get('city'):
@@ -915,6 +1041,7 @@ def _payload_locked(level: str = 'nation', ident: Optional[str] = None,
                     'coverage': None,
                     'tiles': None,
                     'virtual': True,
+                    'stats': radar.get('stats'),
                 } if radar.get('virtual') else {
                     'available': bool(radar.get('available')),
                     'ts': radar.get('ts'),
@@ -931,9 +1058,27 @@ def _payload_locked(level: str = 'nation', ident: Optional[str] = None,
                 'clearanceNote': '许可要素由本班次已写定的计划字段组装，不重新计算；标“待批”的班次不进入在飞序列。',
                 'flights': flights,
                 'upcoming': nation_ops.upcoming(corridors, minute)[:90],
-                'alerts': nation_ops.alerts(corridors, flights, weather, scoped_cities),
-                'intel': nation_ops.intel(scoped_cities, weather, airport_by_city),
-                'fog': _fog(scoped_cities, weather),
+                'alerts': nation_ops.alerts(corridors, flights, judge_weather, scoped_cities),
+                # intel 是"读数 + 判定"两张皮：visM/tempC/wind 取实况（数字必须是真的），
+                # low/status 取判定口径（否则虚拟雾区里的城市会写着"可放行"而飞机已停飞）。
+                # 每行带 virtualVis 标记，前端据此在数字后面加"虚拟"。
+                'intel': nation_ops.intel(scoped_cities, intel_weather, airport_by_city),
+                # 雾由能见度派生：喂 judge_weather 就自动跟着虚拟雾走，不需要另画一层
+                'fog': {**_fog(scoped_cities, judge_weather),
+                        **({'virtual': True,
+                            'note': '虚拟气象：雾区为合成场（按虚拟能见度派生），非实况。'}
+                           if virtual else {})},
+                # 虚拟气象的影响面写着讲清楚：换的是回波与雾，气温/风/能见度读数仍是实况。
+                # 前端在开启虚拟时把这几行显示出来，避免"虚拟"被读成"整页都是假数据"。
+                'weatherMode': {
+                    'virtual': bool(virtual),
+                    'label': '虚拟气象（演示包）' if virtual else '实测气象',
+                    'replaced': ['radar', 'fog'] if virtual else [],
+                    'untouched': ['tempC', 'windMps', 'humidity', 'pressure'] if virtual else [],
+                    'note': ('回波为合成对流系统、雾区按虚拟能见度派生；'
+                             '气温、风等要素仍为公开源实况。裁决用能见度已按虚拟雾区调整。'
+                             if virtual else '全部要素取自公开源实况。'),
+                },
                 # 机场净空（DERIVED）：规则化几何 + 穿越统计。
                 # 与东北 69 站点的法定管制区（OFFICIAL）分开，永不合并计数。
                 # 只挂计数摘要；几何与穿越明细走 /traffic/v2/nation/zones 按需取。
@@ -965,7 +1110,7 @@ def _payload_locked(level: str = 'nation', ident: Optional[str] = None,
                             'blocked': blocked, 'borderDetourCorridors': border_hit,
                             'hold': sum(1 for row in flights if row['decision'] == 'HOLD'),
                             'lowVisCities': sum(1 for row in scoped_cities
-                                                if (weather.get(row['name']) or {}).get('low')),
+                                                if (judge_weather.get(row['name']) or {}).get('low')),
                             'detourShiftKm': round(sum(r['shiftKm'] for r in table.values()), 1)}}
 
     if level in ('nation', 'north'):

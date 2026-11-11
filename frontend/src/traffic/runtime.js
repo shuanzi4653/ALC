@@ -1895,7 +1895,6 @@ export const SECTION_CAN_DO=Object.freeze({
   home:['看哪条走廊最差（点结论条）','把时间轴拖到 T+3h 看风险变化','按 Ctrl+K 搜班次或走廊'],
   national:['按大区筛一遍全国省级单元','看哪几个省有机场与实况','逐级下钻到省与市'],
   overview:['点地图上的载具看单班航迹','切换图层看雷达与风险区','导出本轮快照'],
-  briefing:['挑一个班次看放行许可报文','按状态筛选待放行','跳到走廊剖面看判据'],
   schedule:['按城市或班次号搜索','翻页看全量台账','点行选中后看单班处置'],
   alerts:['按严重度筛选事件','定位到地图上的事件位置','把事件带进研判页'],
   weather:['切换实测/虚拟通道','看逐站 METAR 与风险区','导出本帧观测'],
@@ -1954,7 +1953,10 @@ export const CALIBER_LEDGER=Object.freeze([
 ])
 
 export const SECTION_NAMES=Object.freeze({
-  home:'运行首页',overview:'运行总览',national:'全国航线网',briefing:'运行情报',schedule:'调度台账',
+  // V1.0.5：`briefing`（运行情报）并入 `weather`（气象监测）。
+  // 一个分节只放一个视图 —— 原来态势页里还嵌着"台账/情报/处置"四个页内 tab，
+  // 与左侧导航里的同名入口重复，点两处都能到同一屏。
+  home:'运行首页',overview:'运行总览',national:'全国航线网',schedule:'调度台账',
   alerts:'事件处置台',weather:'气象监测',mechanism:'算法机理',reference:'口径与来源',
   assistant:'大模型取证',history:'运行日志',
   profile:'走廊剖面',card:'推演',counterfactual:'反事实对照',ledger:'分歧台账',
@@ -2407,7 +2409,8 @@ export function airspaceIntel(plan,flights,weather,network){
 
 export const DRILL_TARGETS=Object.freeze({
   accepted:{section:'schedule',status:'ALL',hint:'「调度台账」逐条列出全部受理班次'},
-  detour:{section:'briefing',hint:'「民航运行情报」里的「改航依据 · 逐班复诵」逐班给出气象判据'},
+  // V1.0.5：运行情报并入气象监测，落点跟着改（否则点 KPI 静默无反应）
+  detour:{section:'weather',hint:'「在飞班次情报」逐班给改航判据与绕飞量，落点就是气象监测页的两张表'},
   delay:{section:'schedule',status:'HOLD',hint:'「调度台账」按运行状态筛出等待放行的班次，逐班看延误是怎么来的'},
   weather:{section:'alerts',cause:'weather',hint:'「预警中心 · 事件处置台」只留气象成因的事件，每条带走廊与建议'},
   risk:{section:'weather',hint:'「气象监测」逐区域列出成员、来源与合并口径'},
@@ -3570,7 +3573,6 @@ export const SECTION_HINTS = Object.freeze({
   overview: '逐班台账：申请、计划、实际与裁决，可下钻到省市',
   weather: '逐市实况、回波与雾区，标来源与数据时效',
   profile: '沿走廊逐公里的不可飞概率剖面',
-  briefing: '班次情报（判据与裁决）与空域情报（机场、净空）',
   alerts: '预警事件的成因分布与处置状态',
   assistant: '大模型的证据检索与判定留痕',
   schedule: '逐班次的申请、计划与实际',
@@ -3612,7 +3614,7 @@ export const HIDDEN_SECTIONS = Object.freeze(new Set(['mechanism', 'counterfactu
 export const SECTION_HASHES = Object.freeze({
   home: 'situation/home', national: 'situation/national',
   overview: 'situation/overview', weather: 'situation/weather',
-  profile: 'corridor/profile', briefing: 'corridor/briefing',
+  profile: 'corridor/profile',
   alerts: 'dispatch/console', schedule: 'dispatch/ledger', assistant: 'dispatch/evidence',
   card: 'model/card', reference: 'model/reference', mechanism: 'model/mechanism',
   counterfactual: 'compare/counterfactual', ledger: 'compare/ledger',
@@ -3624,12 +3626,23 @@ export function sectionHash(section) {
   return '#/' + (SECTION_HASHES[section] || SECTION_HASHES.home)
 }
 
+/**
+ * 旧 hash → 现视图。删掉一个分节时**必须**在这里登记：
+ * 外部说明、别人收藏的链接、答辩时给的地址都可能还是旧的，
+ * `sectionFromHash` 查不到会静默回落首页 —— 那比 404 更像"页面坏了"。
+ */
+export const LEGACY_SECTION_HASHES = Object.freeze({
+  'corridor/briefing': 'weather',      // V1.0.5：运行情报 → 气象监测
+})
+
 /** hash → 视图。非法/空 hash 一律回落到 `home`（不要抛、不要留在空白页）。 */
 export function sectionFromHash(hash) {
   const raw = String(hash || '').replace(/^#\/?/, '').replace(/\/+$/, '')
   for (const [key, path] of Object.entries(SECTION_HASHES)) {
     if (path === raw) return key
   }
+  const legacy = LEGACY_SECTION_HASHES[raw]
+  if (legacy) return legacy
   return 'home'
 }
 

@@ -68,9 +68,14 @@ test('the four 1366 pages keep a 12px floor breakpoint', () => {
 // 不进人工队列。这条口径只活在文案里 —— 回退后页面不会算错任何数字，只会把
 // "已自动放行" 重新说成 "须经批准"，所以只能靠源码断言钉住。
 test('airport clearance crossings are described as auto-approved', () => {
+  // V1.0.5：原断言的落点（TrafficWorkbench 里的班次详情）随东北总览一起下线，
+  // 全国层的净空口径改由「气象监测 → 机场情报」这一行承担。
+  const intel = read('src/components/traffic/NationBriefing.vue')
+  assert.match(intel, /净空（规则化生成，非官方公布）/,
+    '机场情报必须说明净空是规则化生成、非官方公布')
+  assert.match(read('src/components/traffic/NationMap.vue'), /机场净空限制区（规则化生成，非官方公布）/,
+    '地图上的禁飞区说明没跟上')
   const detail = read('src/components/TrafficWorkbench.vue')
-  assert.match(detail, /机场净空按自动审批放行/,
-    '班次详情必须说明机场净空是自动审批放行')
   assert.doesNotMatch(detail, /须经空中交通管理机构批准/,
     '旧的"须经空中交通管理机构批准"文案会让读者以为机场净空还在排队')
 

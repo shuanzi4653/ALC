@@ -63,34 +63,27 @@ test('the fps watchdog is a real function, not a placeholder', () => {
   assert.equal(typeof startFpsWatch, 'function')
 })
 
-test('the 3D component refuses to build a map on a failed probe', () => {
-  const source = read('../src/components/traffic/NationGlobe.vue')
-  // 探测必须在 new MlMap 之前，且失败直接 return —— 建了就是给主线程上刑
-  const probeAt = source.indexOf('probeGPU()')
-  const mapAt = source.indexOf('new MlMap(')
-  assert.ok(probeAt > 0 && mapAt > probeAt, '能力探测必须排在创建地图之前')
-  assert.match(source, /if\s*\(!gpu\.ok\)[\s\S]{0,240}return/, '探测不通过时不得继续建图')
-  assert.match(source, /startFpsWatch\(/, '三维必须挂帧率看门狗')
-  assert.match(source, /terrain/, '省/市层要挂 DEM 地形')
-})
-
-test('no per-city extrusions are drawn on the 3D map', () => {
-  const source = read('../src/components/traffic/NationGlobe.vue')
-  // 曾经给省会起过 fill-extrusion 体块柱。全国缩放下那是一片半透明方块，
-  // 读者会当成 UI 残影（用户 2026-11-11 直接问"每个城市上面的透明方块是什么"），
-  // 所以全部撤掉：城市只用点 + 环标记，三维里保留的体块只有机场净空柱。
-  assert.ok(!/id:'towers'/.test(source), '不应再有城市体块图层')
-  assert.ok(!/towerFC/.test(source), '不应再有体块数据源')
-  assert.match(source, /id:'node-dot'/, '城市仍以点标记存在')
-  assert.match(source, /id:'zone-wall'/, '净空柱是三维里唯一保留的体块')
-})
-
-test('the panel falls back to the tilt view with a stated reason', () => {
+// V1.0.5：三维视图整体下线（用户 2026-11-12：「地形和倾斜和三维删掉，对应的功能也删掉」）。
+// 这一组原本钉的是"能不能安全地进三维"；组件删掉之后，判据反过来钉**不许悄悄加回来**——
+// 材料里已经按"不用三维"写了，代码里若又长出入口，答辩现场会被问住。
+test('三维视图已下线：组件删除、入口移除、无残留地形', () => {
+  assert.throws(() => read('../src/components/traffic/NationGlobe.vue'), /ENOENT|no such file/i,
+    'NationGlobe.vue 应已删除')
   const panel = read('../src/components/traffic/NationPanel.vue')
-  assert.match(panel, /if\s*\(!probe\.ok\)/, '面板在探测失败时必须拦下三维')
-  assert.match(panel, /tilt\.value=true/, '拦下之后要有倾斜视图兜底')
-  assert.match(panel, /liftNote/, '降级必须写明原因，不能静默失败')
-  assert.match(panel, /onGlobeDegrade/, '看门狗回调要接上')
+  assert.ok(!/threeD|toggle3d|onGlobeDegrade|probeGPU/.test(panel),
+    '面板不应再有三维状态、回调或能力探测')
+  assert.ok(!/terrainOn|toggleTilt|liftNote/.test(panel), '地形 / 倾斜入口应已移除')
+  const map = read('../src/components/traffic/NationMap.vue')
+  assert.ok(!/terrainTiles|terrainOn/.test(map), '地图不应再挂 DEM 地形图层')
+  assert.ok(!/\btilt\b/.test(map), '地图不应再有倾斜（CSS 透视）分支')
+})
+
+// gpu.js 本身保留：城市地图（东北那套 maplibre 运行图）仍需要判断 WebGL 可用性。
+// 这里只确认纯函数还在，避免"删三维时顺手把探测函数也删了"。
+test('GPU 探测函数仍在（城市地图还在用）', () => {
+  assert.equal(typeof probeGPU, 'function')
+  assert.equal(typeof gpuLabel, 'function')
+  assert.equal(typeof startFpsWatch, 'function')
 })
 
 test('map paths are closed so no layer loses its last edge', () => {

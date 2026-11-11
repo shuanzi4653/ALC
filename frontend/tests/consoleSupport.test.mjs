@@ -338,8 +338,9 @@ test('every KPI that can be drilled actually lands on a section that exists',()=
   // 只写 `Object.keys(SECTION_NAMES)` 是测不出"少了一个分节"的 —— 少一项之后
   // 剩下的仍然自洽。写死清单则会在删掉一个分节时立刻变红。
   const SECTIONS=Object.keys(SECTION_NAMES)
+  // V1.0.5：'briefing'（运行情报）并入 'weather'（气象监测），14 个分节。
   assert.deepEqual(SECTIONS,
-    ['home','overview','national','briefing','schedule','alerts','weather','mechanism','reference','assistant','history',
+    ['home','overview','national','schedule','alerts','weather','mechanism','reference','assistant','history',
      'profile','card','counterfactual','ledger'],
     '分节清单变了：新增/删除分节必须同时改这里、drillTarget 的落点、NAV_GROUPS 的归组、与 docs/NAMING.md §1')
   // 0.11.1（Beta）新增四项（手册 §10）：走廊剖面 / 模型卡 / 反事实对照 / 分歧台账。
@@ -425,13 +426,22 @@ function consoleSection(section){
 // （`.traffic-main` / 班次剖面 / 决策板 / 推演条各占一行）。按行切的话，总览只切到
 // 第一行，`.traffic-detail` 就落到了切片之外 —— 那会让这条判据对着一个切片长度报错，
 // 而不是对着"第 3 次点击能不能落地"报错。
+// V1.0.5：东北总览那段（traffic-main / traffic-table-panel）已下线，
+// 总览与气象监测现在都由 NationPanel 渲染，台账是一行 NationBriefing。
+// 判据不跟着改的话，它报的是"这一节没渲染"，而页面其实是好的 —— 典型的假阴性。
+const PANEL_SRC=readFileSync(new URL('../src/components/traffic/NationPanel.vue', import.meta.url),'utf8')
+const BRIEFING_SRC=readFileSync(new URL('../src/components/traffic/NationBriefing.vue', import.meta.url),'utf8')
 const WORKBENCH_RANGES={
-  overview:['class="traffic-main"','class="traffic-table-panel"'],
-  schedule:['class="traffic-table-panel"','</template>'],
+  schedule:["activeSection==='schedule'",'</template>'],
 }
 
 /** 某一节在页面上实际渲染的那一段模板。台账/总览在工作台里，其余在控制台里。 */
 function landing(section){
+  // 总览 = 全国台的台账视图；气象监测 = 全国台 + 两张情报表。
+  // 两者都不在 OperationsConsole 里，也不在 Workbench 的一行标签里 ——
+  // 承诺的落点（指标块、情报筛选）写在组件内部，所以直接取组件源码。
+  if(section==='overview') return stripComments(PANEL_SRC)
+  if(section==='weather') return stripComments(PANEL_SRC+BRIEFING_SRC)
   const range=WORKBENCH_RANGES[section]
   if(range){
     const at=WORKBENCH_TPL.indexOf(range[0])
@@ -451,10 +461,11 @@ function landing(section){
 // 写成 `.traffic-detail` 这种带点的形式会永远找不到 —— 而"永远找不到"的判据在失败
 // 时长得像"这一条真的没做"，正是本项目反复记下的那类假阴性（§十八⑫）。
 const EVIDENCE_STEPS={
-  schedule:{second:['traffic-table-panel'],third:['traffic-detail','traffic-clearance'],thirdSection:'overview'},
-  briefing:{second:['data-batch-clearance'],third:['data-detour-row']},
+  // 台账：第二下落在台账页的说明条，第三下切到总览（选中该班次）看指标块与班次详情
+  schedule:{second:['data-scope-bar'],third:['data-nation-headline'],thirdSection:'overview'},
+  // V1.0.5：运行情报并入气象监测 —— 第二下进情报筛选，第三下看班次表内筛选
+  weather:{second:['data-intel-filters'],third:['data-filter']},
   alerts:{second:['data-alert-key'],third:['data-disposal-action']},
-  weather:{second:['data-weather-situation'],third:['data-weather-bands']},
   mechanism:{second:['data-mechanism-census'],third:['data-mechanism-detail','data-mechanism-step']},
   assistant:{second:['data-ai-mark-row'],third:['data-ai-coverage']},
 }

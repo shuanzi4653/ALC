@@ -59,10 +59,11 @@ test('覆盖层按 data-theme 生效，且地图变量有两个版本', () => {
   }
 })
 
-test('三维只改 paint、不重建样式（重建会丢相机）', () => {
-  const globe = read('../src/components/traffic/NationGlobe.vue')
-  assert.match(globe, /function applyPalette/, '必须有调色板应用函数')
-  assert.match(globe, /setPaintProperty/, '主题切换应走 setPaintProperty')
-  assert.match(globe, /addEventListener\('alc-theme'/, '要监听主题切换事件')
-  assert.ok(!/alc-theme[\s\S]{0,200}setStyle\(/.test(globe), '不要在主题切换时 setStyle')
+test('三维下线后，主题表里不再有三维容器规则', () => {
+  // 原判据是"三维切主题只改 paint、不 setStyle（否则丢相机）"。
+  // 三维已删，判据反过来：浅色主题里不该再留 `--nglobe-*` 这类只为三维存在的变量，
+  // 留着会让人以为还有一条三维渲染链路要维护。
+  const css = read('../src/theme-light.css')
+  assert.ok(!/nglobe/.test(css), 'theme-light.css 不应再出现 nglobe 相关规则')
 })
+

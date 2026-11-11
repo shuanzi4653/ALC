@@ -9,7 +9,13 @@ const read = (p) => readFileSync(new URL(`../src/${p}`, import.meta.url), 'utf8'
 
 const map = read('components/traffic/NationMap.vue')
 const panel = read('components/traffic/NationPanel.vue')
-const globe = read('components/traffic/NationGlobe.vue')
+
+// V1.0.5：三维组件已删除。这条断言不是"少测一个文件"，
+// 而是把"这一层不再有三维"钉死 —— 材料里已经按"不用三维"写了。
+test('三维视图已下线（组件不存在）', () => {
+  assert.throws(() => read('components/traffic/NationGlobe.vue'), /ENOENT|no such file/i,
+    'NationGlobe.vue 应已删除；要加回来必须先改材料口径')
+})
 
 test('地图不再渲染省名（这是用户点名要去掉的东西）', () => {
   assert.ok(!/provinceLabels/.test(map), '省名计算还在')
@@ -68,10 +74,12 @@ test('放大时标记物保持屏幕尺寸（否则地名会比版图还大）',
   assert.ok(/scale\(\$\{inv\}\)/.test(map), '起终点组没有反向缩放')
 })
 
-test('三维也要画选中航线，且与二维同口径', () => {
-  assert.ok(/const pickedFC=computed/.test(globe), '三维缺 pickedFC')
-  assert.ok(/id:'picked-line'/.test(globe), '三维缺选中航线图层')
-  assert.ok(/put\('picked',pickedFC\.value\)/.test(globe), 'applyData 没同步 picked')
-  // 全国层不画航线：两个视图对同一件事必须给同一个答案
-  assert.ok(/if\(level\.value==='nation'\) return EMPTY/.test(globe), '三维全国层还在画航线')
+test('三维已下线：选中航线只在二维画一次', () => {
+  // 原判据是"三维也要画选中航线，且全国层不画"。三维删掉后，
+  // 它的意思是"不要再出现第二套绘制逻辑"——二维的 pickedLine 是唯一来源。
+  const src = read('components/traffic/NationMap.vue')
+  assert.match(src, /const pickedLine=computed/, '二维必须保留选中航线')
+  assert.ok(!/picked-line/.test(src) || /nmap-pick-line/.test(src),
+    '选中航线只应有一套图层命名')
 })
+

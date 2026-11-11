@@ -79,14 +79,36 @@ function refitCurrent(){
   if(props.selectedId&&pickedLine.value) focusPts(pickedLine.value.pts)
 }
 
+/**
+ * 双击标签复位。绑在 <svg> 上而不是每个 `<g>` 上：
+ * `@dblclick` 直接绑 SVG 分组时，事件目标是里面的 `<rect>`，某些浏览器下
+ * 分组收不到（实测 Playwright 双击命中 rect，分组的处理函数没跑）。
+ * 这里从事件目标往上找 `.map-tag`，再读它的 data-key —— 稳且只有一份逻辑。
+ */
+function onSvgDblclick(ev){
+  const host=ev.target&&ev.target.closest?ev.target.closest('.map-tag'):null
+  if(!host) return
+  const key=host.getAttribute('data-key')
+  if(key) resetLabelOff(key)
+}
+
 onMounted(()=>{
+  window.addEventListener('pointermove',moveLabelDrag,{passive:false})
+  window.addEventListener('pointerup',endLabelDrag)
+  window.addEventListener('pointercancel',endLabelDrag)
   fitView()
   if(typeof ResizeObserver!=='undefined'&&host.value){
     ro=new ResizeObserver(fitView)
     ro.observe(host.value)
   }
 })
-onUnmounted(()=>{if(ro) ro.disconnect()})
+onUnmounted(()=>{
+  window.removeEventListener('pointermove',moveLabelDrag)
+  window.removeEventListener('pointerup',endLabelDrag)
+  window.removeEventListener('pointercancel',endLabelDrag)
+  clearTimeout(dragState.timer)
+  if(ro) ro.disconnect()
+})
 const RADAR_COLOR={WEAK:'rgba(40,190,110,.20)',CONVECTIVE:'rgba(245,190,60,.30)',STRONG:'rgba(238,72,60,.42)'}
 
 const level=computed(()=>props.data?.level||'nation')
@@ -737,17 +759,83 @@ const tipFlip=computed(()=>!!tip.value&&tip.value.x>((typeof window!=='undefined
 
 // 常显的文字标签：全国层只给"值得看的几架"（选中/绕飞/高风险），
 // 下钻到大区及以下才全标 —— 106 行小字会把地图盖住，这是上一轮刚清理过的问题。
+// —— 标签手工挪位（V1.0.5）——
+// 城市名与航班标签会撞在一起，避让算法只能"少标一个"，不能"挪到我看得顺眼的地方"。
+// 现在按住 300ms 可以拖：位置存 localStorage，刷新/切页仍然有效；双击复位。
+// 用 getScreenCTM().inverse() 换算，是为了让拖动量自动跟随缩放（放大到 4 倍时，
+// 屏幕拖 40px 与 1 倍时拖 40px 在图上不是同一段距离）。
+const LABEL_OFF_KEY='alc.labelOff.v1'
+const labelOff=ref(readLabelOff())
+function readLabelOff(){
+  try{ const raw=JSON.parse(localStorage.getItem(LABEL_OFF_KEY)||'{}'); return raw&&typeof raw==='object'?raw:{} }
+  catch(e){ return {} }
+}
+function persistLabelOff(){
+  try{ localStorage.setItem(LABEL_OFF_KEY, JSON.stringify(labelOff.value)) }catch(e){}
+}
+function offOf(key){
+  const o=labelOff.value[key]
+  return o&&Number.isFinite(o.dx)&&Number.isFinite(o.dy)?o:{dx:0,dy:0}
+}
+const dragState=reactive({key:'',active:false,moved:false,timer:0,pt:null,m:null})
+function startLabelDrag(ev,key){
+  if(ev.button!==0) return
+  const host=ev.currentTarget
+  const m=host&&host.getScreenCTM?host.getScreenCTM():null
+  if(!m) return
+  const inv=m.inverse()
+  dragState.m=inv
+  dragState.pt=new DOMPoint(ev.clientX,ev.clientY).matrixTransform(inv)
+  dragState.key=key; dragState.active=false; dragState.moved=false
+  clearTimeout(dragState.timer)
+  // 300ms 内松手＝普通点击（点城市名下钻），超过才进入拖动
+  dragState.timer=setTimeout(()=>{
+    if(dragState.key!==key) return
+    dragState.active=true
+    document.body.style.cursor='grabbing'
+  },300)
+}
+function moveLabelDrag(ev){
+  if(!dragState.key||!dragState.active||!dragState.m) return
+  ev.preventDefault()
+  const p=new DOMPoint(ev.clientX,ev.clientY).matrixTransform(dragState.m)
+  const dx=p.x-dragState.pt.x, dy=p.y-dragState.pt.y
+  if(!dx&&!dy) return
+  dragState.pt=p
+  dragState.moved=true
+  const cur=offOf(dragState.key)
+  labelOff.value={...labelOff.value,[dragState.key]:{dx:cur.dx+dx,dy:cur.dy+dy}}
+}
+function endLabelDrag(){
+  clearTimeout(dragState.timer)
+  if(dragState.active&&dragState.moved){
+    const cur=offOf(dragState.key)
+    // 松手时几乎没挪动（<3 个世界单位）：当作误触，不往存储里塞一堆 dx:0.4
+    if(Math.abs(cur.dx)+Math.abs(cur.dy)<3){
+      const next={...labelOff.value}
+      delete next[dragState.key]
+      labelOff.value=next
+    }
+    persistLabelOff()
+  }
+  dragState.key=''; dragState.active=false; dragState.m=null
+  document.body.style.cursor=''
+}
+function resetLabelOff(key){
+  if(!labelOff.value[key]) return
+  const next={...labelOff.value}
+  delete next[key]
+  labelOff.value=next
+  persistLabelOff()
+}
+/** 拖动过后紧接着的那一次 click 要吃掉，否则"拖到一边"会顺带把城市选中。 */
+function labelClickable(){ return !dragState.moved }
+
 const flightLabels=computed(()=>{
   const list=notableFlights.value
   const k=inv.value
   // 与城市名互相避让：航班标签压在"西宁"上，两个都读不清。
   // 城市名先画，航班标签让路（城市名是底图，飞机数据是浮层）。
-  //
-  // V1.0.4：判据从"离城市点 44×10 的方框"改成**真实矩形相交**，并给出四个候选位置。
-  // 旧判据是围绕城市**点**画一个 88×20 的禁区，而城市名现在有胶囊底、
-  // 飞机标签又抬到了机身正上方 —— 按点算会把大半飞机判成"压住了城市名"
-  // （实测 8 架只剩 1 架有标签）。现在四个方向依次试，第一个不压别人的就用：
-  // 既不压飞机、不压城市名，又能多标几架。
   const cityBoxes=(labels.value||[]).map(n=>{
     const right=n.x<=VIEW.w-90
     const x0=right?n.x+6*k:n.x-6*k-n.tag.w*k
@@ -756,32 +844,40 @@ const flightLabels=computed(()=>{
   const hit=(a,b,pad)=>a.x0<b.x1+pad&&a.x1>b.x0-pad&&a.y0<b.y1+pad&&a.y1>b.y0-pad
   const out=[]
   for(const f of list){
-    // 密度决定"写多少"，不决定"写不写"（写不写由可见性与避让决定）。
-    // 精简：不写航班标签，只留城市与航线；标准：编号 + 高度；详细：再加速度。
+    // 精简档：不写任何航班标签，只留城市与航线
     if(props.density==='min') continue
-    const text = props.density==='slim'
-      ? `${f.callsign} · ${f.altM}m · ${Math.round(f.speedKmh||0)}km/h`
-      : `${f.callsign} · ${f.altM}m`
-    const tag=tagBox(text,'flight')
-    const w=tag.w*k,h=tag.h*k
-    // 四个候选：上 / 下 / 右 / 左。间距都是 10 个世界单位 —— 机身外接半径 6，
-    // 留 4 的通气；以前基线只抬 7，文字下沿正好压在机头上（用户第 2 条）。
-    const spots=[
-      {x0:-w/2,y0:-(10+h)},
-      {x0:-w/2,y0:10},
-      {x0:10,y0:-h/2},
-      {x0:-10-w,y0:-h/2},
-    ]
-    let box=null
-    for(const spot of spots){
-      const cand={x0:f.x+spot.x0,x1:f.x+spot.x0+w,y0:f.y+spot.y0,y1:f.y+spot.y0+h}
-      if(cityBoxes.some(c=>hit(cand,c,2))) continue
-      if(out.some(o=>hit(cand,o.box,3))) continue
-      box=cand;break
+    // "放大详细、缩小简略"用**能否放下**来实现，而不是按缩放比例硬切：
+    // 放大后标签稀疏、地方大，长的就能放下；缩小后到处撞车，自动退到只写编号。
+    // 手动选"详细"时把最短的候选也锁成"编号+高度"，不让它缩成光秃秃一个号。
+    const cs=f.callsign
+    const variants = props.density==='slim'
+      ? [`${cs} · ${f.altM}m · ${Math.round(f.speedKmh||0)}km/h`, `${cs} · ${f.altM}m`]
+      : [`${cs} · ${f.altM}m`, cs]
+    let placed=null
+    for(const text of variants){
+      const tag=tagBox(text,'flight')
+      const w=tag.w*k,h=tag.h*k
+      // 四个候选：上 / 下 / 右 / 左。间距都是 10 个世界单位 —— 机身外接半径 6，留 4 的通气。
+      const spots=[
+        {x0:-w/2,y0:-(10+h)},
+        {x0:-w/2,y0:10},
+        {x0:10,y0:-h/2},
+        {x0:-10-w,y0:-h/2},
+      ]
+      for(const spot of spots){
+        const cand={x0:f.x+spot.x0,x1:f.x+spot.x0+w,y0:f.y+spot.y0,y1:f.y+spot.y0+h}
+        if(cityBoxes.some(c=>hit(cand,c,2))) continue
+        if(out.some(o=>hit(cand,o.box,3))) continue
+        placed={text,tag,box:cand}
+        break
+      }
+      if(placed) break
     }
-    if(!box) continue
-    out.push({id:f.id,x:f.x,y:f.y,text,important:f.selected||f.detour||f.bad,tag,box,
-      cxOff:(box.x0-f.x+w/2)/k,cyOff:(box.y0-f.y+h/2)/k})
+    if(!placed) continue
+    const w=placed.tag.w*k,h=placed.tag.h*k
+    out.push({id:f.id,x:f.x,y:f.y,text:placed.text,important:f.selected||f.detour||f.bad,
+      tag:placed.tag,box:placed.box,
+      cxOff:(placed.box.x0-f.x+w/2)/k,cyOff:(placed.box.y0-f.y+h/2)/k})
   }
   return out
 })
@@ -951,7 +1047,8 @@ function clickNode(node){
 <div class="nmap" ref="host">
   <svg :viewBox="`0 0 ${VIEW.w} ${VIEW.h}`" role="img" aria-label="全国航线网"
        :class="{dragging}" @wheel.prevent="onWheel" @mousedown="onDown"
-       @mousemove="onMove" @mouseup="onUp" @mouseleave="onUp">
+       @mousemove="onMove" @mouseup="onUp" @mouseleave="onUp"
+       @dblclick="onSvgDblclick">
     <defs>
       <linearGradient id="towerFace" x1="0" y1="0" x2="0" y2="1">
         <stop offset="0%" stop-color="rgba(150,210,245,.85)"/>
@@ -1155,9 +1252,12 @@ function clickNode(node){
       </g>
 
       <!-- 7.2 班次常显标签：编号 + 高度。位置由 flightLabels 四向避让算好（上/下/右/左） -->
-      <g class="nmap-flight-labels" pointer-events="none">
-        <g v-for="row in flightLabels" :key="'fl'+row.id" class="map-tag"
-           :transform="`translate(${row.x+row.cxOff*inv} ${row.y+row.cyOff*inv})`">
+      <g class="nmap-flight-labels">
+        <g v-for="row in flightLabels" :key="'fl'+row.id" class="map-tag flight-tag"
+           :transform="`translate(${row.x+row.cxOff*inv+offOf('f:'+row.id).dx} ${row.y+row.cyOff*inv+offOf('f:'+row.id).dy})`"
+           :class="{dragging:dragState.active&&dragState.key==='f:'+row.id}"
+           :data-key="'f:'+row.id" @mousedown.stop
+           @pointerdown="startLabelDrag($event,'f:'+row.id)">
           <rect :x="-row.tag.w*inv/2" :y="-row.tag.h*inv/2" :width="row.tag.w*inv" :height="row.tag.h*inv"
                 :rx="row.tag.h*inv/2" :ry="row.tag.h*inv/2"
                 class="tag-bg" :class="{key:row.important}"/>
@@ -1191,8 +1291,11 @@ function clickNode(node){
 
       <!-- 8 标注：城市名走"胶囊底 + 无描边字"，短名看起来就是标准椭圆 -->
       <g class="nmap-labels">
-        <g v-for="node in labels" :key="'l'+node.name" class="map-tag"
-           :transform="`translate(${node.x+((node.x>VIEW.w-90?-1:1)*(node.tag.w/2+6)*inv)} ${node.y})`">
+        <g v-for="node in labels" :key="'l'+node.name" class="map-tag city-tag"
+           :class="{dragging:dragState.active&&dragState.key==='c:'+node.name}"
+           :data-key="'c:'+node.name"
+           @pointerdown="startLabelDrag($event,'c:'+node.name)" @mousedown.stop
+           :transform="`translate(${node.x+((node.x>VIEW.w-90?-1:1)*(node.tag.w/2+6)*inv)+offOf('c:'+node.name).dx} ${node.y+offOf('c:'+node.name).dy})`">
           <rect v-if="!node.bare" :x="-node.tag.w*inv/2" :y="-node.tag.h*inv/2"
                 :width="node.tag.w*inv" :height="node.tag.h*inv"
                 :rx="node.tag.h*inv/2" :ry="node.tag.h*inv/2" class="tag-bg"/>

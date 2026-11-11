@@ -54,12 +54,19 @@ test('W-28：KPI 的第二行基线说明不再占版面', () => {
   assert.ok(/directionNote\(kpi\) \|\| '无基线'/.test(BRIEF), '基线文字要挂在 title 上')
 })
 
-test('W-28：图例默认收起，且展开时不推挤地图', () => {
-  assert.ok(/<details class="traffic-legend">/.test(WORK), '图例没有收进 details')
-  assert.ok(/\.traffic-legend span\{position:absolute/.test(WORK),
-    '展开的图例必须浮起来：推挤会把下面的地图在展开瞬间缩放一次')
-  // 旧的常驻整行必须删掉，否则两套图例并存
-  assert.ok(!WORK.includes('traffic-legend-hint'), '旧的一整行图例还在')
+test('W-28：图例只写「图标 + 词」，且不占地图高度', () => {
+  // 工具条里那个 `<details class="traffic-legend">` 随东北总览一起下线了；
+  // 现在图例是地图底部的一行（`.nrn-legend`），只放"图标 + 词"，
+  // 解释性文字一律进 title —— 一整句解释会把图例变成第二块说明面板。
+  assert.ok(!/class="traffic-legend"/.test(WORK), '工具条里的 details 图例应当已移除')
+  const PANEL = readFileSync(new URL('../src/components/traffic/NationPanel.vue', import.meta.url), 'utf8')
+  const block = PANEL.match(/<p class="nrn-legend[^"]*"[^>]*>([\s\S]*?)<\/p>/)
+  assert.ok(block, '图例应在地图内（.nrn-legend）')
+  const items = [...block[1].matchAll(/<i class="[^"]*"><\/i>/g)].length
+  assert.ok(items >= 4 && items <= 8, `图例项 ${items} 个：超过 8 项就没人看了`)
+  assert.ok(!/class="nrn-legend[^"]*"[^>]*>[^<]*。<\/p>/.test(block[0]), '图例里不该有整句解释')
+  // 精简后不许把"边境停飞"这类已删口径带回来（detail: copyGuard 另有全域扫描）
+  assert.ok(!/边境停飞/.test(PANEL), '已删口径回流')
 })
 
 test('W-28：首页面板不超过三块（地图 / 放行许可 / 城市气象）', () => {

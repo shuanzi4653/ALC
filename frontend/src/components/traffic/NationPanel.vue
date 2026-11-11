@@ -102,6 +102,9 @@ function onCorridorPick(row){
 // 不是前端加一层滤镜 —— 关掉立刻回到真实回波，两条路径互不污染。
 const virtualWx=ref(false)
 const wxVirtual=computed(()=>!!data.value?.radar?.virtual)
+// 换掉了什么由后端说（weatherMode.replaced / untouched），前端不复述 ——
+// 两边各写一份的话，改了一处另一处就成了假话。
+const wxMode=computed(()=>data.value?.weatherMode || {})
 // —— 航线显示：三档开关 + 条数上限（用户要"人工决定开多少个"） ——
 const LINE_KEY='alc.traffic.lines'
 const lineKinds=ref({cross:true,feed:true,intra:false})
@@ -758,19 +761,24 @@ onUnmounted(()=>{
       <div class="m"><b>{{ num(total.corridors) }}</b><span>航线</span></div>
       <div class="m"><b>{{ num(total.airborne) }}</b><span>在飞</span></div>
       <div class="m" :class="{warn:total.delayed>0}"><b>{{ num(total.delayed) }}</b><span>绕飞</span></div>
-      <div class="m" :class="{bad:total.blocked>0}"><b>{{ num(total.blocked) }}</b><span>停飞</span></div>
-      <div class="m" :class="{warn:total.hold>0}"><b>{{ num(total.hold) }}</b><span>延期</span></div>
+      <!-- 「停飞」= 班次决定为 HOLD（天气/边界），这是读者真正关心的那一格。
+           以前这一格放的是 borderBlocked（距境外过近受限的走廊），实测长期为 0，
+           而天气造成的停飞被塞进「延期」，于是"回波压境但停飞 0 架"。 -->
+      <div class="m" :class="{bad:total.hold>0}"><b>{{ num(total.hold) }}</b><span>停飞</span></div>
+      <div class="m" v-if="total.blocked"><b>{{ num(total.blocked) }}</b><span>距境外过近受限</span></div>
       <div class="m"><b>{{ num(total.lowVisCities) }}</b><span>低能见度城市</span></div>
     </div>
     <p class="nrn-sub">
       纳入 <b>{{ num(summary.provinces) }}</b> 省 · <b>{{ num(summary.cities) }}</b> 市 ·
       <b>{{ num(summary.airports) }}</b> 机场 · <b>{{ num(summary.feedCities) }}</b> 市无机场（专用接驳）·
       <b>{{ num(summary.weatherCities) }}</b> 市有实况
-      <!-- 演示包必须自带角标：合成回波看起来和实况一模一样，
-           不在页头挂一个"虚拟"，任何人截图出去都会当成真实天气。 -->
-      <em class="nrn-virt" v-if="wxVirtual" data-virtual-badge>
-        虚拟气象 · 合成回波，非实况
-      </em>
+    </p>
+    <!-- 演示包必须自带说明，而且要说**换掉了什么、没换什么**：
+         只写"虚拟气象 · 非实况"说不清边界，读者会以为整页都是假的；
+         说清"回波与雾是合成的、气温风是实况"，才能既提醒又不自贬。 -->
+    <p class="nrn-virt-note" v-if="wxVirtual" data-virtual-badge>
+      <b>虚拟气象（演示包）</b>
+      <span>{{ wxMode.note || '回波为合成对流系统、雾区按虚拟能见度派生；气温、风等要素仍为公开源实况。' }}</span>
     </p>
   </header>
 
@@ -821,7 +829,7 @@ onUnmounted(()=>{
                 :title="`显示哪些航线：跨省主干 / 机场接驳 / 省内短途；条数可以自己拖${lineStats.forced?`。其中 ${lineStats.forced} 条因为此刻有班次在飞而强制显示`:''}`">
           航线 {{ lineStats.shown }}/{{ lineStats.total }}</button>
         <button :class="{on:virtualWx}" @click="toggleVirtual" data-virtual-toggle
-                :title="'虚拟气象：只替换雷达回波与雾，气温/风/能见度仍是实况；按同一套判据重算绕飞与停飞'">
+                :title="'虚拟气象：把雷达回波换成合成对流系统、把雾区按虚拟能见度重算；气温与风仍是实况。裁决走同一套判据'">
           {{ virtualWx?'虚拟气象 · 开':'实测气象' }}</button>
         <button :class="{on:zoneOn}" @click="zoneOn=!zoneOn; zoneOn&&ensureZones()"
                 :title="'禁飞区：机场净空 + 强回波，红色多边形框；关掉连绕飞一起隐藏'">禁飞</button>
@@ -956,13 +964,10 @@ onUnmounted(()=>{
 
     <!-- ================= 右栏：分块统计 ================= -->
     <aside class="nrn-side" v-if="mode!=='corridor'&&mode!=='card'" :class="{'wx-wide':mode==='weather'}">
-      <div class="nrn-total">
-        <div><b>{{ total.corridors||0 }}</b><span>航线</span></div>
-        <div><b>{{ total.airborne||0 }}</b><span>在飞</span></div>
-        <div :class="{alarm:total.delayed>0}"><b>{{ total.delayed||0 }}</b><span>绕飞</span></div>
-        <div :class="{alarm:total.blocked>0}"><b>{{ total.blocked||0 }}</b><span>停飞</span></div>
-        <div :class="{alarm:total.hold>0}"><b>{{ total.hold||0 }}</b><span>延期</span></div>
-      </div>
+      <!-- 右栏顶部原本还有一条五项 KPI（航线/在飞/绕飞/停飞/延期），
+           与页头的指标块完全重复，而且口径更旧（把 borderBlocked 当"停飞"、
+           把天气停飞叫"延期"）。同一屏两套数、两种叫法，是"数字看着会跳"的根源之一。
+           删掉，只留页头一套。 -->
 
       <!-- 上：区块。全国只列大区，点进去才换成省；再往里换城市 —— 一层只放一层 -->
       <!-- 推演：六段链路。与态势共用同一栏，但内容完全不同 ——
@@ -1230,9 +1235,15 @@ onUnmounted(()=>{
 .nrn-cnt{margin-left:3px;font-style:normal;font-size:9.5px;opacity:.62;font-variant-numeric:tabular-nums}
 .nrn-echo-note{margin-right:8px;font-size:10px;color:#ffc857}
 html[data-theme="light"] .nrn-echo-note{color:#a4610a}
-.nrn-virt{margin-left:8px;font-style:normal;font-size:10px;padding:1px 7px;border-radius:999px;
-  color:#ffd08a;background:rgba(200,140,30,.16);border:1px solid rgba(220,170,60,.55)}
-html[data-theme="light"] .nrn-virt{color:#8a5a00;background:#fdf3e0;border-color:#e0bb78}
+.nrn-virt-note{display:flex;gap:8px;align-items:baseline;margin:4px 0 0;max-width:820px;
+  padding:5px 10px;border-radius:0 6px 6px 0;border-left:3px solid #ffc857;
+  background:rgba(120,88,20,.18);font-size:11px;line-height:1.55;color:#e8d3a0}
+.nrn-virt-note b{color:#ffd98a;font-weight:600;white-space:nowrap}
+.nrn-virt-note span{color:#d9c69a}
+html[data-theme="light"] .nrn-virt-note{background:#fdf6e7 !important;border-left-color:#c99a2e !important;
+  color:#6b4a05 !important}
+html[data-theme="light"] .nrn-virt-note b{color:#7a5200 !important}
+html[data-theme="light"] .nrn-virt-note span{color:#6b5a2a !important}
 .nrn-linepanel{position:absolute;top:52px;left:14px;z-index:9;width:250px;
   display:flex;flex-direction:column;gap:6px;padding:9px 11px;border-radius:9px;
   background:rgba(9,24,36,.97);border:1px solid rgba(70,120,155,.6);
@@ -1400,12 +1411,6 @@ html[data-theme="light"] .nrn-legend i.box{border-color:#c92a2a}
 .nrn-wx li.head{background:none;color:#6a8ca2;font-size:9.5px;padding:0 5px 2px;letter-spacing:.2px;
   position:sticky;top:0;z-index:1}
 .nrn-wx li.head b,.nrn-wx li.head em,.nrn-wx li.head span{color:#6a8ca2;font-weight:400}
-.nrn-total{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;background:rgba(12,32,46,.8);
-  border:1px solid rgba(70,110,140,.4);border-radius:8px;padding:7px 6px}
-.nrn-total div{text-align:center}
-.nrn-total b{display:block;font-size:15px;color:#eaf6ff;font-variant-numeric:tabular-nums}
-.nrn-total span{font-size:10px;color:#7d9cb3}
-.nrn-total .alarm b{color:#ffc857}
 .nrn-side h3{margin:4px 0 0;font-size:12px;color:#a9cde2;font-weight:600}
 .nrn-side h3 small{margin-left:6px;font-size:10px;color:#6f92a8;font-weight:400}
 .nrn-block{border:1px solid rgba(70,110,140,.32);border-radius:8px;overflow:hidden;background:rgba(10,26,38,.6)}
@@ -1581,9 +1586,8 @@ html[data-theme="light"] .ev-note{color:#7a5200 !important}
  * 抬字号会把一屏撑破，所以必须同时压缩 padding，否则地图会被挤没。 */
 @media(max-width:1500px){
   .nrn-monitor,.nrn-legend,.nrn-sub{font-size:11px}
-  .nrn-total span,.nrn-block-hd span,.nrn-prov span,.nrn-city-list span{font-size:11px}
-  .nrn-total b{font-size:14px}
-  .nrn-block-hd b,.nrn-prov b,.nrn-city-list b{font-size:11.5px}
+  .nrn-block-hd span,.nrn-prov span,.nrn-city-list span{font-size:11px}
+    .nrn-block-hd b,.nrn-prov b,.nrn-city-list b{font-size:11.5px}
   .nrn-block-hd em,.nrn-prov em,.nrn-city-list em{font-size:11px}
   .nrn-tools{gap:5px}
   .nrn-tools button,.nrn-tools select{font-size:11px;padding:3px 7px}
@@ -1608,9 +1612,7 @@ html[data-theme="light"] .ev-note{color:#7a5200 !important}
   .nrn-tools{gap:4px}
   .nrn-tools button,.nrn-tools select{font-size:10.5px;padding:2px 6px}
   .nrn-tools input[type=range]{min-width:80px}
-  .nrn-total b{font-size:15px}
-  .nrn-total span{font-size:10px}
-}
+    }
 @media(max-width:1180px){
   .nrn-body{grid-template-columns:minmax(0,1fr) 320px}
   .nrn-detail .cols{grid-template-columns:repeat(2,minmax(0,1fr))}

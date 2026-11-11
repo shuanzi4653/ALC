@@ -408,6 +408,8 @@ def intel(cities: Iterable[Dict[str, Any]], weather: Dict[str, Dict[str, Any]],
             'icao': station.get('icao'), 'station': station.get('site'),
             'visM': vis, 'windMps': wind, 'tempC': live.get('tempC'),
             'low': bool(live.get('low')), 'status': status, 'tone': tone,
+            # 虚拟气象下能见度读数是实况、判定是虚拟的，这枚标记让前端能说明差别
+            'virtualVis': bool(live.get('virtualVis')),
             'hasWeather': bool(live),
         })
     rows.sort(key=lambda item: (item['status'] == '可放行', item['visM'] or 99999))

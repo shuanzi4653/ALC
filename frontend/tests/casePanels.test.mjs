@@ -76,5 +76,7 @@ test('W-33：导航里不许同时出现「处置台」与「预警中心」', (
   assert.ok(!tabLabels.includes('事件处置台'), 'tab 条里重复出现入口名')
   assert.equal(new Set(tabLabels).size, tabLabels.length, 'tab 条里出现重复词')
   // 入口总数不变
-  assert.equal(navEntryCount(), 8)
+  // V1.0.5：8 → 7。「运行情报」并入「气象监测」，走廊组只剩「走廊剖面」。
+  // 入口减少不等于功能减少：13 个页面仍在，只是不再一个页面一个按钮。
+  assert.equal(navEntryCount(), 7)
 })

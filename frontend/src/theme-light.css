@@ -164,12 +164,6 @@ html[data-theme="light"] .nrn-canvas {
   border-color: #dbe6f1 !important;
 }
 
-html[data-theme="light"] .nrn-total {
-  background: #ffffff !important;
-  border-color: #dbe6f1 !important;
-}
-html[data-theme="light"] .nrn-total b { color: #0f3550; }
-html[data-theme="light"] .nrn-total span { color: #6b8399; }
 
 html[data-theme="light"] .nrn-blocks h3,
 html[data-theme="light"] .nrn-side h3 { color: #31556f; }
@@ -475,33 +469,7 @@ html[data-theme="light"] .wb-theme {
 }
 html[data-theme="light"] .wb-theme:hover { background: #eef6fd !important; }
 
-/* ---------- 三维城市名：深色底用浅字，浅色底必须反过来 ---------- */
-html[data-theme="light"] body .nglobe .nglobe-lbl {
-  color: #1f3f57 !important;
-  text-shadow: 0 0 3px rgba(255, 255, 255, .96), 0 0 6px rgba(255, 255, 255, .88) !important;
-}
-html[data-theme="light"] .nglobe-note {
-  background: rgba(255, 255, 255, .86) !important;
-  color: #55738a !important;
-  border-color: #dbe6f1 !important;
-}
-/* 三维容器与南海小图：深色版是暗底，浅色下要反过来，否则地图是白的、角上一块深色方块 */
-html[data-theme="light"] .nglobe {
-  --nglobe-bg: #e9f0f7;
-  --nglobe-inset-bg: rgba(255, 255, 255, .95);
-  --nglobe-inset-line: rgba(84, 124, 166, .45);
-  --nglobe-inset-land: rgba(120, 165, 205, .18);
-  --nglobe-inset-edge: rgba(60, 120, 170, .75);
-  --nglobe-inset-lbl: #46647d;
-}
-html[data-theme="light"] .nglobe-tip {
-  background: rgba(255, 255, 255, .94) !important;
-  border-color: #dbe6f1 !important;
-  color: #31556f !important;
-}
-
 /* ---------- 卡片投影：浅色下靠"线 + 极轻阴影"分层，不用深色块 ---------- */
-html[data-theme="light"] .nrn-total,
 html[data-theme="light"] .nrn-wx,
 html[data-theme="light"] .nrn-region,
 html[data-theme="light"] .nrn-city,

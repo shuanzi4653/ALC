@@ -701,6 +701,14 @@ onUnmounted(()=>{
       <b>调度台账</b>
       <span class="scope-note">气象与雷达为公开源实况；交通为模拟（SIM），不参与运行计划</span>
     </div>
+    <!-- 密度档在这里生效：值班员/指挥默认展开口径说明，演示档收起。
+        （`DENSITY_POLICY.ledger` 必须有界面消费点，否则切档位屏幕上什么都不变 ——
+        以前这条开关的消费点在东北那张已下线的台账表里。） -->
+    <details class="ledger-note density-fold" :open="densityPolicy(density).ledger" data-density="ledger">
+      <summary>这一页的数怎么来的</summary>
+      <p>台账按当前分钟的快照重算：起降时刻是计划值，绕飞 / 停飞是<b>此刻</b>的裁决结果。
+        交通为模拟派生（SIM），气象与雷达来自公开源；两者不合并成"综合风险"一个数。</p>
+    </details>
     <!-- 给组件一个确定高度的槽位：它内部靠 flex:1 让表体滚动，父级不给高度就不滚 -->
     <div class="scope-body">
       <NationBriefing view="ledger" variant="ledger" self-fetch/>
@@ -936,6 +944,16 @@ onUnmounted(()=>{
 @media(prefers-reduced-motion:reduce){.traffic-build-strip .tbs-fill{transition:none}
   .traffic-build-strip .tbs-fill::after{animation:none}.traffic-build-strip .tbs-fill.pending{animation:none}}
 .traffic-workbench.map-expanded .traffic-main{grid-template-columns:1fr}.traffic-workbench.map-expanded .operations-nav{margin-top:0}@media(max-width:1000px){.traffic-workbench .traffic-main{grid-template-columns:1fr;min-height:520px}.traffic-workbench .traffic-map-panel{min-height:460px}}
+
+/* 调度台账的口径说明：密度档控制默认开合，样式与其它 density-fold 一致 */
+.ledger-note{margin:0 0 8px;font-size:12px;color:#8aa2b6}
+.ledger-note summary{cursor:pointer;padding:4px 0;list-style:none}
+.ledger-note summary::-webkit-details-marker{display:none}
+.ledger-note summary::before{content:'▸ ';color:#5f7f96}
+.ledger-note[open] summary::before{content:'▾ '}
+.ledger-note p{margin:2px 0 0;line-height:1.65;color:#7d9cb0;max-width:900px}
+html[data-theme="light"] .ledger-note{color:#4a6a85 !important}
+html[data-theme="light"] .ledger-note p{color:#5b7a92 !important}
 </style>
 
 <style scoped>
