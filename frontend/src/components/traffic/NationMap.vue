@@ -34,6 +34,11 @@ const props=defineProps({
   // 全国层显示哪些航线：三档开关 + 条数上限（用户 2026-11-11 要"人工决定开多少个"）
   lineKinds:{type:Object,default:()=>({cross:true,feed:true,intra:false})},
   lineLimit:{type:Number,default:291},
+  // 只画这一条走廊（走廊/推演页用）。给了就把其余航线全部滤掉。
+  soloCorridor:{type:String,default:''},
+  // 锁定视图：走廊页看的是"这条线连的是哪两座城"，缩放会把注意力挪走，
+  // 所以那一页禁掉滚轮与拖拽，视野由 soloCorridor 自动 fit。
+  lockView:{type:Boolean,default:false},
 })
 const emit=defineEmits(['drill','select-flight','select-corridor','hover-node'])
 
@@ -86,10 +91,6 @@ const proj=computed(()=>{
   const k=Math.min(VIEW.w/w,VIEW.h/h)
   return {k,ox:(VIEW.w-w*k)/2,oy:(VIEW.h-h*k)/2,v,lon0:rad(v.lon0),lat1:merc(v.lat1)}
 })
-// 8 px 方框（中心在原点，边长 8）：禁飞区小到看不清时用它兜底。
-// 用 scale(inv) 把它拉回屏幕尺寸，这样放大后它不会跟着变成大块。
-const MINI_BOX='M-4,-4 L4,-4 L4,4 L-4,4 Z'
-
 // 五角星（中心在原点，外接半径 6）：省会用，别拿它做别的标记
 const STAR='M0,-6 L1.76,-2.43 L5.71,-1.85 L2.85,0.94 L3.53,4.85 L0,2.9 L-3.53,4.85 L-2.85,0.94 L-5.71,-1.85 L-1.76,-2.43 Z'
 
@@ -127,18 +128,9 @@ const terrainTiles=computed(()=>{
   if(!props.terrainOn) return []
   return tilesFor('https://tiles.openfreemap.org/natural_earth/ne2sr/{z}/{x}/{y}.png',5,5)
 })
-const radarTiles=computed(()=>{
-  if(!props.radarOn) return []
-  const t=props.data?.radar?.tiles
-  if(!t) return []
-  return tilesFor(t,4,5)
-})
-
-// —— 回波环：按屏幕尺寸分流 ——
-// 这里踩过一个坑：强回波是按 0.14° 网格聚出来的，最小的环只有 0.17°×0.39°，
-// 在国家级缩放下不足 2×4 px。这种尺寸再按 0.9 px 描边，描边宽度已经接近环本身，
-// 画出来就是一个**空心小方框**——地图上看着像贴了个红标签，完全不像回波。
-// 所以分两路：屏幕上够大的环才描边（等值线），小到看不出形状的直接填实。
+// —— 回波环 ——
+// 几何在后端已经做过栅格闭运算（补孔）+ 几何闭运算（磨角）+ Chaikin（成曲线），
+// 前端只负责上色。不再按屏幕尺寸分流画"填实小方块"：那是瓦片位图时代的补丁。
 const radarRings=computed(()=>{
   if(!props.radarOn) return []
   const bands=props.data?.radar?.bands||{}
@@ -211,13 +203,14 @@ const zonePolys=computed(()=>{
         if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y
       }
       const w=x1-x0,h=y1-y0
-      // 287 个限制区在全国层大多只有 1–2 px，按真实尺寸画就是一片红把图盖住。
-      // 早先的处理是"小于 9 px 退化成点"，但图例画的是方框、用户也明确要"红色的框"，
-      // 于是图上是点、图例是框，两回事。现在改成**最小尺寸方框**：
-      // 真实几何够大就画真多边形；不够大就画一个 8 px 的方框（视觉上仍是"框"）。
-      const small=Math.max(w,h)<9
-      out.push({kind,small,cx:(x0+x1)/2,cy:(y0+y1)/2,w,h,
-        d:small?null:toPath({type:'Polygon',coordinates:[ring]},project)})
+      // 太小就不画。国级 287 个机场限制区大多只有 1–2 px：
+      // 画成点像红疹、强行放大成 8 px 方框又满屏红格子（用户两轮都否了）。
+      // 现在的口径：按层级设**最小可显示尺寸**，小于阈值直接不出现 ——
+      // 全国 14 px、大区 10 px、省 8 px、市 4 px。要看小禁区就下钻。
+      const minPx={nation:14,region:10,province:8,city:4}[level.value]||8
+      if(Math.max(w,h)<minPx) continue
+      out.push({kind,cx:(x0+x1)/2,cy:(y0+y1)/2,w,h,
+        d:toPath({type:'Polygon',coordinates:[ring]},project)})
     }
   }
   push(bands.LIMIT,'LIMIT')
@@ -342,21 +335,9 @@ const lineStyle=computed(()=>{
 })
 const lineWidth=computed(()=>lineStyle.value.w)
 
-const corridors=computed(()=>{
-  const all=props.data?.corridors||[]
-  let rows=all
-  if(level.value==='nation'){
-    const k=props.lineKinds||{}
-    rows=all.filter(row=>{
-      const kind=row.kind
-      if(kind==='CROSS') return !!k.cross
-      if(kind==='AIRPORT_FEED') return !!k.feed
-      return !!k.intra
-    })
-    // 按航程降序截取：只开 50 条时看到的是骨架，而不是随机 50 条
-    rows=[...rows].sort((a,b)=>(b.lengthKm||0)-(a.lengthKm||0)).slice(0,Math.max(0,props.lineLimit))
-  }
-  return rows.map(row=>{
+// 一条走廊 → 可渲染的形状。抽成函数是因为"走廊页只画一条"要复用它：
+// 之前 solo 分支想直接 map 一个新对象，字段一缺就画不出来（箭头/绕飞全丢）。
+function toLineShape(row){
   const path=row.path&&row.path.length>1?row.path:[row.fromLonLat,row.toLonLat]
   const coords=path.map(([lon,lat])=>project(lon,lat))
   const points=coords.length===2?arcPoints(coords[0],coords[1],row.bulge):coords
@@ -366,10 +347,6 @@ const corridors=computed(()=>{
     const dp=row.detour.path.map(([lon,lat])=>project(lon,lat))
     detour='M'+dp.map(p=>p[0].toFixed(1)+' '+p[1].toFixed(1)).join('L')
   }
-  // 航线方向箭头：取约 48% 处那一段的切线角。整条线只放一个，
-  // 多了会和"航班图标"抢注意力 —— 箭头说明的是"这条线往哪飞"，不是"现在在哪"。
-  // 箭头只在"看得见方向"的线段上放：全国层 492 条线平均只有 20–40 px，
-  // 每条都插箭头等于在图上撒三角。所以按屏幕长度取阈值，级别越近阈值越低。
   let arrow=null
   const arrowMin=level.value==='nation'?34:(level.value==='region'?18:5)
   let screenLen=0
@@ -386,8 +363,27 @@ const corridors=computed(()=>{
   }
   return {id:row.id,d,pts:points,arrow,detour,blocked:!!row.borderBlocked,
     fromName:row.fromName,toName:row.toName,kind:row.kind,kindLabel:row.kindLabel,lengthKm:row.lengthKm,
+    detourKm:row.detourKm||(row.detour&&row.detour.shiftKm)||0,
     selected:props.selectedCorridor===row.id}
-  })
+}
+
+const corridors=computed(()=>{
+  const all=props.data?.corridors||[]
+  // 走廊页只画一条：其余全部滤掉，否则"这一条"会淹没在 291 条里。
+  if(props.soloCorridor) return all.filter(r=>r.id===props.soloCorridor).map(toLineShape)
+  let rows=all
+  if(level.value==='nation'){
+    const k=props.lineKinds||{}
+    rows=all.filter(row=>{
+      const kind=row.kind
+      if(kind==='CROSS') return !!k.cross
+      if(kind==='AIRPORT_FEED') return !!k.feed
+      return !!k.intra
+    })
+    // 按航程降序截取：只开 50 条时看到的是骨架，而不是随机 50 条
+    rows=[...rows].sort((a,b)=>(b.lengthKm||0)-(a.lengthKm||0)).slice(0,Math.max(0,props.lineLimit))
+  }
+  return rows.map(toLineShape)
 })
 
 // —— 节点与建筑 ——
@@ -548,7 +544,7 @@ function hoverNode(node,event){
 function hoverZone(zone,event){
   const rows=[{text:zone.kind==='RWY'?'跑道梯形净空':'机场净空限制区'},
     {text:'规则化生成，非官方公布'},
-    {text:zone.small?'放大可见边界':'边界按真实几何绘制'}]
+    {text:'边界按真实几何绘制'}]
   showTip(event,zone.kind==='RWY'?'禁飞区 · 跑道':'禁飞区 · 机场净空',rows)
 }
 // 航线：悬停时把两端城市名强制显示（labels 会把这两个名字提权），
@@ -582,10 +578,13 @@ const flightLabels=computed(()=>{
     picked=key.concat(rest.slice(0,8-key.length))
   }
   const list=level.value==='nation'?picked.slice(0,12):all
+  // 与城市名互相避让：航班标签压在"西宁"上，两个都读不清。
+  // 城市名先画，航班标签让路（城市名是底图，飞机数据是浮层）。
+  const cityBoxes=(labels.value||[]).map(n=>({x:n.x+14,y:n.y}))
   const out=[]
   for(const f of list){
-    // 简单避让：与已放置标签在 46×11 的盒内相交就跳过
     if(out.some(p=>Math.abs(p.x-f.x)<46&&Math.abs(p.y-f.y)<11)) continue
+    if(cityBoxes.some(c=>Math.abs(c.x-f.x)<44&&Math.abs(c.y-f.y)<10)) continue
     out.push({id:f.id,x:f.x,y:f.y,text:`${f.callsign} · ${f.altM}m`,important:f.selected||f.detour||f.bad})
   }
   return out
@@ -652,6 +651,7 @@ const pan=ref({x:0,y:0})
 const dragging=ref(false)
 let dragStart=null,moved=false
 function onWheel(e){
+  if(props.lockView) return
   const rect=e.currentTarget.getBoundingClientRect()
   const factor=e.deltaY<0?1.14:1/1.14
   const next=Math.max(1,Math.min(9,zoom.value*factor))
@@ -662,7 +662,9 @@ function onWheel(e){
   pan.value={x:mx-(mx-pan.value.x)*k,y:my-(my-pan.value.y)*k}
   zoom.value=next
 }
-function onDown(e){dragging.value=true;moved=false;dragStart={x:e.clientX,y:e.clientY,px:pan.value.x,py:pan.value.y}}
+function onDown(e){
+  if(props.lockView) return
+  dragging.value=true;moved=false;dragStart={x:e.clientX,y:e.clientY,px:pan.value.x,py:pan.value.y}}
 function onMove(e){
   if(!dragging.value||!dragStart) return
   if(Math.abs(e.clientX-dragStart.x)>3||Math.abs(e.clientY-dragStart.y)>3) moved=true
@@ -699,6 +701,16 @@ watch([()=>props.followId,()=>props.flights],()=>{
   const flight=(props.flights||[]).find(item=>item.id===props.followId)
   if(flight) centerOn(flight.lon,flight.lat,Math.max(2.2,zoom.value))
 })
+
+// 走廊页：只画一条时把视野 fit 到它，并且**不做过渡**（lockView 下没有手动缩放，
+// 过渡只会让"点左边换右边"变成一段漂移）。
+watch(()=>props.soloCorridor,(id)=>{
+  if(!id) return
+  nextTick(()=>{
+    const line=(corridors.value||[])[0]
+    if(line&&line.pts) focusPts(line.pts)
+  })
+},{immediate:true})
 
 // 选中即聚焦：只跟 selectedId 走。若跟着 computed 走，飞机会每帧挪动零点几像素，
 // 视野就会被每帧重算，画面像被人一直按住不放。
@@ -806,19 +818,12 @@ function clickNode(node){
       <!-- 3.8 禁飞区（DERIVED）：气象（回波轮廓）与非气象（机场限制区）用同一套红框。
            小到看不清的用 8 px 方框兜底 —— 图例是框，图上就必须是框，不能是点。 -->
       <g v-if="zonePolys.length" class="nmap-zones">
-        <template v-for="(zone,index) in zonePolys" :key="'z'+index">
-          <path v-if="zone.small" :d="MINI_BOX" class="no-fly-box mini"
-                @mouseenter="hoverZone(zone,$event)" @mousemove="hoverMove" @mouseleave="hoverLeave"
-                :transform="`translate(${zone.cx.toFixed(1)} ${zone.cy.toFixed(1)}) scale(${inv})`"
-                :style="{strokeWidth:.9, opacity:level==='nation'?.72:.9}">
-            <title>{{ zoneTitle(zone) }}</title>
-          </path>
-          <path v-else :d="zone.d" class="no-fly-box"
-                @mouseenter="hoverZone(zone,$event)" @mousemove="hoverMove" @mouseleave="hoverLeave"
-                :style="{strokeWidth:(level==='nation'?1.1:1.6)*inv, opacity:level==='nation'?.8:.95}">
-            <title>{{ zoneTitle(zone) }}</title>
-          </path>
-        </template>
+        <path v-for="(zone,index) in zonePolys" :key="'z'+index" :d="zone.d"
+              class="no-fly-box"
+              @mouseenter="hoverZone(zone,$event)" @mousemove="hoverMove" @mouseleave="hoverLeave"
+              :style="{strokeWidth:(level==='nation'?1.1:1.6)*inv, opacity:level==='nation'?.85:.95}">
+          <title>{{ zoneTitle(zone) }}</title>
+        </path>
       </g>
 
       <!-- 4 建筑：城市体块。立体模式下才立起来，平面模式只留底影 -->
@@ -838,11 +843,11 @@ function clickNode(node){
            492 条线在全国缩放下平均只有 20–40 px，画出来就是一张蜘蛛网，
            而这一层要看的是"哪些城市有网络"，不是"每条线怎么走"。
            下钻到大区/省/市再画，那时一条线才占几十上百像素，方向也才读得出来。 -->
-      <g v-if="corridors.length" fill="none" stroke-linecap="round"
+      <g v-if="corridors.length" fill="none" stroke-linecap="butt"
          :opacity="audience==='airspace'?.3:lineStyle.op">
         <path v-for="line in corridors" :key="'c'+line.id" :d="line.d"
               :stroke="line.blocked?(virtualMode?'rgba(255,96,70,.95)':'var(--map-corridor-blocked)'):'var(--map-corridor)'"
-              :stroke-width="line.blocked?lineWidth*(virtualMode?2.2:.8):lineWidth"
+              :stroke-width="(line.blocked?lineWidth*(virtualMode?2.2:.8):lineWidth)*inv"
               :class="{hit:line.selected,clickable:true,'virt-alarm':virtualMode&&line.blocked}"
               @mousemove="hoverMove" @mouseleave="leaveLine"
               @mouseenter="hoverLine(line,$event)"
@@ -850,7 +855,7 @@ function clickNode(node){
         <path v-for="line in corridors.filter(l=>l.detour)" :key="'d'+line.id" :d="line.detour"
               :stroke="virtualMode?'rgba(255,214,120,1)':'var(--map-detour)'"
               class="hit detour-line"
-              :style="{strokeWidth:lineWidth*(virtualMode?2.4:1.3)}"
+              :style="{strokeWidth:lineWidth*(virtualMode?2.4:1.6)*inv}"
               :stroke-dasharray="`${5*inv} ${3.5*inv}`"
               @click="!moved&&emit('select-corridor',line)"/>
       </g>
@@ -1001,9 +1006,7 @@ html[data-theme="light"] .echo-strong{fill:rgba(200,40,30,.34);stroke:rgba(176,2
 .cap-star{fill:#ff4d4f;stroke:rgba(8,20,32,.85);stroke-width:.7;pointer-events:none}
 .cap-ring{stroke:rgba(186,218,255,.42);pointer-events:none}
 .no-fly-box{fill:rgba(224,49,49,.06);stroke:#e03131;pointer-events:stroke;cursor:help}
-.no-fly-box.mini{fill:rgba(224,49,49,.10)}
-.no-fly-dot{fill:#e03131;stroke:none;pointer-events:none;opacity:.34}
-html[data-theme="light"] .no-fly-dot{opacity:.26}
+
 html[data-theme="light"] .no-fly-box{fill:rgba(224,49,49,.05);stroke:#c92a2a}
 html[data-theme="light"] .cap-star{fill:#c92a2a;stroke:#ffffff}
 html[data-theme="light"] .cap-ring{stroke:rgba(40,90,130,.5)}
@@ -1011,16 +1014,18 @@ html[data-theme="light"] .cap-ring{stroke:rgba(40,90,130,.5)}
 .nmap-flight-labels text{fill:#dff3ff;paint-order:stroke;stroke:rgba(3,12,20,.9);
   stroke-width:2.2px;letter-spacing:.2px;opacity:.9}
 .nmap-flight-labels text.key{fill:#8ef0ff;opacity:1;font-weight:600}
-.nmap-tip{position:fixed;z-index:30;transform:translate(14px,14px);pointer-events:none;
-  min-width:170px;max-width:240px;padding:7px 9px;border-radius:7px;
-  background:rgba(8,22,34,.95);border:1px solid rgba(90,150,190,.55);
-  box-shadow:0 8px 22px -12px rgba(0,0,0,.9);font-size:11px;line-height:1.55;color:#cfe6f5}
+/* 用户点名"不要花哨气泡框"：去圆角、去投影、去卡片感，
+   只留一条平贴的窄条 —— 它是指示，不是弹窗。 */
+.nmap-tip{position:fixed;z-index:30;transform:translate(12px,10px);pointer-events:none;
+  min-width:140px;max-width:230px;padding:4px 7px;border-radius:1px;
+  background:rgba(6,18,28,.78);border-left:2px solid rgba(126,206,255,.7);
+  box-shadow:none;font-size:10.5px;line-height:1.5;color:#bcd6e8}
 .nmap-tip.flip{transform:translate(-100%,14px);margin-left:-14px}
-.nmap-tip b{display:block;color:#eaf8ff;font-size:12px;letter-spacing:.4px}
+.nmap-tip b{display:block;color:#eaf8ff;font-size:11.5px;letter-spacing:.3px}
 .nmap-tip span{display:block;color:#9fc0d6}
 .nmap-tip span.bad{color:#ff9c86}
-html[data-theme="light"] .nmap-tip{background:rgba(255,255,255,.97);border-color:#cfdcea;
-  box-shadow:0 8px 20px -12px rgba(20,50,80,.5);color:#3f5c76}
+html[data-theme="light"] .nmap-tip{background:rgba(255,255,255,.92);
+  border-left-color:#0b7ea6;box-shadow:none;color:#3f5c76}
 html[data-theme="light"] .nmap-tip b{color:#0f3550}
 html[data-theme="light"] .nmap-tip span{color:#5b7a92}
 html[data-theme="light"] .nmap-tip span.bad{color:#c0392b}

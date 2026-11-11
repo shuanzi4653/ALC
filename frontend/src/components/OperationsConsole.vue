@@ -26,7 +26,7 @@ const props=defineProps({
   corridorFocus:{type:String,default:''},
   corridorPair:{type:Object,default:null},
   aiReviewed:{type:Object,default:()=>({})}})
-const emit=defineEmits(['select-flight','weather-mode-change','locate-event','ai-reviewed','open-section','seek'])
+const emit=defineEmits(['select-flight','weather-mode-change','locate-event','ai-reviewed','open-section','seek','open-corridor'])
 const caseMode=isCaseMode()
 const stationRows=computed(()=>{
   const rows=props.weather?.stationVisibility||[]
@@ -267,6 +267,21 @@ async function loadJournal(){
   try{
     const body=await requestJson(`/api/traffic/v2/nation/journal?minute=${Math.round(props.minute||60)}&lookback=40`)
     journal.value=(body?.rows||[]).map(row=>({...row,at:row.at||''}))
+    // 人工裁决也进这本账：它在走廊页写下，日志不显示就等于"做了没留痕"。
+    // 结论与推演同源：都读同一条记录（action + auto）。
+    try{
+      const rv=JSON.parse(localStorage.getItem('alc.review.v1')||'{}')||{}
+      const manual=Object.entries(rv).map(([corridor,rec])=>({
+        id:'MANUAL-'+corridor, minute:null, at:'', kind:'MANUAL', kindLabel:'人工干预',
+        actionLabel:({RELEASE:'放行',DETOUR:'改绕飞',HOLD:'停飞'})[rec.action]||rec.action,
+        name:corridor, flightId:'', corridor,
+        detail:`人工裁决：${({RELEASE:'放行',DETOUR:'改绕飞',HOLD:'停飞'})[rec.action]||rec.action}`
+          + (rec.reason?`（${rec.reason}）`:'')
+          + (rec.auto?`；算法原判 ${rec.auto}`:''),
+        auto:false,
+      }))
+      journal.value=[...manual,...journal.value]
+    }catch(_){}
     const w=body?.window||[]
     journalWindow.value=w.length===2?`第 ${w[0]}–${w[1]} 分钟` : ''
   }catch(e){journalError.value=e.message;journal.value=[]}
@@ -291,6 +306,13 @@ const journalCounts=computed(()=>{
 })
 const journalWindow=ref('')
 const journalWindowText=computed(()=>journalWindow.value)
+// 日志行点开 → 那条走廊的推演。结论一致靠"同一份记录"：
+// 日志写的是 decisionLabel / 人工记录，推演页读的也是这两个，不在前端各拼一句。
+function openJournalRow(row){
+  const corridor=row.corridor||String(row.flightId||'').split('#')[0]
+  if(!corridor) return
+  emit('open-corridor',{corridor,flightId:row.flightId||''})
+}
 const journalTime=row=>{
   const at=String(row.at||'')
   if(/^\d{2}:\d{2}( \+\d+d)?$/.test(at)) return at      // 派生日志：已经是推演时刻
@@ -298,7 +320,8 @@ const journalTime=row=>{
   const d=new Date(at)
   return Number.isNaN(d.getTime())?at:d.toLocaleString('zh-CN',{hour12:false})
 }
-const journalMinute=row=>Number.isFinite(Number(row.minute))?Number(row.minute).toFixed(1):'—'
+// 人工干预行没有"推演分钟"（它不是某一帧发生的事），写 0.0 会让人以为发生在第 0 分钟
+const journalMinute=row=>(row.minute==null||!Number.isFinite(Number(row.minute)))?'—':Number(row.minute).toFixed(1)
 const journalTarget=row=>row.name?(row.name+(row.flightId?' · '+row.flightId:'')):(row.flightId||'—')
 
 function journalCsv(rows){
@@ -1096,7 +1119,10 @@ async function copyReceipt(row){
   <summary>运行日志明细 <span>{{journalRows.length}} 条</span></summary>
   <table class="operation-journal">
     <thead><tr><th>时刻</th><th>类型</th><th>推演分钟</th><th>对象</th><th>内容</th><th>明细</th></tr></thead>
-    <tbody><tr v-for="row in [...journalRows].reverse()" :key="row.id">
+    <tbody><tr v-for="row in [...journalRows].reverse()" :key="row.id"
+               :class="{jump:!!(row.corridor||row.flightId)}"
+               :title="(row.corridor||row.flightId)?'点开这条走廊的推演':''"
+               @click="openJournalRow(row)">
       <td>{{journalTime(row)}}</td>
       <td><span class="journal-kind" :class="row.kind.toLowerCase()">{{row.kindLabel}}</span></td>
       <td>{{journalMinute(row)}}</td>
@@ -1240,6 +1266,9 @@ async function copyReceipt(row){
 .journal-bar input{flex:0 1 260px;min-width:160px;background:#12293a!important;border:1px solid #2b4a5e!important;
   color:#d3e6f0;border-radius:7px;padding:8px 11px;font:inherit;font-size:12px}
 .journal-bar input::placeholder{color:#5f8098}
+tbody tr.jump{cursor:pointer}
+tbody tr.jump:hover{background:rgba(126,206,255,.10)}
+html[data-theme="light"] tbody tr.jump:hover{background:#eef6fd}
 .journal-export{margin-left:auto;font:inherit;font-size:12px;padding:7px 13px;background:#16323f!important;
   border:1px solid #2b5f70!important;color:#bfeaf6!important;border-radius:7px;cursor:pointer}
 .journal-export:hover:not(:disabled){border-color:#65cce5!important}

@@ -15,7 +15,10 @@
           <b>{{ flight.callsign }}</b>
           <code>{{ flight.id }}</code>
         </div>
-        <span class="dd-verd" :class="tone">{{ data?.flight?.decisionLabel || flight.decisionLabel }}</span>
+        <span class="dd-verd" :class="tone">
+          <template v-if="review">人工 · {{ reviewText }}</template>
+          <template v-else>{{ data?.flight?.decisionLabel || flight.decisionLabel }}</template>
+        </span>
       </header>
       <p class="dd-sub">
         {{ short(flight.fromName) }} → {{ short(flight.toName) }}
@@ -131,7 +134,10 @@
         <!-- ⑥ 结论与边界 -->
         <section class="dd-seg" data-seg="conclusion">
           <h4><i>6</i>结论与边界 <em>OFFICIAL 边界</em></h4>
-          <p class="dd-concl">{{ data.conclusion }}</p>
+          <p class="dd-concl">{{ finalConclusion }}</p>
+          <p class="dd-rv" v-if="review">
+            这条人工裁决写在「{{ flight.id }}」上，走廊页、推演页与日志同步同一份记录。
+          </p>
           <p class="dd-disc">{{ data.discipline }}</p>
           <p class="dd-line quiet" v-if="data.generatedAt">生成于 {{ clock(data.generatedAt) }} · 第 {{ data.minute }} 分钟</p>
         </section>
@@ -147,6 +153,9 @@ const props = defineProps({
   flight: { type: Object, default: null },
   minute: { type: Number, default: 0 },
   paused: { type: Boolean, default: true },
+  // 人工裁决（走廊页记录的那一条）。有它就以它为准：
+  // 日志写什么、推演结论就写什么 —— 两处读同一份，不许各说各话。
+  review: { type: Object, default: null },
 })
 
 const data = ref(null)
@@ -197,9 +206,24 @@ watch(key, () => {
 onUnmounted(() => { if (timer) clearTimeout(timer) })
 
 const drivers = computed(() => props.flight?.drivers || [])
+const REVIEW_LABEL = { RELEASE: '放行', DETOUR: '改绕飞', HOLD: '停飞' }
+const reviewText = computed(() => {
+  const r = props.review
+  if (!r) return ''
+  return REVIEW_LABEL[r.action] || r.action
+})
 const tone = computed(() => {
+  if (props.review) return props.review.action === 'HOLD' ? 'bad' : (props.review.action === 'DETOUR' ? 'warn' : 'good')
   const lv = props.flight?.riskLevel
   return lv === 'HIGH' ? 'bad' : (lv === 'MEDIUM' ? 'warn' : 'good')
+})
+// 结论句：有人工裁决就照人工的写，并且把"算法怎么判"留在后面 ——
+// 两句话都在，读者才知道是谁改的、改成了什么。
+const finalConclusion = computed(() => {
+  const auto = data.value?.conclusion || ''
+  const r = props.review
+  if (!r) return auto
+  return `人工裁决：${reviewText.value}${r.reason ? '（' + r.reason + '）' : ''}；算法原判 ${auto}`
 })
 const passCount = computed(() => (data.value?.criteria || []).filter(c => c.pass).length)
 const bothExposureZero = computed(() => {
@@ -375,6 +399,8 @@ function clock(iso) {
 
 /* ⑥ 结论 */
 .dd-concl{font-size:11px;line-height:1.6;color:#dfeefb}
+.dd-rv{font-size:10px;line-height:1.55;color:#8ef0ff}
+html[data-theme="light"] .dd-rv{color:#0b7ea6}
 .dd-disc{font-size:9.5px;line-height:1.55;color:#6f92a8;border-left:2px solid rgba(120,170,200,.3);
   padding-left:6px}
 

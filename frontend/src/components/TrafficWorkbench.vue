@@ -39,6 +39,18 @@ function onScopeChange(next){
 const activeSection=ref('home'),scope=ref('nation')
 // 运行情报的两个视图：班次情报（默认，看飞行汽车）| 空域情报（机场与净空）。
 // 原来的「民航情报」名不副实——它展示的是机场城市气象，而情报的对象该是飞行汽车。
+// 走廊/推演页的定位目标。处置事件与日志行都跳这里：
+// 点一条事件 → 直接落到那条走廊上，而不是"切到城市让用户自己找"。
+const corridorFocusId=ref('')
+function openCorridor(payload){
+  const corridorId=(payload&&payload.corridor)||String((payload&&payload.flightId)||'').split('#')[0]
+  if(!corridorId) return
+  corridorFocusId.value=''
+  // 先清空再赋值：同一条走廊连续点两次，子组件也要能再收到一次
+  nextTick(()=>{ corridorFocusId.value=corridorId })
+  activeSection.value='profile'
+}
+
 const intelTab=ref('flight'),settings=ref(false),operations=ref([]),operationsReady=ref(false),commandBusy=ref(false),mapExpanded=ref(false)
 const demoMode=isDemoMode()
 const workbench=ref(null)
@@ -626,7 +638,10 @@ onUnmounted(()=>{
        所以不存在"两套全国页"。东北那张 maplibre 运行图（HomeStage）
        不再当首屏 —— 它会以四级通用的形式在三维里回来（T19）。 -->
   <section class="traffic-page national-page" v-if="activeSection==='home'||activeSection==='national'">
-    <NationPanel :scope-key="nationScopeKey" @scope-change="onScopeChange"/>
+    <!-- 首页这一份也要接 open-corridor：处置事件在首页的「处置」页签里点开，
+         没有这个监听就只会原地不动（实测点了没反应）。 -->
+    <NationPanel :scope-key="nationScopeKey" :focus-corridor="corridorFocusId"
+                 @scope-change="onScopeChange" @open-corridor="openCorridor"/>
   </section>
   <div class="scope-bar" v-if="activeSection==='overview'" data-scope-bar-overview>
     <b>运行总览</b>
@@ -657,11 +672,13 @@ onUnmounted(()=>{
   <section class="traffic-page national-page"
            v-if="scope==='nation'&&['weather','profile','alerts','assistant','card'].includes(activeSection)">
     <NationPanel :scope-key="nationScopeKey" :initial-view="nationViewOf(activeSection)"
-                 :mode="activeSection==='weather'?'weather':(activeSection==='card'?'card':(activeSection==='assistant'?'evidence':''))"
+                 :mode="activeSection==='weather'?'weather':(activeSection==='card'?'card':(activeSection==='profile'?'corridor':(activeSection==='assistant'?'evidence':'')))"
                  :hint="NATION_HINTS[activeSection]||''"
-                 :hide-tabs="activeSection!=='home'" @scope-change="onScopeChange"/>
+                 :focus-corridor="corridorFocusId"
+                 :hide-tabs="activeSection!=='home'" @scope-change="onScopeChange"
+                 @open-corridor="openCorridor"/>
   </section>
-  <OperationsConsole v-if="!['home','overview','schedule','national'].includes(activeSection)&&!['briefing','weather','profile','alerts','assistant','card'].includes(activeSection)" :corridor-focus="corridorFocus" :corridor-pair="corridorPair" :view="activeSection" :session="session" :network="network" :flights="scoped" :weather="weather" :selected="selected" :minute="minute" :city-name="cityName" :operations="operations" :density="density" :focus="drillFocus" :weather-mode="weatherMode" :weather-mode-status="weatherModeStatus" :alert-flights="scoped" :event-focus="eventFocus" :ai-reviewed="aiReviewed" @select-flight="chooseFlight" @weather-mode-change="onWeatherModeChange" @locate-event="locateEvent" @ai-reviewed="onAiReviewed" @open-section="activeSection=$event" @seek="minute=$event" :max-minute="playbackMax"/>
+  <OperationsConsole v-if="!['home','overview','schedule','national'].includes(activeSection)&&!['briefing','weather','profile','alerts','assistant','card'].includes(activeSection)" :corridor-focus="corridorFocus" :corridor-pair="corridorPair" :view="activeSection" :session="session" :network="network" :flights="scoped" :weather="weather" :selected="selected" :minute="minute" :city-name="cityName" :operations="operations" :density="density" :focus="drillFocus" :weather-mode="weatherMode" :weather-mode-status="weatherModeStatus" :alert-flights="scoped" :event-focus="eventFocus" :ai-reviewed="aiReviewed" @select-flight="chooseFlight" @weather-mode-change="onWeatherModeChange" @locate-event="locateEvent" @ai-reviewed="onAiReviewed" @open-section="activeSection=$event" @seek="minute=$event" @open-corridor="openCorridor" :max-minute="playbackMax"/>
   <!-- 全国范围：运行情报 / 调度台账接的是全国数据；切回东北就是 V1.0.0 原页 -->
   <section class="traffic-page scope-page" v-if="scope==='nation'&&(activeSection==='briefing'||activeSection==='schedule')">
     <div class="scope-bar" data-scope-bar>

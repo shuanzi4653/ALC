@@ -318,11 +318,11 @@ function clock(m){
         <span>{{ model.nationalModel.provenance.cities }} 城 · {{ model.nationalModel.provenance.samples }} 样本 · 按时间切分</span>
         <em>输入与标签同源（open-meteo 模式能见度），指标衡量的是"模式能见度的演变可预测性"</em>
       </div>
-      <!-- 空域净空：原来挂在「态势」侧栏，跟着 mode 跑到推演页去过。
+      <!-- 空域禁飞区：原来挂在「态势」侧栏，跟着 mode 跑到推演页去过。
            它是空域的事，就该跟「空域情报」这一页在一起；边界与穿越明细在
            地图「空域视角」里看，这里给的是同一套几何的**账目**。 -->
       <section class="nb-airspace" v-if="zones.available" data-airspace-block>
-        <h3>空域净空 <small>规则化生成 · {{ zones.policy==='PROHIBITED'?'一律禁飞':'可申请穿越' }}</small></h3>
+        <h3>空域禁飞区 <small>规则化生成 · {{ zones.policy==='PROHIBITED'?'一律禁飞':'可申请穿越' }}</small></h3>
         <div class="nb-air-grid">
           <div><small>受限机场</small><b>{{ zones.counts.airports||0 }}</b></div>
           <div><small>限制区</small><b>{{ zones.counts.limitZones||0 }} 个</b></div>

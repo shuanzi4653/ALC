@@ -1416,6 +1416,8 @@ def journal(minute: int = 60, lookback: int = 40, level: str = 'nation',
             rows.append({'minute': round(dep, 1), 'at': clock(dep), 'kind': 'SYSTEM',
                          'kindLabel': '运行事件', 'actionLabel': '起飞',
                          'name': name, 'flightId': fid,
+                         'corridor': f.get('corridor'), 'decision': f.get('decision'),
+                         'decisionLabel': f.get('decisionLabel'),
                          'detail': f"{f.get('callsign')} 于 {f.get('actualAt') or f.get('departAt')} 起飞，"
                                    f"高度 {f.get('altM')} m，许可 {f.get('clearance', {}).get('statusLabel') or '—'}"})
         # 到达：发生在窗口内
@@ -1423,12 +1425,16 @@ def journal(minute: int = 60, lookback: int = 40, level: str = 'nation',
             rows.append({'minute': round(arr, 1), 'at': clock(arr), 'kind': 'SYSTEM',
                          'kindLabel': '运行事件', 'actionLabel': '到达',
                          'name': name, 'flightId': fid,
+                         'corridor': f.get('corridor'), 'decision': f.get('decision'),
+                         'decisionLabel': f.get('decisionLabel'),
                          'detail': f"{f.get('callsign')} 到达，全程 {f.get('durationMin')} 分钟"})
         # 绕飞 / 延期 / 停飞：这是"当前状态"，时刻记在当前分钟
         if decision == 'DETOUR':
             rows.append({'minute': minute, 'at': clock(minute), 'kind': 'SYSTEM',
                          'kindLabel': '运行事件', 'actionLabel': '绕飞',
                          'name': name, 'flightId': fid,
+                         'corridor': f.get('corridor'), 'decision': f.get('decision'),
+                         'decisionLabel': f.get('decisionLabel'),
                          'detail': f"风险 {f.get('riskP')}；外偏后航程增加 {f.get('detourKm')} km"})
         if decision == 'HOLD':
             # 关键：延期可能来自"规则风险"也可能来自"模型低能见概率"。
@@ -1439,6 +1445,8 @@ def journal(minute: int = 60, lookback: int = 40, level: str = 'nation',
             rows.append({'minute': minute, 'at': clock(minute), 'kind': 'SYSTEM',
                          'kindLabel': '运行事件', 'actionLabel': '延期',
                          'name': name, 'flightId': fid,
+                         'corridor': f.get('corridor'), 'decision': f.get('decision'),
+                         'decisionLabel': f.get('decisionLabel'),
                          'detail': f"{why}（{f.get('riskLevelLabel')}档）；规则分 {f.get('riskP')}；"
                                    f"计划 {f.get('planAt')}，实际未放行"})
     for c in corridors:

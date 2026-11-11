@@ -146,6 +146,48 @@ def _chaikin(ring, iterations=2):
     return pts
 
 
+def _close_cells(cells: List[Tuple[float, float]]) -> List[Tuple[float, float]]:
+    """在**栅格层**做闭运算（膨胀一次 → 腐蚀一次），补单格孔洞与单格缝隙。
+
+    为什么必须在这一层做：回波是"逐格判定 → 每格一个方盒 → union"得到的。
+    某个格子只要低于阈值就被剔除，同一片回波里就出现成排的空格，
+    union 出来的形状自然是碎裂的（实测一帧 370 个环）。
+    几何层的 buffer 闭运算磨的是棱角，补不了这些孔 —— 孔在栅格阶段就已经形成了。
+
+    只补 1 格：补 2 格会把两片本该分开的小雨拼成一片，那是另一种失真。
+    """
+    if not cells:
+        return []
+    grid = {(int(round(lon / GRID_DEG)), int(round(lat / GRID_DEG))) for lon, lat in cells}
+    # 膨胀
+    grown = set()
+    for i, j in grid:
+        for di in (-1, 0, 1):
+            for dj in (-1, 0, 1):
+                grown.add((i + di, j + dj))
+    # 腐蚀
+    closed = set()
+    for i, j in grown:
+        if all((i + di, j + dj) in grown for di in (-1, 0, 1) for dj in (-1, 0, 1)):
+            closed.add((i, j))
+    # 再补内部空洞：被 8 邻域包住但自己空的格子，迭代两轮（外围不会被误填）
+    for _ in range(2):
+        holes = set()
+        for i, j in closed:
+            for di in (-1, 0, 1):
+                for dj in (-1, 0, 1):
+                    cand = (i + di, j + dj)
+                    if cand in closed:
+                        continue
+                    near = sum(1 for a in (-1, 0, 1) for b in (-1, 0, 1) if (cand[0] + a, cand[1] + b) in closed)
+                    if near >= 7:      # 8 邻域里至少 7 个是实心 → 是孔，不是边界
+                        holes.add(cand)
+        if not holes:
+            break
+        closed |= holes
+    return [(i * GRID_DEG, j * GRID_DEG) for (i, j) in closed]
+
+
 def _rings_of(cells: List[Tuple[float, float]]) -> List[List[List[float]]]:
     import shapely
     from shapely.geometry import box
@@ -223,7 +265,7 @@ def fetch(force: bool = False) -> Dict[str, Any]:
         return _empty(f'取帧失败：{str(exc)[:90]}')
 
     stamp = datetime.fromtimestamp(frame['time'], tz=timezone.utc).strftime('%Y%m%d%H%M')
-    cache_file = CACHE_DIR / f'{stamp}-z{TILE_ZOOM}-g{GRID_DEG}-geo3.json'
+    cache_file = CACHE_DIR / f'{stamp}-z{TILE_ZOOM}-g{GRID_DEG}-geo4.json'
     if cache_file.exists() and not force:
         try:
             cached = json.loads(cache_file.read_text(encoding='utf-8'))
@@ -264,7 +306,9 @@ def fetch(force: bool = False) -> Dict[str, Any]:
             for lon, lat, band in rows:
                 cells[band].append((lon, lat))
 
-    bands = {band: _rings_of(rows) for band, rows in cells.items()}
+    # 先补栅格孔洞，再成环：一片雨就应该是一个环，而不是一片雨加几百个洞。
+    closed_cells = {band: _close_cells(rows) for band, rows in cells.items()}
+    bands = {band: _rings_of(rows) for band, rows in closed_cells.items()}
     total_cells = sum(len(rows) for rows in cells.values())
     value = {
         'available': True,

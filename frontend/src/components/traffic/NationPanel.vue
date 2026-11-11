@@ -3,6 +3,7 @@ import {computed,defineAsyncComponent,onMounted,onUnmounted,ref,watch} from 'vue
 import {requestJson} from '../../api.js'
 import {store} from '../../store.js'
 import NationDeduce from './NationDeduce.vue'
+import CorridorBrowser from './CorridorBrowser.vue'
 import NationMap from './NationMap.vue'
 import NationBriefing from './NationBriefing.vue'
 import {parseScope,scopeKey} from '../../traffic/scope.js'
@@ -20,6 +21,9 @@ const NationGlobe=defineAsyncComponent(()=>import('./NationGlobe.vue'))
 //   ③ **逐级重新请求**：下钻与返回都清空上一屏，内存里不留整棵树。
 const props=defineProps({
   compact:{type:Boolean,default:false},
+  // 处置事件 / 日志行跳进来时要定位到的走廊号（NC-0200 这类）。
+  // 必须是 prop：写成同名的本地 ref，父级传进来的值会被空的本地值遮住（实测跳不过去）。
+  focusCorridor:{type:String,default:''},
   // 当前作用域（`nation` / `region:north` / `province:河北省` / `city:石家庄市`）。
   // NationPanel 仍是下钻的执行者，但"现在在哪一级"不再由它独占 ——
   // 气象、台账、处置、取证读的是同一份 store.scope。
@@ -38,7 +42,7 @@ const props=defineProps({
   // 不给提示的话用户看到的就是一张空地图，不知道从哪下手。
   hint:{type:String,default:''},
 })
-const emit=defineEmits(['scope-change'])
+const emit=defineEmits(['scope-change','open-corridor'])
 
 const level=ref('nation')
 const ident=ref('')
@@ -83,6 +87,12 @@ const audience=ref('ops')
 const zoneGeom=ref(null)
 // 禁飞区在首页默认开（用户 2026-11-11 要求：气象与非气象都要在首页看得到）
 const zoneOn=ref(true)
+// 走廊页/推演页：左侧列表选中的走廊。外部（处置、日志）跳进来时用 focusCorridor 指定。
+function onCorridorPick(row){
+  if(!row) return
+  const f=(flights.value||[]).find(x=>x.corridor===row.id)
+  if(f) pickFlight(f)
+}
 // 虚拟气象演示包：后端 ?virtual=1 生成合成回波并**重算**绕飞与停飞，
 // 不是前端加一层滤镜 —— 关掉立刻回到真实回波，两条路径互不污染。
 const virtualWx=ref(false)
@@ -130,6 +140,8 @@ const fog=computed(()=>data.value?.fog||{available:false,counts:{},bands:{},citi
 // 机场净空（DERIVED）。与 border 的 OFFICIAL 管制区分开显示：
 // 两套几何一个是官方公布、一个是规则化生成，混在一起说会被追问依据。
 const zones=computed(()=>data.value?.zones||{available:false,counts:{},rows:[]})
+// 走廊页的地图要吃净空环（`bands`），不是 NationPanel 自己的 zonePolys
+const zoneBandsGeom=computed(()=>zoneGeom.value?.bands||null)
 
 // 回波范围：三档环一起算，定位按钮按它飞过去
 const radarBBox=computed(()=>{
@@ -398,8 +410,15 @@ function onSeek(){ frameMinute.value=minute.value; loadFlights() }
 // 该班次若还在飞就同时选中它 —— 否则读者只能对着"青海省 · 2 处"猜是哪两处。
 function openAlert(row){
   const places=row.places||[]
-  // places 里的字符串是"起点 → 终点"（走廊端点），不是城市名：
-  // 直接拿它去切城市会切到"克拉玛依市 → 阿勒泰地区"这种不存在的 id。
+  // 用户要的落点变了：处置点开不再"切到城市让用户自己找"，而是**直接进那个班次的走廊**，
+  // 在那里做人工裁决。走廊号就藏在班次 id 里（NC-0270#-1 → NC-0270），不用再查表。
+  const fid=row.flightId||(row.memberIds||[]).map(x=>String(x).replace(/^EV-[A-Z]+-/,''))[0]||''
+  const corridor=String(fid).split('#')[0]
+  if(corridor&&corridor.includes('-')){
+    emit('open-corridor',{corridor, flightId:fid})
+    return
+  }
+  // 聚合事件没有单一班次时退回"切到成员城市"，至少让人看见影响面
   const raw=String(places[0]||'')
   const city=raw.split('→')[0].trim()
   const cityHit=(data.value?.nodes||[]).some(n=>n.name===city)
@@ -576,41 +595,8 @@ const wxSourceDetail=computed(()=>{
 function pBand(p){return p==null?'':(p>=0.6?'bad':(p>=0.35?'warn':(p>=0.15?'watch':'')))}
 // 气象表要"一眼看出哪列是异常"，所以温度/风速/能见度各自上色。
 // 阈值集中在这里，别散到模板里 —— 否则改一次要翻三个地方。
-// —— 推演个性化：先选对象，再看链路 ——
-// 之前这一页只能"在地图上点"，点到什么算什么。推演的逻辑应该是**先立题**：
-// 选一座城市（在哪一片空域）或一班航班（哪一条航路），再顺着实况→判据→裁决往下看。
-const pickCity=ref('')
-const cityOptions=computed(()=>{
-  const rows=(data.value?.nodes||[]).filter(n=>n.name)
-  // 省会/机场城市排前面：从 319 个城里找一个县城，用下拉是折磨
-  const weight=n=>(n.rank||3)*10+((n.hasAirport||n.airport)?0:1)
-  return [...rows].sort((a,b)=>weight(a)-weight(b)||String(a.name).localeCompare(String(b.name),'zh')).slice(0,120)
-})
-const flightOptions=computed(()=>{
-  const rows=[...flights.value]
-  rows.sort((a,b)=>String(a.callsign).localeCompare(String(b.callsign)))
-  return rows.slice(0,80)
-})
-function jumpToCity(){
-  const name=pickCity.value
-  if(!name) return
-  if(level.value==='city'&&ident.value===name) return
-  go('city',name,name)
-}
-function pickFromList(){
-  const flight=flights.value.find(f=>f.id===selectedId.value)
-  if(flight) pickFlight(flight)
-}
-// 选题行里的一句话：选中的这一班现在怎么样，细的看下方详情
-const pickSummary=computed(()=>{
-  const flight=selectedFlight.value
-  if(!flight) return ''
-  const wx=(data.value?.nodes||[]).find(n=>n.name===flight.fromName||n.name===flight.toName)
-  const parts=[flight.decisionLabel, `风险 ${flight.riskP.toFixed(2)}`]
-  if(wx?.weather) parts.push(`实况 ${wx.weather.tempC==null?'—':wx.weather.tempC+' °C'} / 能见度 ${visText(wx.weather.visM)}`)
-  return parts.join(' · ')
-})
-
+// 推演/走廊已改成「左侧列表 + 右侧详情」，两级下拉（选城市→选班次）随之作废。
+// 这里只留一句说明：同一件事不要有两个入口，旧代码留着只会被后来的人当成还在用。
 const profileText=computed(()=>{
   const prof=corridorProfile.value
   if(!prof) return ''
@@ -732,25 +718,6 @@ onUnmounted(()=>{
 
   <!-- 推演页的"立题"行：先选对象，再看链路。不给选择器的话，
        这一页只能靠在地图上盲点，点不中就什么都没发生。 -->
-  <div class="nrn-pick" v-if="mode==='card'" data-card-picker>
-    <label>城市
-      <select v-model="pickCity" @change="jumpToCity" aria-label="推演城市">
-        <option value="">选择城市…</option>
-        <option v-for="c in cityOptions" :key="c.name" :value="c.name">
-          {{ shortName(c.name) }}{{ c.airport?(' · '+c.airport):' · 无机场' }}</option>
-      </select>
-    </label>
-    <label>班次
-      <select v-model="selectedId" @change="pickFromList" aria-label="推演班次">
-        <option value="">选择班次…</option>
-        <option v-for="f in flightOptions" :key="f.id" :value="f.id">
-          {{ f.callsign }} · {{ shortName(f.fromName) }}→{{ shortName(f.toName) }}</option>
-      </select>
-    </label>
-    <span class="pick-note" v-if="pickSummary">{{ pickSummary }}</span>
-    <span class="pick-note quiet" v-else>选城市定位空域，选班次看这一架的实况 → 判据 → 裁决</span>
-  </div>
-
   <p class="nrn-state" v-if="loading">正在加载本级数据…</p>
   <p class="nrn-state bad" v-else-if="error">本级不可用 · {{ error }}<button @click="load">重试</button></p>
 
@@ -759,9 +726,18 @@ onUnmounted(()=>{
        都会把链条打断 —— 提示条有值时整个内容区会被排除掉（实测整页空白）。
        所以这里显式写全条件，不用 else-if 链。 -->
   <p class="nrn-hint" v-if="hint&&mode!=='card'&&data&&!loading&&!error" data-nation-hint>{{ hint }}</p>
-  <div class="nrn-body" v-if="data&&!loading&&!error" :class="{'no-map':view!=='map','card-mode':mode==='card'}">
+  <div class="nrn-body" v-if="data&&!loading&&!error" :class="{'no-map':view!=='map','card-mode':mode==='corridor'||mode==='card'}">
+    <!-- 走廊 / 推演：左列表 + 右(这条走廊的地图 + 数据 or 推演链路)。
+         这一层不再用"全国地图 + 右栏统计"，因为那一层看不出"这一条航线本身"。 -->
+    <CorridorBrowser v-if="mode==='corridor'||mode==='card'"
+                     :mode="mode==='card'?'card':'corridor'"
+                     :data="data" :flights="flights" :minute="minute"
+                     :zone-bands="zoneOn?zoneBandsGeom:null"
+                     :focus-corridor="props.focusCorridor"
+                     @select="onCorridorPick"/>
+
     <!-- ================= 态势 ================= -->
-    <div class="nrn-map" v-show="view==='map'">
+    <div class="nrn-map" v-show="view==='map'" v-if="mode!=='corridor'&&mode!=='card'">
       <div class="nrn-tools">
         <button class="play" @click="togglePlay">{{ playing?'Ⅱ 暂停':'▶ 推演' }}</button>
         <input type="range" min="0" :max="MINUTES" step="1" v-model.number="minute"
@@ -866,7 +842,7 @@ onUnmounted(()=>{
         <i class="dot"></i>城市
         <i class="line"></i>航线
         <i class="line warn"></i>绕飞
-        <i class="box"></i>禁飞区
+        <i class="box"></i>{{ level==='province'||level==='city' ? '禁飞区' : '禁飞区（下钻可见）' }}
         <i class="tri"></i>应急
         <span v-if="virtualMode" class="virt">虚拟增强</span>
       </p>
@@ -920,7 +896,7 @@ onUnmounted(()=>{
     </div>
 
     <!-- ================= 右栏：分块统计 ================= -->
-    <aside class="nrn-side" :class="{'wx-wide':mode==='weather'}">
+    <aside class="nrn-side" v-if="mode!=='corridor'&&mode!=='card'" :class="{'wx-wide':mode==='weather'}">
       <div class="nrn-total">
         <div><b>{{ total.corridors||0 }}</b><span>航线</span></div>
         <div><b>{{ total.airborne||0 }}</b><span>在飞</span></div>
@@ -983,7 +959,7 @@ onUnmounted(()=>{
 
       <!-- 双受众的另一半：空域视角的侧栏。同一套几何，换成"哪些点禁飞、边界在哪"的读法 -->
       <div class="nrn-zone" v-if="mode!=='card'&&audience==='airspace'" data-zone-panel>
-        <h4>空域净空
+        <h4>空域禁飞区
           <small>规则化生成 · {{ zonePolicy==='PROHIBITED'?'一律禁飞':'可申请穿越' }}</small></h4>
         <p><span>受限额</span><b>{{ zoneCounts.airports||0 }} 机场</b></p>
         <p><span>限制区</span><b>{{ zoneCounts.limitZones||0 }} 个 · {{ zoneCounts.coverageSqKm||0 }} km²</b></p>
@@ -1219,8 +1195,11 @@ html[data-theme="light"] .nrn-lineall{background:#f2f7fc;border-color:#cfdcea;co
 .nrn-body.no-map{grid-template-columns:minmax(0,1fr) 360px}
 /* 推演：右栏内容比一屏高。grid 行默认按内容高度撑开，会把右栏顶出容器、
    压到下面的详情卡上（实测板子直接盖住取证按钮）。钉成一整行，让板子自己滚。 */
-.nrn-body.card-mode{grid-template-rows:minmax(0,1fr)}
+/* 走廊/推演页只有一列（浏览器自己分左右）：留着一列 560 的右栏，
+   浏览器只会挤在左半屏，右边空一条。 */
+.nrn-body.card-mode{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr)}
 .nrn-body.card-mode>.nrn-side{overflow:hidden}
+.nrn-body.card-mode>div{min-height:0}
 
 .nrn-map{position:relative;display:flex;flex-direction:column;min-height:0;gap:6px;min-width:0;width:auto}
 .nrn-hint{margin:0;padding:5px 9px;border-radius:6px;font-size:11.5px;color:#a9cde2;
