@@ -339,9 +339,9 @@ function shortName(name){
 }
 const nodes=computed(()=>{
   const all=(props.data?.nodes||[])
-  // 全国层 319 个城市点在屏幕上是一片沙：真正要读的是"省会 + 有机场的城市"（约 87 个）。
-  // 其余城市并没有被删掉 —— 下钻到大区/省就全部回来，右栏列表也一直都在。
-  const list=level.value==='nation'?all.filter(node=>(node.rank||3)<=2):all
+  // 全国层把 319 个城市全部画出来：这一层不画航线之后，城市点就是主角。
+  // 三级用大小区分（省会 > 机场城市 > 一般），不再靠"藏起来"减噪。
+  const list=all
   return list.map(node=>{
     const [x,y]=project(node.lon,node.lat)
     return {...node,x,y,short:shortName(node.name),
@@ -381,9 +381,13 @@ const provinceLabels=computed(()=>{
 const flightDots=computed(()=>{
   const out=[]
   for(const f of props.flights||[]){
+    // 延期的班次**不画**：它还没起飞，画在航路上等于告诉人"这架已经在飞"。
+    // 它仍然在台账与处置页里，也仍然计入"延期 N 架"。
+    if(f.decision==='HOLD') continue
     const [x,y]=project(f.lon,f.lat)
+    // 绕飞用颜色标出来就够了（琥珀），不再加图标形状——形状留给"应急"这一档
     out.push({...f,x,y,selected:props.selectedId===f.id,
-      bad:f.decision==='HOLD'||f.riskLevel==='HIGH'})
+      detour:f.status==='DELAYED',bad:f.riskLevel==='HIGH'})
   }
   return out
 })
@@ -562,9 +566,12 @@ function clickNode(node){
       <rect v-if="tilt" x="-400" y="-300" :width="VIEW.w+800" :height="VIEW.h+900"
             style="fill:var(--map-ground)" pointer-events="none"/>
 
-      <!-- 5 航线：空域视角下让位给净空，不删只淡 -->
-      <g fill="none" stroke-linecap="round"
-         :opacity="audience==='airspace'?.3:(level==='nation'?.45:1)">
+      <!-- 5 航线：全国层不画。
+           492 条线在全国缩放下平均只有 20–40 px，画出来就是一张蜘蛛网，
+           而这一层要看的是"哪些城市有网络"，不是"每条线怎么走"。
+           下钻到大区/省/市再画，那时一条线才占几十上百像素，方向也才读得出来。 -->
+      <g v-if="level!=='nation'" fill="none" stroke-linecap="round"
+         :opacity="audience==='airspace'?.3:1">
         <path v-for="line in corridors" :key="'c'+line.id" :d="line.d"
               :stroke="line.blocked?(virtualMode?'rgba(255,96,70,.95)':'var(--map-corridor-blocked)'):'var(--map-corridor)'"
               :stroke-width="line.blocked?lineWidth*(virtualMode?2.2:.8):lineWidth"
@@ -579,7 +586,7 @@ function clickNode(node){
       <!-- 5.5 航线方向箭头：每条线一枚，说明"往哪飞"。
            全国层 492 条线如果每段都画箭头，会在图上撒满三角；
            所以只在 48% 处放一枚，并按当前级别缩放，省/市层才看得清。 -->
-      <g class="nmap-arrows" :opacity="audience==='airspace'?.12:(level==='nation'?.42:.9)">
+      <g v-if="level!=='nation'" class="nmap-arrows" :opacity="audience==='airspace'?.12:.9">
         <template v-for="line in corridors" :key="'a'+line.id">
           <path v-if="line.arrow"
                 :transform="`translate(${line.arrow.x.toFixed(1)} ${line.arrow.y.toFixed(1)}) rotate(${line.arrow.angle.toFixed(1)}) scale(${level==='nation'?0.62:(level==='region'?0.8:1)})`"
@@ -611,15 +618,17 @@ function clickNode(node){
       <!-- 7 航班：每架一个独立对象，点谁选谁 -->
       <g class="nmap-flights" :opacity="audience==='airspace'?.3:1">
         <g v-for="f in flightDots" :key="f.id"
-           :transform="`translate(${f.x.toFixed(1)} ${f.y.toFixed(1)}) rotate(${f.heading.toFixed(0)})`"
+           :transform="`translate(${f.x.toFixed(1)} ${f.y.toFixed(1)}) rotate(${f.heading.toFixed(0)}) scale(${level==='nation'?0.68:1})`"
            @click.stop="!moved&&emit('select-flight',f)">
           <circle v-if="f.selected" r="9" fill="none" stroke="#8ef0ff" stroke-width="1.4" filter="url(#glow)"/>
           <path v-if="f.selected" d="M7 0 L-4 4 L-2 0 L-4 -4 Z" fill="#8ef0ff"
                 stroke="rgba(10,30,45,.85)" stroke-width=".5"/>
           <template v-else>
+            <!-- 三档颜色：常态浅蓝、绕飞琥珀、应急红（应急目前无数据触发，先占位）。
+                 延期的班次不在这里 —— 它还没起飞，flightDots 已经过滤掉了。 -->
             <path d="M6 0 L-3.4 3.2 L-1.7 0 L-3.4 -3.2 Z"
-                  :fill="f.bad?'#ff8f6b':(f.status==='DELAYED'?'#ffc857':'#dff3ff')"
-                  :stroke="f.bad?'rgba(90,20,10,.8)':'rgba(10,30,45,.8)'" stroke-width=".45"/>
+                  :style="{fill: f.emergency?'var(--map-emergency)':(f.detour?'var(--map-fly-detour)':'var(--map-fly)')}"
+                  :stroke="f.emergency?'var(--map-emergency)':'rgba(10,30,45,.55)'" stroke-width=".45"/>
           </template>
           <title>{{ f.callsign }} · {{ f.fromName }} → {{ f.toName }} · {{ f.altM }} m · {{ f.decisionLabel }}</title>
         </g>

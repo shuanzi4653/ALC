@@ -109,6 +109,9 @@ function arcLngLat(a,b,strength){
   return out
 }
 const corridorFC=computed(()=>{
+  // 全国层不画航线：492 条线在这个缩放下只有 20–40 px，是蜘蛛网不是信息。
+  // 与二维图保持同一口径 —— 两个视图对同一件事必须给同一个答案。
+  if(level.value==='nation') return EMPTY
   const features=[]
   for(const row of props.data?.corridors||[]){
     const path=(row.path&&row.path.length>1)?row.path:[row.fromLonLat,row.toLonLat]
@@ -219,11 +222,15 @@ const zoneFC=computed(()=>{
 const zonePolicy=computed(()=>String(props.zones?.policy||'APPROVAL_REQUIRED'))
 
 // —— 航班 ——
-const flightFC=computed(()=>fc((props.flights||[]).filter(f=>f.lon!=null).map(f=>({
+const flightFC=computed(()=>fc((props.flights||[])
+  // 延期（HOLD）的班次还没起飞，不画
+  .filter(f=>f.lon!=null&&f.decision!=='HOLD')
+  .map(f=>({
   type:'Feature',
   properties:{
     id:f.id,callsign:f.callsign,heading:f.heading||0,
-    bad:(f.status==='DELAYED'||f.decision==='HOLD')?1:0,
+    // 绕飞用颜色标（琥珀），停飞/应急才换图标
+    detour:f.status==='DELAYED'?1:0,
     place:`${f.fromName} → ${f.toName}`,
   },
   geometry:{type:'Point',coordinates:[f.lon,f.lat]},
@@ -508,21 +515,21 @@ onMounted(()=>{
   map.on('styleimagemissing',event=>{
     if(disposed||!map) return
     if(event.id==='plane'&&!map.hasImage('plane')) map.addImage('plane',planeImage('#e8f6ff'))
-    if(event.id==='plane-bad'&&!map.hasImage('plane-bad')) map.addImage('plane-bad',planeImage('#ffb08a'))
+    if(event.id==='plane-detour'&&!map.hasImage('plane-detour')) map.addImage('plane-detour',planeImage('#ffc857'))
   })
   // maplibre 6 在样式编译阶段就会去取图标，比 styleimagemissing 更早；
   // 官方给的入口是 setMissingStyleImageResolver —— 用它才不会先刷一条警告。
   if(typeof map.setMissingStyleImageResolver==='function'){
     map.setMissingStyleImageResolver(id=>{
       if(id==='plane') return planeImage('#e8f6ff')
-      if(id==='plane-bad') return planeImage('#ffb08a')
+      if(id==='plane-detour') return planeImage('#ffc857')
       return null
     })
   }
   map.on('load',()=>{
     if(disposed) return
     if(!map.hasImage('plane')) map.addImage('plane',planeImage('#e8f6ff'))
-    if(!map.hasImage('plane-bad')) map.addImage('plane-bad',planeImage('#ffb08a'))
+    if(!map.hasImage('plane-detour')) map.addImage('plane-detour',planeImage('#ffc857'))
     if(!map.getLayer('flight-icon')) map.addLayer(FLIGHT_LAYER)
     ready.value=true
     applyData(true)
@@ -677,7 +684,7 @@ const insetShapes=computed(()=>{
 })
 const levelLabel=computed(()=>({nation:'全国',region:'大区',province:'省域',city:'城市'}[level.value]||level.value))
 const scaleNote=computed(()=>({
-  nation:'省界与航路按真实经纬度铺开；城市用点+环标记，不画体块',
+  nation:'城市用点+环标记；全国层与二维图一致，不画航线',
   region:'本区省界与航路；城市用点+环标记',
   province:'地形高程（DEM，z≤6）+ 机场净空柱（垂直放大 10×）',
   city:'地形高程 + 机场净空柱（垂直放大 10×）',

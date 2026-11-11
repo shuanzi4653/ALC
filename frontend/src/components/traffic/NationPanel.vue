@@ -214,7 +214,7 @@ const headline=computed(()=>{
   // 两行连着读会变成"全国 全国 492 条航线…"。这里只讲这一刻的数字。
   const parts=[`${t.corridors||0} 条航线`,`在飞 ${t.airborne||0} 架`]
   if(t.delayed)parts.push(`绕飞 ${t.delayed} 架`)
-  if(t.hold)parts.push(`暂缓 ${t.hold} 架`)
+  if(t.hold)parts.push(`延期 ${t.hold} 架`)
   if(t.blocked)parts.push(`边境停飞 ${t.blocked} 条`)
   if(t.lowVisCities)parts.push(`低能见度 ${t.lowVisCities} 城`)
   return parts.join(' · ')
@@ -362,7 +362,7 @@ const weatherRows=computed(()=>{
   return rows.slice(0,level.value==='nation'?12:(density.value==='slim'?16:40))
 })
 
-// 时间轴推进时，只刷新"在飞/绕飞/暂缓"这三个会变的数；航线数、停飞数是静态的，
+// 时间轴推进时，只刷新"在飞/绕飞/延期"这三个会变的数；航线数、停飞数是静态的，
 // 不该跟着分钟乱跳。所以按省/市名去 byProvince/byCity 里取，取不到就退回快照值。
 function airOf(name,fallback){const row=byProvince.value[name];return row?row.airborne:(fallback||0)}
 function airOfCity(name,fallback){const row=byCity.value[name];return row?row.airborne:(fallback||0)}
@@ -481,28 +481,6 @@ const wxSourceDetail=computed(()=>{
 function pBand(p){return p==null?'':(p>=0.6?'bad':(p>=0.35?'warn':(p>=0.15?'watch':'')))}
 // 气象表要"一眼看出哪列是异常"，所以温度/风速/能见度各自上色。
 // 阈值集中在这里，别散到模板里 —— 否则改一次要翻三个地方。
-function tempBand(t){
-  if(t==null) return ''
-  if(t<=0) return 't-cold'
-  if(t<=10) return 't-cool'
-  if(t<=22) return 't-mild'
-  if(t<=30) return 't-warm'
-  return 't-hot'
-}
-function windBand(w){
-  if(w==null) return ''
-  if(w<3) return 'w-calm'
-  if(w<6) return 'w-breezy'
-  return 'w-windy'
-}
-function visBand(v){
-  if(v==null) return ''
-  if(v>=10000) return 'v-good'
-  if(v>=3000) return 'v-mid'
-  if(v>=1500) return 'v-low'
-  return 'v-bad'
-}
-
 // —— 推演个性化：先选对象，再看链路 ——
 // 之前这一页只能"在地图上点"，点到什么算什么。推演的逻辑应该是**先立题**：
 // 选一座城市（在哪一片空域）或一班航班（哪一条航路），再顺着实况→判据→裁决往下看。
@@ -731,6 +709,7 @@ onUnmounted(()=>{
                  @drill="drill" @select-flight="pickFlight" @select-corridor="pickCorridor"/>
       </div>
 
+      <div class="nrn-mapfoot">
       <div class="nrn-monitor" data-border-monitor>
         <!-- 口径写进 title，不上主行：主行放"这一刻是什么"，规则解释放悬停。
              先前这里既有"比对范围：…30 km 为预警带"整句，又有末尾一句 border.note，
@@ -747,13 +726,16 @@ onUnmounted(()=>{
       </div>
 
       <p class="nrn-legend" v-if="audience==='ops'">
-        <i class="dot"></i>节点三级：省会/首府（大点+浅环）＞机场城市＞一般
-        <i class="line"></i>航线同色同宽
-        <i class="line warn"></i>琥珀＝绕飞航迹
-        <i class="line bad"></i>红＝边境受限停飞
-        <i class="zone"></i>琥珀圈＝机场净空限制区（规则化）
-        <span v-if="virtualMode" class="virt">虚拟增强：回波与绕飞/停飞加亮</span>
-        <span class="quiet" v-if="border.excludeKm">边境 {{ border.excludeKm }} km 内侧城市整体退出通航（保守取值；名单见「运行情报 · 空域情报」）</span>
+        <i class="dot"></i>一般 ＜ 机场 ＜ 省会（点大小）
+        <template v-if="level!=='nation'">
+          <i class="line"></i>航线同色，三角指方向
+          <i class="line blocked"></i>深橙＝边境停飞
+        </template>
+        <i class="line warn"></i>琥珀＝绕飞
+        <i class="line emergency"></i>红＝应急（预留）
+        <i class="zone"></i>琥珀圈＝净空限制区
+        <span v-if="virtualMode" class="virt">虚拟增强：回波与绕飞加亮</span>
+        <span class="quiet" v-if="level==='nation'">· 全国层只画城市与在飞班次，下钻才画航线<span v-if="border.excludeKm">；边境 {{ border.excludeKm }} km 内侧城市退出通航（名单见「空域情报」）</span></span>
       </p>
       <p class="nrn-legend air" v-else>
         <i class="zone"></i><template v-if="zonePolicy==='PROHIBITED'">红圈＝净空限制区（演示态：一律禁止进入）</template><template v-else>琥珀圈＝净空限制区（默认：可申请穿越）</template>
@@ -762,6 +744,7 @@ onUnmounted(()=>{
         <span v-if="zoneBusy" class="quiet">净空几何载入中…</span>
         <span v-else-if="zoneErr" class="bad">净空几何不可用：{{ zoneErr }}</span>
       </p>
+      </div>
     </div>
 
     <!-- ================= 台账 / 情报：与原生页共用同一份组件 ================= -->
@@ -779,7 +762,7 @@ onUnmounted(()=>{
     <div class="nrn-table" v-show="view==='alerts'">
       <div class="nrn-table-hd">
         <h3>事件处置 <small>{{ alerts.length }} 条</small></h3>
-        <p>四类：低能见度、边境受限、回波绕飞、放行暂缓。规则动作自动给出处置建议，需人工确认的标为待处置。</p>
+        <p>四类：低能见度、边境受限、回波绕飞、延期起飞。规则动作自动给出处置建议，需人工确认的标为待处置。</p>
       </div>
       <ul class="nrn-alerts">
         <li v-for="row in alerts" :key="row.id" :class="row.severity">
@@ -800,7 +783,7 @@ onUnmounted(()=>{
         <div><b>{{ total.airborne||0 }}</b><span>在飞</span></div>
         <div :class="{alarm:total.delayed>0}"><b>{{ total.delayed||0 }}</b><span>绕飞</span></div>
         <div :class="{alarm:total.blocked>0}"><b>{{ total.blocked||0 }}</b><span>停飞</span></div>
-        <div :class="{alarm:total.hold>0}"><b>{{ total.hold||0 }}</b><span>暂缓</span></div>
+        <div :class="{alarm:total.hold>0}"><b>{{ total.hold||0 }}</b><span>延期</span></div>
       </div>
 
       <!-- 上：区块。全国只列大区，点进去才换成省；再往里换城市 —— 一层只放一层 -->
@@ -885,9 +868,9 @@ onUnmounted(()=>{
           <li v-for="row in wxRows" :key="row.name" :class="{bad:row.low}">
             <b>{{ row.short }}</b>
             <em :class="pBand(row.p)">{{ row.p==null?'—':(row.p*100).toFixed(0)+'%' }}</em>
-            <span :class="tempBand(row.temp)">{{ row.temp==null?'—':row.temp+'°' }}</span>
-            <span :class="windBand(row.wind)">{{ row.wind==null?'—':row.wind+' m/s' }}</span>
-            <span :class="visBand(row.vis)">{{ visText(row.vis) }}</span>
+            <span>{{ row.temp==null?'—':row.temp+'°' }}</span>
+            <span>{{ row.wind==null?'—':row.wind+' m/s' }}</span>
+            <span>{{ visText(row.vis) }}</span>
           </li>
           <li v-if="!wxRows.length" class="empty">
             {{ wxRefreshing?'实况补数中，约 1 分钟刷新后可见':'本级暂无逐市气象' }}</li>
@@ -1074,7 +1057,9 @@ onUnmounted(()=>{
 .nrn-tools input[type=range]{flex:1;min-width:90px}
 .nrn-tools .clock{font-variant-numeric:tabular-nums;color:#bfe9ff;font-size:12px}
 
-.nrn-monitor{position:absolute;left:8px;right:8px;bottom:28px;z-index:4;
+.nrn-mapfoot{position:absolute;left:8px;right:8px;bottom:6px;z-index:4;
+  display:flex;flex-direction:column;gap:4px;pointer-events:none}
+.nrn-monitor{
   padding:5px 9px;border:1px solid rgba(80,130,160,.35);border-radius:7px;
   background:rgba(10,26,38,.9);font-size:11px;color:#8fb2c8;
   display:flex;flex-wrap:wrap;gap:3px 12px;pointer-events:none}
@@ -1082,13 +1067,15 @@ onUnmounted(()=>{
 .nrn-monitor .quiet{color:#6f92a8}
 .nrn-monitor .push{color:#7d9cb3}
 .nrn-monitor .push.on{color:#7fe0bb}
-.nrn-legend{position:absolute;left:8px;right:8px;bottom:5px;z-index:4;margin:0;
+.nrn-legend{margin:0;
   font-size:10.5px;color:#8fb2c8;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
-  background:rgba(8,18,28,.86);border-radius:6px;padding:2px 8px;pointer-events:none}
+  background:rgba(8,18,28,.86);border-radius:6px;padding:3px 8px;pointer-events:none}
 .nrn-legend i{display:inline-block;width:14px;height:2px;background:rgba(126,206,255,.62);margin-right:4px;vertical-align:middle}
 .nrn-legend i.dot{width:6px;height:6px;border-radius:50%;background:#eaf6ff}
 .nrn-legend i.warn{background:rgba(255,206,90,.9)}
 .nrn-legend i.bad{background:rgba(226,92,74,.75)}
+.nrn-legend i.blocked{background:rgba(232,89,12,.9)}
+.nrn-legend i.emergency{background:#ff3b30}
 .nrn-legend i.zone{width:9px;height:9px;border-radius:50%;background:rgba(245,190,60,.22);
   border:1px solid rgba(245,190,60,.75)}
 .nrn-legend i.dim{background:rgba(126,206,255,.3)}
@@ -1156,30 +1143,6 @@ onUnmounted(()=>{
 .nrn-wx li em.bad{color:#ff8f6b}
 .nrn-wx li span{text-align:right;font-variant-numeric:tabular-nums}
 
-/* 气象表分级配色：温度/风速/能见度各一条暖冷轴，异常值一眼能挑出来 */
-.nrn-wx li span.t-cold{color:#8fc8ff}
-.nrn-wx li span.t-cool{color:#9fd7ef}
-.nrn-wx li span.t-mild{color:#a8d8b0}
-.nrn-wx li span.t-warm{color:#ffcf8a}
-.nrn-wx li span.t-hot{color:#ff9d6e}
-.nrn-wx li span.w-calm{color:#8fbfa8}
-.nrn-wx li span.w-breezy{color:#ffd479}
-.nrn-wx li span.w-windy{color:#ff9d6e}
-.nrn-wx li span.v-good{color:#8fd8b0}
-.nrn-wx li span.v-mid{color:#cfe0a0}
-.nrn-wx li span.v-low{color:#ffcf8a}
-.nrn-wx li span.v-bad{color:#ff8f6b;font-weight:600}
-
-/* 低能见度行：红框做一次"渐显渐隐"，让它在满屏数字里自己跳出来。
-   只动背景与描边，不动位置 —— 闪动不该影响阅读。 */
-.nrn-wx li.bad{animation:wx-alarm 2.8s ease-in-out infinite}
-@keyframes wx-alarm{
-  0%,100%{background:rgba(226,75,74,.06);outline-color:rgba(226,75,74,.35)}
-  50%{background:rgba(226,75,74,.20);outline-color:rgba(255,120,95,.85)}
-}
-@media (prefers-reduced-motion: reduce){
-  .nrn-wx li.bad{animation:none;background:rgba(226,75,74,.14)}
-}
 .nrn-wx li.empty{grid-template-columns:1fr;color:#6f92a8;text-align:center}
 .nrn-wx li.head{background:none;color:#6a8ca2;font-size:9.5px;padding:0 5px 2px;letter-spacing:.2px;
   position:sticky;top:0;z-index:1}
@@ -1189,7 +1152,7 @@ onUnmounted(()=>{
 .nrn-total div{text-align:center}
 .nrn-total b{display:block;font-size:15px;color:#eaf6ff;font-variant-numeric:tabular-nums}
 .nrn-total span{font-size:10px;color:#7d9cb3}
-.nrn-total .alarm b{color:#ffab7a}
+.nrn-total .alarm b{color:#ffc857}
 .nrn-side h3{margin:4px 0 0;font-size:12px;color:#a9cde2;font-weight:600}
 .nrn-side h3 small{margin-left:6px;font-size:10px;color:#6f92a8;font-weight:400}
 .nrn-block{border:1px solid rgba(70,110,140,.32);border-radius:8px;overflow:hidden;background:rgba(10,26,38,.6)}

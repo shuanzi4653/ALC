@@ -24,7 +24,7 @@ VIS_BANDS = ((1500.0, 0.72), (3000.0, 0.45), (5000.0, 0.22))
 WIND_HIGH = 12.0
 RISK_HOLD = 0.75
 RISK_WATCH = 0.35
-# 模型判据的门槛：与规则分分开定。0.35 起提示、0.60 暂缓 —— 这是**运营阈值**，
+# 模型判据的门槛：与规则分分开定。0.35 起提示、0.60 延期 —— 这是**运营阈值**，
 # 不是模型自带的，改了要同步改口径页。
 MODEL_WATCH = 0.35
 MODEL_HOLD = 0.60
@@ -447,7 +447,7 @@ def alerts(corridors: List[Dict[str, Any]], flights: List[Dict[str, Any]],
             else:
                 why = '放行条件未满足'
             out.append({
-                'id': f"EV-HOLD-{flight['id']}", 'code': 'FLIGHT_HOLD', 'kind': '放行暂缓',
+                'id': f"EV-HOLD-{flight['id']}", 'code': 'FLIGHT_HOLD', 'kind': '延期起飞',
                 'severity': 'bad', 'place': f"{flight['fromName']} → {flight['toName']}",
                 'province': flight['fromProvince'],
                 'detail': f'{why}，暂不放行',

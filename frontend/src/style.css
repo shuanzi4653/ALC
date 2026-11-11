@@ -108,8 +108,12 @@ body {
   --map-node-stroke: rgba(8, 20, 32, .85);
   --map-label: #9ec4e0;
   --map-corridor: rgba(126, 206, 255, .62);
-  --map-corridor-blocked: rgba(226, 92, 74, .55);
+  /* 停飞用深橙，不用红 —— 红留给"应急"这一档（目前没有数据会触发，先占位） */
+  --map-corridor-blocked: rgba(232, 89, 12, .78);
   --map-detour: rgba(255, 206, 90, .9);
+  --map-fly: #dff3ff;
+  --map-fly-detour: #ffc857;
+  --map-emergency: #ff3b30;
 }
 
 /* ---- 投影模式（快捷键 P）---------------------------------------------------

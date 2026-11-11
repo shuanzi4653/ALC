@@ -32,12 +32,15 @@ html[data-theme="light"] {
   --map-inset-line: rgba(84, 124, 166, .45);
   --map-ground: rgba(236, 243, 250, .82);
   --map-node: #16384f;
-  --map-node-dim: rgba(32, 68, 96, .78);
+  --map-node-dim: rgba(44, 84, 116, .5);
   --map-node-stroke: rgba(255, 255, 255, .92);
   --map-label: #24485f;
   --map-corridor: rgba(24, 96, 152, .78);
-  --map-corridor-blocked: rgba(198, 58, 38, .7);
+  --map-corridor-blocked: rgba(200, 78, 8, .85);
   --map-detour: rgba(186, 124, 8, .95);
+  --map-fly: #16384f;
+  --map-fly-detour: #a35c00;
+  --map-emergency: #d4380d;
 }
 
 /* ---------- 外壳 ---------- */
