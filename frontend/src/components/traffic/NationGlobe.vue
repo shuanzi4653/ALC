@@ -32,6 +32,9 @@ const props=defineProps({
   fogOn:{type:Boolean,default:true},
   density:{type:String,default:'full'},
   selectedId:{type:String,default:''},
+  // 本地连续时刻：与二维图共用同一个推进量，两个视图对"这一架现在在哪"必须给同一个答案
+  frameMinute:{type:Number,default:-1},
+  minute:{type:Number,default:0},
   selectedCorridor:{type:String,default:''},
   virtualMode:{type:Boolean,default:false},
   followId:{type:String,default:''},
@@ -222,6 +225,23 @@ const zoneFC=computed(()=>{
 const zonePolicy=computed(()=>String(props.zones?.policy||'APPROVAL_REQUIRED'))
 
 // —— 航班 ——
+// 选中班次的航线：全国层平时不画航线，这一条是例外（与二维图同口径）。
+// 点哪一架，就把那一条从起点到终点摊出来。
+const pickedFC=computed(()=>{
+  const f=(props.flights||[]).find(x=>x.id===props.selectedId)
+  if(!f) return EMPTY
+  const row=(props.data?.corridors||[]).find(c=>c.id===f.corridor)
+  let path=(row?.path&&row.path.length>1)?row.path:null
+  if(!path&&f.fromLonLat&&f.toLonLat) path=[f.fromLonLat,f.toLonLat]
+  if(!path||path.length<2) return EMPTY
+  const coords=path.length===2?arcLngLat(path[0],path[1],row?.bulge):path
+  return fc([
+    {type:'Feature',properties:{kind:'route'},geometry:{type:'LineString',coordinates:coords}},
+    {type:'Feature',properties:{kind:'end'},geometry:{type:'Point',coordinates:path[0]}},
+    {type:'Feature',properties:{kind:'end'},geometry:{type:'Point',coordinates:path[path.length-1]}},
+  ])
+})
+
 const flightFC=computed(()=>fc((props.flights||[])
   // 延期（HOLD）的班次还没起飞，不画
   .filter(f=>f.lon!=null&&f.decision!=='HOLD')
@@ -231,7 +251,7 @@ const flightFC=computed(()=>fc((props.flights||[])
     id:f.id,callsign:f.callsign,heading:f.heading||0,
     // 绕飞用颜色标（琥珀），停飞/应急才换图标
     detour:f.status==='DELAYED'?1:0,
-    place:`${f.fromName} → ${f.toName}`,
+    detail:`${f.fromName} → ${f.toName} · ${f.decisionLabel}`,
   },
   geometry:{type:'Point',coordinates:[f.lon,f.lat]},
 }))))
@@ -269,6 +289,7 @@ function buildStyle(){
       fog:{type:'geojson',data:fogFC.value},
       zones:{type:'geojson',data:zoneFC.value},
       flights:{type:'geojson',data:flightFC.value},
+      picked:{type:'geojson',data:pickedFC.value},
     },
     layers:[
       {id:'bg',type:'background',paint:{'background-color':PAL.background}},
@@ -310,6 +331,13 @@ function buildStyle(){
       {id:'node-low',type:'circle',source:'nodes',filter:['==',['get','low'],1],paint:{
         'circle-radius':6.4,'circle-color':'rgba(0,0,0,0)',
         'circle-stroke-color':'rgba(232,84,72,.9)','circle-stroke-width':1.2}},
+      {id:'picked-line',type:'line',source:'picked',
+       filter:['==',['get','kind'],'route'],paint:{
+        'line-color':'#8ef0ff','line-width':2.2,'line-opacity':.95}},
+      {id:'picked-end',type:'circle',source:'picked',
+       filter:['==',['get','kind'],'end'],paint:{
+        'circle-radius':5,'circle-color':'#8ef0ff',
+        'circle-stroke-color':'#06202c','circle-stroke-width':1.2}},
     ],
   }
 }
@@ -416,6 +444,7 @@ function applyData(force){
     syncMarkers()
   }
   put('flights',flightFC.value)
+  put('picked',pickedFC.value)
 }
 
 function fitToData(animate){
@@ -621,6 +650,23 @@ watch(()=>props.data,(next)=>{
   if(switched){lastScope=scope; fitToData(true); mountTerrain(true)}
 })
 watch(()=>props.flights,()=>{if(map) applyData(false)},{deep:false})
+watch(()=>props.selectedId,()=>{
+  if(map) applyData(false)
+  if(!map||!props.selectedId) return
+  const f=(props.flights||[]).find(x=>x.id===props.selectedId)
+  if(!f) return
+  const row=(props.data?.corridors||[]).find(c=>c.id===f.corridor)
+  const path=(row?.path&&row.path.length>1)?row.path:(f.fromLonLat&&f.toLonLat?[f.fromLonLat,f.toLonLat]:null)
+  if(!path) return
+  let b=[1e9,1e9,-1e9,-1e9]
+  for(const [lon,lat] of path){
+    b[0]=Math.min(b[0],lon);b[1]=Math.min(b[1],lat)
+    b[2]=Math.max(b[2],lon);b[3]=Math.max(b[3],lat)
+  }
+  const pad=Math.max(.18,(b[2]-b[0])*.45,(b[3]-b[1])*.45)
+  map.fitBounds([[b[0]-pad,b[1]-pad],[b[2]+pad,b[3]+pad]],{
+    padding:{top:60,bottom:80,left:60,right:60},pitch:50,bearing:-10,duration:900})
+})
 watch(()=>props.radarOn,()=>{if(map) applyData(true)})
 watch(()=>props.fogOn,()=>{if(map) applyData(true)})
 watch(()=>props.audience,()=>{applyAudience(); applyData(true)})

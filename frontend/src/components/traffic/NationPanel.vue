@@ -51,8 +51,13 @@ const evidenceBusy=ref(false)
 const evidenceErr=ref('')
 
 const minute=ref(60)
-const playing=ref(false)
+// 地图上的飞行汽车是"活的"：默认就在走（像 Flightradar24 那样打开就在动），
+// 随时可暂停、可拖时间轴。推进由本地 rAF 负责，后端快照每分钟对齐一次。
+const playing=ref(true)
 const speed=ref(1)                    // 分钟/秒：0.25≈15×、1=60×、5=300×
+// 连续时刻（浮点分钟）。minute 是整数、驱动后端取数；frameMinute 只驱动地图插值，
+// 两者差值永远在 [0,1) 内 —— 飞机因此是"滑过去"的，不是整分钟一格一格跳。
+const frameMinute=ref(60)
 const radarOn=ref(true)
 const fogOn=ref(true)
 const terrainOn=ref(false)
@@ -83,7 +88,7 @@ const flights=ref([])
 const live=ref({corridors:0,airborne:0,delayed:0,hold:0,blocked:0,lowVisCities:0})
 const byProvince=ref({})
 const byCity=ref({})
-let timer=null,pushTimer=null,fetchAt=0,seq=0
+let clockRaf=null,pushTimer=null,fetchAt=0,seq=0
 
 const MINUTES=180
 const mapRef=ref(null)
@@ -317,16 +322,35 @@ function drill(nextLevel,nextId,label){
   go(nextLevel,nextId,label)
 }
 
-function togglePlay(){
-  playing.value=!playing.value
-  if(playing.value){
-    timer=setInterval(()=>{
-      minute.value=(minute.value+speed.value)%MINUTES
-      loadFlights()
-    },1000)
-  }else if(timer){clearInterval(timer);timer=null}
+function togglePlay(){ playing.value=!playing.value }
+
+// 常驻 rAF：播放时才推进 frameMinute，暂停时把它对齐回 minute。
+// 用 rAF 而不是 setInterval：60fps 的连续性才能让"移动"成立，
+// 1 秒一跳的 setInterval 只能做出"瞬移"。
+function startClock(){
+  if(clockRaf||typeof requestAnimationFrame==='undefined') return
+  let last=performance.now()
+  const tick=(now)=>{
+    // 30fps 足够：1 秒才走 1 分钟，每帧位移不到 0.2px。
+    // 压到 30fps 是为了少算一半的 flightDots（97 架 × 每帧重建对象）。
+    if(now-last<32){ clockRaf=requestAnimationFrame(tick); return }
+    const dt=Math.min(.25,(now-last)/1000)   // 切标签页回来时 dt 会很大，压住免得瞬移
+    last=now
+    if(playing.value){
+      let next=frameMinute.value+dt*speed.value
+      if(next>=MINUTES) next-=MINUTES
+      frameMinute.value=next
+      const m=Math.floor(next)
+      if(m!==minute.value){ minute.value=m; loadFlights() }
+    }else if(Math.abs(frameMinute.value-minute.value)>.001){
+      frameMinute.value=minute.value
+    }
+    clockRaf=requestAnimationFrame(tick)
+  }
+  clockRaf=requestAnimationFrame(tick)
 }
-watch(speed,()=>{ if(playing.value){togglePlay();togglePlay()} })
+// 拖时间轴：连续时钟要跟着跳，否则会被下一帧拉回去
+function onSeek(){ frameMinute.value=minute.value; loadFlights() }
 
 function pickFlight(flight){
   if(selectedId.value!==flight.id){followId.value='';clearEvidence()}
@@ -573,6 +597,8 @@ watch(()=>props.scopeKey,(key)=>{
 
 onMounted(()=>{
   scopeReady=true
+  frameMinute.value=minute.value
+  startClock()
   measureViewport()
   window.addEventListener('resize',measureViewport)
   load()
@@ -581,7 +607,8 @@ onMounted(()=>{
 })
 onUnmounted(()=>{
   window.removeEventListener('resize',measureViewport)
-  if(timer) clearInterval(timer)
+  if(clockRaf) cancelAnimationFrame(clockRaf)
+  clockRaf=null
   if(pushTimer) clearInterval(pushTimer)
 })
 </script>
@@ -662,7 +689,7 @@ onUnmounted(()=>{
       <div class="nrn-tools">
         <button class="play" @click="togglePlay">{{ playing?'Ⅱ 暂停':'▶ 推演' }}</button>
         <input type="range" min="0" :max="MINUTES" step="1" v-model.number="minute"
-               @input="loadFlights" aria-label="推演时间"/>
+               @input="onSeek" aria-label="推演时间"/>
         <b class="clock">{{ clock(minute) }}</b>
         <select v-model.number="speed" aria-label="推演倍速">
           <option :value="0.25">15 倍速</option>
@@ -695,12 +722,14 @@ onUnmounted(()=>{
            倾斜＝不依赖 WebGL 的 CSS 透视，轻、稳、切页不卡，代价是没有真实高程。 -->
       <div class="nrn-canvas">
       <NationGlobe v-if="threeD" ref="globeRef" :data="data" :flights="flights"
+                   :minute="minute" :frame-minute="frameMinute"
                    :radar-on="radarOn" :fog-on="fogOn" :density="density"
                    :selected-id="selectedId" :selected-corridor="selectedCorridor"
                    :follow-id="followId" :zones="zoneGeom" :audience="audience"
                    @drill="drill" @select-flight="pickFlight" @select-corridor="pickCorridor"
                    @degrade="onGlobeDegrade" @unsupported="onGlobeUnsupported" @fps="onGlobeFps"/>
       <NationMap v-else ref="mapRef" :data="data" :flights="flights" :minute="minute"
+                 :frame-minute="frameMinute"
                  :radar-on="radarOn" :fog-on="fogOn" :terrain-on="terrainOn" :tilt="tilt"
                  :density="density" :virtual-mode="virtualMode" :audience="audience"
                  :zone-bands="zoneGeom&&zoneGeom.bands" :zone-policy="zonePolicy"
@@ -709,7 +738,9 @@ onUnmounted(()=>{
                  @drill="drill" @select-flight="pickFlight" @select-corridor="pickCorridor"/>
       </div>
 
-      <div class="nrn-mapfoot">
+      <!-- 选中班次时把底部两条浮层压暗：这一刻用户看的是那一架，
+           越界监视与图例退到背景，移上去还能读。 -->
+      <div class="nrn-mapfoot" :class="{dim:!!selectedFlight}">
       <div class="nrn-monitor" data-border-monitor>
         <!-- 口径写进 title，不上主行：主行放"这一刻是什么"，规则解释放悬停。
              先前这里既有"比对范围：…30 km 为预警带"整句，又有末尾一句 border.note，
@@ -726,16 +757,16 @@ onUnmounted(()=>{
       </div>
 
       <p class="nrn-legend" v-if="audience==='ops'">
-        <i class="dot"></i>一般 ＜ 机场 ＜ 省会（点大小）
+        <i class="dot"></i>城市：省会＞机场＞一般
         <template v-if="level!=='nation'">
-          <i class="line"></i>航线同色，三角指方向
-          <i class="line blocked"></i>深橙＝边境停飞
+          <i class="line"></i>航线（三角指方向）
         </template>
-        <i class="line warn"></i>琥珀＝绕飞
-        <i class="line emergency"></i>红＝应急（预留）
-        <i class="zone"></i>琥珀圈＝净空限制区
-        <span v-if="virtualMode" class="virt">虚拟增强：回波与绕飞加亮</span>
-        <span class="quiet" v-if="level==='nation'">· 全国层只画城市与在飞班次，下钻才画航线<span v-if="border.excludeKm">；边境 {{ border.excludeKm }} km 内侧城市退出通航（名单见「空域情报」）</span></span>
+        <i class="line blocked"></i>边境停飞
+        <i class="line warn"></i>绕飞
+        <i class="line emergency"></i>应急（预留）
+        <i class="zone"></i>净空圈
+        <span v-if="virtualMode" class="virt">虚拟增强</span>
+        <span class="quiet" data-pick-hint>· 点任一飞行汽车看航线</span>
       </p>
       <p class="nrn-legend air" v-else>
         <i class="zone"></i><template v-if="zonePolicy==='PROHIBITED'">红圈＝净空限制区（演示态：一律禁止进入）</template><template v-else>琥珀圈＝净空限制区（默认：可申请穿越）</template>
@@ -1048,7 +1079,7 @@ onUnmounted(()=>{
 .nrn-map{position:relative;display:flex;flex-direction:column;min-height:0;gap:6px;min-width:0;width:auto}
 .nrn-hint{margin:0;padding:5px 9px;border-radius:6px;font-size:11.5px;color:#a9cde2;
   background:rgba(20,60,80,.55);border:1px solid rgba(70,140,170,.35)}
-.nrn-canvas{position:relative;flex:1;min-height:240px;border-radius:10px;overflow:hidden;
+.nrn-canvas{position:relative;flex:1;min-height:300px;border-radius:10px;overflow:hidden;
   border:1px solid rgba(70,110,140,.3)}
 .nrn-tools{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:12px}
 .nrn-tools button,.nrn-tools select{background:#10283a;border:1px solid #2b4c62;color:#a9cde2;border-radius:5px;padding:4px 9px;font-size:11.5px;cursor:pointer}
@@ -1058,7 +1089,10 @@ onUnmounted(()=>{
 .nrn-tools .clock{font-variant-numeric:tabular-nums;color:#bfe9ff;font-size:12px}
 
 .nrn-mapfoot{position:absolute;left:8px;right:8px;bottom:6px;z-index:4;
-  display:flex;flex-direction:column;gap:4px;pointer-events:none}
+  display:flex;flex-direction:column;gap:4px;pointer-events:none;
+  transition:opacity .25s ease}
+.nrn-mapfoot.dim{opacity:.26}
+.nrn-mapfoot.dim:hover{opacity:1}
 .nrn-monitor{
   padding:5px 9px;border:1px solid rgba(80,130,160,.35);border-radius:7px;
   background:rgba(10,26,38,.9);font-size:11px;color:#8fb2c8;
@@ -1239,7 +1273,10 @@ onUnmounted(()=>{
 .nrn-alerts p.act{color:#ffd08a}
 .nrn-alerts .tag{margin-top:4px}
 
-.nrn-detail{border:1px solid rgba(70,110,140,.4);border-radius:9px;background:rgba(10,26,38,.9);padding:8px 10px}
+.nrn-detail{border:1px solid rgba(70,110,140,.4);border-radius:9px;background:rgba(10,26,38,.9);padding:8px 10px;
+  /* 选中班次的详情会长到 300px 以上，把地图压成一条缝；
+     限高并让它自己滚，地图（画布）才是主角。 */
+  max-height:26vh;overflow:auto}
 .nrn-detail header{display:flex;align-items:center;gap:9px;font-size:12.5px;padding-bottom:6px;border-bottom:1px solid rgba(70,110,140,.3)}
 .nrn-detail header b{color:#eaf6ff;font-size:13px}
 .nrn-detail header code{font-size:10.5px;color:#7fb6d6}
@@ -1303,8 +1340,11 @@ onUnmounted(()=>{
 }
 /* 768 高的屏：把详情区限高并允许内部滚动，别让地图被压没 */
 @media(max-height:820px){
-  .nrn-canvas{min-height:220px}
-  .nrn-detail{max-height:44vh;overflow:auto}
+  /* 1366×768 是最常见的答辩投影分辨率。这一档下地图必须优先：
+     画布保底 300px，详情卡限到 32vh 并自己滚 —— 之前 44vh 会把地图压成一条缝，
+     图例与监视条几乎盖满整幅图。 */
+  .nrn-canvas{min-height:300px}
+  .nrn-detail{max-height:26vh;overflow:auto}
   .nrn-side{max-height:none}
 }
 @media(max-width:1400px){

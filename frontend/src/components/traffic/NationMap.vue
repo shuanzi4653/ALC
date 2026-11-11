@@ -1,5 +1,5 @@
 <script setup>
-import {computed,onMounted,onUnmounted,reactive,ref,watch} from 'vue'
+import {computed,nextTick,onMounted,onUnmounted,reactive,ref,watch} from 'vue'
 import china from '../../assets/china.json'
 
 // 全国航线图（墨卡托）。
@@ -13,6 +13,9 @@ const props=defineProps({
   data:{type:Object,default:null},
   flights:{type:Array,default:()=>[]},
   minute:{type:Number,default:0},
+  // 本地连续时刻（浮点分钟）。播放时它比 minute 大零点几分钟，用来把"每分钟一跳"
+  // 的班次位置补成连续移动；不播放时等于 minute（-1 表示不启用本地推进）。
+  frameMinute:{type:Number,default:-1},
   radarOn:{type:Boolean,default:true},
   fogOn:{type:Boolean,default:true},
   terrainOn:{type:Boolean,default:true},
@@ -41,8 +44,15 @@ function fitView(){
   if(!el) return
   const rect=el.getBoundingClientRect()
   if(rect.width>80&&rect.height>80){
+    const changed=VIEW.w!==Math.round(rect.width)||VIEW.h!==Math.round(rect.height)
     VIEW.w=Math.round(rect.width)
     VIEW.h=Math.round(rect.height)
+    // 画布尺寸一变（最典型：选中班次后详情卡张开，把地图压矮一半），
+    // 旧的 pan 就不再对应新的 viewBox，整幅图会飞出画布。
+    // 选中态下重新聚焦；否则保持原样，别把用户手动缩放的视野偷偷重置。
+    if(changed) requestAnimationFrame(()=>{
+      if(props.selectedId&&pickedLine.value) focusPts(pickedLine.value.pts)
+    })
   }
 }
 onMounted(()=>{
@@ -322,7 +332,7 @@ const corridors=computed(()=>(props.data?.corridors||[]).map(row=>{
       arrow={x:points[at][0],y:points[at][1],angle:Math.atan2(dy,dx)*180/Math.PI}
     }
   }
-  return {id:row.id,d,detour,arrow,blocked:!!row.borderBlocked,
+  return {id:row.id,d,pts:points,arrow,detour,blocked:!!row.borderBlocked,
     fromName:row.fromName,toName:row.toName,kindLabel:row.kindLabel,lengthKm:row.lengthKm,
     selected:props.selectedCorridor===row.id}
 }))
@@ -364,36 +374,104 @@ const labels=computed(()=>{
   }
   return placed
 })
-const provinceLabels=computed(()=>{
-  if(level.value!=='nation') return []
-  // 省名会互相压：东部几省的中心点只差十几个像素，30 个名字叠成一片灰。
-  // 这里按 26×11 的包围盒做一次贪心避让，宁可少几个名字，也不要糊成一团。
-  const placed=[]
-  for(const row of (props.data?.provinces||[])){
-    const [x,y]=project(row.center[0],row.center[1])
-    if(placed.some(p=>Math.abs(p.x-x)<26&&Math.abs(p.y-y)<11)) continue
-    placed.push({name:shortName(row.name),x,y})
-  }
-  return placed
+// —— 航班 ——
+// 本地推进量（分钟）：把两次后端快照之间的空档补上，位置才连续。
+// 上限 6 分钟 —— 再多就是外推，不是数据了；超过就让后端快照接管。
+const advanceMin=computed(()=>{
+  const base=props.frameMinute>=0?props.frameMinute:props.minute
+  const adv=base-props.minute
+  return adv>0?Math.min(6,adv):0
 })
 
-// —— 航班 ——
 const flightDots=computed(()=>{
   const out=[]
+  const adv=advanceMin.value
   for(const f of props.flights||[]){
     // 延期的班次**不画**：它还没起飞，画在航路上等于告诉人"这架已经在飞"。
     // 它仍然在台账与处置页里，也仍然计入"延期 N 架"。
     if(f.decision==='HOLD') continue
-    const [x,y]=project(f.lon,f.lat)
-    // 绕飞用颜色标出来就够了（琥珀），不再加图标形状——形状留给"应急"这一档
-    out.push({...f,x,y,selected:props.selectedId===f.id,
+    let lon=f.lon,lat=f.lat
+    // 沿当前航向按速度外推：比"起点→终点直线插值"准，飞机不会飘离真实航路
+    // （航路是弯的，直线插值在转弯段会明显错位）。
+    if(adv>0&&Number.isFinite(lon)&&Number.isFinite(lat)&&f.speedKmh){
+      const dKm=f.speedKmh*adv/60
+      const h=(f.heading||0)*Math.PI/180
+      lat-=dKm*Math.sin(h)/110.574
+      lon+=dKm*Math.cos(h)/(111.32*Math.max(.2,Math.cos(lat*Math.PI/180)))
+    }
+    const [x,y]=project(lon,lat)
+    // 当前进度：后端给的 progress + 本地推进的那一段
+    const p=(f.progress||0)+adv/Math.max(1,f.durationMin||1)
+    // 进站淡出、离站淡入 —— "飞出去就没了"，而不是从图上突然跳掉，
+    // 这是 Flightradar24 那种"活的"观感的来源。命中判据只在这一小段里失效。
+    const fade=p>=.985?Math.max(0,(1-p)/.015):(p<=.02?Math.max(.25,p/.02):1)
+    out.push({...f,x,y,progressNow:Math.max(0,Math.min(1,p)),fade,
+      selected:props.selectedId===f.id,
       detour:f.status==='DELAYED',bad:f.riskLevel==='HIGH'})
   }
   return out
 })
 
+// —— 选中的班次：把它那一条航线与起终点摊开 ——
+// 全国层平时不画航线，但"我点了这架，它从哪来到哪去"必须答得出来，
+// 所以这是唯一的例外：只为这一架画一条。
+const pickedFlight=computed(()=>flightDots.value.find(f=>f.selected)||null)
+const pickedLine=computed(()=>{
+  const f=pickedFlight.value
+  if(!f) return null
+  const line=(corridors.value||[]).find(l=>l.id===f.corridor)
+  if(line) return line
+  // 库里查不到这条航路（改线/越界等极端情况）就退化成起终点直线，不假装有航路
+  const a=f.fromLonLat,b=f.toLonLat
+  if(!a||!b) return null
+  const pts=arcPoints(project(a[0],a[1]),project(b[0],b[1]),.02)
+  return {id:'pick-'+f.id,pts,d:pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ')}
+})
+const pickedMarks=computed(()=>{
+  const f=pickedFlight.value,line=pickedLine.value
+  if(!f||!line||!line.pts||line.pts.length<2) return []
+  const [ax,ay]=line.pts[0]
+  const [bx,by]=line.pts[line.pts.length-1]
+  const gap=Math.hypot(bx-ax,by-ay)
+  // 起点和终点同名（州内接驳航线）时只标一个点：
+  // 两个一模一样的名字叠在一起，读者会以为是渲染错了。
+  const sameName=f.fromName===f.toName||gap<6
+  const a={key:'a',x:ax,y:ay,name:f.fromName,sub:sameName}
+  if(sameName){
+    Object.assign(a,{lx:-18,ly:-18,anchor:'end',line:true})
+    return [a]
+  }
+  // 两点在屏幕上挨得近时把标签往外拉，用引线连回原点 —— 宁可多一根线，不要两行字糊在一起
+  if(gap<76){
+    Object.assign(a,{lx:-20,ly:-16,anchor:'end',line:true})
+    return [a,{key:'b',x:bx,y:by,name:f.toName,sub:true,lx:20,ly:22,anchor:'start',line:true}]
+  }
+  Object.assign(a,{lx:0,ly:-10,anchor:'middle',line:false})
+  return [a,{key:'b',x:bx,y:by,name:f.toName,sub:true,lx:0,ly:14,anchor:'middle',line:false}]
+})
+
+// 选中一架就把它那条航线摊到视野里：全国层一条航路只有十几像素，
+// 不放大根本看不出"从哪到哪"。放大到航线占屏约六成就够，不顶边。
+function focusPts(pts){
+  if(!pts||pts.length<2) return false
+  let minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9
+  for(const [x,y] of pts){
+    minX=Math.min(minX,x);maxX=Math.max(maxX,x)
+    minY=Math.min(minY,y);maxY=Math.max(maxY,y)
+  }
+  const w=Math.max(26,maxX-minX), h=Math.max(26,maxY-minY)
+  const next=Math.max(1,Math.min(4.2,Math.min(VIEW.w*.62/w,VIEW.h*.5/h)))
+  const cx=(minX+maxX)/2, cy=(minY+maxY)/2
+  zoom.value=next
+  pan.value={x:VIEW.w/2-cx*next,y:VIEW.h/2-cy*next}
+  return next>1.02
+}
+
 // —— 交互 ——
 const zoom=ref(1)
+// 标记物反向缩放：放大看某条航线时，点、飞机、文字必须保持屏幕尺寸不变，
+// 否则 8 倍放大后会变成"巨幅广告"（实测起终点地名比地图还大）。
+const inv=computed(()=>1/zoom.value)
 const pan=ref({x:0,y:0})
 const dragging=ref(false)
 let dragStart=null,moved=false
@@ -446,6 +524,18 @@ watch([()=>props.followId,()=>props.flights],()=>{
   if(flight) centerOn(flight.lon,flight.lat,Math.max(2.2,zoom.value))
 })
 
+// 选中即聚焦：只跟 selectedId 走。若跟着 computed 走，飞机会每帧挪动零点几像素，
+// 视野就会被每帧重算，画面像被人一直按住不放。
+watch(()=>props.selectedId,id=>{
+  if(!id) return
+  // 两步：先等 Vue 把详情卡挂上，再等一帧让 grid 重新分配高度。
+  // 只等 nextTick 会在"画布还没缩水"时算 pan，随后尺寸一变就偏。
+  nextTick(()=>{
+    if(pickedLine.value) focusPts(pickedLine.value.pts)
+    setTimeout(()=>{ if(props.selectedId&&pickedLine.value) focusPts(pickedLine.value.pts) },180)
+  })
+})
+
 function clickShape(shape){
   if(moved||shape.boundary||!shape.live) return
   emit('drill','province',shape.name,shape.name)
@@ -473,7 +563,9 @@ function clickNode(node){
       <clipPath id="nmap-china-clip"><path :d="chinaClipD"/></clipPath>
     </defs>
 
-    <g :transform="`translate(${pan.x} ${pan.y}) scale(${zoom})`">
+    <!-- 世界层用 CSS transform 而不是 SVG transform 属性：
+         属性变化浏览器不做插值，聚焦时会"啪"地跳过去；CSS 能过渡。 -->
+    <g class="nmap-world" :style="{transform:`translate(${pan.x.toFixed(2)}px, ${pan.y.toFixed(2)}px) scale(${zoom})`}">
       <!-- 1 地形：真实晕渲瓦片（墨卡托，与投影一致） -->
       <g v-if="terrainTiles.length" class="nmap-terrain" :clip-path="'url(#nmap-china-clip)'">
         <image v-for="t in terrainTiles" :key="'t'+t.key" :x="t.x" :y="t.y"
@@ -516,7 +608,7 @@ function clickNode(node){
               :style="{fill: shape.boundary?'var(--map-boundary)':'var(--map-land)',
                        stroke: shape.boundary?'none':'var(--map-line)'}"
               :opacity="shape.boundary||shape.live||level==='nation'?1:.55"
-              stroke-width=".7" :class="{clickable:shape.live&&!shape.boundary}"
+              stroke-width=".7" vector-effect="non-scaling-stroke" :class="{clickable:shape.live&&!shape.boundary}"
               @click="clickShape(shape)">
           <title>{{ shape.name }}{{ shape.boundary?' · 南海诸岛界线':(shape.live?'':(level==='nation'?' · 未纳入通航范围（台湾、西藏、香港、澳门）':' · 不在本级范围')) }}</title>
         </path>
@@ -558,7 +650,7 @@ function clickNode(node){
         <g v-for="node in nodes" :key="'b'+node.name">
           <rect v-if="tilt" :x="node.x-1.8" :y="node.y-node.tower*2.6" width="3.6"
                 :height="node.tower*2.6" fill="url(#towerFace)" opacity=".5"/>
-          <ellipse v-else :cx="node.x" :cy="node.y" rx="2.6" ry="1.4" fill="rgba(8,20,32,.5)"/>
+          <ellipse v-else :cx="node.x" :cy="node.y" :rx="2.6*inv" :ry="1.4*inv" class="node-shadow"/>
         </g>
       </g>
 
@@ -589,7 +681,7 @@ function clickNode(node){
       <g v-if="level!=='nation'" class="nmap-arrows" :opacity="audience==='airspace'?.12:.9">
         <template v-for="line in corridors" :key="'a'+line.id">
           <path v-if="line.arrow"
-                :transform="`translate(${line.arrow.x.toFixed(1)} ${line.arrow.y.toFixed(1)}) rotate(${line.arrow.angle.toFixed(1)}) scale(${level==='nation'?0.62:(level==='region'?0.8:1)})`"
+                :transform="`translate(${line.arrow.x.toFixed(1)} ${line.arrow.y.toFixed(1)}) rotate(${line.arrow.angle.toFixed(1)}) scale(${(level==='nation'?0.62:(level==='region'?0.8:1))*inv})`"
                 d="M-2.6 -1.8 L3 0 L-2.6 1.8 Z"
                 :fill="line.blocked?'var(--map-corridor-blocked)':'var(--map-corridor)'"
                 :stroke="line.blocked?'var(--map-corridor-blocked)':'var(--map-corridor)'"
@@ -600,28 +692,44 @@ function clickNode(node){
       <!-- 6 节点 -->
       <g class="nmap-nodes">
         <g v-for="node in nodes" :key="'n'+node.name" @click="clickNode(node)">
-          <circle v-if="node.external" :cx="node.x" :cy="node.y" :r="node.rank===1?3.4:2.4"
+          <circle v-if="node.external" :cx="node.x" :cy="node.y" :r="(node.rank===1?3.4:2.4)*inv"
                   fill="none" stroke="rgba(160,200,235,.75)" stroke-width="1.1"/>
           <template v-else>
-            <circle :cx="node.x" :cy="node.y" :r="node.rank===1?3:(node.rank===2?2:1.05)"
+            <circle :cx="node.x" :cy="node.y" :r="(node.rank===1?3:(node.rank===2?2:1.05))*inv"
                     :style="{fill: node.rank===3?'var(--map-node-dim)':'var(--map-node)',
                             stroke: node.rank===3?'none':'var(--map-node-stroke)'}" stroke-width=".55"/>
-            <circle v-if="node.capital" :cx="node.x" :cy="node.y" r="5.8" fill="none"
+            <circle v-if="node.capital" :cx="node.x" :cy="node.y" :r="5.8*inv" fill="none"
                     stroke="rgba(186,218,255,.40)" stroke-width=".9"/>
-            <circle v-if="node.weather&&node.weather.low" :cx="node.x" :cy="node.y" r="4.8"
+            <circle v-if="node.weather&&node.weather.low" :cx="node.x" :cy="node.y" :r="4.8*inv"
                     fill="none" stroke="rgba(226,75,74,.92)" stroke-width="1"/>
           </template>
           <title>{{ node.name }}{{ node.capital?' · 省会/首府':'' }}{{ node.hasAirport?' · 机场 '+node.airport:' · 无机场（有专用接驳）' }}<template v-if="node.weather"> · {{ node.weather.tempC==null?'—':node.weather.tempC+' °C' }}</template></title>
         </g>
       </g>
 
-      <!-- 7 航班：每架一个独立对象，点谁选谁 -->
+      <!-- 6.5 选中班次的航线。全国层平时不画航线，这一条是唯一的例外：
+           "我点的这架，从哪来、到哪去"必须当场答得出来。
+           已飞段实线、未飞段虚线 —— 用 pathLength=100 归一化后拿 dasharray 截断，
+           比自己切路径稳（航路是贝塞尔弧，切不出干净的子路径）。 -->
+      <g v-if="pickedFlight&&pickedLine" class="nmap-pick" fill="none" stroke-linecap="round">
+        <path :d="pickedLine.d" class="pick-rest" pathLength="100" :style="{strokeWidth:1.1*inv}"/>
+        <path :d="pickedLine.d" class="pick-done" pathLength="100"
+              :style="{strokeWidth:1.9*inv}"
+              :stroke-dasharray="`${(pickedFlight.progressNow*100).toFixed(2)} 1000`"/>
+      </g>
+
+      <!-- 7 航班：每架一个独立对象，点谁选谁。
+           每架按自己的 fade 单独淡出 —— 到站的那一架会慢慢消失，
+           而不是在整分钟刷新时从图上跳掉。 -->
       <g class="nmap-flights" :opacity="audience==='airspace'?.3:1">
         <g v-for="f in flightDots" :key="f.id"
-           :transform="`translate(${f.x.toFixed(1)} ${f.y.toFixed(1)}) rotate(${f.heading.toFixed(0)}) scale(${level==='nation'?0.68:1})`"
+           :opacity="f.fade*(f.selected||f.detour||f.bad?1:.82)"
+           :transform="`translate(${f.x.toFixed(1)} ${f.y.toFixed(1)}) rotate(${f.heading.toFixed(0)}) scale(${(f.selected?1:(level==='nation'?0.6:0.92))*inv})`"
            @click.stop="!moved&&emit('select-flight',f)">
+          <circle v-if="f.selected" class="pick-halo" r="9" fill="none"
+                  stroke="#8ef0ff" stroke-width="1.6"/>
           <circle v-if="f.selected" r="9" fill="none" stroke="#8ef0ff" stroke-width="1.4" filter="url(#glow)"/>
-          <path v-if="f.selected" d="M7 0 L-4 4 L-2 0 L-4 -4 Z" fill="#8ef0ff"
+          <path v-if="f.selected" d="M8.4 0 L-4.8 4.8 L-2.4 0 L-4.8 -4.8 Z" fill="#8ef0ff"
                 stroke="rgba(10,30,45,.85)" stroke-width=".5"/>
           <template v-else>
             <!-- 三档颜色：常态浅蓝、绕飞琥珀、应急红（应急目前无数据触发，先占位）。
@@ -634,13 +742,31 @@ function clickNode(node){
         </g>
       </g>
 
+      <!-- 7.5 选中班次的起终点：这是全图唯一会出现的"地名"。
+           省名已经全部撤掉 —— 地图上留字只留"这一架从哪到哪"，字才有信息量。 -->
+      <g v-if="pickedMarks.length" class="nmap-pick-ends">
+        <g v-for="end in pickedMarks" :key="end.key"
+           :transform="`translate(${end.x.toFixed(1)} ${end.y.toFixed(1)}) scale(${inv})`">
+          <line v-if="end.line" class="end-lead" x1="0" y1="0"
+                :x2="end.lx" :y2="end.ly-(end.key==='a'?4:-4)"/>
+          <circle class="end-ring" r="6.4" fill="none" stroke-width=".8"/>
+          <circle class="end-dot" r="3" stroke-width=".7"/>
+          <text class="end-lbl" :text-anchor="end.anchor"
+                :x="end.lx" :y="end.ly">{{ end.name }}</text>
+          <text v-if="end.sub&&pickedFlight" class="end-sub" :text-anchor="end.anchor"
+                :x="end.lx" :y="end.ly+11.6">
+            {{ pickedFlight.arriveAt }} 到达 · {{ pickedFlight.decisionLabel }}
+            <template v-if="pickedFlight.exposure&&pickedFlight.exposure.directMin>0"> · 回波暴露 {{ Math.round(pickedFlight.exposure.directMin) }} 分</template>
+          </text>
+        </g>
+      </g>
+
       <!-- 8 标注 -->
       <g class="nmap-labels">
-        <text v-for="row in provinceLabels" :key="'p'+row.name" :x="row.x" :y="row.y-8"
-              text-anchor="middle" class="prov">{{ row.name }}</text>
         <text v-for="node in labels" :key="'l'+node.name"
-              :x="node.x+(node.x>VIEW.w-90?-5.5:5.5)" :y="node.y+3.2"
-              :text-anchor="node.x>VIEW.w-90?'end':'start'" class="city">{{ node.short }}</text>
+              :x="node.x+((node.x>VIEW.w-90?-5.5:5.5)*inv)" :y="node.y+3.2*inv"
+              :text-anchor="node.x>VIEW.w-90?'end':'start'" class="city"
+              :style="{fontSize:(8.6*inv)+'px'}">{{ node.short }}</text>
       </g>
     </g>
   </svg>
@@ -659,6 +785,28 @@ function clickNode(node){
 .nmap path.hit{filter:drop-shadow(0 0 2px rgba(255,206,90,.55))}
 .nmap path.virt-alarm{filter:drop-shadow(0 0 4px rgba(255,90,60,.85))}
 .nmap .inset-lbl{font-size:7.5px;fill:rgba(170,205,230,.85)}
-.nmap .prov{font-size:8.5px;letter-spacing:.4px;fill:var(--map-label);opacity:.72;pointer-events:none}
+.nmap .node-shadow{fill:rgba(8,20,32,.5)}
 .nmap .city{font-size:8.6px;fill:#dceefb;paint-order:stroke;stroke:rgba(4,12,20,.85);stroke-width:2.4px;pointer-events:none}
+
+/* 选中班次：已飞实线、未飞虚线；起终点用"环+点+地名"标出来 */
+.nmap-world{transform-origin:0 0;transition:transform .55s cubic-bezier(.22,.85,.2,1)}
+.nmap svg.dragging .nmap-world{transition:none}
+.nmap-pick .pick-rest{stroke:var(--map-corridor);stroke-width:1.2;opacity:.62;stroke-dasharray:4 3}
+.nmap-pick .pick-done{stroke:#8ef0ff;stroke-width:1.9;opacity:.95;
+  filter:drop-shadow(0 0 3px rgba(120,235,255,.6))}
+.nmap-pick-ends .end-dot{fill:#8ef0ff;stroke:rgba(6,20,32,.85)}
+.nmap-pick-ends .end-ring{stroke:rgba(142,240,255,.55)}
+.nmap-pick-ends .end-lbl{font-size:9.6px;font-weight:600;fill:#e6f9ff;paint-order:stroke;
+  stroke:rgba(3,12,20,.92);stroke-width:2.8px;pointer-events:none}
+.nmap-pick-ends .end-sub{font-size:8px;fill:#8fd8ea;paint-order:stroke;
+  stroke:rgba(3,12,20,.9);stroke-width:2.6px;pointer-events:none}
+.nmap-pick-ends .end-lead{stroke:rgba(142,240,255,.45);stroke-width:.7;stroke-dasharray:2 2}
+
+/* 选中飞机的呼吸环：transform-box 必须给，否则 SVG 里 scale 会绕错原点 */
+.pick-halo{transform-box:fill-box;transform-origin:center;animation:pick-halo 1.9s ease-out infinite}
+@keyframes pick-halo{
+  0%{transform:scale(.55);opacity:.9}
+  100%{transform:scale(1.9);opacity:0}
+}
+@media (prefers-reduced-motion: reduce){.pick-halo{animation:none;opacity:.5}}
 </style>

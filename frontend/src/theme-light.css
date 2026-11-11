@@ -631,3 +631,56 @@ html[data-theme="light"] .nrn-wx li span.v-bad { color: #c0392b !important; }
 }
 html[data-theme="light"] .nrn-wx li.bad { animation-name: wx-alarm-light; }
 html[data-theme="light"] .nrn-wx li.bad { outline-color: rgba(212, 56, 13, .45) !important; }
+
+/* ---------- 选中班次的航线与起终点（浅色下青色会发白，改用深青） ---------- */
+html[data-theme="light"] .nmap-pick .pick-done {
+  stroke: #0b7ea6 !important;
+  filter: none !important;
+}
+html[data-theme="light"] .nmap-pick .pick-rest { stroke: #4a8cb0 !important; }
+html[data-theme="light"] .nmap-pick-ends .end-dot { fill: #0b7ea6 !important; stroke: #ffffff !important; }
+html[data-theme="light"] .nmap-pick-ends .end-ring { stroke: rgba(11, 126, 166, .6) !important; }
+html[data-theme="light"] .nmap-pick-ends .end-lbl {
+  fill: #0f3550 !important;
+  stroke: rgba(255, 255, 255, .96) !important;
+}
+html[data-theme="light"] .nmap-pick-ends .end-sub {
+  fill: #1b628c !important;
+  stroke: rgba(255, 255, 255, .96) !important;
+}
+html[data-theme="light"] .nmap-pick-ends .end-lead { stroke: rgba(11, 126, 166, .55) !important; }
+
+/* ---------- 选中班次的详情卡 ---------- */
+html[data-theme="light"] .nrn-detail {
+  background: #ffffff !important;
+  border-color: #dbe6f1 !important;
+}
+html[data-theme="light"] .nrn-detail h4 { color: #0f3550 !important; }
+html[data-theme="light"] .nrn-detail h4 small { color: #6b8399 !important; }
+html[data-theme="light"] .nrn-detail p { color: #4a6a85 !important; }
+html[data-theme="light"] .nrn-detail p span { color: #6b8399 !important; }
+html[data-theme="light"] .nrn-detail p b { color: #12314a !important; }
+html[data-theme="light"] .nrn-detail header { border-color: #e3ecf4 !important; }
+html[data-theme="light"] .nrn-detail header b { color: #0f3550 !important; }
+html[data-theme="light"] .nrn-detail header code { color: #4a7f9c !important; }
+html[data-theme="light"] .nrn-detail header button {
+  background: #ffffff !important;
+  border-color: #cfdcea !important;
+  color: #31556f !important;
+}
+html[data-theme="light"] .nrn-detail header button.follow { color: #0b7ea6 !important; border-color: #9cc7e8 !important; }
+html[data-theme="light"] .nrn-detail header button.follow.on { background: #e3f0fb !important; color: #0d4f74 !important; }
+html[data-theme="light"] .nrn-detail button.mini {
+  background: #f2f7fc !important;
+  border-color: #cfdcea !important;
+  color: #31556f !important;
+}
+
+/* 城市点底影：深色下是"垫在点后的暗影"，浅色下必须反过来变成淡灰，否则是一片黑疙瘩 */
+html[data-theme="light"] .nmap .node-shadow { fill: rgba(60, 100, 140, .16) !important; }
+
+/* 下钻层的城市名：深色底用浅字，浅色底必须反过来（否则白字压白底） */
+html[data-theme="light"] .nmap .city {
+  fill: #12314a !important;
+  stroke: rgba(255, 255, 255, .95) !important;
+}
