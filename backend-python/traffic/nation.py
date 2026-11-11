@@ -93,7 +93,7 @@ def _airports() -> Dict[str, Any]:
 
 @lru_cache(maxsize=1)
 def _city_rows() -> List[Dict[str, Any]]:
-    # 纳入范围**以路网节点为准**：边境 50 km 内退出的城市在建网时已连同航线一起删除，
+    # 纳入范围**以路网节点为准**：边界 50 km 内退出的城市在建网时已连同航线一起删除，
     # 这里再按节点名单过一遍，避免"城市还在、航线没了"的半拉子状态。
     allowed = {row['name'] for row in _network().get('nodes') or []}
     rows = [row for row in _cities_doc()['cities']
@@ -663,7 +663,7 @@ def _summary(provinces: List[Dict[str, Any]], corridors: List[Dict[str, Any]],
         'stationsModel': sum(1 for row in stations if row.get('source') == 'MODEL'),
         'operational': sum(1 for row in provinces if row['state'] == 'operational'),
         'pending': sum(1 for row in provinces if row['state'] == 'pending'),
-        # 边境退出通航：城市与航线一并删除，这里把被删的城市名与距离摊开，
+        # 边界退出通航：城市与航线一并删除，这里把被删的城市名与距离摊开，
         # 材料里要能一条条对上，不能只说"已处理"。
         'borderExcludeKm': _network().get('borderExcludeKm'),
         'borderExcludedCities': [row['name'] for row in _network().get('borderExcluded') or []],
@@ -920,7 +920,7 @@ def _payload_locked(level: str = 'nation', ident: Optional[str] = None,
         city = next((item for item in _city_rows() if item['name'] == ident), None)
         if city is None:
             return {'status': 'NOT_FOUND', 'level': level, 'id': ident,
-                    'note': '纳入范围内没有这个城市（边境 50 km 内的城市已整体退出通航）'}
+                    'note': '纳入范围内没有这个城市（外围缓冲带内的城市已整体退出通航）'}
         row = next((item for item in provinces if item['name'] == city['province']), None)
         corridors = _slice_corridors({city['province']}, city=ident)
         feed = [item for item in corridors if item.get('feed')]
@@ -1076,8 +1076,8 @@ def _evidence_locked(flight_id: str, minute: int = 60) -> Dict[str, Any]:
         {'n': 5, 'title': '反事实与边界', 'rows': [
             {'label': '不绕飞暴露', 'value': f"{flight['exposure']['directMin']} 分钟", 'source': 'DERIVED'},
             {'label': '绕飞后暴露', 'value': f"{flight['exposure']['detourMin']} 分钟", 'source': 'DERIVED'},
-            {'label': '边境', 'value': ('航线已按边境带改线' if corridor.get('borderDetour')
-                                      else ('该航线因边境受限停飞' if corridor.get('borderBlocked') else '未触发边境管制')),
+            {'label': '边界', 'value': ('航线已按边界带改线' if corridor.get('borderDetour')
+                                      else ('该航线受限停飞' if corridor.get('borderBlocked') else '未触发')),
              'source': 'OFFICIAL'},
         ]},
     ]

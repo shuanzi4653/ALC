@@ -143,7 +143,7 @@ def _clearance(row: Dict[str, Any], sched: Dict[str, float], depart: float,
     if detour:
         conditions.append(f"按绕飞航路执行（外偏 {detour.get('shiftKm', 0)} km）")
     if row.get('borderDetour'):
-        conditions.append('已按边境带改线')
+        conditions.append('已按边界带改线')
     return {
         'status': status, 'statusLabel': CLEARANCE_LABEL[status],
         'route': f"{row['fromName']} → {row['toName']}",
@@ -219,7 +219,7 @@ def flight_objects(corridors: Iterable[Dict[str, Any]], minute: int,
         if risk['riskLevel'] == 'HIGH':
             alerts.append({'code': 'LOW_VIS', 'label': '低能见度', 'tone': 'bad'})
         if row.get('borderDetour'):
-            alerts.append({'code': 'BORDER_REROUTE', 'label': '边境改线', 'tone': 'quiet'})
+            alerts.append({'code': 'BORDER_REROUTE', 'label': '边界改线', 'tone': 'quiet'})
         if late:
             alerts.append({'code': 'DELAY', 'label': f'延误 {late} min', 'tone': 'warn'})
 
@@ -415,10 +415,10 @@ def alerts(corridors: List[Dict[str, Any]], flights: List[Dict[str, Any]],
     for row in corridors:
         if row.get('borderBlocked'):
             out.append({
-                'id': f"EV-BORDER-{row['id']}", 'code': 'BORDER_HOLD', 'kind': '边境受限',
+                'id': f"EV-BORDER-{row['id']}", 'code': 'BORDER_HOLD', 'kind': '空域受限',
                 'severity': 'bad', 'place': f"{row['fromName']} → {row['toName']}",
                 'province': row['fromProvince'],
-                'detail': '航路落在我方一侧 10 km 管制带内；'
+                'detail': '航路落入 10 km 管制带内；'
                           + ('绕飞后仍越界' if row.get('detour') else '没有可用的绕飞方案'),
                 'action': '该航线停飞，不进入排班；恢复需空管批准',
                 'status': '已停飞', 'auto': True,
@@ -528,8 +528,8 @@ def border_monitor(corridors: List[Dict[str, Any]], flights: List[Dict[str, Any]
         'nearestKm': nearest,
         'blockedCorridors': len(blocked),
         'blockedNames': [f"{row['fromName']} → {row['toName']}" for row in blocked],
-        'scope': '国界/实际控制线向我方一侧 10 km 管制带（本项目保守口径）；30 km 为预警带',
-        'note': '越界数逐架按几何算出：每条航路都量了到境外的最近距离。',
+        'scope': '通航边界内侧 10 km 管制带（本项目保守口径）；30 km 为预警带',
+        'note': '边界计数逐架按几何算出：每条航路都量了到通航边界的最近距离。',
     }
 
 

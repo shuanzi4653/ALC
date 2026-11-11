@@ -665,7 +665,7 @@ export function fixedZoneFrozenNote(network,{playing=false}={}){
   const zones=network?.staticAirspace?.zones||[]
   if(!zones.length)return ''
   return `固定管制区为法规静态数据（${zones.length} 处），其几何本身不随时间变化；`
-    +'随时间变化的是各班次穿越管制区的时段，见地图越界监视条。'
+    +'随时间变化的是各班次穿越管制区的时段，见地图边界监视条。'
 }
 
 export const WEATHER_BUCKET_MINUTES=2

@@ -116,7 +116,7 @@ function visText(vis){
 function shortName(name){return (name||'').replace(/(市|地区|盟|自治州)$/,'')}
 
 // 纳入范围（口径，不是实时态势）。
-// 主页右栏原本挂着一张"边境 50 km 内 N 城已退出通航"的折叠卡 —— N 和名单都随数据变，
+// 主页右栏原本挂着一张"外围缓冲带内 N 城已退出通航"的折叠卡 —— N 和名单都随数据变，
 // 摆在首页右下角会被读成"有一条正在发生的告警"。它其实是**建网规则**，
 // 所以放到这里：机场情报讲的是"网络里有哪些点"，规则跟着网络走才对。
 const borderKm=computed(()=>data.value?.border?.excludeKm||0)
@@ -233,7 +233,7 @@ function clock(m){
         </table>
       </div>
       <p class="nb-scope-foot" v-if="view==='intel'&&borderKm" data-scope-foot>
-        纳入范围：台湾、西藏、香港、澳门不纳入通航；边境 <b>{{ borderKm }}</b> km 内侧的城市整体退出通航（保守取值，条例只写“一定范围”）。
+        纳入范围：台湾、西藏、香港、澳门不纳入通航；外围 <b>{{ borderKm }}</b> km 缓冲带内的城市整体退出通航（保守取值）。
         <template v-if="excluded.length">
           当前共 <b>{{ excluded.length }}</b> 城：{{ excluded.map(row=>row.name.replace(/市$/,'')+' '+row.distanceKm+' km').join('、') }}。
         </template>

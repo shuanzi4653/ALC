@@ -695,7 +695,7 @@ function clickNode(node){
           <circle v-if="node.external" :cx="node.x" :cy="node.y" :r="(node.rank===1?3.4:2.4)*inv"
                   fill="none" stroke="rgba(160,200,235,.75)" stroke-width="1.1"/>
           <template v-else>
-            <circle :cx="node.x" :cy="node.y" :r="(node.rank===1?3:(node.rank===2?2:1.05))*inv"
+            <circle :cx="node.x" :cy="node.y" :r="(node.rank===1?3:(node.rank===2?2:1))*inv"
                     :style="{fill: node.rank===3?'var(--map-node-dim)':'var(--map-node)',
                             stroke: node.rank===3?'none':'var(--map-node-stroke)'}" stroke-width=".55"/>
             <circle v-if="node.capital" :cx="node.x" :cy="node.y" :r="5.8*inv" fill="none"

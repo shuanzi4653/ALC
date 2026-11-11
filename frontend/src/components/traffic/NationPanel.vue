@@ -220,7 +220,7 @@ const headline=computed(()=>{
   const parts=[`${t.corridors||0} 条航线`,`在飞 ${t.airborne||0} 架`]
   if(t.delayed)parts.push(`绕飞 ${t.delayed} 架`)
   if(t.hold)parts.push(`延期 ${t.hold} 架`)
-  if(t.blocked)parts.push(`边境停飞 ${t.blocked} 条`)
+  if(t.blocked)parts.push(`停飞 ${t.blocked} 条`)
   if(t.lowVisCities)parts.push(`低能见度 ${t.lowVisCities} 城`)
   return parts.join(' · ')
 })
@@ -739,13 +739,13 @@ onUnmounted(()=>{
       </div>
 
       <!-- 选中班次时把底部两条浮层压暗：这一刻用户看的是那一架，
-           越界监视与图例退到背景，移上去还能读。 -->
+           边界监视与图例退到背景，移上去还能读。 -->
       <div class="nrn-mapfoot" :class="{dim:!!selectedFlight}">
       <div class="nrn-monitor" data-border-monitor>
         <!-- 口径写进 title，不上主行：主行放"这一刻是什么"，规则解释放悬停。
              先前这里既有"比对范围：…30 km 为预警带"整句，又有末尾一句 border.note，
              两条长句把主行挤成两行，反而看不清"到底几架在管制带"。 -->
-        <strong :title="`${border.scope}。${border.note}`">越界监视 <b>{{ border.inside||0 }}</b> 架在管制带</strong>
+        <strong :title="`${border.scope}。${border.note}`">边界监视 <b>{{ border.inside||0 }}</b> 架在管制带</strong>
         <span>停飞 {{ border.blockedCorridors||0 }} 条<template v-if="(border.blockedNames||[]).length">（{{ (border.blockedNames||[]).slice(0,3).join('、') }}{{ (border.blockedNames||[]).length>3?' 等':'' }}）</template></span>
         <span>改线 {{ border.reroutedCorridors||0 }} 条</span>
         <span v-if="fog.available" title="能见度低于 3 km 计低能见度；低于 1.5 km 计浓雾">低能见度 {{ fog.counts.cities }} 城（浓雾 {{ fog.counts.BAN }}）</span>
@@ -757,16 +757,12 @@ onUnmounted(()=>{
       </div>
 
       <p class="nrn-legend" v-if="audience==='ops'">
-        <i class="dot"></i>城市：省会＞机场＞一般
-        <template v-if="level!=='nation'">
-          <i class="line"></i>航线（三角指方向）
-        </template>
-        <i class="line blocked"></i>边境停飞
+        <i class="dot"></i>城市
+        <i v-if="level!=='nation'" class="line"></i><span v-if="level!=='nation'">航线</span>
         <i class="line warn"></i>绕飞
-        <i class="line emergency"></i>应急（预留）
+        <i class="line emergency"></i>应急
         <i class="zone"></i>净空圈
         <span v-if="virtualMode" class="virt">虚拟增强</span>
-        <span class="quiet" data-pick-hint>· 点任一飞行汽车看航线</span>
       </p>
       <p class="nrn-legend air" v-else>
         <i class="zone"></i><template v-if="zonePolicy==='PROHIBITED'">红圈＝净空限制区（演示态：一律禁止进入）</template><template v-else>琥珀圈＝净空限制区（默认：可申请穿越）</template>
@@ -793,7 +789,7 @@ onUnmounted(()=>{
     <div class="nrn-table" v-show="view==='alerts'">
       <div class="nrn-table-hd">
         <h3>事件处置 <small>{{ alerts.length }} 条</small></h3>
-        <p>四类：低能见度、边境受限、回波绕飞、延期起飞。规则动作自动给出处置建议，需人工确认的标为待处置。</p>
+        <p>四类：低能见度、空域受限、回波绕飞、延期起飞。规则动作自动给出处置建议，需人工确认的标为待处置。</p>
       </div>
       <ul class="nrn-alerts">
         <li v-for="row in alerts" :key="row.id" :class="row.severity">
@@ -988,7 +984,7 @@ onUnmounted(()=>{
         <b>{{ selectedLine.fromName }} → {{ selectedLine.toName }}</b>
         <code>{{ selectedLine.id }}</code>
         <span class="tag" :class="selectedLine.borderBlocked?'bad':(selectedLine.detour?'warn':'good')">
-          {{ selectedLine.borderBlocked?'边境停飞':(selectedLine.detour?'绕飞放行':'直飞') }}
+          {{ selectedLine.borderBlocked?'停飞':(selectedLine.detour?'绕飞放行':'直飞') }}
         </span>
         <button @click="selectedCorridor=''">收起</button>
       </header>
@@ -998,7 +994,7 @@ onUnmounted(()=>{
           <p><span>类型</span><b>{{ selectedLine.kindLabel }}</b></p>
           <p><span>长度</span><b>{{ selectedLine.lengthKm }} km</b></p>
           <p><span>两端</span><b>{{ selectedLine.fromProvince }} / {{ selectedLine.toProvince }}</b></p>
-          <p><span>边境</span><b>{{ selectedLine.borderDetour?'已改线避让':'未触发' }}</b></p>
+          <p><span>绕飞避让</span><b>{{ selectedLine.borderDetour?'已改线':'未触发' }}</b></p>
         </div>
         <div>
           <h4>回波遭遇</h4>
@@ -1108,12 +1104,10 @@ onUnmounted(()=>{
 .nrn-legend i.dot{width:6px;height:6px;border-radius:50%;background:#eaf6ff}
 .nrn-legend i.warn{background:rgba(255,206,90,.9)}
 .nrn-legend i.bad{background:rgba(226,92,74,.75)}
-.nrn-legend i.blocked{background:rgba(232,89,12,.9)}
 .nrn-legend i.emergency{background:#ff3b30}
 .nrn-legend i.zone{width:9px;height:9px;border-radius:50%;background:rgba(245,190,60,.22);
   border:1px solid rgba(245,190,60,.75)}
 .nrn-legend i.dim{background:rgba(126,206,255,.3)}
-.nrn-legend .quiet{color:#6f92a8}
 .nrn-legend .bad{color:#ffa08a}
 .nrn-legend .virt{color:#ffcf7a}
 

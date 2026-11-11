@@ -32,7 +32,7 @@ html[data-theme="light"] {
   --map-inset-line: rgba(84, 124, 166, .45);
   --map-ground: rgba(236, 243, 250, .82);
   --map-node: #16384f;
-  --map-node-dim: rgba(44, 84, 116, .5);
+  --map-node-dim: rgba(34, 74, 108, .62);
   --map-node-stroke: rgba(255, 255, 255, .92);
   --map-label: #24485f;
   --map-corridor: rgba(24, 96, 152, .78);
@@ -225,7 +225,6 @@ html[data-theme="light"] .nrn-legend {
   color: #4a6a85 !important;
   border-color: #dbe6f1 !important;
 }
-html[data-theme="light"] .nrn-legend .quiet { color: #7891a7; }
 
 html[data-theme="light"] .nrn-zone {
   background: #f4faf0 !important;
@@ -683,4 +682,14 @@ html[data-theme="light"] .nmap .node-shadow { fill: rgba(60, 100, 140, .16) !imp
 html[data-theme="light"] .nmap .city {
   fill: #12314a !important;
   stroke: rgba(255, 255, 255, .95) !important;
+}
+
+/* ---------- 图例图标（深色版是浅蓝/白点，浅底上会消失） ---------- */
+html[data-theme="light"] .nrn-legend i { background: #2a6f9e !important; }
+html[data-theme="light"] .nrn-legend i.dot { background: #12314a !important; }
+html[data-theme="light"] .nrn-legend i.warn { background: #b8860b !important; }
+html[data-theme="light"] .nrn-legend i.emergency { background: #d4380d !important; }
+html[data-theme="light"] .nrn-legend i.zone {
+  background: rgba(186, 124, 8, .16) !important;
+  border-color: #b8860b !important;
 }
