@@ -82,6 +82,25 @@ const audience=ref('ops')
 const zoneGeom=ref(null)
 // 禁飞区在首页默认开（用户 2026-11-11 要求：气象与非气象都要在首页看得到）
 const zoneOn=ref(true)
+// —— 航线显示：三档开关 + 条数上限（用户要"人工决定开多少个"） ——
+const LINE_KEY='alc.traffic.lines'
+const lineKinds=ref({cross:true,feed:true,intra:false})
+const lineLimit=ref(291)
+const linePanel=ref(false)
+try{
+  const saved=JSON.parse(localStorage.getItem(LINE_KEY)||'null')
+  if(saved&&saved.kinds){ lineKinds.value={...lineKinds.value,...saved.kinds}; lineLimit.value=Number(saved.limit)||291 }
+}catch(_){}
+watch([lineKinds,lineLimit],()=>{
+  try{localStorage.setItem(LINE_KEY,JSON.stringify({kinds:lineKinds.value,limit:lineLimit.value}))}catch(_){}
+},{deep:true})
+const lineStats=computed(()=>{
+  const rows=data.value?.corridors||[]
+  const pick=rows.filter(r=>(r.kind==='CROSS'&&lineKinds.value.cross)
+    ||(r.kind==='AIRPORT_FEED'&&lineKinds.value.feed)
+    ||(r.kind==='INTRA'&&lineKinds.value.intra))
+  return {total:rows.length,matched:pick.length,shown:Math.min(pick.length,Math.max(0,lineLimit.value))}
+})
 const zoneBusy=ref(false)
 const zoneErr=ref('')
 const zonePolicy=ref('APPROVAL_REQUIRED')
@@ -702,6 +721,9 @@ onUnmounted(()=>{
         </select>
         <button :class="{on:radarOn}" @click="radarOn=!radarOn">回波</button>
         <button :class="{on:fogOn}" @click="fogOn=!fogOn" :disabled="!fog.available">雾区</button>
+        <button :class="{on:lineStats.shown>0}" @click="linePanel=!linePanel"
+                :title="'显示哪些航线：跨省主干 / 机场接驳 / 省内短途；条数可以自己拖'">
+          航线 {{ lineStats.shown }}/{{ lineStats.total }}</button>
         <button :class="{on:zoneOn}" @click="zoneOn=!zoneOn; zoneOn&&ensureZones()"
                 :title="'禁飞区：机场净空 + 强回波，红色多边形框；关掉连绕飞一起隐藏'">禁飞</button>
         <button :class="{on:terrainOn}" @click="terrainOn=!terrainOn">地形</button>
@@ -718,6 +740,21 @@ onUnmounted(()=>{
         <button :disabled="!radarBBox" @click="locateLayer('radar')">定位回波</button>
         <button :disabled="!fog.bbox" @click="locateLayer('fog')">定位雾区</button>
         <button @click="resetMap()">复位</button>
+      </div>
+
+      <!-- 航线显示控制：三档开关 + 条数滑块（用户 2026-11-11 要求"人工决定开多少个"） -->
+      <div class="nrn-linepanel" v-if="linePanel" data-line-panel>
+        <label><input type="checkbox" v-model="lineKinds.cross"/> 跨省主干 <small>30 条</small></label>
+        <label><input type="checkbox" v-model="lineKinds.feed"/> 机场接驳 <small>261 条</small></label>
+        <label><input type="checkbox" v-model="lineKinds.intra"/> 省内短途 <small>201 条</small></label>
+        <div class="nrn-linerange">
+          <span>显示条数</span>
+          <input type="range" min="0" :max="Math.max(1,lineStats.matched)" step="1"
+                 v-model.number="lineLimit" aria-label="航线显示条数"/>
+          <b>{{ lineStats.shown }}</b>
+        </div>
+        <p class="nrn-linehint">按航程从长到短截取：只开 50 条时看到的是骨架，不是随机 50 条。</p>
+        <button class="nrn-lineall" @click="lineLimit=0">全部关闭</button>
       </div>
 
       <p class="nrn-lift" v-if="liftNote" data-lift-note>{{ liftNote }}</p>
@@ -738,7 +775,8 @@ onUnmounted(()=>{
                  :frame-minute="frameMinute"
                  :radar-on="radarOn" :fog-on="fogOn" :terrain-on="terrainOn" :tilt="tilt"
                  :density="density" :virtual-mode="virtualMode" :audience="audience"
-                 :zone-bands="zoneOn&&zoneGeom?zoneGeom.bands:null" :zone-policy="zonePolicy"
+                 :zone-bands="zoneOn&&zoneGeom?zoneGeom.bands:null"
+                 :line-kinds="lineKinds" :line-limit="lineLimit" :zone-policy="zonePolicy"
                  :selected-id="selectedId" :selected-corridor="selectedCorridor"
                  :follow-id="followId"
                  @drill="drill" @select-flight="pickFlight" @select-corridor="pickCorridor"/>
@@ -763,11 +801,12 @@ onUnmounted(()=>{
       </div>
 
       <p class="nrn-legend" v-if="audience==='ops'">
+        <i class="star"></i>北京
         <i class="dot"></i>城市
-        <i v-if="level!=='nation'" class="line"></i><span v-if="level!=='nation'">航线</span>
+        <i class="line"></i>航线
         <i class="line warn"></i>绕飞
-        <i class="line emergency"></i>应急
-        <i class="zone"></i>净空圈
+        <i class="box"></i>禁飞区
+        <i class="tri"></i>应急
         <span v-if="virtualMode" class="virt">虚拟增强</span>
       </p>
       <p class="nrn-legend air" v-else>
@@ -1058,6 +1097,26 @@ onUnmounted(()=>{
   border-radius:5px;padding:3px 9px;font-size:11px;cursor:pointer}
 .nrn-aud button.on{background:#17394d;border-color:#2e6b85;color:#bfe9ff}
 .nrn-aud button.policy{border-color:rgba(245,190,60,.5);color:#ffd479}
+.nrn-linepanel{position:absolute;top:52px;left:14px;z-index:9;width:250px;
+  display:flex;flex-direction:column;gap:6px;padding:9px 11px;border-radius:9px;
+  background:rgba(9,24,36,.97);border:1px solid rgba(70,120,155,.6);
+  box-shadow:0 14px 30px -18px rgba(0,0,0,.95);font-size:11.5px;color:#b8d3e6}
+.nrn-linepanel label{display:flex;align-items:center;gap:6px;cursor:pointer}
+.nrn-linepanel label small{margin-left:auto;color:#7d9cb3}
+.nrn-linerange{display:flex;align-items:center;gap:7px;margin-top:2px}
+.nrn-linerange span{white-space:nowrap;color:#8fb2c8}
+.nrn-linerange input{flex:1;min-width:0}
+.nrn-linerange b{color:#8ef0ff;font-variant-numeric:tabular-nums}
+.nrn-linehint{margin:0;font-size:10.5px;line-height:1.5;color:#6f92a8}
+.nrn-lineall{align-self:flex-start;background:none;border:1px solid #2c4a60;color:#9dbccf;
+  border-radius:5px;padding:3px 8px;font-size:10.5px;cursor:pointer}
+html[data-theme="light"] .nrn-linepanel{background:rgba(255,255,255,.98);border-color:#cfdcea;
+  color:#3f5c76;box-shadow:0 14px 26px -18px rgba(20,50,80,.45)}
+html[data-theme="light"] .nrn-linepanel label small{color:#7d97ad}
+html[data-theme="light"] .nrn-linerange span{color:#5b7a92}
+html[data-theme="light"] .nrn-linepanel b{color:#0b7ea6}
+html[data-theme="light"] .nrn-linehint{color:#7d97ad}
+html[data-theme="light"] .nrn-lineall{background:#f2f7fc;border-color:#cfdcea;color:#31556f}
 .nrn-lift{margin:0;padding:4px 9px;border-radius:6px;font-size:11px;color:#ffd08a;
   background:rgba(70,50,14,.5);border:1px solid rgba(160,120,40,.45)}
 
@@ -1106,7 +1165,7 @@ onUnmounted(()=>{
 .nrn-legend{margin:0;
   font-size:10.5px;color:#8fb2c8;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
   background:rgba(8,18,28,.86);border-radius:6px;padding:3px 8px;pointer-events:none}
-.nrn-legend i{display:inline-block;width:14px;height:2px;background:rgba(126,206,255,.62);margin-right:4px;vertical-align:middle}
+.nrn-legend i{display:inline-block;width:14px;height:2px;background:var(--map-corridor);margin-right:4px;vertical-align:middle}
 .nrn-legend i.dot{width:6px;height:6px;border-radius:50%;background:#eaf6ff}
 .nrn-legend i.warn{background:rgba(255,206,90,.9)}
 .nrn-legend i.bad{background:rgba(226,92,74,.75)}
@@ -1114,6 +1173,12 @@ onUnmounted(()=>{
 .nrn-legend i.zone{width:9px;height:9px;border-radius:50%;background:rgba(245,190,60,.22);
   border:1px solid rgba(245,190,60,.75)}
 .nrn-legend i.dim{background:rgba(126,206,255,.3)}
+.nrn-legend i.star{width:9px;height:9px;background:#e03131;clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)}
+.nrn-legend i.box{width:10px;height:8px;background:rgba(224,49,49,.08);border:1.4px solid #e03131;border-radius:1px}
+.nrn-legend i.tri{width:0;height:0;background:none;border-left:4.5px solid transparent;
+  border-right:4.5px solid transparent;border-bottom:8px solid #ff3b30;margin-right:6px}
+html[data-theme="light"] .nrn-legend i.star{background:#c92a2a}
+html[data-theme="light"] .nrn-legend i.box{border-color:#c92a2a}
 .nrn-legend .bad{color:#ffa08a}
 .nrn-legend .virt{color:#ffcf7a}
 

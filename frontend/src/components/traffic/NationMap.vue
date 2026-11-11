@@ -31,6 +31,9 @@ const props=defineProps({
   zonePolicy:{type:String,default:'APPROVAL_REQUIRED'},
   // 'ops' 运行视角 | 'airspace' 空域视角：同一套几何，换主体（航线让位给净空圈）
   audience:{type:String,default:'ops'},
+  // 全国层显示哪些航线：三档开关 + 条数上限（用户 2026-11-11 要"人工决定开多少个"）
+  lineKinds:{type:Object,default:()=>({cross:true,feed:true,intra:false})},
+  lineLimit:{type:Number,default:291},
 })
 const emit=defineEmits(['drill','select-flight','select-corridor','hover-node'])
 
@@ -316,9 +319,33 @@ function arcPoints(a,b,bulgeIn){
   }
   return pts
 }
-const lineWidth=computed(()=>({nation:.62,region:.95,province:1.6,city:1.4}[level.value]||1))
+// 显示条数决定线宽与透明度：开得越多，单条越轻，避免"开全部就糊成蜘蛛网"
+const lineStyle=computed(()=>{
+  const n=props.lineLimit
+  const nation=level.value==='nation'
+  if(!nation) return {w:{region:.95,province:1.6,city:1.4}[level.value]||1,op:1,arrow:'all'}
+  // 条数越多单条越轻，但不能轻到看不见：300 条时仍要能读出"网"的形状
+  if(n<=60) return {w:1.3,op:.95,arrow:'all'}
+  if(n<=300) return {w:1.15,op:.9,arrow:'cross'}
+  return {w:.9,op:.72,arrow:'cross'}
+})
+const lineWidth=computed(()=>lineStyle.value.w)
 
-const corridors=computed(()=>(props.data?.corridors||[]).map(row=>{
+const corridors=computed(()=>{
+  const all=props.data?.corridors||[]
+  let rows=all
+  if(level.value==='nation'){
+    const k=props.lineKinds||{}
+    rows=all.filter(row=>{
+      const kind=row.kind
+      if(kind==='CROSS') return !!k.cross
+      if(kind==='AIRPORT_FEED') return !!k.feed
+      return !!k.intra
+    })
+    // 按航程降序截取：只开 50 条时看到的是骨架，而不是随机 50 条
+    rows=[...rows].sort((a,b)=>(b.lengthKm||0)-(a.lengthKm||0)).slice(0,Math.max(0,props.lineLimit))
+  }
+  return rows.map(row=>{
   const path=row.path&&row.path.length>1?row.path:[row.fromLonLat,row.toLonLat]
   const coords=path.map(([lon,lat])=>project(lon,lat))
   const points=coords.length===2?arcPoints(coords[0],coords[1],row.bulge):coords
@@ -347,9 +374,10 @@ const corridors=computed(()=>(props.data?.corridors||[]).map(row=>{
     }
   }
   return {id:row.id,d,pts:points,arrow,detour,blocked:!!row.borderBlocked,
-    fromName:row.fromName,toName:row.toName,kindLabel:row.kindLabel,lengthKm:row.lengthKm,
+    fromName:row.fromName,toName:row.toName,kind:row.kind,kindLabel:row.kindLabel,lengthKm:row.lengthKm,
     selected:props.selectedCorridor===row.id}
-}))
+  })
+})
 
 // —— 节点与建筑 ——
 function shortName(name){
@@ -695,8 +723,8 @@ function clickNode(node){
            492 条线在全国缩放下平均只有 20–40 px，画出来就是一张蜘蛛网，
            而这一层要看的是"哪些城市有网络"，不是"每条线怎么走"。
            下钻到大区/省/市再画，那时一条线才占几十上百像素，方向也才读得出来。 -->
-      <g v-if="level!=='nation'" fill="none" stroke-linecap="round"
-         :opacity="audience==='airspace'?.3:1">
+      <g v-if="corridors.length" fill="none" stroke-linecap="round"
+         :opacity="audience==='airspace'?.3:lineStyle.op">
         <path v-for="line in corridors" :key="'c'+line.id" :d="line.d"
               :stroke="line.blocked?(virtualMode?'rgba(255,96,70,.95)':'var(--map-corridor-blocked)'):'var(--map-corridor)'"
               :stroke-width="line.blocked?lineWidth*(virtualMode?2.2:.8):lineWidth"
@@ -713,9 +741,10 @@ function clickNode(node){
       <!-- 5.5 航线方向箭头：每条线一枚，说明"往哪飞"。
            全国层 492 条线如果每段都画箭头，会在图上撒满三角；
            所以只在 48% 处放一枚，并按当前级别缩放，省/市层才看得清。 -->
-      <g v-if="level!=='nation'" class="nmap-arrows" :opacity="audience==='airspace'?.12:.9">
+      <g v-if="corridors.length" class="nmap-arrows"
+         :opacity="audience==='airspace'?.12:(level==='nation'?lineStyle.op*.9:.9)">
         <template v-for="line in corridors" :key="'a'+line.id">
-          <path v-if="line.arrow"
+          <path v-if="line.arrow&&(lineStyle.arrow==='all'||line.kind==='CROSS')"
                 :transform="`translate(${line.arrow.x.toFixed(1)} ${line.arrow.y.toFixed(1)}) rotate(${line.arrow.angle.toFixed(1)}) scale(${(level==='nation'?0.62:(level==='region'?0.8:1))*inv})`"
                 d="M-2.6 -1.8 L3 0 L-2.6 1.8 Z"
                 :fill="line.blocked?'var(--map-corridor-blocked)':'var(--map-corridor)'"
