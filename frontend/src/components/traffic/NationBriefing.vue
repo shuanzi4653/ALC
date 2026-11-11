@@ -318,6 +318,22 @@ function clock(m){
         <span>{{ model.nationalModel.provenance.cities }} 城 · {{ model.nationalModel.provenance.samples }} 样本 · 按时间切分</span>
         <em>输入与标签同源（open-meteo 模式能见度），指标衡量的是"模式能见度的演变可预测性"</em>
       </div>
+      <!-- 空域净空：原来挂在「态势」侧栏，跟着 mode 跑到推演页去过。
+           它是空域的事，就该跟「空域情报」这一页在一起；边界与穿越明细在
+           地图「空域视角」里看，这里给的是同一套几何的**账目**。 -->
+      <section class="nb-airspace" v-if="zones.available" data-airspace-block>
+        <h3>空域净空 <small>规则化生成 · {{ zones.policy==='PROHIBITED'?'一律禁飞':'可申请穿越' }}</small></h3>
+        <div class="nb-air-grid">
+          <div><small>受限机场</small><b>{{ zones.counts.airports||0 }}</b></div>
+          <div><small>限制区</small><b>{{ zones.counts.limitZones||0 }} 个</b></div>
+          <div><small>跑道梯形</small><b>{{ zones.counts.runwayZones||0 }} 处</b></div>
+          <div><small>覆盖陆域</small><b>{{ ((zones.counts.coverageRatio||0)*100).toFixed(2) }}%</b></div>
+        </div>
+        <p class="nb-air-note">
+          {{ zones.note }} 边界与逐条穿越在地图右上「空域视角」里看：那里画的是同一套多边形，
+          可以逐条核对哪条航线穿过了哪个限制区。
+        </p>
+      </section>
       <div class="nb-hd">
         <h3>机场情报 <small>{{ intel.length }} 个机场城市</small></h3>
         <p>实况来自公开源（METAR / open-meteo）；“放行建议”是按能见度门槛算的规则派生值，不是官方结论。</p>
@@ -414,6 +430,19 @@ function clock(m){
 .nb-weather li b{flex:0 0 auto}
 .nb-weather li.bad{outline:1px solid rgba(226,75,74,.5)}
 .nb-weather span{color:#8fb2c8}
+.nb-airspace{border:1px solid rgba(70,110,140,.35);border-radius:8px;padding:8px 10px;
+  margin:0 2px 8px;background:rgba(10,26,38,.5)}
+.nb-airspace h3{font-size:12px;color:#cfe6f5;margin-bottom:6px}
+.nb-airspace h3 small{margin-left:6px;font-size:10px;color:#6f92a8;font-weight:400}
+.nb-air-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.nb-air-grid div{display:flex;flex-direction:column;gap:1px}
+.nb-air-grid small{font-size:10px;color:#7d9cb3}
+.nb-air-grid b{font-size:13px;color:#dfeefb;font-variant-numeric:tabular-nums}
+.nb-air-note{margin-top:6px;font-size:10px;line-height:1.55;color:#6f92a8}
+html[data-theme="light"] .nb-airspace{background:#f6fafd;border-color:#dbe6f1}
+html[data-theme="light"] .nb-airspace h3{color:#12314a}
+html[data-theme="light"] .nb-air-grid b{color:#0f3550}
+html[data-theme="light"] .nb-air-note,html[data-theme="light"] .nb-air-grid small{color:#6b8399}
 .nb-filters{display:flex;align-items:center;gap:5px;flex-wrap:wrap;padding:0 2px 6px}
 .nb-filters button{background:none;border:1px solid rgba(70,110,140,.45);color:#9dbccf;
   border-radius:999px;padding:2px 9px;font-size:10.5px;cursor:pointer;transition:.15s}

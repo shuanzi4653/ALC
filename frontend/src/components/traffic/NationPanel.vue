@@ -123,6 +123,8 @@ const summary=computed(()=>data.value?.summary||{})
 const rollup=computed(()=>data.value?.rollup||{level:'nation',total:{},regions:[],provinces:[],cities:[]})
 const total=computed(()=>({...(rollup.value.total||{}),...live.value}))
 const radarMeta=computed(()=>data.value?.radar||{})
+// 每档上限 200 片是硬截断：一旦不显示"被截掉了"，读者会以为图上就是全部回波。
+const echoStats=computed(()=>radarMeta.value.stats||{truncated:false,totalRings:0,keptRings:0,cap:200})
 const border=computed(()=>data.value?.border||{})
 const fog=computed(()=>data.value?.fog||{available:false,counts:{},bands:{},cities:[]})
 // 机场净空（DERIVED）。与 border 的 OFFICIAL 管制区分开显示：
@@ -770,7 +772,9 @@ onUnmounted(()=>{
           <option :value="1">60 倍速</option>
           <option :value="5">300 倍速</option>
         </select>
-        <button :class="{on:radarOn}" @click="radarOn=!radarOn">回波</button>
+        <button :class="{on:radarOn}" @click="radarOn=!radarOn"
+                :title="`雷达回波：公开拼图裁剪到国内，三档轮廓按面积排序（本帧 ${echoStats.keptRings||0} 片${echoStats.truncated?'，已截断':''}）`">
+          回波<em v-if="echoStats.keptRings" class="nrn-cnt">{{ echoStats.keptRings }}</em></button>
         <button :class="{on:fogOn}" @click="fogOn=!fogOn" :disabled="!fog.available">雾区</button>
         <button :class="{on:lineStats.shown>0}" @click="linePanel=!linePanel"
                 :title="'显示哪些航线：跨省主干 / 机场接驳 / 省内短途；条数可以自己拖'">
@@ -855,6 +859,9 @@ onUnmounted(()=>{
       </div>
 
       <p class="nrn-legend" v-if="audience==='ops'">
+        <span v-if="echoStats.truncated" class="nrn-echo-note" data-echo-truncated>
+          回波过多，已按面积取前 {{ echoStats.cap }} 片（原 {{ echoStats.totalRings }} 片）
+        </span>
         <i class="star"></i>北京
         <i class="dot"></i>城市
         <i class="line"></i>航线
@@ -1165,6 +1172,9 @@ onUnmounted(()=>{
   border-radius:5px;padding:3px 9px;font-size:11px;cursor:pointer}
 .nrn-aud button.on{background:#17394d;border-color:#2e6b85;color:#bfe9ff}
 .nrn-aud button.policy{border-color:rgba(245,190,60,.5);color:#ffd479}
+.nrn-cnt{margin-left:3px;font-style:normal;font-size:9.5px;opacity:.62;font-variant-numeric:tabular-nums}
+.nrn-echo-note{margin-right:8px;font-size:10px;color:#ffc857}
+html[data-theme="light"] .nrn-echo-note{color:#a4610a}
 .nrn-virt{margin-left:8px;font-style:normal;font-size:10px;padding:1px 7px;border-radius:999px;
   color:#ffd08a;background:rgba(200,140,30,.16);border:1px solid rgba(220,170,60,.55)}
 html[data-theme="light"] .nrn-virt{color:#8a5a00;background:#fdf3e0;border-color:#e0bb78}

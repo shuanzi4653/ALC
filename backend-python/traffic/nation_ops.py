@@ -449,6 +449,19 @@ def alerts(corridors: List[Dict[str, Any]], flights: List[Dict[str, Any]],
                 'status': '自动处置', 'auto': True,
             })
     for flight in flights:
+        # 气象停飞与延期起飞是两件事：前者是"这条航路此刻不成立"（硬约束，无绕飞方案），
+        # 后者是"再等等就能飞"。以前都塞进「延期起飞」，处置页会出现
+        # "延期 9 条，留在地面等待下一个时隙"——而它们等的不是时隙，是航路。
+        if flight['decision'] == 'HOLD' and any('强回波' in d for d in (flight.get('drivers') or [])):
+            out.append({
+                'id': f"EV-WXHOLD-{flight['id']}", 'code': 'WEATHER_HOLD', 'kind': '气象停飞',
+                'severity': 'bad', 'place': f"{flight['fromName']} → {flight['toName']}",
+                'province': flight['fromProvince'],
+                'detail': '航路压在强回波内且找不到可脱离的小绕方案，本航路此刻不成立',
+                'action': '该班次停飞；待回波移出航路后重新计算绕飞方案，再决定恢复或改期',
+                'status': '已停飞', 'auto': True, 'flightId': flight['id'],
+            })
+            continue
         if flight['decision'] == 'HOLD':
             # 判据要写"到底是哪一条"触发的。
             # 以前这里固定写"风险概率 X，高于 0.75 暂不放行"，而 HOLD 还可能是

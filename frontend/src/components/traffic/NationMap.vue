@@ -86,6 +86,10 @@ const proj=computed(()=>{
   const k=Math.min(VIEW.w/w,VIEW.h/h)
   return {k,ox:(VIEW.w-w*k)/2,oy:(VIEW.h-h*k)/2,v,lon0:rad(v.lon0),lat1:merc(v.lat1)}
 })
+// 8 px 方框（中心在原点，边长 8）：禁飞区小到看不清时用它兜底。
+// 用 scale(inv) 把它拉回屏幕尺寸，这样放大后它不会跟着变成大块。
+const MINI_BOX='M-4,-4 L4,-4 L4,4 L-4,4 Z'
+
 // 五角星（中心在原点，外接半径 6）：省会用，别拿它做别的标记
 const STAR='M0,-6 L1.76,-2.43 L5.71,-1.85 L2.85,0.94 L3.53,4.85 L0,2.9 L-3.53,4.85 L-2.85,0.94 L-5.71,-1.85 L-1.76,-2.43 Z'
 
@@ -138,6 +142,8 @@ const radarTiles=computed(()=>{
 const radarRings=computed(()=>{
   if(!props.radarOn) return []
   const bands=props.data?.radar?.bands||{}
+  // 帧标识：雷达帧号优先，没有就用推演分钟。它只进 key，用来触发淡入动画。
+  const frame=String(props.data?.radar?.ts||props.minute||'')
   const out=[]
   for(const level of ['WEAK','CONVECTIVE','STRONG']){
     for(const ring of bands[level]||[]){
@@ -150,7 +156,7 @@ const radarRings=computed(()=>{
       }
       const size=Math.max(maxX-minX,maxY-minY)
       out.push({
-        level,
+        level, frame,
         d:toPath({type:'Polygon',coordinates:[ring]},project),
         small:size<15,
       })
@@ -178,6 +184,10 @@ const fogPolys=computed(()=>{
 // —— 禁飞区：287 个机场限制区 + 10 条跑道梯形（非气象） ——
 // 与气象禁飞（强回波轮廓）共用"红框"这一种标记：用户 2026-11-11 定"禁飞区就是红框"。
 // 取不到几何就返回空数组：空图层和"没有禁飞区"是两回事，界面上另有 zoneErr 说明。
+function zoneTitle(zone){
+  return (zone.kind==='RWY' ? '禁飞区：跑道梯形净空（仅 10 站有方位）'
+    : '禁飞区：机场净空限制区（规则化生成，非官方公布）')
+}
 const zonePolys=computed(()=>{
   const bands=props.zoneBands
   if(!bands) return []
@@ -201,11 +211,12 @@ const zonePolys=computed(()=>{
         if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y
       }
       const w=x1-x0,h=y1-y0
-      // 屏幕尺寸分流：287 个限制区在全国层大多只有 1–2 px，
-      // 全画成框就是一片红（实测把整张图盖住）。小于 9 px 一律退化成点，
-      // 放大/下钻后自然变回框 —— 与雷达环的处理同一套逻辑。
+      // 287 个限制区在全国层大多只有 1–2 px，按真实尺寸画就是一片红把图盖住。
+      // 早先的处理是"小于 9 px 退化成点"，但图例画的是方框、用户也明确要"红色的框"，
+      // 于是图上是点、图例是框，两回事。现在改成**最小尺寸方框**：
+      // 真实几何够大就画真多边形；不够大就画一个 8 px 的方框（视觉上仍是"框"）。
       const small=Math.max(w,h)<9
-      out.push({kind,small,cx:(x0+x1)/2,cy:(y0+y1)/2,
+      out.push({kind,small,cx:(x0+x1)/2,cy:(y0+y1)/2,w,h,
         d:small?null:toPath({type:'Polygon',coordinates:[ring]},project)})
     }
   }
@@ -425,6 +436,10 @@ const labels=computed(()=>{
   for(const line of corridors.value){
     if(line.kind==='CROSS'){ ends.add(line.fromName); ends.add(line.toName) }
   }
+  // 悬停某条航线时，它两端的名字必须出现：只给一条线、不给两个地名，
+  // 读者没法知道这条线连的是哪两座城。这是"强制显示"，不吃密度限制。
+  const hl=(corridors.value||[]).find(l=>l.id===hoverLineId.value)
+  if(hl){ ends.add(hl.fromName); ends.add(hl.toName) }
   const rankOf=(node)=>ends.has(node.name)?0:(node.rank||3)
   // 全国层现在也标（只标本级之外有连线的端点与省会，约 40 个）：
   // 一个地名都不给，等于让读者自己数城市点。
@@ -483,29 +498,90 @@ const flightDots=computed(()=>{
   return out
 })
 
+// 换帧过渡：新环淡入 260ms、旧环淡出 260ms 后销毁。
+// 只做淡入也够软，但"旧图直接消失"仍是一次硬切，所以留一帧影子。
+const echoGhost=ref([])
+let ghostTimer=null
+watch(()=>radarRings.value, (next,prev)=>{
+  if(!prev||!prev.length) return
+  echoGhost.value=prev
+  if(ghostTimer) clearTimeout(ghostTimer)
+  ghostTimer=setTimeout(()=>{ echoGhost.value=[] },260)
+})
+onUnmounted(()=>{ if(ghostTimer) clearTimeout(ghostTimer) })
+
 // —— 选中的班次：把它那一条航线与起终点摊开 ——
 // 全国层平时不画航线，但"我点了这架，它从哪来到哪去"必须答得出来，
 // 所以这是唯一的例外：只为这一架画一条。
 // —— 悬停：不点也能看这一架是谁 ——
 // 用 clientX/clientY 定位一个 fixed 浮层，不去换算 SVG 坐标：
 // 换算要乘 pan/zoom，还要处理 viewBox 缩放，容易差几个像素，而这里只要"跟着鼠标"。
-const hover=ref(null)
-function hoverEnter(f,event){
-  hover.value={f, x:event.clientX, y:event.clientY}
+// 浮层统一成「标题 + 若干行」，航班/城市/禁飞区/航线共用一块 DOM：
+// 四套各自写一遍会出现"有的地方有浮层、有的地方还是浏览器原生 title"。
+const tip=ref(null)
+function showTip(event,title,rows){
+  tip.value={x:event.clientX,y:event.clientY,title,rows}
 }
 function hoverMove(event){
-  if(hover.value){ hover.value.x=event.clientX; hover.value.y=event.clientY }
+  if(tip.value){ tip.value.x=event.clientX; tip.value.y=event.clientY }
 }
-function hoverLeave(){ hover.value=null }
+function hoverLeave(){ tip.value=null }
+
+function hoverEnter(f,event){
+  showTip(event, f.callsign, [
+    {text:`${f.fromName} → ${f.toName}`},
+    {text:`${f.altM} m · ${f.speedKmh} km/h · 已飞 ${Math.round((f.progressNow||0)*100)}%`},
+    {text:`${f.decisionLabel} · 风险 ${f.riskLevelLabel}`, cls:f.bad?'bad':''},
+  ])
+}
+// 城市点：以前只有浏览器原生 <title>（1 秒延迟、样式不可控）。
+// 这里给"这个点是什么"，不重复右栏的逐市气象表。
+function hoverNode(node,event){
+  const rows=[{text:node.capital?'省会 / 直辖市':'城市节点'}]
+  if(node.airport) rows.push({text:`机场 ${node.airport}`})
+  else rows.push({text:'无机场（专用接驳）'})
+  if(node.pLowVis!=null) rows.push({text:`模型低能见概率 ${(node.pLowVis*100).toFixed(0)}%`,
+    cls:node.pLowVis>=0.35?'bad':''})
+  rows.push({text:`${node.short} · 点击下钻`})
+  showTip(event,node.short,rows)
+}
+function hoverZone(zone,event){
+  const rows=[{text:zone.kind==='RWY'?'跑道梯形净空':'机场净空限制区'},
+    {text:'规则化生成，非官方公布'},
+    {text:zone.small?'放大可见边界':'边界按真实几何绘制'}]
+  showTip(event,zone.kind==='RWY'?'禁飞区 · 跑道':'禁飞区 · 机场净空',rows)
+}
+// 航线：悬停时把两端城市名强制显示（labels 会把这两个名字提权），
+// 否则全国层只有一条线，读者得拿尺子量它连的是哪两座城。
+const hoverLineId=ref('')
+function hoverLine(line,event){
+  hoverLineId.value=line.id
+  const rows=[{text:line.kindLabel||'航线'}]
+  rows.push({text:`${line.lengthKm} km`})
+  rows.push({text:line.blocked?'停飞':(line.detour?'绕飞放行':'直飞')},
+    )
+  showTip(event,`${shortName(line.fromName)} → ${shortName(line.toName)}`,rows)
+}
+function leaveLine(){ hoverLineId.value=''; hoverLeave() }
+
 // 模板里不能直接写 window（表达式作用域只有组件实例），算在 computed 里
-const tipFlip=computed(()=>!!hover.value&&hover.value.x>((typeof window!=='undefined'?window.innerWidth:1920)-260))
+const tipFlip=computed(()=>!!tip.value&&tip.value.x>((typeof window!=='undefined'?window.innerWidth:1920)-260))
 
 // 常显的文字标签：全国层只给"值得看的几架"（选中/绕飞/高风险），
 // 下钻到大区及以下才全标 —— 106 行小字会把地图盖住，这是上一轮刚清理过的问题。
 const flightLabels=computed(()=>{
   const all=flightDots.value.filter(f=>f.fade>.4)
   const key=all.filter(f=>f.selected||f.detour||f.bad)
-  const list=level.value==='nation'?key.slice(0,12):all
+  // 全国层只标"值得看的几架"，但**不能一个都没有**：
+  // 实测 6 个时刻里有 4 个时刻绕飞 0 架、高风险的基本都在延期里（延期不画），
+  // 于是标签长期为空 —— 用户要的"每个箭头旁边有高度/速度/编号"就落空了。
+  // 兜底：关键的那几架排前面，不够 8 架就按风险降序补足到 8 架。
+  let picked=key
+  if(level.value==='nation'&&key.length<8){
+    const rest=all.filter(f=>!key.includes(f)).sort((a,b)=>(b.riskP||0)-(a.riskP||0))
+    picked=key.concat(rest.slice(0,8-key.length))
+  }
+  const list=level.value==='nation'?picked.slice(0,12):all
   const out=[]
   for(const f of list){
     // 简单避让：与已放置标签在 46×11 的盒内相交就跳过
@@ -678,9 +754,15 @@ function clickNode(node){
            几何由后端做过闭运算平滑（radar_field._smooth），这里只负责上色。 -->
       <g v-if="radarRings.length" :clip-path="'url(#nmap-china-clip)'">
         <!-- 回波：淡填充 + 清晰描边（专业雷达的读法：绿→黄→红）。
-             几何在后端已经做过闭运算平滑，这里描边才不会把台阶放大成锯齿。 -->
-        <template v-for="(ring,index) in radarRings" :key="'rr'+index">
-          <path :d="ring.d" :class="'echo-'+ring.level.toLowerCase()"
+             几何在后端已经做过闭运算平滑，这里描边才不会把台阶放大成锯齿。
+             换帧时旧环淡出 260ms、新环淡入 260ms —— 逐分钟变化是连续的，不是硬切。 -->
+        <g v-if="echoGhost.length" class="nmap-echo-ghost">
+          <path v-for="(ring,index) in echoGhost" :key="'g'+index" :d="ring.d"
+                :class="'echo-out echo-'+ring.level.toLowerCase()"
+                :style="{strokeWidth:(virtualMode?2.2:1.5)*inv}"/>
+        </g>
+        <template v-for="(ring,index) in radarRings" :key="'rr'+index+'-'+ring.frame">
+          <path :d="ring.d" :class="'echo-in echo-'+ring.level.toLowerCase()"
                 :style="{strokeWidth:(virtualMode?2.2:1.5)*inv}"/>
         </template>
       </g>
@@ -721,14 +803,20 @@ function clickNode(node){
         <text :x="insetBox.x+7" :y="insetBox.y+insetBox.h-7" class="inset-lbl">南海诸岛</text>
       </g>
 
-      <!-- 3.8 净空（DERIVED）：空域视角下是主体，运行视角只在省/市层做底图 -->
+      <!-- 3.8 禁飞区（DERIVED）：气象（回波轮廓）与非气象（机场限制区）用同一套红框。
+           小到看不清的用 8 px 方框兜底 —— 图例是框，图上就必须是框，不能是点。 -->
       <g v-if="zonePolys.length" class="nmap-zones">
         <template v-for="(zone,index) in zonePolys" :key="'z'+index">
-          <circle v-if="zone.small" class="no-fly-dot" :cx="zone.cx" :cy="zone.cy"
-                  :r="1.3*inv" :style="{opacity:level==='nation'?.55:.8}"/>
+          <path v-if="zone.small" :d="MINI_BOX" class="no-fly-box mini"
+                @mouseenter="hoverZone(zone,$event)" @mousemove="hoverMove" @mouseleave="hoverLeave"
+                :transform="`translate(${zone.cx.toFixed(1)} ${zone.cy.toFixed(1)}) scale(${inv})`"
+                :style="{strokeWidth:.9, opacity:level==='nation'?.72:.9}">
+            <title>{{ zoneTitle(zone) }}</title>
+          </path>
           <path v-else :d="zone.d" class="no-fly-box"
-                :style="{strokeWidth:(level==='nation'?1.1:1.6)*inv, opacity:level==='nation'?.62:.9}">
-            <title>禁飞区：机场净空限制区（规则化生成，非官方公布）；跑道梯形仅 10 站有方位</title>
+                @mouseenter="hoverZone(zone,$event)" @mousemove="hoverMove" @mouseleave="hoverLeave"
+                :style="{strokeWidth:(level==='nation'?1.1:1.6)*inv, opacity:level==='nation'?.8:.95}">
+            <title>{{ zoneTitle(zone) }}</title>
           </path>
         </template>
       </g>
@@ -756,6 +844,8 @@ function clickNode(node){
               :stroke="line.blocked?(virtualMode?'rgba(255,96,70,.95)':'var(--map-corridor-blocked)'):'var(--map-corridor)'"
               :stroke-width="line.blocked?lineWidth*(virtualMode?2.2:.8):lineWidth"
               :class="{hit:line.selected,clickable:true,'virt-alarm':virtualMode&&line.blocked}"
+              @mousemove="hoverMove" @mouseleave="leaveLine"
+              @mouseenter="hoverLine(line,$event)"
               @click="!moved&&emit('select-corridor',line)"/>
         <path v-for="line in corridors.filter(l=>l.detour)" :key="'d'+line.id" :d="line.detour"
               :stroke="virtualMode?'rgba(255,214,120,1)':'var(--map-detour)'"
@@ -782,7 +872,8 @@ function clickNode(node){
 
       <!-- 6 节点 -->
       <g class="nmap-nodes">
-        <g v-for="node in nodes" :key="'n'+node.name" @click="clickNode(node)">
+        <g v-for="node in nodes" :key="'n'+node.name" @click="clickNode(node)"
+           @mouseenter="hoverNode(node,$event)" @mousemove="hoverMove" @mouseleave="hoverLeave">
           <circle v-if="node.external" :cx="node.x" :cy="node.y" :r="(node.rank===1?3.4:2.4)*inv"
                   fill="none" stroke="rgba(160,200,235,.75)" stroke-width="1.1"/>
           <template v-else>
@@ -873,12 +964,9 @@ function clickNode(node){
       </g>
     </g>
   </svg>
-  <div v-if="hover" class="nmap-tip" :style="{left:hover.x+'px', top:hover.y+'px'}"
-       :class="{flip:tipFlip}">
-    <b>{{ hover.f.callsign }}</b>
-    <span>{{ hover.f.fromName }} → {{ hover.f.toName }}</span>
-    <span>{{ hover.f.altM }} m · {{ hover.f.speedKmh }} km/h · 已飞 {{ Math.round((hover.f.progressNow||0)*100) }}%</span>
-    <span :class="hover.f.bad?'bad':''">{{ hover.f.decisionLabel }} · 风险 {{ hover.f.riskLevelLabel }}</span>
+  <div v-if="tip" class="nmap-tip" :style="{left:tip.x+'px', top:tip.y+'px'}" :class="{flip:tipFlip}">
+    <b>{{ tip.title }}</b>
+    <span v-for="(row,i) in tip.rows" :key="'t'+i" :class="row.cls||''">{{ row.text }}</span>
   </div>
 </div>
 </template>
@@ -896,6 +984,14 @@ function clickNode(node){
 .nmap path.virt-alarm{filter:drop-shadow(0 0 4px rgba(255,90,60,.85))}
 .nmap .inset-lbl{font-size:7.5px;fill:rgba(170,205,230,.85)}
 .nmap .node-shadow{fill:rgba(8,20,32,.5)}
+.echo-in{animation:echoIn .26s ease-out both}
+.echo-out{animation:echoOut .26s ease-out both;pointer-events:none}
+.nmap-echo-ghost{pointer-events:none}
+@keyframes echoIn{from{opacity:0}to{opacity:1}}
+@keyframes echoOut{from{opacity:1}to{opacity:0}}
+@media (prefers-reduced-motion: reduce){
+  .echo-in,.echo-out{animation:none}
+}
 .echo-weak{fill:rgba(74,189,134,.22);stroke:rgba(96,214,158,.55)}
 .echo-convective{fill:rgba(245,190,60,.40);stroke:rgba(255,206,90,.88)}
 .echo-strong{fill:rgba(232,60,48,.58);stroke:rgba(255,120,95,.95)}
@@ -904,7 +1000,8 @@ html[data-theme="light"] .echo-convective{fill:rgba(214,148,10,.26);stroke:rgba(
 html[data-theme="light"] .echo-strong{fill:rgba(200,40,30,.34);stroke:rgba(176,26,18,.92)}
 .cap-star{fill:#ff4d4f;stroke:rgba(8,20,32,.85);stroke-width:.7;pointer-events:none}
 .cap-ring{stroke:rgba(186,218,255,.42);pointer-events:none}
-.no-fly-box{fill:rgba(224,49,49,.06);stroke:#e03131;pointer-events:none}
+.no-fly-box{fill:rgba(224,49,49,.06);stroke:#e03131;pointer-events:stroke;cursor:help}
+.no-fly-box.mini{fill:rgba(224,49,49,.10)}
 .no-fly-dot{fill:#e03131;stroke:none;pointer-events:none;opacity:.34}
 html[data-theme="light"] .no-fly-dot{opacity:.26}
 html[data-theme="light"] .no-fly-box{fill:rgba(224,49,49,.05);stroke:#c92a2a}

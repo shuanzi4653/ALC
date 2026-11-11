@@ -193,6 +193,19 @@ def _china_mask():
     return unary_union(shapes) if shapes else None
 
 
+# 每帧的环数统计：{band: {kept, total}}。供载荷里的 truncated 字段与界面提示用。
+_RADAR_STATS: Dict[str, Dict[str, Dict[str, int]]] = {}
+
+
+def radar_stats(radar_ts: str) -> Dict[str, Any]:
+    st = _RADAR_STATS.get(radar_ts) or {}
+    total = sum(int(v.get('total') or 0) for v in st.values())
+    kept = sum(int(v.get('kept') or 0) for v in st.values())
+    return {'bands': st, 'totalRings': total, 'keptRings': kept,
+            'truncated': any(int(v.get('total') or 0) > int(v.get('kept') or 0) for v in st.values()),
+            'cap': 200}
+
+
 @lru_cache(maxsize=2)
 def _radar_clipped(radar_ts: str) -> Dict[str, Any]:
     """回波只保留**国内**部分。
@@ -208,6 +221,7 @@ def _radar_clipped(radar_ts: str) -> Dict[str, Any]:
         return bands
     from shapely.geometry import Polygon
     out: Dict[str, List[List[List[float]]]] = {}
+    stats: Dict[str, Dict[str, int]] = {}
     for band, rings in bands.items():
         kept: List[List[List[float]]] = []
         for ring in rings or []:
@@ -232,6 +246,9 @@ def _radar_clipped(radar_ts: str) -> Dict[str, Any]:
         # 按面积降序取前 200：极端天气也不会把整片主雨带截掉（原先是 [:45] 顺序截断）
         kept.sort(key=lambda item: item[0], reverse=True)
         out[band] = [coords for _area, coords in kept[:200]]
+        stats[band] = {'kept': len(out[band]), 'total': len(kept)}
+    # 截断必须能被界面读到：悄悄丢掉 30 片回波，等于让读者以为"就这么多"。
+    _RADAR_STATS[radar_ts] = stats
     return out
 
 
@@ -909,6 +926,7 @@ def _payload_locked(level: str = 'nation', ident: Optional[str] = None,
                     # 瓦片直链：前端按墨卡托贴图，边界比矢量多边形更像真实回波
                     'tiles': radar.get('tiles_url'),
                     'virtual': False,
+                    'stats': radar_stats(radar.get('ts') or 'none'),
                 }),
                 'clearanceNote': '许可要素由本班次已写定的计划字段组装，不重新计算；标“待批”的班次不进入在飞序列。',
                 'flights': flights,
