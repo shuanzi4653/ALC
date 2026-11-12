@@ -168,8 +168,8 @@ def _station_rows() -> Tuple[Dict[int, List[Dict[str, Any]]], Dict[str, Any]]:
 def _corridor_counts() -> Tuple[Counter, Counter, int]:
     """按省统计走廊数，**城际（CAR）与配送（DELIVERY）分开**。
 
-    全国屏的"风险走廊"口径只算城际走廊（53 条那条网）；配送走廊是城内的，
-    混进来会让 267 这种数字被误读成"全国 267 条风险走廊"。
+    全国屏的"风险走廊"口径只算城际走廊；配送走廊是城内的，混进来会让总数
+    被误读成"全国这么多条风险走廊"。
 
     第三个返回值是**跨省走廊数**：这类走廊的 `province` 为 None，不属于任何一个省，
     所以单独计数，不能悄悄丢进某个省，也不能从总数里消失。
@@ -288,8 +288,13 @@ def national() -> Dict[str, Any]:
             'trunk': {'source': 'SIM', 'count': len(corridors),
                       'note': '省级干线（省会代表点 MST + 就近补边），只用于全国屏聚合与示意，'
                               '不参与运行计划与裁决'},
-            'local': {'source': 'RUN', 'provinces': 3,
-                      'note': '东北三省 51 条省内 + 2 条跨省城际走廊，来自运行计划实际跑出的航路'},
+            # 本层不写死省名与条数：RUN 走廊来自运行计划，计划变了两句话就会漂。
+            'local': {'source': 'RUN', 'provinces': len([p for p in car_counts if p]),
+                      'corridors': sum(car_counts.values()),
+                      'interprovincial': interprovincial,
+                      'note': (f'运行计划实际跑出的城际走廊 {sum(car_counts.values())} 条'
+                               f'（分布在 {len([p for p in car_counts if p])} 个省级单元）'
+                               f'，另有跨省 {interprovincial} 条；与省级干线分开计数，不合并')},
         },
         'summary': {
             'provinces': len(rows),

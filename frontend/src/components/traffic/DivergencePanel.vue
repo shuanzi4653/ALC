@@ -9,16 +9,42 @@ const props=defineProps({
 })
 const data=ref(null),error=ref(''),loading=ref(false)
 const VERDICT_LABEL={ACCEPT:'采纳模型判断',REJECT:'否决模型',MANUAL:'转人工复核'}
+const ACTION_LABEL={RELEASE:'放行',DETOUR:'改绕飞',HOLD:'停飞'}
+
+// 全国层没有服务端裁决台账（日志是按分钟重算的派生表，没有可写的历史），
+// 人做过的事只落在 `alc.review.v1` —— 走廊页的「人工裁决」写的就是它。
+// 以前这一页只读服务端，于是全国层永远是空表：不是"没人判过"，是"读错了地方"。
+// 这里把本机记录并进同一张表：判定口径不变（与算法原判一致=采纳，不一致=否决），
+// 列也一套 —— 两份记录并排，靠"操作人"区分来源。
+const REVIEW_KEY='alc.review.v1'
+function readLocal(){
+  try{
+    const table=JSON.parse(localStorage.getItem(REVIEW_KEY)||'{}')||{}
+    return Object.entries(table).filter(([,rec])=>rec&&rec.action).map(([corridor,rec])=>{
+      const auto=String(rec.auto||'').trim()
+      return {
+        at:'', corridorId:corridor, flightId:'', p:null, confidence:null,
+        ruleLevel:auto||'—',
+        verdict:auto&&rec.action===auto?'ACCEPT':'REJECT',
+        note:[rec.reason||'', auto?`算法原判 ${ACTION_LABEL[auto]||auto}`:'',
+              `人工 ${ACTION_LABEL[rec.action]||rec.action}`].filter(Boolean).join('；'),
+        operator:'本机值班员 · 走廊页', local:true,
+      }
+    })
+  }catch(_){return []}
+}
+const localRows=ref(readLocal())
 
 async function load(){
   loading.value=true
+  localRows.value=readLocal()          // 换了标签页再回来，本机记录要重读
   try{data.value=await requestJson('/api/traffic/v2/divergences?limit=50',{timeoutMs:15000});error.value=''}
   catch(e){error.value=e.message}
   finally{loading.value=false}
 }
 onMounted(load)
 
-const allRows=computed(()=>data.value?.rows||[])
+const allRows=computed(()=>[...localRows.value,...(data.value?.rows||[])])
 const rows=computed(()=>{
   const focus=String(props.focusCorridor||'').trim()
   if(!focus)return allRows.value
@@ -51,12 +77,12 @@ function exportCsv(){
   <p class="dg-state" v-if="loading&&!data">正在读取台账…</p>
   <p class="dg-state bad" v-else-if="error">台账不可用 · {{ error }}</p>
 
-  <template v-else-if="data">
+  <template v-else-if="data || localRows.length">
     <header class="dg-hd">
       <div>
         <h2 v-if="!compact">分歧台账 <small>AI 与规则不一致时，人的最终判断</small></h2>
         <p class="dg-sub" v-if="decided">
-          共 <b class="alc-num">{{ data.total }}</b> 条 ·
+          共 <b class="alc-num">{{ allRows.length }}</b> 条 ·
           采纳 <b class="alc-num">{{ counts.ACCEPT }}</b> ·
           否决 <b class="alc-num">{{ counts.REJECT }}</b> ·
           转人工 <b class="alc-num">{{ counts.MANUAL }}</b>
@@ -73,8 +99,9 @@ function exportCsv(){
     <div class="dg-empty" v-if="!rows.length">
       <b v-if="scoped">本走廊还没有人工复核记录。</b>
       <b v-else>台账是空的 —— 这是真实状态，不是加载失败。</b>
-      <p>记录产生于<b>预警中心的处置按钮</b>：点"采纳 / 否决 / 转人工"，
-        这条裁决就会带时间、走廊号、当时的概率与理由落进本表。</p>
+      <p>记录产生于两处：<b>走廊页的「人工裁决」</b>（放行 / 改绕飞 / 停飞，记在本浏览器）与
+        <b>预警中心的处置按钮</b>（采纳 / 否决 / 转人工，记在服务端台账）。
+        前者只要在走廊页点过一次就会出现，不用等任何建场。</p>
       <p v-if="scoped && allRows.length">全库共 {{ allRows.length }} 条，但都不在本走廊。</p>
       <p>本版本没有回放式补录：宁可空着，也不塞占位内容充数。</p>
     </div>
@@ -106,8 +133,9 @@ function exportCsv(){
     </template>
 
     <footer class="dg-foot">
-      <span v-if="data.note">{{ data.note }}</span>
-      <span>台账按工作区隔离（<code>X-ALC-Workspace</code>），换工作区看不到彼此的记录。</span>
+      <span v-if="data?.note && !allRows.length">{{ data.note }}</span>
+      <span>服务端台账按工作区隔离（<code>X-ALC-Workspace</code>），换工作区看不到彼此的记录；
+        「本机值班员 · 走廊页」那几行是浏览器本地记录，换设备看不到。</span>
       <span>否决与回滚必须带理由：后端对空理由直接 422，不接受"点了就算"。</span>
     </footer>
   </template>

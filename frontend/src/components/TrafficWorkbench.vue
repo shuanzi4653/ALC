@@ -93,7 +93,8 @@ const showEvents=ref(true),showObservations=ref(true),search=ref(''),status=ref(
 let generation=0,weatherGeneration=0,poll=null,timer=null,disposed=false
 const stateNames={AIRBORNE:'飞行中',HOLD:'等待放行',PENDING:'待执行',ARRIVED:'已到达',CLOSED:'已关闭'}
 const phaseNames={CLIMB:'爬升',CRUISE:'巡航',DESCENT:'下降',AIRBORNE:'飞行中',HOLD:'待放行',PENDING:'待执行',ARRIVED:'已到达',CLOSED:'已关闭'}
-const provinces=['辽宁省','吉林省','黑龙江省']
+// 东北三省的省份名单随顶栏下拉一起撤掉了（V1.0.6）：那套过滤只服务旧 session，
+// 而界面上的每一页现在都读全国载荷。全国 → 大区 → 省 → 市 的分级在 scope.js 里。
 const appliedOperationKey=computed(()=>operations.value.flatMap((op,i)=>op.minute<=minute.value?[i]:[]).join(','))
 const flights=computed(()=>session.value?.status==='READY'&&operationsReady.value?effectiveFlights(session.value.flights,appliedOperationKey.value?appliedOperationKey.value.split(',').map(i=>operations.value[Number(i)]):[],Infinity):[])
 const filtered=computed(()=>filterLedgerRows(flights.value,{showCar:showCar.value,showDelivery:showDelivery.value,city:city.value,search:search.value,status:status.value,minute:minute.value}))
@@ -135,7 +136,24 @@ const mapFlights=computed(()=>{
 })
 const boardFlights=computed(()=>flights.value.filter(f=>!city.value||[f.fromCity,f.toCity].includes(city.value)))
 const counts=computed(()=>{const c={AIRBORNE:0,HOLD:0,PENDING:0,ARRIVED:0,CLOSED:0};for(const f of scoped.value)c[flightState(f,minute.value)]++;return c})
-const cityName=computed(()=>network.value?.cities.find(c=>c.id===city.value)?.name||'全域')
+// 顶栏的作用域文字：全国 / 全国 / 华北 。层级名与 scope.js 的 SCOPE_LEVEL_LABEL 同源，
+// 不在这里另写一套中文（否则"大区"和"区域"会同时出现在两块界面上）。
+const scopeTrailText=computed(()=>{
+  const s=store.scope||{}
+  if(!s.level||s.level==='nation') return '全国'
+  return `全国 / ${s.label||s.id||''}`
+})
+function resetNationScope(){
+  const next={level:'nation',id:'',label:'全国'}
+  store.scope=next
+  writeScopeToUrl(next)
+  activeSection.value='home'
+}
+const scopeDrilled=computed(()=>{
+  const level=store.scope?.level
+  return !!level&&level!=='nation'
+})
+const cityName=computed(()=>network.value?.cities.find(c=>c.id===city.value)?.name||scopeTrailText.value)
 const location=computed(()=>{const pts=trajectoryOf(selected.value);return pts.length?atTime(pts,minute.value):null})
 const actualTimes=computed(()=>executionTimes(selected.value,minute.value))
 const selectedPhase=computed(()=>selected.value?flightPhase(selected.value,minute.value):'')
@@ -423,9 +441,9 @@ const mapStatusText=computed(()=>{
   return status.buildings?`地图：已载入 · ${status.buildings} 个建筑要素`:'地图：已载入'
 })
 const progressView=computed(()=>buildProgressView(session.value))
-// 全国范围的三个视图（全国台、全国情报、全国台账）都不参与东北建场
-// 全国台覆盖的视图：这些页面里不显示东北的「建场进度条」。
-// 全国网是 SIM，不参与东北建场，挂一条 0% 的进度条只会让人以为卡死了。
+// 全国台的视图：这些页面读的是全国载荷（319 市 / 492 条航线），不参与"建场"。
+// 全国网是 SIM，逐分钟解析式生成，没有"建场"这一步；挂一条 0% 的建场进度条
+// 只会让人以为卡死了，所以这些页面一律不显示进度条。
 const NATION_VIEWS=['home','national','overview','weather','profile','alerts','assistant','card']
 const nationScopeView=computed(()=>{
   if(NATION_VIEWS.includes(activeSection.value)) return true
@@ -590,7 +608,7 @@ watch([activeSection,mapExpanded],async()=>{await nextTick();if(workbench.value)
 watch(()=>weatherBucket(minute.value),loadWeather)
 watch(city,()=>{weather.value=null;loadWeather()})
 watch(()=>filtered.value.length,()=>{page.value=Math.min(page.value,Math.max(1,Math.ceil(filtered.value.length/20)))})
-// 顶栏的推演时刻：全国台自己报（它有自己的 0–1440 分钟），东北台用本组件的 minute。
+// 顶栏的推演时刻：全国台自己报（它有自己的 0–1440 分钟），旧 session 页用本组件的 minute。
 const nationMinute=ref(0), nationPlaying=ref(true)
 const topMinute=computed(()=>nationScopeView.value?nationMinute.value:minute.value)
 const topPlaying=computed(()=>nationScopeView.value?nationPlaying.value:playing.value)
@@ -626,7 +644,13 @@ onUnmounted(()=>{
   </p>
   <header class="wb-top" data-workbench-top>
     <span class="wb-brand"><b>天窗智巡</b><em>低空航路气象风险裁决</em></span>
-    <span class="wb-scope" data-scope-label>{{ cityName }}</span>
+    <!-- 作用域（V1.0.6）：全国 → 大区 → 省 → 市 的唯一显示点。
+         没下钻时是静态标签；下钻之后变成一个按钮，点一下回全国 —— 否则从带 scope 的
+         链接进来，用户只能靠浏览器后退才知道"现在看的是河北省"。 -->
+    <button v-if="scopeDrilled" class="wb-scope wb-scope-jump" data-scope-jump
+            :title="`当前作用域：${scopeTrailText}（全国 → 大区 → 省 → 市）；点一下回到全国`"
+            @click="resetNationScope">{{ scopeTrailText }} · 回全国</button>
+    <span v-else class="wb-scope" data-scope-label>{{ cityName }}</span>
     <!-- 两个时间分开写：右边那个是**真实的北京时间**，每秒走；
          左边那个是**推演时刻**，暂停时会停住。以前只有一个"时间基准"，
          用户暂停后看到它也停了，会以为整站卡死。 -->
@@ -655,9 +679,10 @@ onUnmounted(()=>{
          合并入口在"当前页是它的兄弟 tab"时只保留"你在这个入口里"的弱标识（entry-context）。 -->
     <div class="nav-subs" v-if="activeGroup" :data-group="activeGroup.key"><template v-for="group in NAV_GROUPS" :key="group.key"><button v-for="sub in visibleSubs(group)" :key="sub.key" :data-section="sub.key" v-show="group.key===activeGroup?.key" :class="{active:activeSection===sub.key, 'entry-context':sub.merged&&sub.members.includes(activeSection)&&activeSection!==sub.key&&!entryTabList.some(t=>t.key===activeSection)}" @click="activeSection=sub.key">{{ sub.label }}</button></template><template v-if="entryTabList.length"><span class="nav-tab-sep" aria-hidden="true">|</span><button v-for="tab in entryTabList" :key="tab.key" class="nav-entry-tab" :data-entry-tab="tab.key" :class="{active:activeSection===tab.key}" @click="activeSection=tab.key">{{ tab.label }}</button></template></div>
     <div class="nav-fill">
-      <!-- 这个下拉只对东北那套（session/network）有效；全国台用 scope 下钻，
-         把它挂在首页会显示"东北三省 · 全域"，让人以为全国页还是东北的。 -->
-      <label class="nav-region" v-if="!nationScopeView" title="运行区域"><select aria-label="运行区域" v-model="city" @change="selectedId='';page=1"><option value="">东北三省 · 全域</option><optgroup v-for="p in provinces" :label="p" :key="p"><option v-for="c in network?.cities.filter(c=>c.province===p)||[]" :key="c.id" :value="c.id">{{c.capital?'省会 · ':''}}{{c.name}}</option></optgroup></select></label>
+      <!-- V1.0.6：这里原来挂的是东北三省的城市下拉（v-model=city），只对旧 session 有过滤
+           作用；而界面上的页面都读全国载荷，下拉一挂上去就写着"东北三省 · 全域"，等于把全国页
+           说回东北。三省下拉已撤，作用域改到顶栏那个胶囊上（见 `.wb-scope-jump`）——
+           侧栏只有 176 px，放 label + 控件会溢出到正文上（实测按钮落在 x=216）。 -->
 
       <button class="nav-toggle" data-settings-toggle :class="{on:settings}" :aria-pressed="settings" title="运行设置：情景、重新调度、信息密度、本页可做" @click="settings=!settings">设置</button>
     </div>
@@ -673,18 +698,19 @@ onUnmounted(()=>{
 
   <!-- V1.0.2：首页就是全国四级态势（全国 → 大区 → 省 → 市）。
        `national` 是旧地址，applyHash 已把它归到 home，这里一并渲染同一组件，
-       所以不存在"两套全国页"。旧的首屏组件 `HomeStage.vue`（东北 maplibre 运行图）
+       所以不存在"两套全国页"。旧的首屏组件 `HomeStage.vue`（一张 maplibre 运行图）
        在 9aafd7f 之后**已经没有任何地方引用**，只剩测试还在读它的源码；
-       三维能力以 NationGlobe.vue 的形式回来了。是否删除 HomeStage 取决于要不要
-       保留那批只针对它的用例（删了用例数会从 506 掉下来，材料里的数字要跟着改）。 -->
+       三维能力已下线，`NationGlobe.vue` 同批删除。是否删除 HomeStage 取决于要不要
+       保留那批只针对它的用例（删了用例数会从 506 掉下来，材料里的数字要跟着改）。
+       V1.0.6 决定：**先留着组件文件，界面上不再引用**。 -->
   <section class="traffic-page national-page" v-if="activeSection==='home'||activeSection==='national'">
     <!-- 首页这一份也要接 open-corridor：处置事件在首页的「处置」页签里点开，
          没有这个监听就只会原地不动（实测点了没反应）。 -->
     <NationPanel :scope-key="nationScopeKey" :focus-corridor="corridorFocusId"
                  @scope-change="onScopeChange" @open-corridor="openCorridor" @tick="onNationTick"/>
   </section>
-  <!-- 运行总览同样四级：全国走全国台，切到东北才用 V1.0.0 那张 maplibre 运行图。
-       两者共用同一个 scope 变量，避免"总览是东北、情报是全国"的错位。 -->
+  <!-- 运行总览与首页共用同一个全国台，只是首屏视图不同（总览落台账）。
+       两者读同一个 scope 变量，避免"总览在一级、情报在另一级"的错位。 -->
   <!-- 运行总览默认落「台账」视图：首页已经是地图态势，两个入口看同一张图没有意义。
        总览给的是逐班次数据，首屏看地图、要看数就点这里。 -->
   <section class="traffic-page national-page" v-if="activeSection==='overview'&&scope==='nation'">
@@ -692,7 +718,7 @@ onUnmounted(()=>{
   </section>
   <!-- V1.0.5：一个分节只放一个视图。气象监测=情报（左表右气象统计）、
        运行总览=台账、处置=处置，各自由左侧导航进入；页内不再有 tab 条，
-       也不再提供"全国/东北"作用域切换（东北那套已从界面下线）。 -->
+       也不再有第二个作用域变量 —— 全国 → 大区 → 省 → 市 只有 store.scope 一处。 -->
   <section class="traffic-page national-page"
            v-if="['weather','profile','alerts','assistant','card'].includes(activeSection)">
     <NationPanel :scope-key="nationScopeKey" :initial-view="nationViewOf(activeSection)"
@@ -707,11 +733,11 @@ onUnmounted(()=>{
   <section class="traffic-page scope-page" v-if="activeSection==='schedule'">
     <div class="scope-bar" data-scope-bar>
       <b>调度台账</b>
-      <span class="scope-note">气象与雷达为公开源实况；交通为模拟（SIM），不参与运行计划</span>
+      <span class="scope-note">气象与雷达为公开源实况；交通为模拟（SIM），不对应真实航班</span>
     </div>
     <!-- 密度档在这里生效：值班员/指挥默认展开口径说明，演示档收起。
         （`DENSITY_POLICY.ledger` 必须有界面消费点，否则切档位屏幕上什么都不变 ——
-        以前这条开关的消费点在东北那张已下线的台账表里。） -->
+        消费点就是下面这条 `<details>`；别处再挂一份会让"密度变了、屏幕没变"。） -->
     <details class="ledger-note density-fold" :open="densityPolicy(density).ledger" data-density="ledger">
       <summary>这一页的数怎么来的</summary>
       <p>台账按当前分钟的快照重算：起降时刻是计划值，绕飞 / 停飞是<b>此刻</b>的裁决结果。
@@ -742,8 +768,8 @@ onUnmounted(()=>{
   <CommandPalette :open="paletteOpen" :groups="NAV_GROUPS" :routes="paletteRoutes" :flights="paletteFlights"
                   @close="paletteOpen=false" @run="onPaletteRun"/>
 </main>
-<!-- 建场进度条只属于东北那套（会按气象重建计划）；全国网是 SIM，不参与建场，
-     全国页上挂着一条 0% 的进度条只会让人以为卡死了。 -->
+<!-- 建场进度条只属于旧 session（按气象重建计划时才有进度）；全国网是 SIM，
+     逐分钟解析式生成，没有"建场"，全国页上挂着一条 0% 的进度条只会让人以为卡死了。 -->
 <div class="traffic-build-strip" v-if="showBuildStrip" role="status" aria-live="polite" data-build-strip>
   <div class="tbs-track" :class="{pending:buildProgress===null}" role="progressbar"
        :aria-valuenow="buildProgress===null?undefined:buildProgress"
@@ -895,11 +921,7 @@ onUnmounted(()=>{
   .operations-nav>button{order:1;flex:0 0 auto}
   .operations-nav .nav-fill{margin-left:0;width:100%;order:3;padding-right:0}
   .operations-nav .nav-map-status{max-width:none;flex:1 1 auto}
-  .operations-nav .nav-region{margin-left:auto;order:2}
 }
-.nav-region{display:flex;align-items:center;gap:7px;flex:0 1 auto;min-width:0}
-.nav-region>span{font-size:12px;letter-spacing:1px;color:#7fa5bd;white-space:nowrap}
-.nav-region select{max-width:250px;min-width:0;flex:0 1 auto}
 .detail-scope{font-size:12px;font-weight:400;color:#6d899d;text-indent:0;white-space:nowrap}
 .traffic-legend{position:relative;margin-left:auto;font-size:12px;color:#7794a8}
 .traffic-legend summary{cursor:pointer;list-style:none;padding:2px 8px;border:1px solid var(--alc-line);
@@ -1033,7 +1055,6 @@ html[data-theme="light"] .ledger-note p{color:#5b7a92 !important}
 .nav-subs::-webkit-scrollbar{display:none}
 .nav-subs button{padding:4px 8px!important;font-size:12px!important;border-radius:6px;white-space:nowrap}
 .nav-fill{margin-left:auto;display:flex;align-items:center;gap:6px;flex:0 1 auto;min-width:0;overflow:hidden}
-.nav-region select{max-width:150px;font-size:12px!important;padding:3px 4px!important}
 .nav-algorithm{max-width:210px;font-size:12px;color:var(--alc-text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .nav-timebase{font-size:12px;color:var(--alc-text-dim);white-space:nowrap;flex-shrink:0}
 .operations-nav .nav-toggle{padding:4px 8px!important;font-size:12px!important}
@@ -1063,6 +1084,11 @@ html[data-theme="light"] .ledger-note p{color:#5b7a92 !important}
 .wb-brand b{font-size:16px;letter-spacing:1.2px;color:#e2f3fd;font-weight:600;white-space:nowrap}
 .wb-brand em{font-style:normal;font-size:11.5px;color:#6f92a8;letter-spacing:.4px;white-space:nowrap}
 .wb-scope{font-size:12px;color:#9fc4dd;border:1px solid #26445a;border-radius:4px;padding:2px 8px;white-space:nowrap}
+/* 下钻之后同一枚胶囊变成按钮：只多一个"· 回全国"，不做第二套样式 ——
+   用户不需要重新认一个控件，只需要知道"能点回去"。 */
+.wb-scope-jump{font:inherit;font-size:12px;color:#c6eef5;background:rgba(38,97,117,.22);
+  border-color:#2d5d72;cursor:pointer}
+.wb-scope-jump:hover{color:#eaf9fc;border-color:#3f7f97}
 .wb-spacer{flex:1 1 auto}
 .traffic-workbench .wb-rail-toggle{font-size:12px!important;padding:5px 10px!important}
 .wb-shell{flex:1 1 auto;display:flex;min-height:0;min-width:0}
@@ -1082,8 +1108,6 @@ html[data-theme="light"] .ledger-note p{color:#5b7a92 !important}
 .traffic-workbench .operations-nav .nav-tab-sep{display:none}
 .traffic-workbench .operations-nav .nav-fill{margin:auto 0 0;display:flex;flex-direction:column;
   align-items:stretch;gap:6px;padding:9px 0 0;border-top:1px solid #1d384a;width:auto;order:0}
-.traffic-workbench .operations-nav .nav-region{margin:0}
-.traffic-workbench .operations-nav .nav-region select{width:100%;max-width:none;min-width:0}
 .traffic-workbench .operations-nav .nav-fill .nav-toggle{width:100%;justify-content:flex-start!important;
   text-align:left!important;font-size:12px!important}
 .wb-body{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;
@@ -1093,7 +1117,6 @@ html[data-theme="light"] .ledger-note p{color:#5b7a92 !important}
   font-size:0!important;padding:10px 0!important}
 .traffic-workbench .operations-nav.rail-collapsed .nav-group em{font-size:13px}
 .traffic-workbench .operations-nav.rail-collapsed .nav-subs{display:none}
-.traffic-workbench .operations-nav.rail-collapsed .nav-region,
 .traffic-workbench .operations-nav.rail-collapsed .nav-toggle{display:none}
 .traffic-workbench.home-mode{padding:0}
 .traffic-workbench.home-mode .wb-body{padding:10px 12px 12px}
@@ -1104,7 +1127,6 @@ html[data-theme="light"] .ledger-note p{color:#5b7a92 !important}
   .traffic-workbench .operations-nav .nav-group{justify-content:center!important;font-size:0!important}
   .traffic-workbench .operations-nav .nav-group em{font-size:13px}
   .traffic-workbench .operations-nav .nav-subs{display:none}
-  .traffic-workbench .operations-nav .nav-region,
   .traffic-workbench .operations-nav .nav-toggle{display:none}
 }
 
@@ -1173,9 +1195,6 @@ html[data-theme="light"] .ledger-note p{color:#5b7a92 !important}
   background:rgba(89,223,252,.12)!important;border-color:rgba(89,223,252,.30)!important;color:#e6f7ff!important}
 .traffic-workbench .operations-nav .nav-fill .nav-toggle.on{
   background:rgba(89,223,252,.20)!important;border-color:rgba(89,223,252,.45)!important;color:#eaf8ff!important}
-.traffic-workbench .operations-nav .nav-region select{
-  background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.07);border-radius:7px;
-  padding:6px 8px;font-size:12px;color:#bcd3e2}
 
 .traffic-workbench .operations-nav.rail-collapsed .nav-group{
   justify-content:center!important;padding:10px 0!important;border-radius:8px!important}
@@ -1192,7 +1211,6 @@ html[data-theme="light"] .ledger-note p{color:#5b7a92 !important}
   .traffic-workbench .operations-nav .nav-group{justify-content:center!important;font-size:0!important;padding:10px 0!important}
   .traffic-workbench .operations-nav .nav-group em{font-size:13px;min-width:0;width:100%;background:transparent}
   .traffic-workbench .operations-nav .nav-subs{display:none}
-  .traffic-workbench .operations-nav .nav-region,
   .traffic-workbench .operations-nav .nav-toggle{display:none}
   .traffic-workbench .wb-body{padding:12px 14px 16px}
 }

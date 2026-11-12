@@ -12,7 +12,9 @@ OPEN = {'DIRECT', 'DETOUR', 'WAIT'}
 
 def validate_task(task):
     if task.get('regionId') not in REGIONS:
-        raise ValueError('请选择东北三省任务区域')
+        # 不写"东北三省"：这句话是产品的报错，不是某个旧版本的区域名。
+        # 可用区域从引擎的 REGIONS 表里读，表变了这句话跟着变。
+        raise ValueError('请选择任务区域：' + ' / '.join(r['name'] for r in REGIONS.values()))
     for key in ('from', 'to'):
         p = task.get(key)
         if not isinstance(p, (list, tuple)) or len(p) != 2 or not all(isinstance(x, (int, float)) and math.isfinite(x) for x in p):

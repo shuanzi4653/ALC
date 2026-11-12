@@ -488,7 +488,10 @@ def _route_basis(lateral_line, static_obstacle, envelope, radar_obstacle, allowe
     return 'CLEAR', None
 
 CLEARANCE_VALIDITY_MINUTES = 15
-CLEARANCE_LIMIT_TEXT = '东北三省低空协同运行边界'
+# 放行界限的**表述**，不是地名。这条字符串会原样出现在"放行界限"那一行，
+# 供值班员复诵；写死一个省名，等于把全国层的许可说成某个区域的许可。
+# 真正的可飞范围由 `allowed` 几何决定，屏上另有图与范围声明。
+CLEARANCE_LIMIT_TEXT = '低空协同运行边界（按本项目保守口径裁定的可飞空域）'
 
 def _clearance_record(flight, *, direction_route, clearance_status, weather_note,
                       validity_minutes=CLEARANCE_VALIDITY_MINUTES):

@@ -87,7 +87,7 @@ const baseRows=computed(()=>props.payload?props.flights:(local.value?.flights||[
 const sortKey=ref(props.variant==='briefing'?'risk':'depart')
 const sortDir=ref(props.variant==='briefing'?'desc':'asc')
 const filterKey=ref('all')
-// 台账的搜索框（V1.0.6 补回）：V1.0.5 把东北那张台账表换成这个组件时，
+// 台账的搜索框（V1.0.6 补回）：V1.0.5 把旧的那张台账表换成这个组件时，
 // 搜索与导出一起丢了 —— 而"能按班次号/城市定位一行"是值班时最常用的动作。
 const query=ref('')
 const q=computed(()=>query.value.trim().toLowerCase())

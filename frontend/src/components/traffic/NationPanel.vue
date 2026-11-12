@@ -430,7 +430,7 @@ function startClock(){
 // 拖时间轴：连续时钟要跟着跳，否则会被下一帧拉回去
 function onSeek(){ frameMinute.value=minute.value; loadFlights() }
 
-// 顶栏要显示"推演时刻"，但全国台有自己的 minute（0–1440），和东北那套（0–480）
+// 顶栏要显示"推演时刻"，但全国台有自己的 minute（0–1440），和旧 session（0–480）
 // 不是一个量，所以由这里把真实状态报上去，不让顶栏去猜。
 let tickAt=0
 watch([minute,playing],([m,on])=>{
@@ -713,7 +713,7 @@ watch(()=>props.scopeKey,(key)=>{
  * 键盘：空格播放/暂停、左右键 ±1 分钟。
  *
  * 为什么放在这个组件里而不是工作台：这一页的播放与时刻是**本组件自己的** minute
- * （0–1440），工作台那套是东北会话的 0–480，两边不是一个量，接过去必然错位。
+ * （0–1440），工作台那套是旧 session 的 0–480，两边不是一个量，接过去必然错位。
  *
  * 输入框内一律跳过 —— 否则在搜索框里按空格会变成"播放"，那是最烦人的一类 bug。
  */
@@ -908,7 +908,7 @@ onUnmounted(()=>{
         <span>停飞 {{ border.blockedCorridors||0 }} 条<template v-if="(border.blockedNames||[]).length">（{{ (border.blockedNames||[]).slice(0,3).join('、') }}{{ (border.blockedNames||[]).length>3?' 等':'' }}）</template></span>
         <span>改线 {{ border.reroutedCorridors||0 }} 条</span>
         <span v-if="fog.available" title="能见度低于 3 km 计低能见度；低于 1.5 km 计浓雾">低能见度 {{ fog.counts.cities }} 城（浓雾 {{ fog.counts.BAN }}）</span>
-        <span v-if="zones.available" title="规则化生成，非官方公布；与东北 69 站点法定管制区分开计数">
+        <span v-if="zones.available" title="规则化生成，非官方公布；与法定管制区（OFFICIAL，另库）分开计数，不合并">
           净空 {{ zones.counts.airports }} 机场 · 覆盖 {{ ((zones.counts.coverageRatio||0)*100).toFixed(2) }}%</span>
         <span class="diag" v-if="showDiag">视口 {{ viewport.w }}×{{ viewport.h }} · 根容器 {{ viewport.root }}px</span>
         <span class="push" :class="{on:store.wsConnected}" :title="store.wsConnected?'雷达/实况/模型任一变化由服务端推送':'未连上推送，仅按需拉取'">

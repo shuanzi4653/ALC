@@ -4,7 +4,8 @@
 口径（2026-11-10 用户拍板）
 --------------------------
 - **范围**：全国 30 个省级单元。**不含台湾、西藏、港澳**（这两地不通航，不纳入网络）。
-- **节点**：每个地级单元一个节点，共 331 个（`data/traffic/cities-cn.json`，坐标来自 Wikidata）。
+- **节点**：区划目录里 330 个地级单元，**中心点距境外不足 50 km 的 11 城整体退出通航**
+  （节点与航线一并删除，不留半条），实际纳入 **319 个**（`data/traffic/cities-cn.json`，坐标来自 Wikidata）。
 - **航线**：`data/traffic/nation-network.json`（`tools/traffic/build_nation_network.py` 离线生成）：
     ① 省内 MST，市市相连；
     ② **没有机场的市另有一条专用接驳**到最近有机场城市（`AIRPORT_FEED`）——
@@ -13,7 +14,10 @@
 - **定位**：飞行汽车解决**城市间**交通；跨省长距离仍靠飞机与火车 ——
   这套网络是**分担**，不是**取代**，所以跨省只留少量通道，不做全国全互联。
 - **机场**：`data/traffic/airports-cn.json`（站点总表，与此刻是否发报无关）。
-- **实况**：真实 METAR；某省一个报文站都没有时，用 open-meteo 模型实况兜底并标 `MODEL`。
+- **实况**：open-meteo 逐市实况（公开、免密钥）为主，wttr.in 补缺；**不用 METAR 报文**
+  （报文只覆盖几十个站，且冷启动要多花 10 秒）。取不到的城市如实标"无实况"，不补零。
+- **规模（当前数据）**：30 省 / 319 市 / 56 个有机场的城市 / 492 条航线
+  （省内 201 + 机场接驳 261 + 跨省 30）。四个数都从载荷 `summary` 读，不在文档里写死当结论。
 
 四级走同一入口 `payload(level, id)`，逐级按需切片 —— 前端每下钻一次重新请求，
 返回上级时把数据清掉，内存里不留整棵树。
@@ -682,12 +686,12 @@ def _corridor_stats() -> Dict[str, Dict[str, int]]:
 def _live_stations() -> List[Dict[str, Any]]:
     """全国层的"实况点"就是**逐市实况本身**。
 
-    原来这里拉东北 METAR（`national()` 与 `model_stations.fetch()` 两次 HTTP，
-    冷启动合计 12 秒，且只覆盖东北几十个站），而全国层已经有 319 城逐市实况 ——
-    重复拉一份又慢又不全，纯属把东北那套的取数逻辑惯性带过来。
+    早先这里拉的是 METAR（`national()` 与 `model_stations.fetch()` 两次 HTTP，冷启动
+    合计 12 秒，且只覆盖几十个站），而全国层本来就有 319 城逐市实况 —— 重复拉一份又慢
+    又不全，是把旧运行网的取数逻辑惯性带过来了。
 
-    METAR 仍然留在东北那套页面做机场实测与交叉校验；全国层不再调它。
-    这一改把冷启动从 12 秒压到 2.5 秒（实测）。
+    现在全国层一律用逐市实况，不再调 METAR：METAR 只在离线交叉校验里用。
+    冷启动从 12 秒压到 2.5 秒（实测）。
     """
     weather = _city_weather()
     points: List[Dict[str, Any]] = []
@@ -906,7 +910,7 @@ def _base(level: str, ident: Optional[str]) -> Dict[str, Any]:
             'cities': '民政部区划目录 + Wikidata P625（data/traffic/cities-cn.json）',
             'network': 'SIM：省内 MST + 无机场市机场接驳 + 每省最多 2 条跨省通道（A* 生成）',
             'airports': 'aviationweather.gov stationinfo 站点总表（与是否发报无关）',
-            'stations': '公开源逐市实况（open-meteo / wttr）；METAR 仅在东北那套页面做机场实测',
+            'stations': '公开源逐市实况（open-meteo / wttr），全国 319 市逐点；不使用 METAR 报文，报文仅作离线交叉校验',
         },
         'positioning': '飞行汽车解决城市间交通；跨省长距离仍靠飞机与火车，本网络是分担不是取代。',
     }
@@ -1080,7 +1084,7 @@ def _payload_locked(level: str = 'nation', ident: Optional[str] = None,
                              if virtual else '全部要素取自公开源实况。'),
                 },
                 # 机场净空（DERIVED）：规则化几何 + 穿越统计。
-                # 与东北 69 站点的法定管制区（OFFICIAL）分开，永不合并计数。
+                # 与法定管制区（OFFICIAL，另库）分开，永不合并计数。
                 # 只挂计数摘要；几何与穿越明细走 /traffic/v2/nation/zones 按需取。
                 # 287 个环放进主载荷会多出 250 KB，而首页并不用它们。
                 'zones': nation_zones.summary(),
@@ -1527,7 +1531,8 @@ def journal(minute: int = 60, lookback: int = 40, level: str = 'nation',
     没有"历史"可存，也不需要存 —— 每一分钟都能重算出来。所以这里的做法是
     **在时间窗内扫一遍**，把进出场、绕飞、延期、停飞挑出来，带上发生的时刻。
 
-    产出行的字段与东北会话日志（/traffic/journal）对齐，前端两本账可以共用一个表格。
+    产出行的字段与旧会话日志（`/traffic/journal`）对齐，前端两本账共用一个表格 ——
+    账本可以有两本，列不能有两套（否则同一个"绕飞"在两页里长得不一样）。
     """
     minute = max(0, min(1440, int(minute or 0)))
     lookback = max(5, min(180, int(lookback or 40)))
@@ -1637,7 +1642,7 @@ def journal(minute: int = 60, lookback: int = 40, level: str = 'nation',
 
 
 def _model_card(model_probs: Optional[Dict[str, float]] = None) -> Dict[str, Any]:
-    """模型卡：ml-v2（东北三站、不能外推）+ ml-v3（全国，真在这 319 城上训练的）。"""
+    """模型卡：ml-v2（沈阳/长春/哈尔滨三站，不能外推）+ ml-v3（全国，在这 319 城上训练的）。"""
     card = nation_ops.model_card()
     try:
         from ml import national_model

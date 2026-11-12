@@ -1908,48 +1908,66 @@ export const SECTION_CAN_DO=Object.freeze({
   ledger:['看模型与规则的分歧','按走廊筛选','导出分歧台账 CSV'],
 })
 
+// 裁决引擎层的口径总账（V1.0.6：由旧三省运行网改为全国四级）。
+//
+// 为什么整张重写而不是改几个字：这一张表原来写的是"53 条城际 / 216 条货运 / vis3k 62 个事件"，
+// 那是旧 session 引擎的规模；现在判定跑在全国 492 条航线、319 座城市上，并按
+// 全国 → 大区 → 省 → 市 四级切片。表的每一行都指得出**当前作用域载荷**里的字段，
+// 所以四级共用这一张，不按层级各写一份（各写一份必然漂移）。
+//
+// `numerator` / `denominator` 写的是**口径定义**，不是本帧数值 —— 数值在①层现算。
+// 分母写 null 表示"它不是一个比值"，界面上显示为"—"，不是"还没填"。
 export const CALIBER_LEDGER=Object.freeze([
-  {key:'planned',name:'计划班次',definition:'情景基线内全部计划执行的班次',
-   numerator:null,denominator:null,source:'建场输出 `session.stats.accepted`（交通为模拟）',
-   refresh:'每次建场',owner:'后端'},
-  {key:'releaseRate',name:'放行率',definition:'允许执行的班次占比',
-   numerator:'放行班次',denominator:'计划班次',source:'规则引擎与模型融合后的处置结果',
-   refresh:'每次建场（换情景 / 换气象通道时重算）',owner:'后端'},
-  {key:'pending',name:'待处置走廊（观测判据命中）',
-   definition:'能见度 <1000 m / 阵风 >阈值 / 云底 <300 m 任一条命中的城际走廊数（同一批走廊里最轻的一档）',
-   numerator:'观测判据命中的走廊',denominator:'全部载客走廊（当前 53 条，另有 216 条货运走廊）',
-   source:'GET /api/traffic/v2/overview 的 kpis[pending] 与 kpiDetail.observations',
-   refresh:'每 5 分钟（页面轮询）',owner:'规则引擎'},
-  {key:'high',name:'已触发停飞判据的走廊',
-   definition:'观测判据或概率档（p ≥ 概率档阈值）任一命中的城际走廊数 —— 与下方「概率档高概率走廊」分开统计，不合并',
-   numerator:'观测判据命中 ∪ p ≥ 概率档阈值',denominator:'全部城际走廊（53 条）',
-   source:'同上 kpis[high]；阈值与分子见 kpiDetail',
-   refresh:'每 5 分钟（页面轮询）',owner:'规则引擎'},
-  {key:'probability',
-   name:'概率档高概率走廊',
-   definition:'不可飞概率 ≥ 概率档阈值（当前 0.25）的城际走廊数。**与上一条分开统计**：上一条说"规则判了几条"，这一条说"模型自己会判几条"',
-   numerator:'p ≥ 0.25 的走廊',denominator:'全部城际走廊（53 条）',
-   source:'kpiDetail.probability 与 kpiDetail.probabilityThreshold（后端常量 P_PROB_BLOCK）',
-   refresh:'每 5 分钟（页面轮询）',owner:'模型'},
-  {key:'lead',name:'平均提前量',definition:'离线回放中首次报警时刻到事件发生的时长中位数（不是本帧读数，本帧触发数见 `kpis[high]`）',
-   numerator:'Σ 提前量',denominator:'跨阈事件数（vis3k 62 个 / 阵风 56 个）',
-   source:'model-v2-metrics.json 的 targets.vis3k.leadTime.medianMin',
-   refresh:'训练时计算，随模型发布',owner:'模型'},
-  {key:'coverage',name:'模型覆盖',definition:'拿到概率输出的走廊占比',
-   numerator:'有概率的走廊',denominator:'全部城际走廊',source:'`kpis[ai]`（后端算，前端不重算）',
-   refresh:'每 5 分钟（页面轮询）',owner:'模型'},
-  {key:'sigma',name:'插值不确定度 σ',definition:'σ = 0.05 + 0.02 × 最近站距(km)',
-   numerator:null,denominator:null,source:'`traffic/v2.py::_idw()`，随每个采样点返回',
-   refresh:'每次请求',owner:'后端'},
-  {key:'ribbon',name:'可飞性带段数',definition:'沿走廊每 5 km 一段，颜色=该段不可飞概率',
-   numerator:'采样段数',denominator:'走廊长度(km) ÷ 5',source:'`corridors[].samples`（含经纬度）',
-   refresh:'每次进入页面 · 拖时轴重取',owner:'模型'},
-  {key:'divergence',name:'分歧记录',definition:'规则与模型结论不一致且已留痕的条数',
-   numerator:'台账行数',denominator:null,source:'`.run/traffic/decisions/<workspace>.jsonl`（按工作区隔离）',
-   refresh:'每次裁决',owner:'后端'},
-  {key:'cities',name:'地级行政区',definition:'覆盖范围内全部地级市',
-   numerator:null,denominator:null,source:'`data/traffic/city-centers.json`（静态）',
-   refresh:'静态',owner:'前端'},
+  {key:'corridors',name:'航线（当前作用域）',
+   definition:'当前作用域内的航线条数。跨省航线在两端省各出现一次，这是"本省涉及"，不是重复计数；全国合计与停飞、绕飞三项一律回原始列表数，不把各省块相加',
+   numerator:null,denominator:null,
+   source:'`GET /api/traffic/v2/nation` 的 `traffic.corridors`（四级同入口，按 level/id 切片）',
+   refresh:'每次下钻 · 每次换作用域',owner:'后端'},
+  {key:'airborne',name:'在飞班次',
+   definition:'当前分钟处在航路上的班次。一件班次一个编号，位置由起降时刻与航路进度算出。**含**被判暂不放行的架次（屏上停住不走），所以「停飞」是「在飞」的子集，两者不能相加',
+   numerator:'在航天数',denominator:'当前作用域航线数',
+   source:'`traffic.airborne`；逐班对象见 `flights[]`（含起降时刻、许可与裁决）',
+   refresh:'每拖一格时间轴（1 分钟）',owner:'后端'},
+  {key:'releaseRate',name:'放行率',
+   definition:'在飞班次中决定不是 HOLD 的占比。直飞与绕飞都算放行 —— 绕飞是"换一条航路走"，不是"没走"',
+   numerator:'放行班次（RELEASE + DETOUR = 在飞 − 停飞）',denominator:'在飞班次',
+   source:'`traffic.airborne` 与 `traffic.hold` 之差；前端不重算',
+   refresh:'每拖一格时间轴（1 分钟）',owner:'后端'},
+  {key:'hold',name:'停飞班次',
+   definition:'决定为 HOLD 的班次：规则风险 ≥0.75、模型低能见概率 ≥0.60、或航路压在强回波内且找不到可脱离的小绕方案 —— 任一命中即停飞',
+   numerator:'HOLD 班次（在飞的子集）',denominator:'在飞班次',
+   source:'`traffic.hold`；每条判据写在 `flights[].drivers[]`，界面上逐班可查',
+   refresh:'每拖一格时间轴（1 分钟）',owner:'规则引擎 + 模型'},
+  {key:'detour',name:'绕飞班次与绕飞量',
+   definition:'原航路擦入回波外场、按法线方向侧移改航的班次；侧移距离即绕飞量，追加延误按绕飞量折算',
+   numerator:'绕飞班次（`status=DELAYED`）',denominator:'在飞班次',
+   source:'`traffic.delayed` 与 `traffic.detourShiftKm`',
+   refresh:'每次换雷达帧 · 每拖一格时间轴',owner:'后端'},
+  {key:'radarHit',name:'回波命中航线',
+   definition:'原航路与对流外场相交的航线数。相交才可能绕飞；不相交就是不绕，不按"附近有回波"折算',
+   numerator:'命中航线的条数',denominator:'当前作用域航线数',
+   source:'`traffic.radarHitCorridors`（绕飞几何由 `traffic/nation.py::_detour_for` 按 8 km 加密采样求出）',
+   refresh:'每次换雷达帧',owner:'后端'},
+  {key:'border',name:'距境外管制带',
+   definition:'航路逐点与邻国边界求最近距离；10 km 为硬限（越界即停飞），30 km 为预警带（提前量，不是管制线）',
+   numerator:'当前进入 10 km 带的在飞班次',denominator:'已逐点量距的航线数',
+   source:'`border.inside` / `border.checkedCorridors` / `border.blockedCorridors`',
+   refresh:'每次下钻 · 每拖一格时间轴',owner:'后端'},
+  {key:'lowVis',name:'低能见度城市',
+   definition:'端点能见度 <3000 m 的城市数。虚拟气象开启时这一格与雾区同源（雾由能见度派生），所以会一起变',
+   numerator:'低能见城市',denominator:'当前作用域城市数',
+   source:'`summary.lowVisCities` 与 `summary.cities`；逐市读数见 `intel[]`',
+   refresh:'每次取实况（约 10 分钟一轮）',owner:'规则引擎'},
+  {key:'model',name:'模型概率覆盖',
+   definition:'拿到 ml-v3 低能见概率的城市占比。p ≥0.35 提示、p ≥0.60 与规则分**并列**触发延期 —— 是第二道判据，不并进规则分，谁也别替谁背书',
+   numerator:'有概率输出的城市',denominator:'当前作用域城市数',
+   source:'`modelCard.liveCoverage.cities`、`modelCard.fallback.probSource`（取不到时标 RULE 并给原因）',
+   refresh:'每次取逐市小时数据',owner:'模型'},
+  {key:'zones',name:'机场净空限制区',
+   definition:'按公开跑道方位与机场等级规则化生成的限制区（28 点环），几何走独立接口按需取；与法定管制区（OFFICIAL）分开计数，永不合并',
+   numerator:'限制区个数',denominator:null,
+   source:'`zones.counts`；几何 `/api/traffic/v2/nation/zones`',
+   refresh:'随航网生成（静态）',owner:'后端'},
 ])
 
 export const SECTION_NAMES=Object.freeze({
@@ -3543,7 +3561,8 @@ export const ENTRY_LABELS = Object.freeze({
 const NAV_SPEC = [
   { key: 'situation', no: 1, label: '态势', subtitle: '未来 6 小时，哪片天不能飞',
     // V1.0.1：全国视图**不新开入口**（W-21b 的 8 个入口是产品决定），
-    // 挂在「运行总览」这个入口下，作为它的一个 tab：全国 → 东北全域。
+    // 挂在「运行总览」这个入口下，作为它的一个 tab：全国 → 大区 → 省 → 市。
+    // V1.0.6：`national` 已并入 `home`（首页就是全国四级），这里只是保留可深链的旧键。
     subs: ['home', { key: 'overview', members: ['overview', 'national'] }, 'weather'] },
   // V1.0.5：情报已并入「气象监测」，走廊组只剩"这条线本身"。
   { key: 'corridor', no: 2, label: '走廊', subtitle: '这条走廊几点能飞，凭什么',
@@ -3581,7 +3600,7 @@ export const SECTION_HINTS = Object.freeze({
   counterfactual: '同一份计划，AI 与规则各自处置了什么（已并入推演）',
   ledger: '人与系统判定不一致的逐条记录（已并入推演）',
   history: '运行日志与按帧回放',
-  reference: '口径、阈值与每一条数据的来源',
+  reference: '口径、阈值与每一条数据的来源（全国 → 大区 → 省 → 市 四级）',
 })
 
 /**
@@ -3883,7 +3902,7 @@ export const FOG_RING_KM = Object.freeze({ BAN: 6, CAUTION: 12 })
  *     ——它决定"这站算禁飞还是偏低"，会进结论、进 KPI、进禁飞走廊计数；
  *   · `FOG_SIGN_KM`（60 / 36 km）是**画多大才看得见**的声明常量，只影响图形。
  *
- * 为什么要分开：0.11.9 那一版按判据阈值画圈，6 km 的圈落在东北三省全域视图里只有
+ * 为什么要分开：0.11.9 那一版按判据阈值画圈，6 km 的圈落在全省/全域视图里只有
  * 7–13 px —— 徽标写着"实测 4 站 · 最低 998 m"、KPI 写着 18 条禁飞，地图上却找不到雾
  * （0.11.10 复测靠在同帧开关图层做像素差分量出 60 px，等于没画）。那是**尺度**问题，
  * 不是数据问题。

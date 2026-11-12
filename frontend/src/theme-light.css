@@ -75,6 +75,29 @@ html[data-theme="light"] .wb-scope {
   border-color: #c3dcef !important;
 }
 html[data-theme="light"] .nav-timebase { color: #55738a; }
+/* ---------- 反事实对照 / 分歧台账（V1.0.6 这两页改成全国层数据源） ----------
+ * 两个面板的提示条、切换按钮原来是按深色底写的字面量色（#f4e2c4 / rgba(255,255,255,.10)），
+ * 浅色下就变成浅底浅字、白字按钮 —— 实测"全国层"那一行整条读不出来。 */
+html[data-theme="light"] .cf-notice { color: #3c5c76 !important; }
+html[data-theme="light"] .cf-notice.forced {
+  background: #eef5fc !important; border-left-color: #7fa8cf !important;
+}
+html[data-theme="light"] .cf-notice.live {
+  background: #fdf6e7 !important; border-left-color: #d9a441 !important;
+}
+html[data-theme="light"] .cf-notice b { color: #0f3550 !important; }
+html[data-theme="light"] .cf-switch {
+  background: #ffffff !important; border-color: #c3dcef !important; color: #14567d !important;
+}
+html[data-theme="light"] .cf-switch:hover { background: #eef6fd !important; }
+html[data-theme="light"] .cf-scope { color: #4a6a85 !important; }
+
+/* 顶栏作用域胶囊（V1.0.6：替掉三省城市下拉）：浅色下必须是浅底深字。
+   它平时是 .wb-scope 的静态标签，下钻后变成 .wb-scope-jump 按钮 —— 两态同一枚胶囊。 */
+html[data-theme="light"] .wb-scope-jump {
+  background: #ffffff !important; color: #14567d !important; border-color: #c3dcef !important;
+}
+html[data-theme="light"] .wb-scope-jump:hover { background: #eef6fd !important; }
 html[data-theme="light"] .wb-rail-toggle,
 html[data-theme="light"] .nav-toggle {
   background: #ffffff !important;
@@ -307,7 +330,7 @@ html[data-theme="light"] .tag.good { background: rgba(35, 120, 4, .12); color: #
 html[data-theme="light"] .tag.warn { background: rgba(173, 104, 0, .14); color: #ad6800; }
 html[data-theme="light"] .tag.bad { background: rgba(212, 56, 13, .12); color: #d4380d; }
 
-/* 东北原生页（OperationsConsole 等）里的卡片与表格 */
+/* 原生页（OperationsConsole 等）里的卡片与表格 */
 html[data-theme="light"] .traffic-page,
 html[data-theme="light"] .traffic-main,
 html[data-theme="light"] .traffic-table-panel { background: transparent; color: #16324a; }
@@ -497,7 +520,7 @@ html[data-theme="light"] .nb-weather span { color: #537a96 !important; }
 html[data-theme="light"] .nb-scope-foot { color: #6b8399 !important; }
 html[data-theme="light"] .nb-zone-line { color: #5f7d94 !important; }
 
-/* ---------- 原生控制台（日志 / 口径 / 东北处置与气象） ----------
+/* ---------- 原生控制台（日志 / 口径 / 处置与气象） ----------
  * 这一块是 V1.0.0 的老页面，颜色全是字面量、类名几十个。
  * 这里按"容器 + 文字 + 常见卡片"三层覆盖，目标是"能读、不刺眼"，
  * 不追求把每一枚小徽标都改成浅色底 —— 徽标本身有语义色，保持原样反而更清楚。 */

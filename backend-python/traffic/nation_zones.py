@@ -1,8 +1,9 @@
 """全国机场净空（DERIVED）：规则化几何 + 穿越统计 + 指标。
 
 为什么要单独一个模块，而不是改 `zones.py`：
-`zones.py` 管的是**东北 69 个站点的法定管制区**（`fixed-zones.json`，每条带法定依据，
-标 `OFFICIAL`）。那一套不能动，也不能和规则化出来的圈混在一起计数。
+`zones.py` 管的是**法定管制区**（`fixed-zones.json`，每条带法定依据，标 `OFFICIAL`，
+覆盖旧三省运行网那 69 个站点）。那一套不能动，也不能和规则化出来的圈混在一起计数 ——
+全国层与它只共享"永不合并"这一条纪律，不共享任何几何。
 
 本模块只做 v3 §3 要求的那一层：把 287 个机场按公开等级与跑道方位**规则化**成
 限制区 / 巡视区 / 净空区，全部标 `DERIVED`，界面上必须写"非官方公布"。
@@ -171,7 +172,7 @@ def summary(policy: str = 'APPROVAL_REQUIRED') -> Dict[str, Any]:
         'source': 'DERIVED',
         'policy': 'PROHIBITED' if strict else 'APPROVAL_REQUIRED',
         'note': ('按公开跑道方位与机场等级规则化生成，非官方公布；'
-                 '与东北 69 站点的法定管制区（OFFICIAL）分开计数，不合并。'),
+                 '与法定管制区（OFFICIAL，另库）分开计数，不合并。'),
         'counts': {
             'airports': len(sites),
             'withRunway': len({row['ident'] for row in built['runway']}),
@@ -212,7 +213,7 @@ def payload(policy: str = 'APPROVAL_REQUIRED') -> Dict[str, Any]:
         'source': 'DERIVED',
         'policy': enforcement,
         'note': ('按公开跑道方位与机场等级规则化生成，非官方公布；'
-                 '与东北 69 站点的法定管制区（OFFICIAL）分开计数，不合并。'),
+                 '与法定管制区（OFFICIAL，另库）分开计数，不合并。'),
         'counts': {
             'airports': len(sites),
             'withRunway': len({row['ident'] for row in runway}),

@@ -4,14 +4,17 @@ import {requestJson} from '../../api.js'
 import {activeCase,caseMeta} from '../../traffic/caseMode.js'
 import {pct} from '../../traffic/runtime.js'
 
+const props=defineProps({minute:{type:Number,default:60}})
 const data=ref(null),error=ref(''),loading=ref(false),policy=ref('balanced')
 
 const DEFAULT_CF_CASE='fog-20250105'
 const scope=ref('')
-const effectiveCase=computed(()=>{
-  if(scope.value==='live')return ''
-  return activeCase()||DEFAULT_CF_CASE
-})
+// 两种模式：
+//   · 案例重放（?case=… 或手动切换）——旧会话计划上的 A/B，要等计划建完；
+//   · 全国层（默认）——当前帧的"含模型 / 不含模型"，数据就在 /v2/nation 里，即时可用。
+// 默认走全国层：这一页的问题（用 AI 和不用，差多少）在全国层就能回答，
+// 而案例重放只对"某一次大雾"有意义，不该是每一帧的默认。
+const effectiveCase=computed(()=>activeCase()||(scope.value==='case'?DEFAULT_CF_CASE:''))
 const cfCaseQuery=computed(()=>(effectiveCase.value?`&case=${encodeURIComponent(effectiveCase.value)}`:''))
 const caseNote=computed(()=>{
   if(effectiveCase.value&&!activeCase())return 'forced'
@@ -22,7 +25,7 @@ const caseLabel=computed(()=>{
   const meta=caseMeta()||{}
   return effectiveCase.value===(activeCase()||'')&&meta.label?meta.label:'2025-01-05 沈阳大雾'
 })
-function switchScope(next){scope.value=next;polls=0;load()}
+function switchScope(next){scope.value=next;polls=0;data.value=null;load()}
 const POLL_MS=3000
 const MAX_POLLS=40
 let timer=null,disposed=false,polls=0
@@ -32,15 +35,70 @@ const POLICIES=[
   {key:'efficiency',label:'效率',note:'事故代价 4 000（宁可少停）'},
 ]
 function stopPolling(){if(timer){clearTimeout(timer);timer=null}}
+
+/** 全国层：把 modelAxis 折成这一页的三张卡。
+ *
+ *  为什么不在前端比阈值：判定阈值（p ≥ 0.60 停飞）只在后端一处定义，
+ *  前端再写一份，后端改了口径界面会静默停在旧值 —— 所以这里只做计数搬运，
+ *  差异由 `counterfactual.modelAxis` 算好再下发。
+ */
+function buildNational(payload){
+  const axis=payload?.counterfactual?.modelAxis
+  const total=(payload?.flights||[]).length
+  if(!axis||!axis.applicable){
+    return {status:'NO_MODEL', note:'本帧没有拿到模型概率（限流或模型文件缺失），模型轴做不出来 —— 不画一条 0 差异的假对照。'}
+  }
+  const k=axis.changedCount||0
+  const withModel=axis.withModel||{}, withoutModel=axis.withoutModel||{}
+  const share=total?k/total*100:0
+  return {
+    status:'OK', mode:'national',
+    scope:{plan:'全国层', reviewed:total, flights:total},
+    a:{label:'不含模型（只看规则分与回波）', exposure:k, delayMinutes:0, cancelled:0},
+    b:{label:'含模型（ml-v3 并列判据，现状）', exposure:0, delayMinutes:0, cancelled:0, delayedFlights:0},
+    delta:{exposure:-k, exposurePct:-Math.round(share*10)/10, delayMinutes:0,
+           delaySharePct:0, diverged:k, divergedObservation:0, divergedProbability:k},
+    sample:(axis.changed||[]).map(c=>({
+      flightId:c.id, corridorId:String(c.id||'').split('#')[0],
+      p:c.pModel, confidence:null, ruleLevel:c.riskLevel||c.riskLevelLabel||'—',
+      effectiveLevel:'暂不放行', basis:'概率档',
+      note:(c.drivers||[]).join('；')||c.place,
+    })),
+    conclusion:`本帧 ${total} 架在飞，其中 ${k} 架（${share.toFixed(1)}%）是模型概率 ≥${Math.round((axis.threshold||0.6)*100)}% 判的停飞；`
+      +`摘掉模型它们会照常飞。规则分与绕飞几何两边完全相同，所以这 ${k} 架是模型单独拦下的。`,
+    note:axis.note,
+    caveat:'全国层的模型轴只摘"模型"这一层：规则分、绕飞几何、边界管制两边一致。案例重放的 A/B 是另一条轴（换的是代价参数），两者不可互比。',
+    params:null,
+  }
+}
+
+async function loadNational(){
+  loading.value=true
+  try{
+    const payload=await requestJson(
+      `/api/traffic/v2/nation?level=nation&minute=${Math.round(props.minute||60)}`,{timeoutMs:60000})
+    if(disposed)return
+    data.value=buildNational(payload)
+    error.value=''
+  }catch(e){
+    if(!disposed)error.value=e.message
+  }finally{
+    if(!disposed)loading.value=false
+  }
+}
+
 async function load(silent=false){
   if(disposed)return
+  if(!effectiveCase.value){await loadNational();return}
   if(!silent)loading.value=true
   try{
     const payload=await requestJson(`/api/traffic/v2/counterfactual?seed=42&scenario=live&policy=${policy.value}${cfCaseQuery.value}`,{timeoutMs:30000})
     if(disposed)return
     data.value=payload
     error.value=''
-    if(payload?.status==='BUILDING'&&polls<MAX_POLLS){
+    // BUSY 与 BUILDING 是同一件事的两种回报：计划正在别处建、或本请求触发了建场。
+    // 以前只认 BUILDING，于是拿到 BUSY 就停在"对照不可用（BUSY）"不动 —— 用户只能靠点重试。
+    if((payload?.status==='BUILDING'||payload?.status==='BUSY')&&polls<MAX_POLLS){
       polls+=1
       stopPolling()
       timer=setTimeout(()=>load(true),POLL_MS)
@@ -59,7 +117,8 @@ onBeforeUnmount(()=>{disposed=true;stopPolling()})
 
 const d=computed(()=>data.value||null)
 const ready=computed(()=>d.value?.status==='OK')
-const building=computed(()=>d.value?.status==='BUILDING')
+const building=computed(()=>d.value?.status==='BUILDING'||d.value?.status==='BUSY')
+const nationalMode=computed(()=>d.value?.mode==='national')
 const delta=computed(()=>d.value?.delta||{})
 const totalFlights=computed(()=>d.value?.scope?.flights||0)
 const head=computed(()=>{
@@ -80,7 +139,7 @@ function pctText(v){return typeof v==='number'?`${v>0?'+':''}${v}%`:'—'}
 
 <template>
 <section class="cf">
-  <p class="cf-state" v-if="loading&&!d">正在重放运行计划…（要等同一份计划算完）</p>
+  <p class="cf-state" v-if="loading&&!d">正在读取反事实对照…</p>
   <p class="cf-state bad" v-else-if="error">对照不可用 · {{ error }}</p>
   <p class="cf-state" v-else-if="d&&!ready&&building">
     <span aria-hidden="true" class="cf-spin"></span>
@@ -89,8 +148,9 @@ function pctText(v){return typeof v==='number'?`${v>0?'+':''}${v}%`:'—'}
     <span class="cf-bar" role="progressbar" :aria-valuenow="d.progress||0" aria-valuemin="0" aria-valuemax="100">
       <i :style="{width:Math.max(0,Math.min(100,d.progress||0))+'%'}"></i>
     </span>
-    <span class="cf-eta">首次进入通常要 40–90 秒（当前 workspace 冷缓存要重跑整份计划）；这段可以先看别的分节，回来会接着算。</span>
+    <span class="cf-eta">案例重放要重跑整份计划（首次 40–90 秒，缓存后即时）；看全国层的即时对照请点下面的按钮。</span>
     <span v-if="d.note"> · {{ d.note }}</span>
+    <button @click="switchScope('')">改看全国层</button>
   </p>
   <p class="cf-state" v-else-if="d&&!ready">
     对照不可用（{{ d.status }}）<span v-if="d.note"> · {{ d.note }}</span>
@@ -99,38 +159,62 @@ function pctText(v){return typeof v==='number'?`${v>0?'+':''}${v}%`:'—'}
 
   <template v-else-if="ready">
     <header class="cf-hd">
+      <!-- 标题由页头给（口径统一在 OperationsConsole 一处），这里只放"这一帧看的是什么"。
+           以前两处各写一遍「反事实对照」，屏幕上就是同一个标题叠两次。 -->
       <div>
-        <h2>反事实对照 <small>同一份计划，只换裁决规则</small></h2>
         <p class="cf-sub">
-          计划 {{ String(d.scope?.plan||'').slice(0,8) }} · 参评 {{ d.scope?.reviewed }} / {{ totalFlights }} 架次 ·
-          <span class="cf-scope" data-cf-scope>{{ effectiveCase ? '气象 · 2025-01-05 沈阳大雾' : '气象 · 实时' }}</span> ·
-          <span :title="`观测档改判 ${delta.divergedObservation ?? 0} 架次（此刻观测已达不可飞）；概率档改判 ${delta.divergedProbability ?? 0} 架次（未来概率过半且高置信）`">
-            AI 改判 {{ delta.diverged }} 架次<template v-if="delta.diverged">（观测档 {{ delta.divergedObservation ?? 0 }} · 概率档 {{ delta.divergedProbability ?? 0 }}）</template>
-          </span>
+          <template v-if="nationalMode">
+            全国层 · 第 {{ minute }} 分钟 · 在飞 {{ totalFlights }} 架次 ·
+            <span class="cf-scope" data-cf-scope>含模型 / 不含模型</span> ·
+            <span :title="`摘掉模型后改回放行 ${delta.diverged} 架次（全部由 p ≥ 阈值触发）`">
+              模型判停 {{ delta.diverged }} 架次
+            </span>
+          </template>
+          <template v-else>
+            计划 {{ String(d.scope?.plan||'').slice(0,8) }} · 参评 {{ d.scope?.reviewed }} / {{ totalFlights }} 架次 ·
+            <span class="cf-scope" data-cf-scope>{{ effectiveCase ? '气象 · 2025-01-05 沈阳大雾' : '气象 · 实时' }}</span> ·
+            <span :title="`观测档改判 ${delta.divergedObservation ?? 0} 架次（此刻观测已达不可飞）；概率档改判 ${delta.divergedProbability ?? 0} 架次（未来概率过半且高置信）`">
+              AI 改判 {{ delta.diverged }} 架次<template v-if="delta.diverged">（观测档 {{ delta.divergedObservation ?? 0 }} · 概率档 {{ delta.divergedProbability ?? 0 }}）</template>
+            </span>
+          </template>
         </p>
       </div>
-      <div class="cf-policy">
+      <div class="cf-policy" v-if="!nationalMode">
         <button v-for="p in POLICIES" :key="p.key" :class="{active:p.key===policy}" @click="policy=p.key;load()">
           {{ p.label }}<small>{{ p.note }}</small>
         </button>
       </div>
     </header>
 
-    <p class="cf-notice forced" v-if="caseNote==='forced'" data-cf-notice="forced">
-      未指定案例，按 <b>2025-01-05 沈阳大雾</b> 重放。
-      <button class="cf-switch" @click="switchScope('live')">改看实时气象</button>
+    <p class="cf-notice live" v-if="nationalMode" data-cf-notice="national">
+      <b>全国层</b> · 当前帧的模型判据摘除对照，随分钟与气象更新。
+      <button class="cf-switch" @click="switchScope('case')">改看 {{ caseLabel }} 案例重放</button>
+    </p>
+    <p class="cf-notice forced" v-else-if="caseNote==='forced'" data-cf-notice="forced">
+      未指定案例，按 <b>{{ caseLabel }}</b> 重放。
+      <button class="cf-switch" @click="switchScope('')">改看全国层</button>
     </p>
     <p class="cf-notice live" v-else-if="caseNote==='live'" data-cf-notice="live">
       <b>实时气象</b> · 当前无风险走廊 · 两组均为 0 架次。
-      <button class="cf-switch" @click="switchScope('')">切到 2025-01-05 沈阳大雾</button>
+      <button class="cf-switch" @click="switchScope('case')">切到 {{ caseLabel }}</button>
     </p>
 
     <p class="cf-head" v-if="head" :class="head.saved>0?'good':'flat'">
-      <b>{{ head.same?'本快照下两组没有差别':'本快照下 AI 组更保守' }}</b>
-      关掉 AI：<span class="alc-num">{{ d.a.exposure }}</span> 架次暴露在不可飞走廊上；
-      开启 AI：<span class="alc-num">{{ d.b.exposure }}</span> 架次。
-      <template v-if="head.saved>0">换言之，用 <span class="alc-num">{{ head.actions||'等待' }}</span>，
+      <b>{{ head.same?'本快照下两组没有差别':(nationalMode?'本帧有班次是模型单独拦下的':'本快照下 AI 组更保守') }}</b>
+      <template v-if="nationalMode">
+        {{ d.a.label }}：<span class="alc-num">{{ d.a.exposure }}</span> 架次会照常飞；
+        {{ d.b.label }}：<span class="alc-num">{{ d.b.exposure }}</span> 架次。
+      </template>
+      <template v-else>
+        关掉 AI：<span class="alc-num">{{ d.a.exposure }}</span> 架次暴露在不可飞走廊上；
+        开启 AI：<span class="alc-num">{{ d.b.exposure }}</span> 架次。
+      </template>
+      <!-- 案例模式才有"用几次绕飞/延误换掉多少暴露"这笔账；全国层两边都没有额外动作，
+           那句话会变成"用停飞，换掉 32 架次"，读起来像漏了主语。 -->
+      <template v-if="head.saved>0 && !nationalMode">换言之，用 <span class="alc-num">{{ head.actions||'停飞' }}</span>，
         换掉 <span class="alc-num">{{ head.saved }}</span> 架次的风险暴露。</template>
+      <template v-else-if="head.saved>0">代价是这 <span class="alc-num">{{ head.saved }}</span> 架停在地面，
+        没有产生额外绕飞，也没有取消。</template>
     </p>
     <p class="cf-why" v-if="d.conclusion" data-cf-conclusion>{{ d.conclusion }}</p>
 
@@ -142,7 +226,8 @@ function pctText(v){return typeof v==='number'?`${v>0?'+':''}${v}%`:'—'}
           <dt>额外延误</dt><dd class="alc-num">0 分钟</dd>
           <dt>取消</dt><dd class="alc-num">0 架次</dd>
         </dl>
-        <p class="cf-card-note">规则说不飞就不飞、说飞就飞 —— 没有概率，也没有"要不要复核"这一步。</p>
+        <p class="cf-card-note" v-if="nationalMode">规则分（端点能见度分档 + 风速 + 回波）照常生效，只是不再看模型概率 —— 模型判停的那几架会照原计划飞。</p>
+        <p class="cf-card-note" v-else>规则说不飞就不飞、说飞就飞 —— 没有概率，也没有"要不要复核"这一步。</p>
       </div>
       <div class="cf-card b">
         <h3>B · {{ d.b.label }}</h3>
@@ -151,7 +236,12 @@ function pctText(v){return typeof v==='number'?`${v>0?'+':''}${v}%`:'—'}
           <dt>额外延误</dt><dd class="alc-num">{{ d.b.delayMinutes }} 分钟</dd>
           <dt>取消</dt><dd class="alc-num">{{ d.b.cancelled }} 架次（延误 {{ d.b.delayedFlights ?? 0 }} 班）</dd>
         </dl>
-        <p class="cf-card-note" data-probability-rule>
+        <p class="cf-card-note" v-if="nationalMode" data-probability-rule>
+          模型只允许更严，不允许更松：规则说飞、模型说不能飞 → 停飞；规则说不能飞 → 停飞，模型不参与翻案。
+          阈值 <b>p ≥ 60%</b>（停飞）由后端 `MODEL_HOLD` 一处给出，本帧下发的改判架次按它算。
+          模型概率**不并进**规则分，是并列的第二道判据。
+        </p>
+        <p class="cf-card-note" v-else data-probability-rule>
           概率档只允许更严，不允许更松：概率说他能飞、观测说不能飞 → 按不能飞执行；
           概率说他不能飞、观测说能飞 → 转人工复核（置信度 &lt;0.65 直接转人工）。
           概率档阈值 <b>0.25</b>（停飞）/ <b>0.15</b>（谨慎），与后端常量
@@ -166,15 +256,17 @@ function pctText(v){return typeof v==='number'?`${v>0?'+':''}${v}%`:'—'}
           <dt>延误代价</dt><dd class="alc-num">{{ delta.delayMinutes }} 分钟（占计划总时长 {{ delta.delaySharePct }}%）</dd>
           <dt>改判架次</dt><dd class="alc-num">{{ delta.diverged }}</dd>
         </dl>
-        <p class="cf-card-note">"暴露变化为负"＝AI 把风险降下来了；为正＝AI 让更多班次暴露，属异常，应查台账。</p>
+        <p class="cf-card-note" v-if="nationalMode">"暴露变化为负"＝模型把风险降下来了；为 0 ＝这一帧模型没有多拦任何班次。</p>
+        <p class="cf-card-note" v-else>"暴露变化为负"＝AI 把风险降下来了；为正＝AI 让更多班次暴露，属异常，应查台账。</p>
       </div>
     </div>
 
-    <p class="cf-conclusion">{{ d.conclusion }}</p>
+    <p class="cf-conclusion" v-if="!nationalMode">{{ d.conclusion }}</p>
 
     <section class="cf-sample" v-if="d.sample&&d.sample.length">
       <b>改判明细（最多 20 条 · 真改判优先）</b>
-      <small class="cf-sample-note">前段是档位真的变了的班次；后段「低置信 · 留痕未改判」是看过但没动的，
+      <small class="cf-sample-note" v-if="nationalMode">只列被模型改判的班次：规则说能飞、模型概率越过阈值，最终停飞。规则分与几何两边一致，所以这里没有"看过但没动"的第二段。</small>
+      <small class="cf-sample-note" v-else>前段是档位真的变了的班次；后段「低置信 · 留痕未改判」是看过但没动的，
         它们不计入上面的改判架次 —— 两段不可合并读。</small>
       <table>
         <thead><tr><th>航班</th><th>走廊</th><th>不可飞概率</th><th>置信度</th><th>规则</th><th>生效后</th><th>依据</th><th>理由</th></tr></thead>
@@ -182,10 +274,10 @@ function pctText(v){return typeof v==='number'?`${v>0?'+':''}${v}%`:'—'}
           <tr v-for="(r,i) in d.sample" :key="i">
             <td>{{ r.flightId }}</td><td>{{ r.corridorId }}</td>
             <td class="alc-num">{{ pct(r.p,1) }}</td>
-            <td class="alc-num">{{ (r.confidence??0).toFixed(2) }}</td>
+            <td class="alc-num">{{ typeof r.confidence==='number'?r.confidence.toFixed(2):'—' }}</td>
             <td class="alc-num">{{ r.ruleLevel }}</td>
             <td class="alc-num" :class="(r.effectiveLevel??r.fusedLevel)>r.ruleLevel?'strict':''">{{ r.effectiveLevel??r.fusedLevel }}</td>
-            <td class="note">{{ r.obsBan ? '观测档' : (r.fusedLevel !== r.ruleLevel ? '概率档' : '—') }}</td>
+            <td class="note">{{ r.basis || (r.obsBan ? '观测档' : (r.fusedLevel !== r.ruleLevel ? '概率档' : '—')) }}</td>
             <td class="note">{{ r.note }}</td>
           </tr>
         </tbody>
@@ -193,9 +285,9 @@ function pctText(v){return typeof v==='number'?`${v>0?'+':''}${v}%`:'—'}
     </section>
 
     <footer class="cf-foot">
-      <span>代价参数：事故 {{ d.params?.incident }} · 每次改航 {{ d.params?.reroute }} · 每次取消 {{ d.params?.cancel }} · 每 40 分钟延误 {{ d.params?.delay }}</span>
-      <span class="warn">{{ d.note }}</span>
-      <span class="warn">{{ d.caveat }}</span>
+      <span v-if="d.params">代价参数：事故 {{ d.params?.incident }} · 每次改航 {{ d.params?.reroute }} · 每次取消 {{ d.params?.cancel }} · 每 40 分钟延误 {{ d.params?.delay }}</span>
+      <span class="warn" v-if="d.note">{{ d.note }}</span>
+      <span class="warn" v-if="d.caveat">{{ d.caveat }}</span>
     </footer>
   </template>
 </section>
