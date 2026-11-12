@@ -810,11 +810,19 @@ onUnmounted(()=>{
     <div class="nrn-metrics" data-nation-headline>
       <div class="m"><b>{{ num(total.corridors) }}</b><span>航线</span></div>
       <div class="m"><b>{{ num(total.airborne) }}</b><span>在飞</span></div>
-      <div class="m" :class="{warn:total.delayed>0}"><b>{{ num(total.delayed) }}</b><span>绕飞</span></div>
+      <!-- 「绕飞」这一格绑的是 total.delayed，即**按班次计数**；而口径表里另有一个
+           「绕飞航线」（total.detour，按条计数）。两者名字一样、量纲不同，曾经同屏
+           出现 0 / 1 / 3 三个数被当成 bug（2026-11-12 复测）。标签写清量纲，
+           数字一个不动 —— 改数字才是错，改标签只是把已经在载荷里的事实说出来。 -->
+      <div class="m" :class="{warn:total.delayed>0}"
+           title="按班次计：decision 为 DETOUR 的架数（另有「绕飞航线」按条计，口径不同）">
+        <b>{{ num(total.delayed) }}</b><span>绕飞架次</span></div>
       <!-- 「停飞」= 班次决定为 HOLD（天气/边界），这是读者真正关心的那一格。
            以前这一格放的是 borderBlocked（距境外过近受限的走廊），实测长期为 0，
            而天气造成的停飞被塞进「延期」，于是"回波压境但停飞 0 架"。 -->
-      <div class="m" :class="{bad:total.hold>0}"><b>{{ num(total.hold) }}</b><span>停飞</span></div>
+      <div class="m" :class="{bad:total.hold>0}"
+           title="按班次计：decision 为 HOLD 的架数">
+        <b>{{ num(total.hold) }}</b><span>停飞架次</span></div>
       <div class="m" v-if="total.blocked"><b>{{ num(total.blocked) }}</b><span>距境外过近受限</span></div>
       <div class="m"><b>{{ num(total.lowVisCities) }}</b><span>低能见度城市</span></div>
     </div>

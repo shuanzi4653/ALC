@@ -813,7 +813,7 @@ sys.path.insert(0, r'{root}/backend-python')
 | 离线底图形状四判据（面积/外接框/闭合/顶点数） | `tools/maintenance/_verify_offline_basemap.py` |
 | 离线底图重生成 | `tools/generators/_gen_offline_basemap.py` |
 | 文档链接死链检测 | `tools/maintenance/_verify_doc_links.py` |
-| 底图三态 SSR 差分渲染 | `frontend/tests/render-offline-basemap.mjs` |
+| 底图三态 SSR 差分渲染 | `frontend/tests/render-offline-basemap.test.mjs` |
 
 > 所有脚本用 `backend-python\.venv\Scripts\python.exe` 运行；依赖安装在项目 venv，托管运行时无 `shapely`。
 > 维护类脚本（`tools/maintenance/`、`tools/shared/`）用托管 python 即可，它们不 import 项目依赖。

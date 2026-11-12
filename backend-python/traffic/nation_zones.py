@@ -188,8 +188,9 @@ def summary(policy: str = 'APPROVAL_REQUIRED') -> Dict[str, Any]:
 def payload(policy: str = 'APPROVAL_REQUIRED') -> Dict[str, Any]:
     """净空层载荷：环 + 计数 + 口径说明。
 
-    `policy` 可整体切到 `PROHIBITED`（演示用），此时所有限制区标为"一律禁止进入"，
-    计数与等级一起变 —— 切换本身就是一个可演示的动作。
+    `policy` 可整体切到 `PROHIBITED`（演示用），此时所有限制区标为"一律禁止进入"。
+    **等级变、计数不变** —— 切换改的是管制判定，不是几何：287 个限制区、113 条穿越
+    两档完全一样。这一点必须写在这里，否则"切了没变化"会被当成没生效。
     """
     built = _built()
     strict = str(policy).upper() == 'PROHIBITED'
@@ -278,13 +279,25 @@ def crossings(stamp: str, policy: str = 'APPROVAL_REQUIRED') -> Dict[str, Any]:
                 'policy': 'APPROVAL_REQUIRED' if str(policy).upper() != 'PROHIBITED' else 'PROHIBITED',
             })
     rows.sort(key=lambda row: -row['crossings'])
+    strict = str(policy).upper() == 'PROHIBITED'
+    # note 必须跟着 policy 走。以前两档共用一句"不是禁飞"，于是切到 PROHIBITED
+    # 之后侧栏还在说"不是禁飞" —— 自相矛盾的文案比没有文案更伤（V1.0.8 线上实测：
+    # 两档 note 逐字相同）。改的是**管制等级**，几何一条没动，所以 113 这个数不变，
+    # 这句话就是唯一能证明"我确实切了"的东西，必须写准。
+    corridor_count = len(nation_mod._corridor_rows())
+    if strict:
+        note = ('按规则化限制区（DERIVED）与航路求交；当前为演示态：**一律禁止进入**。'
+                f'穿越条数不变（{hit_count} / {corridor_count}）—— 变的是这 {hit_count} 条'
+                '穿越从"可申请"变成"禁止"，不是几何变了。')
+    else:
+        note = ('按规则化限制区（DERIVED）与航路求交；'
+                '默认等级 APPROVAL_REQUIRED 表示"可申请穿越"，不是禁飞。')
     return {
         'available': True,
-        'policy': 'PROHIBITED' if str(policy).upper() == 'PROHIBITED' else 'APPROVAL_REQUIRED',
-        'corridors': len(nation_mod._corridor_rows()),
+        'policy': 'PROHIBITED' if strict else 'APPROVAL_REQUIRED',
+        'corridors': corridor_count,
         'hit': hit_count,
-        'ratio': round(hit_count / max(1, len(nation_mod._corridor_rows())), 3),
+        'ratio': round(hit_count / max(1, corridor_count), 3),
         'rows': rows[:120],
-        'note': ('按规则化限制区（DERIVED）与航路求交；'
-                 '默认等级 APPROVAL_REQUIRED 表示"可申请穿越"，不是禁飞。'),
+        'note': note,
     }

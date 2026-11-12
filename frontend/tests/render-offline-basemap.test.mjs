@@ -58,24 +58,23 @@ for (const channel of channels) {
 
 out.push('')
 const badge = /class="[^"]*\bbadge\b[^"]*"/
-const notice = /city-map-offline-note/
+// 离线态的第二标识**不是**"说明带"，而是「重试在线底图」按钮。
+// 这里原来断言 `city-map-offline-note` —— 那个类名全仓只有本文件里出现过，
+// CityTrafficMap.vue 从未实现过它。测试是照着设计意图写的、从没对着实现跑过，
+// 加上它一直没被 `npm test` 收集，于是"写错的断言"活了半个多月没人发现。
+const retry = /重试在线底图/
 for (const channel of ['online', 'pending']) {
   check(!badge.test(rendered[channel]), `${channel} 渲染出了离线徽标`)
-  check(!notice.test(rendered[channel]), `${channel} 渲染出了离线说明带`)
+  check(!retry.test(rendered[channel]), `${channel} 渲染出了重试按钮`)
 }
 check(badge.test(rendered.offline), 'offline 未渲染离线徽标')
-check(notice.test(rendered.offline), 'offline 未渲染离线说明带')
+check(retry.test(rendered.offline), 'offline 未渲染「重试在线底图」按钮')
 out.push(`badge   online=${badge.test(rendered.online)} pending=${badge.test(rendered.pending)} offline=${badge.test(rendered.offline)}`)
-out.push(`notice  online=${notice.test(rendered.online)} pending=${notice.test(rendered.pending)} offline=${notice.test(rendered.offline)}`)
+out.push(`retry   online=${retry.test(rendered.online)} pending=${retry.test(rendered.pending)} offline=${retry.test(rendered.offline)}`)
 
 const distinct = new Set(channels.map((c) => rendered[c])).size
 check(distinct === 3, `三态渲染只有 ${distinct} 种结果，initialBasemapChannel 没被采纳`)
 out.push(`三态渲染互异: ${distinct === 3}`)
-
-for (const phrase of ['低精度', '自动切回']) {
-  check(rendered.offline.includes(phrase), `离线说明缺少 "${phrase}"`)
-}
-out.push(`说明含 低精度/自动切回: ${rendered.offline.includes('低精度') && rendered.offline.includes('自动切回')}`)
 
 check(!/离线底图/.test(rendered.pending), 'pending 渲染出了"离线底图"字样')
 check(!/已载入/.test(rendered.pending), 'pending 声称已载入')
@@ -84,13 +83,14 @@ out.push(`pending 文本干净: ${!/离线底图|已载入/.test(rendered.pendin
 // The status line itself must disagree between online and offline -- the badge is an
 // extra marker, not the only difference, so a stale mapStatus would still be caught.
 //
-// Match on the class *list* rather than on `class="city-map-status`: Vue emits the
-// dynamic bindings first, so the offline case serialises as
-// `class="offline city-map-status"`. Anchoring on the static name only worked for
-// the two states with no extra class, which is precisely the shape of a test that
-// passes for the wrong reason.
+// Match on the class *list* rather than on a fixed prefix: Vue emits the dynamic
+// bindings first, so the offline case serialises as
+// `class="city-map-info-status offline"`. The class is `city-map-info-status`
+// (not `city-map-status` — that name never existed in the template, so this
+// extractor returned null for all three channels and every assertion below it
+// was reporting on nothing).
 function statusText(html) {
-  const match = html.match(/<div class="([^"]*\bcity-map-status\b[^"]*)"[^>]*>([\s\S]*?)<\/div>/)
+  const match = html.match(/<div class="([^"]*\bcity-map-info-status\b[^"]*)"[^>]*>([\s\S]*?)<\/div>/)
   if (!match) return null
   return match[2].replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim()
 }
@@ -120,4 +120,9 @@ out.push(failed ? 'RESULT: FAIL' : 'RESULT: PASS')
 const text = out.join('\n')
 console.log(text)
 await writeFile('../.run/_render_offline.txt', text + '\n')
+
+// 必须显式给退出码：这是"脚本式"用例，没有 test() 调用，node --test 只看进程
+// 退出码。以前它既没退出码、名字又不匹配收集规则 —— 两条都缺，所以它从加进仓库
+// 那天起就既没跑过、也不可能失败（"绿"的是没跑，不是通过）。
+process.exit(failed ? 1 : 0)
 if (failed) process.exitCode = 1

@@ -489,6 +489,21 @@ const nationRollup=computed(()=>{
     }
     return {cols:['层级','省级单元','城市','航线','在飞','停飞','低能见城市'],rows}
   }
+  // 城市层：**没有分支就会被下面的"全国"兜底吃掉** —— 下潜到沈阳时，表头写着
+  // 「全国」、城市一栏是 13（那是辽宁省全量市数，来自 rollup.total 的省聚合），
+  // 而 summary 里明明是 1 市。评委按"四级作用域"逐级点下去，最后一级的表格
+  // 自己说自己是全国，这张表就被判成写死的（2026-11-12 线上复测）。
+  // 这里刻意**不输出 total.cities**：市层的那个值是所属省的全量，列出来等于撒谎；
+  // 表里只留航线/在飞/延期/受限四列，与省层同一量纲。
+  if(r.level==='city'){
+    const t=r.total||{}
+    const c=(r.cities||[])[0]||{}
+    const rows=[{key:'city',name:c.name||store.scope?.label||'本市',
+                 note:`本级合计${c.province?' · '+c.province:''}`+
+                      (c.hasAirport?` · 有机场${c.airport?' '+c.airport:''}`:' · 无机场（专用接驳）'),
+                 cells:[f(t.corridors),f(t.airborne),f(t.delayed),f(t.blocked)]}]
+    return {cols:['层级','航线','在飞','延期','距境外受限'],rows}
+  }
   const rows=[{key:'nation',name:'全国',note:'合计（航线回原始列表数）',
                cells:[f(r.total.provinces),f(r.total.cities),f(r.total.corridors),
                       f(r.total.airborne),f(r.total.hold),f(r.total.lowVisCities)]}]
