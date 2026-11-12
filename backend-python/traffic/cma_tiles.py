@@ -255,6 +255,13 @@ def ingest_tiles(entries, zoom=3, slot=None, now=None):
     if not cells:
         raise RelayPayloadRejected('中继载荷里没有任何可用瓦片')
 
+    # 收到的是子集时要把"缺哪几个坐标"记下来：缺测在回波图上与"无回波"长得一模一样，
+    # 不写进载荷，下游只会读成"那块天晴"。2026-11-12 源站只发 zoom 3 的 (5,2)(6,2)(5,3)，
+    # (6,3) 全天 404 —— 这正是要靠这个字段说清楚的事。
+    expected = {tuple(t) for t in DEFAULT_GRID}
+    received = {(x, y) for x, y, _ in cells}
+    missing = [list(t) for t in sorted(expected - received)]
+
     instant = slot_instant(used_slot)
     provenance = {
         'provider': 'CMA_DATA_NET', 'dataset': 'RADAR_L3_MST_CREF_GISJPG_Tiles_CR',
@@ -262,6 +269,7 @@ def ingest_tiles(entries, zoom=3, slot=None, now=None):
         'cadenceMinutes': CADENCE_MINUTES, 'zoom': zoom,
         'tileFormat': f'{TILE_SIZE}x{TILE_SIZE} big-endian int16, dBZ = value * {SCALE}',
         'retrievedAt': dt.datetime.now(dt.timezone.utc).isoformat().replace('+00:00', 'Z'),
+        'missingTiles': missing,
     }
     return {
         'available': True, 'provenance': provenance, 'error': None,
@@ -270,6 +278,7 @@ def ingest_tiles(entries, zoom=3, slot=None, now=None):
         'slotAgeMinutes': round((dt.datetime.now(dt.timezone.utc) - instant).total_seconds() / 60, 1),
         'cells': cells, 'degreesPerCell': tile_degrees_per_cell(zoom),
         'gridTiles': sorted((x, y) for x, y, _ in cells),
+        'missingTiles': missing,
         'stats': sample_stats([r for _, _, rows in cells for r in rows]),
         'lookbackStepsUsed': None,
     }

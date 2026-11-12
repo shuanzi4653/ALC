@@ -164,7 +164,8 @@ test('对第三方源只搬字节：不带头、不带 Cookie、不缓存', asyn
 
 test('长度不符的瓦片当作"这一档没有"，绝不将就回传', async () => {
   // 少一个字节就少一行像元：图的位置是对的、内容是错的。这比没有图危险，
-  // 所以长度不符必须落到"这一档不可用"，而不是"差一点也传上去"。
+  // 所以长度不符必须落到"这一张不可用"，而不是"差一点也传上去"。
+  // 注意它只废掉**这一张**：整档两张都废，才轮到下一档（所以 3 档共试 6 张）。
   let served = 0
   const fetchImpl = stubFetch((url) => {
     if (!url.includes('/tiles/')) return response({ payload: {} })
@@ -177,9 +178,55 @@ test('长度不符的瓦片当作"这一档没有"，绝不将就回传', async 
   assert.equal(result.ok, false)
   assert.equal(result.reason, 'NO_SLOT_AVAILABLE')
   assert.equal(result.tried, 3)
-  assert.equal(served, 3)
+  assert.equal(served, 6)
   // 一次 POST 都不该发出去。
   assert.equal(fetchImpl.calls.filter(c => !c.url.includes('/tiles/')).length, 0)
+})
+
+test('网格里少一张时用取到的其余瓦片照常回传 —— 不再整档作废', async () => {
+  // 2026-11-12 线上：zoom 3 只发 (5,2)(6,2)(5,3)，(6,3) 全天 404。
+  // 旧口径"一张失败即整档作废"让 12 个时次全部报废，顶栏红标「已试 12 档」。
+  // 缺的是**一张**（该区域无数据），不是"这一档没发布"，其余瓦片长度正确就该发。
+  const relay = instructions({ grid: [[6, 2], [6, 3]] })
+  const fetchImpl = stubFetch((url) => {
+    if (url.includes('/tiles/')) {
+      if (url.endsWith('/3/3/6.bin')) return response({ ok: false, status: 404 })
+      return response()
+    }
+    return response({ payload: { ttlSeconds: 600 } })
+  })
+  const result = await relayRadarTiles(relay, { fetchImpl, nowMs: Date.UTC(2026, 9, 15, 7, 24) })
+  assert.equal(result.ok, true)
+  // 缺了哪几个坐标必须回传出来：缺测在图上与"无回波"长得一样。
+  assert.deepEqual(result.missing, ['6,3'])
+  const body = JSON.parse(fetchImpl.calls.at(-1).options.body)
+  assert.deepEqual(body.tiles.map(t => [t.x, t.y]), [[6, 2]])
+})
+
+test('某个坐标首档 404 之后不再逐档重试，后续时次直接跳过', async () => {
+  // 网格是枚举出来的、会随源站发布策略变。某个坐标这一轮没有出图，
+  // 后面每一档都不会有它 —— 记住它，别拿 11 次白跑换同一个 404。
+  const relay = instructions({ grid: [[6, 2], [6, 3]], maxLookbackSteps: 4 })
+  let deadHits = 0
+  let firstTile = true
+  const fetchImpl = stubFetch((url) => {
+    if (!url.includes('/tiles/')) return response({ payload: {} })
+    if (url.endsWith('/3/3/6.bin')) {
+      deadHits += 1
+      return response({ ok: false, status: 404 })
+    }
+    // 最新一档的 (6,2) 长度不符 → 本档为空，必须回退到上一档；
+    // 上一档 (6,2) 正常，而 (6,3) 应被跳过（不再请求）。
+    if (firstTile) {
+      firstTile = false
+      return response({ bytes: TILE_BYTES - 2 })
+    }
+    return response()
+  })
+  const result = await relayRadarTiles(relay, { fetchImpl, nowMs: Date.UTC(2026, 9, 15, 7, 24) })
+  assert.equal(result.ok, true)
+  assert.equal(deadHits, 1)
+  assert.equal(result.slot, '2026-10-15 15:18')
 })
 
 test('每一档都取不到时如实说"本机也没取到"，而不是抛出去', async () => {
@@ -187,7 +234,8 @@ test('每一档都取不到时如实说"本机也没取到"，而不是抛出去
   const result = await relayRadarTiles(instructions({ maxLookbackSteps: 5 }), {
     fetchImpl, nowMs: Date.UTC(2026, 9, 15, 7, 24),
   })
-  assert.deepEqual(result, { ok: false, reason: 'NO_SLOT_AVAILABLE', tried: 5 })
+  assert.deepEqual(result,
+    { ok: false, reason: 'NO_SLOT_AVAILABLE', tried: 5, missing: [] })
 })
 
 test('取到字节但后端不收 —— 与"这一档没发布"必须分开报', async () => {

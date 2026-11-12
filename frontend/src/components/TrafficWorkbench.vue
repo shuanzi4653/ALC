@@ -361,7 +361,14 @@ async function loadWeather(){
 const radarRelay=ref({status:'idle',slot:null,detail:''})
 let relayBusy=false,relayNextAllowedAt=0
 function relayFailureText(result){
-  if(result.reason==='NO_SLOT_AVAILABLE')return `本机浏览器也没取到可用的雷达时次（已试 ${result.tried} 档）。源站可能对本网络同样拒绝。`
+  if(result.reason==='NO_SLOT_AVAILABLE'){
+    // 「网格里某个坐标源站在这一轮没发」与「源站拒绝本网络」是两种完全不同的故障：
+    // 前者换时段就好，后者换网络才好。混成一句，排查只能靠猜（2026-11-12 线上即如此）。
+    const miss=(result.missing||[]).length
+    return `本机浏览器也没取到可用的雷达时次（已试 ${result.tried} 档）`
+      +(miss?`；其中 ${miss} 个网格坐标源站这一轮未发布`:'')
+      +'。源站可能对本网络同样拒绝。'
+  }
   if(result.reason==='POST_FAILED')return `瓦片已取到但后端未接受：${result.message}`
   if(result.reason==='NO_INSTRUCTIONS')return '服务端未下发取图说明，未发起中继。'
   // 源站没开 CORS 时浏览器连第一张都读不到，这不是"时次不对"，重试也没用
@@ -381,20 +388,30 @@ function scheduleRelayRetry(){
 
 async function maybeRelayRadar(value){
   const relay=value&&value.radar&&value.radar.relay
-  if(!radarRelayReady(relay))return
-  if(relayBusy||Date.now()<relayNextAllowedAt)return
-  relayBusy=true
+  if(!radarRelayReady(relay)){
+    // 服务端这一轮已经能自己取到（不再下发中继指令）时，必须把上一次的红标收掉：
+    // failed 是滞留态，不收就一直挂在顶栏，直到用户刷新页面为止 —— 红标比没有标更误导人。
+    if(radarRelay.value.status==='failed')radarRelay.value={status:'idle',slot:null,detail:''}
+    return
+  }
+  // 离线模式要在占用 relayBusy **之前**判掉：这里的 return 不经过 finally，
+  // 占了不复位等于此后永远不再发起中继（此前就是这样，一次离线即可锁死整场会话）。
   if(isOfflineMode()){
     radarRelay.value={status:'failed',slot:null,detail:'离线演示模式：未取回波瓦片'}
     return
   }
+  if(relayBusy||Date.now()<relayNextAllowedAt)return
+  relayBusy=true
   radarRelay.value={status:'running',slot:null,detail:'正在由本机浏览器代取瓦片…'}
   try{
     const result=await relayRadarTiles(relay)
     if(result.ok){
       const ttl=Number(result.stored&&result.stored.ttlSeconds)||600
       relayNextAllowedAt=Date.now()+Math.max(60_000,ttl*1000-60_000)
-      radarRelay.value={status:'ok',slot:result.slot,detail:`由本机浏览器代取：${result.slot}（北京时）`}
+      const miss=(result.missing||[]).length
+      radarRelay.value={status:'ok',slot:result.slot,
+        detail:`由本机浏览器代取：${result.slot}（北京时）`
+          +(miss?`；源站缺 ${miss} 张瓦片，已按可用部分回传（缺测区域不代表无回波）`:'')}
       scheduleRelayRetry()
       await loadWeather()
     }else{
