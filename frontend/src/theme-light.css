@@ -32,7 +32,7 @@ html[data-theme="light"] {
   --map-inset-line: rgba(84, 124, 166, .45);
   --map-ground: rgba(236, 243, 250, .82);
   --map-node: #16384f;
-  --map-node-dim: rgba(34, 74, 108, .5);
+  --map-node-dim: rgba(34, 74, 108, .68);
   --map-node-stroke: rgba(255, 255, 255, .92);
   --map-label: #24485f;
   --map-corridor: rgba(24, 96, 152, .78);
