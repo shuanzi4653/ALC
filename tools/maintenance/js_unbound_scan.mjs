@@ -70,6 +70,9 @@ const GLOBALS = new Set([
   'matchMedia', 'getComputedStyle', 'devicePixelRatio',
   'Event', 'CustomEvent', 'KeyboardEvent', 'MouseEvent', 'PointerEvent', 'TouchEvent',
   'HTMLElement', 'SVGElement', 'Node', 'DOMParser',
+  // SVG / Geometry 接口：`NationMap.vue` 用 DOMPoint 做屏幕↔用户坐标换算
+  // （V1.0.5 起），它是浏览器全局构造器，不是未声明变量。
+  'DOMPoint', 'DOMMatrix', 'DOMRect', 'SVGSVGElement', 'SVGGraphicsElement',
   'alert', 'confirm', 'prompt', 'open', 'close', 'postMessage', 'addEventListener',
   'removeEventListener', 'scrollTo', 'scrollBy',
   'setProperty', 'getPropertyValue',

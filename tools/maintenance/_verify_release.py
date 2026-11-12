@@ -171,10 +171,13 @@ def main() -> int:
         text_js = body_js.decode('utf-8', 'replace')
         check('公网：本包 chunk 可取', code_js == 200 and len(body_js) > 100000,
               f'HTTP {code_js} {len(body_js)} B')
-        # 特性探针：这一版新加的两样东西必须真的在发出去的包里。
-        check('公网：chunk 含本次改动（分工说明 / 离线角标）',
-              'brief-scope-note' in text_js and 'brief-kpi-scope' in text_js,
-              'brief-scope-note / brief-kpi-scope')
+        # 特性探针：这一版新加的东西必须真的在发出去的包里。
+        # V1.0.7 换成图例横条的标记：`brief-scope-note` / `brief-kpi-scope` 属于
+        # `SituationBrief.vue`，而它只被 `HomeStage.vue` 引用、后者不挂载，
+        # 于是这两个类名在 V1.0.5 之后就不进包了 —— 拿它当探针会永远 FAIL，且不代表包旧。
+        check('公网：chunk 含本次改动（dBZ 图例横条）',
+              'nrn-dbz' in text_js and 'data-radar-scale' in text_js,
+              'nrn-dbz / data-radar-scale')
 
     # ---- 接口口径探针：光有新前端不够，后端也得是新的 ----
     ov = fetch_json(f'{base}/api/traffic/v2/overview?seed=42&scenario=live')

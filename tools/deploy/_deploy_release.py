@@ -209,7 +209,7 @@ def main() -> int:
         # VERSION 一起走：Python 侧读项目根这份，漏传就是启动时反复重启。
         if scp([VERSION_FILE], f'{remote_tmp}/__VERSION__').returncode != 0:
             die('VERSION 上传失败')
-        rc = sh(f'md5sum {remote_tmp}VERSION')
+        rc = sh(f'md5sum {remote_tmp}/__VERSION__')
         if (rc.stdout.split() or [''])[0] != md5(VERSION_FILE):
             die('VERSION 上传后 md5 不一致')
         print(f'Python 文件 {len(py_files)} 个 + VERSION 上传并校验一致')
@@ -222,7 +222,11 @@ def main() -> int:
         print('jar 已替换并重启 Java')
 
     # ---- ④ Python 侧 ----
-    if relative:
+    # 走 tar 的只有 `--py-tree`（整棵树）；`--py a.py` 那种是逐文件 cp。
+    # 这里原来判的是 `if relative:`，而 --py 模式下 relative 也非空，
+    # 于是每条命令都去解一个根本没上传的 py-tree.tgz —— 结果 jar 换完、Python 没换，
+    # 是最难查的那种半更新状态（2026-11-12 实踩）。
+    if args.py_tree:
         rc = sh(f'cd {R}/backend-python && tar xzf /tmp/aic-py/py-tree.tgz && '
                 'sed "s#  #  #" /tmp/aic-py/MANIFEST.md5 | md5sum -c --quiet - && echo CHECK_OK')
         if rc.returncode != 0 or 'CHECK_OK' not in rc.stdout:

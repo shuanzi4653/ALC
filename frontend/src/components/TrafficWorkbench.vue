@@ -767,6 +767,20 @@ onUnmounted(()=>{
   </div>
   <CommandPalette :open="paletteOpen" :groups="NAV_GROUPS" :routes="paletteRoutes" :flights="paletteFlights"
                   @close="paletteOpen=false" @run="onPaletteRun"/>
+  <!-- 备案号：原来挂在 HomeStage 的页脚上，而 HomeStage 在 V1.0.5「一屏一件事」后不再挂载，
+       于是这两个号跟着消失了（`/assets/beian.png` 也因此成了无人引用的孤儿）。
+       放到主壳里，所有页面共享一条，22px 高，不参与滚动。
+       ICP 与公安联网备案是两件不同的事，两个都要有，链接各自指向官方查询页。 -->
+  <footer class="traffic-beian" data-beian>
+    <a class="tb-item" href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer"
+       title="工业和信息化部政务服务平台 · ICP 备案查询">蜀ICP备2026061491号-1</a>
+    <span class="tb-sep" aria-hidden="true"></span>
+    <a class="tb-item" href="https://beian.mps.gov.cn/#/query/webSearch?code=51010602003735"
+       target="_blank" rel="noreferrer"
+       title="全国互联网安全管理服务平台 · 公安联网备案查询"
+       ><img src="/assets/beian.png" alt="" width="13" height="13" loading="lazy" decoding="async"
+        >川公网安备51010602003735号</a>
+  </footer>
 </main>
 <!-- 建场进度条只属于旧 session（按气象重建计划时才有进度）；全国网是 SIM，
      逐分钟解析式生成，没有"建场"，全国页上挂着一条 0% 的进度条只会让人以为卡死了。 -->
@@ -1078,6 +1092,20 @@ html[data-theme="light"] .ledger-note p{color:#5b7a92 !important}
 @media(max-width:980px){.operations-nav{flex-wrap:wrap;row-gap:4px}.nav-fill{margin-left:0;width:100%;order:3}}
 
 .traffic-workbench{display:flex;flex-direction:column;height:100%;overflow:hidden;padding:0;gap:0}
+/* 备案页脚：两号并列、22px 高、常驻底部。flex:none 保证它不参与 .wb-body 的伸缩，
+   代价只是一屏少 22px —— 比"备案号在页面上找不到"要划算得多。 */
+.traffic-beian{flex:0 0 auto;display:flex;align-items:center;justify-content:center;gap:9px;
+  padding:5px 16px 6px;font-size:11.5px;line-height:1;color:#7fa3cc;
+  border-top:1px solid rgba(255,255,255,.07);background:rgba(6,18,28,.55)}
+.traffic-beian .tb-item{display:inline-flex;align-items:center;gap:4px;color:inherit;
+  text-decoration:none;white-space:nowrap}
+.traffic-beian .tb-item:hover{color:#cfe3f8;text-decoration:underline}
+.traffic-beian .tb-item img{display:block;width:13px;height:13px;flex:none}
+.traffic-beian .tb-sep{width:1px;height:11px;background:rgba(255,255,255,.16)}
+html[data-theme="light"] .traffic-beian{color:#4f6d85;background:#f2f7fc;
+  border-top-color:rgba(0,0,0,.08)}
+html[data-theme="light"] .traffic-beian .tb-item:hover{color:#14567d}
+html[data-theme="light"] .traffic-beian .tb-sep{background:rgba(0,0,0,.16)}
 .wb-top{flex:0 0 auto;display:flex;align-items:center;gap:14px;padding:8px 16px;min-height:46px;
   border-bottom:1px solid #1e3648;background:linear-gradient(180deg,#0f2233 0%,#0b1a27 100%)}
 .wb-brand{display:flex;align-items:baseline;gap:9px;min-width:0}

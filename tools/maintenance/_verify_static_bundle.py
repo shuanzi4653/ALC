@@ -144,6 +144,11 @@ def analyse(bundle):
 
     referenced = set()
     for target in REFERENCE_RE.findall(bundle.text_of("index.html")):
+        # 只统计"包内应该有的文件"。`href="data:image/svg+xml,..."` 是内联 favicon
+        # （自包含，不需要对应文件），外链（http/https、//host）同理 ——
+        # 以前不过滤，data URI 整串被当成路径，于是每次都报一条 MISSING 并判 damaged。
+        if target.startswith(("data:", "http:", "https:", "//", "#", "mailto:")):
+            continue
         referenced.add(target.lstrip("/"))
 
     missing, orphans, unref = [], [], []
