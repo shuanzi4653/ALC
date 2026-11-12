@@ -104,9 +104,8 @@ body {
   --map-inset-line: rgba(120, 165, 205, .45);
   --map-ground: rgba(6, 16, 25, .55);
   --map-node: #eaf6ff;
-  /* 三级城市点的填充：原来 .34 在深底上等于隐形（radius 又只有 1px），
-     319 个城市里有大半看不到点。提到 .62 后仍弱于省会（不喧宾夺主），但看得见。 */
-  --map-node-dim: rgba(214, 236, 255, .62);
+  /* 三级城市点不再单独配色（原 --map-node-dim 已删）：61% 半透明白在 r≈2px 上
+     会被描边与抗锯齿吃掉，视觉上就是一粒黑点。层级只靠半径区分。 */
   --map-node-stroke: rgba(8, 20, 32, .85);
   --map-label: #9ec4e0;
   --map-corridor: rgba(126, 206, 255, .62);

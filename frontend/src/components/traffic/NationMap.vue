@@ -1256,11 +1256,13 @@ function clickNode(node){
                  原来 rank3 是 r=1、fill 34% 透明度、stroke:none —— 全国视图下
                  1px 的半透明点等于隐形，于是地图上出现"只有城市名、没有点"的城市，
                  航线飞到那里像悬空的线（2026-11-12 用户当场指出）。
-                 现在最小 2.0，且三级都给描边：描边把点从底图上"抠"出来，
-                 比单纯放大填充更不糊。省会/机场城市仍靠大小区分层级。 -->
-            <circle :cx="node.x" :cy="node.y" :r="(node.rank===1?3.2:(node.rank===2?2.6:2.0))*inv"
-                    :style="{fill: node.rank===3?'var(--map-node-dim)':'var(--map-node)',
-                            stroke: 'var(--map-node-stroke)'}"
+                 V1.0.8 改成 r=2 + 62% 半透明白，仍然不够：直径只有 4px 时，
+                 0.45px 的近黑描边 + 抗锯齿几乎吃掉整个白心，肉眼读到的是一颗黑点
+                 （用户截图："其他的点看不见，基本上都是通航的小城市"）。
+                 所以三级**同色**：实心白 + 深蓝黑细框，层级只靠半径区分——
+                 半透明在小尺寸上不是"淡一点"，是"没有"。 -->
+            <circle :cx="node.x" :cy="node.y" :r="(node.rank===1?3.2:(node.rank===2?2.6:2.2))*inv"
+                    :style="{fill: 'var(--map-node)', stroke: 'var(--map-node-stroke)'}"
                     :stroke-width="node.rank===3?0.45:0.55"/>
             <!-- 只有**北京**用红色五角星（用户 2026-11-11 定）；其余省会维持"点 + 浅环" -->
             <path v-if="node.name==='北京市'" :d="STAR" class="cap-star"
