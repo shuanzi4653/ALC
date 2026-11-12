@@ -156,6 +156,9 @@
                        :summary="sumConclusion" :force="forceSeq" :force-dir="forceDir" :tone="tone">
           <Timeline :points="timelinePoints" title="本班次的时刻轴" unit="申请 / 计划 / 实际 / 当前"
                     aria="班次申请、计划、实际与当前时刻" />
+          <p class="dd-note" v-if="timelineMissing.length" data-timeline-missing>
+            未取得的时刻：{{ timelineMissing.join('、') }}。该班次尚未到达该节点，不以计划值代替实际值。
+          </p>
           <p class="dd-concl">{{ finalConclusion }}</p>
           <p class="dd-rv" v-if="review">
             这条人工裁决写在「{{ flight.id }}」上，走廊页、推演页与日志同步同一份记录。
@@ -411,6 +414,18 @@ const sumLoss = computed(() => {
   const r = (options.value || []).find((o) => o.recommended)
   return r ? `推荐 ${r.label} · 代价 ${num(r.cost, 2)}` : '无推荐项'
 })
+// 时刻轴只画拿得到的时刻。未来班次没有"实际"，这一格就不出现 —— 但读者看到
+// 四个标签少一个，会以为数据丢了。这里把缺失项列出来，并说明不拿计划值顶替。
+const timelineMissing = computed(() => {
+  const f = props.flight || {}
+  const has = (v) => /(\d{2}):(\d{2})/.test(String(v || ''))
+  const miss = []
+  if (!has(f.requestAt)) miss.push('申请')
+  if (!has(f.planAt)) miss.push('计划')
+  if (!has(f.actualAt)) miss.push('实际')
+  return miss
+})
+
 const sumConclusion = computed(() => (finalConclusion.value || '').slice(0, 46))
 const sumCompare = computed(() => '同一帧移除模型层后的差异，展开读取')
 const sumLedger = computed(() => '人与算法判定不一致的逐条记录，展开读取')
@@ -620,4 +635,6 @@ html[data-theme="light"] .dd-tbl td{color:#17364d;border-bottom-color:#e6eef6}
 html[data-theme="light"] .dd-tbl tr.bad td{color:#a8321f}
 html[data-theme="light"] .dd-empty b{color:#12395c}
 html[data-theme="light"] .dd-empty p{color:#40607a}
+.dd-note{margin:2px 0 6px 0;font-size:10px;line-height:1.6;color:#7d9cb3}
+html[data-theme="light"] .dd-note{color:#5b7386}
 </style>
