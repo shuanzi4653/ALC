@@ -249,7 +249,8 @@ test('没有成因的班次逐项报缺席，且不从不完整的记录里倒�
   const detoured = mechanismChain({ id: 'F-CLOSED-2', status: 'CLOSED', detourMinutes: 5, distanceKm: 180 }, plan())
   assert.deepEqual(detoured.missing, ['criterion', 'window'], '有绕行量时几何还有话可说')
   const geometry = detoured.steps.find(step => step.key === 'geometry')
-  assert.ok(geometry.absent.includes('倒推出一个成因'), geometry.absent)
+  // V1.0.9 改为「无可用成因判据，不作推断」——约束不变：不得由绕行量倒推成因。
+  assert.ok(geometry.absent.includes('无可用成因判据'), geometry.absent)
   assert.equal(geometry.headline, '', '没有成因就没有"这块几何是怎么来的"可讲')
   assert.ok(geometry.lines.some(line => line.includes('180 km')), '量还是照报')
   // 判据行不得凭空出现任何一条成因的名字。

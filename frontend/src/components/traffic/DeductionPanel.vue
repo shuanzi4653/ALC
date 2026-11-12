@@ -268,7 +268,7 @@ function clockOf(iso){
       <header>
         <span class="ded-no">1</span>
         <h3>数据</h3>
-        <p class="ded-lead">{{ allStations.length }} 个机场站 METAR，{{ clockOf(d.observation?.observedAt) }} —— 这一步只读，不判断</p>
+        <p class="ded-lead">{{ allStations.length }} 个机场站 METAR，{{ clockOf(d.observation?.observedAt) }}。本步骤只读取，不判定</p>
       </header>
       <p class="ded-fold-line" v-if="folded(1)">{{ summaries[1] }}</p>
       <div class="ded-body wide" v-else>
@@ -295,9 +295,9 @@ function clockOf(iso){
             <dt>本步输入</dt>
             <dd>{{ allStations.length }} 站 METAR 实测，观测时刻 {{ clockOf(d.observation?.observedAt) }}</dd>
             <dt>本步输出</dt>
-            <dd>每站的能见度与档位 —— 走廊本身还没有结论</dd>
+            <dd>每站能见度与档位；走廊结论尚未生成</dd>
           </dl>
-          <p class="ded-note">档位是<b>单站</b>判的：能见度低于阈值即停飞档。走廊的档位要等第 2、3 步把站点插值到走廊上。</p>
+          <p class="ded-note">档位按单站判定：能见度低于阈值即停飞档。走廊档位在第 2、3 步完成站点插值后给出。</p>
         </aside>
       </div>
     </article>
@@ -343,8 +343,7 @@ function clockOf(iso){
             <b>{{ st.name }}</b>{{ st.station }} · {{ st.distanceKm }} km · 权重 {{ (st.weight*100).toFixed(1) }}%
           </p>
           <p><b>最近站距</b>{{ probs.nearestKm ?? '—' }} km<span v-if="probs.confidence==='LOW'"> · 超 250 km，置信降级</span></p>
-          <p class="ded-note">权重 = 1/d²，取最近 3 站后归一化，连线粗细表示权重。
-            纵轴是<b>真实距离</b>（每 100 km 一格），横轴按权重排序、间距均分 —— 不是地理方位。</p>
+          <p class="ded-note">权重 = 1/d²，取最近 3 站归一化，线宽表示权重。纵轴为真实距离（每 100 km 一格），横轴按权重排序均分，非地理方位。</p>
         </aside>
       </div>
     </article>
@@ -382,7 +381,7 @@ function clockOf(iso){
           </dl>
           <p><b>σ</b>{{ probs.sigma ?? '—' }} · 置信 {{ probs.confidence==='OK'?'正常':'降级' }}</p>
           <p><b>判据取值</b>用<b>最差采样点</b> {{ pct(probs.pMax) }}，不用中点 {{ pct(probs.pUnsafe) }}</p>
-          <p class="ded-note">沿走廊每 5 km 采样一次，取最差的一段 —— 保守取法：只要有一段不可飞，整条都按不可飞看。</p>
+          <p class="ded-note">沿走廊每 5 km 采样，取最差段。任一段不可飞，整条走廊按不可飞处理。</p>
         </aside>
       </div>
     </article>
@@ -416,7 +415,7 @@ function clockOf(iso){
           </dl>
           <p><b>观测档</b>{{ verdictPair.rule }}</p>
           <p><b>概率档</b>{{ verdictPair.probability }}</p>
-          <p class="ded-note">两档取更严者为结论。判据与结论用同一个数：第 3 步的最差采样点。</p>
+          <p class="ded-note">两档取更严者为结论，判据与结论使用同一数值（第 3 步最差采样点）。</p>
         </aside>
       </div>
     </article>
@@ -449,7 +448,7 @@ function clockOf(iso){
           <p v-if="decision.excluded && decision.excluded.CANCEL" class="ded-note">
             取消的损失只有 {{ Math.round(decision.losses?.CANCEL||0) }}，数字上最便宜，但<b>不可执行</b>：{{ decision.excluded.CANCEL }}。
           </p>
-          <p class="ded-note">期望损失 = 概率 × 代价。取消是兜底项，不参与"谁最便宜"的比较。</p>
+          <p class="ded-note">期望损失 = 概率 × 代价。取消为兜底项，不参与最优比较。</p>
         </aside>
       </div>
     </article>
@@ -520,8 +519,8 @@ function clockOf(iso){
             <dd>当前 {{ pct(probs.pMax) }} · 最低 {{ pct(Math.min(...hourly.filter(h=>h.p!=null).map(h=>h.p))) }}</dd>
           </dl>
           <p class="ded-note">
-            <template v-if="hourly[0]?.frameObserved">七帧都是案例内的实测帧，不是模式延伸。</template>
-            <template v-else>3–6 h 一段来自模式逐时值按历史频率校准，不是本模型。</template>
+            <template v-if="hourly[0]?.frameObserved">七帧均为案例内实测帧，非模式延伸。</template>
+            <template v-else>3–6 h 段为模式逐时值按历史频率校准，非本模型。</template>
           </p>
         </aside>
       </div>
@@ -530,7 +529,7 @@ function clockOf(iso){
       <header>
         <span class="ded-no">8</span>
         <h3>复核</h3>
-        <p class="ded-lead">模型与规则不一致时，人最后怎么判 —— 只列本走廊</p>
+        <p class="ded-lead">模型与规则不一致时的人工判定，仅统计本走廊</p>
       </header>
       <p class="ded-fold-line" v-if="folded(8)">{{ summaries[8] }}</p>
       <div class="ded-body wide" v-else>

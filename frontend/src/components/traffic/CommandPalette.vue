@@ -90,9 +90,7 @@ function onKey(event){
     <input ref="box" v-model="query" class="cmdk-input" @keydown="onKey"
            placeholder="输走廊号（如 1-07）/ 班次号 / 页面名 / TS、FAR …" aria-label="搜索">
     <div class="cmdk-list">
-      <p class="cmdk-empty" v-if="!flat.length">
-        没有匹配项。可搜：走廊号、班次号、城市名、页面名、指标名（TS / FAR / POD / Brier）。
-      </p>
+      <p class="cmdk-empty" v-if="!flat.length">无匹配项。可检索：走廊号、班次号、城市名、页面名、指标名（TS / FAR / POD / Brier）。</p>
       <template v-for="group in grouped" :key="group.name">
         <p class="cmdk-group">{{ group.name }}</p>
         <button v-for="item in group.list" :key="item.kind+item.key+(item.meta||'')"
@@ -103,7 +101,7 @@ function onKey(event){
         </button>
       </template>
       <p class="cmdk-empty" v-if="!routes.length&&!flights.length">
-        走廊与班次清单尚未载入 —— 等运行计划就绪后再搜编号。
+        走廊与班次清单尚未载入，请待运行计划就绪后检索。
       </p>
     </div>
     <p class="cmdk-foot">↑↓ 选择 · 回车执行 · Esc 关闭 · 由 Ctrl+K 唤起</p>

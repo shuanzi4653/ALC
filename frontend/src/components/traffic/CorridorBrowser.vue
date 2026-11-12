@@ -28,10 +28,7 @@
                    :radar-on="true" :fog-on="false" :terrain-on="false" :tilt="false"
                    :zone-bands="zoneBands" :solo-corridor="activeId" :lock-view="true"
                    :selected-corridor="activeId" :line-limit="1"/>
-        <p class="cb-mapnote" v-if="active">
-          只画这一条：{{ active.fromName }} → {{ active.toName }}。本页不支持缩放，
-          要看周边空域请去「态势」。
-        </p>
+        <p class="cb-mapnote" v-if="active">仅显示本条走廊：{{ active.fromName }} → {{ active.toName }}。本页不支持缩放，周边空域请见「态势」。</p>
       </div>
 
       <!-- 走廊模式：航旅纵横式数据卡 -->
@@ -56,7 +53,7 @@
             判据：{{ active.drivers.join('；') }}
           </p>
           <p class="cb-why quiet" v-else>
-            本帧没有越过任何阈值 —— 依据为空是结论，不是缺数据。
+            本帧未越过任何阈值，依据为空即结论。
           </p>
 
           <!-- 人工审核：1.0.0 的"人说了算"要保留，算法只给建议 -->
@@ -68,11 +65,7 @@
             <input v-model="reasonText" placeholder="理由（写进日志）" aria-label="人工裁决理由"/>
             <button class="clr" v-if="active.review" @click="clearReview">撤销</button>
           </div>
-          <p class="cb-rv-note" v-if="active.review">
-            人工裁决已记录：{{ reviewLabel(active.review.action) }} · {{ active.review.reason || '未填理由' }}
-            —— 它覆盖算法结论，推演与日志都读这一份；理由可随时改写，改完即存。
-            <em class="rv-scope">（记录在本浏览器，不写服务端台账）</em>
-          </p>
+          <p class="cb-rv-note" v-if="active.review">人工裁决已记录：{{ reviewLabel(active.review.action) }} · {{ active.review.reason || '未填理由' }}。该裁决覆盖算法结论，推演与日志均读取此记录，理由可随时修改。记录存于本浏览器，不写入服务端台账。</p>
         </template>
         <p v-else class="cb-empty">左侧选一条走廊。</p>
       </section>

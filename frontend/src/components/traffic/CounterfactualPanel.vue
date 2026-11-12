@@ -200,20 +200,20 @@ function pctText(v){return typeof v==='number'?`${v>0?'+':''}${v}%`:'—'}
     </p>
 
     <p class="cf-head" v-if="head" :class="head.saved>0?'good':'flat'">
-      <b>{{ head.same?'本快照下两组没有差别':(nationalMode?'本帧有班次是模型单独拦下的':'本快照下 AI 组更保守') }}</b>
+      <b>{{ head.same?'本快照两组无差异':(nationalMode?'本帧存在模型单独拦下的班次':'本快照 AI 组更保守') }}</b>
       <template v-if="nationalMode">
-        {{ d.a.label }}：<span class="alc-num">{{ d.a.exposure }}</span> 架次会照常飞；
+        {{ d.a.label }}：<span class="alc-num">{{ d.a.exposure }}</span> 架次照常执行；
         {{ d.b.label }}：<span class="alc-num">{{ d.b.exposure }}</span> 架次。
       </template>
       <template v-else>
-        关掉 AI：<span class="alc-num">{{ d.a.exposure }}</span> 架次暴露在不可飞走廊上；
-        开启 AI：<span class="alc-num">{{ d.b.exposure }}</span> 架次。
+        关闭模型：<span class="alc-num">{{ d.a.exposure }}</span> 架次暴露于不可飞走廊；
+        启用模型：<span class="alc-num">{{ d.b.exposure }}</span> 架次。
       </template>
       <!-- 案例模式才有"用几次绕飞/延误换掉多少暴露"这笔账；全国层两边都没有额外动作，
            那句话会变成"用停飞，换掉 32 架次"，读起来像漏了主语。 -->
-      <template v-if="head.saved>0 && !nationalMode">换言之，用 <span class="alc-num">{{ head.actions||'停飞' }}</span>，
+      <template v-if="head.saved>0 && !nationalMode">即以 <span class="alc-num">{{ head.actions||'停飞' }}</span>
         换掉 <span class="alc-num">{{ head.saved }}</span> 架次的风险暴露。</template>
-      <template v-else-if="head.saved>0">代价是这 <span class="alc-num">{{ head.saved }}</span> 架停在地面，
+      <template v-else-if="head.saved>0">代价是这 <span class="alc-num">{{ head.saved }}</span> 架停场，
         没有产生额外绕飞，也没有取消。</template>
     </p>
     <p class="cf-why" v-if="d.conclusion" data-cf-conclusion>{{ d.conclusion }}</p>
@@ -226,8 +226,8 @@ function pctText(v){return typeof v==='number'?`${v>0?'+':''}${v}%`:'—'}
           <dt>额外延误</dt><dd class="alc-num">0 分钟</dd>
           <dt>取消</dt><dd class="alc-num">0 架次</dd>
         </dl>
-        <p class="cf-card-note" v-if="nationalMode">规则分（端点能见度分档 + 风速 + 回波）照常生效，只是不再看模型概率 —— 模型判停的那几架会照原计划飞。</p>
-        <p class="cf-card-note" v-else>规则说不飞就不飞、说飞就飞 —— 没有概率，也没有"要不要复核"这一步。</p>
+        <p class="cf-card-note" v-if="nationalMode">规则分（端点能见度分档 + 风速 + 回波）照常生效，不再读取模型概率，模型判停的班次按原计划执行。</p>
+        <p class="cf-card-note" v-else>完全按规则结论执行，不含概率与复核环节。</p>
       </div>
       <div class="cf-card b">
         <h3>B · {{ d.b.label }}</h3>
@@ -236,17 +236,8 @@ function pctText(v){return typeof v==='number'?`${v>0?'+':''}${v}%`:'—'}
           <dt>额外延误</dt><dd class="alc-num">{{ d.b.delayMinutes }} 分钟</dd>
           <dt>取消</dt><dd class="alc-num">{{ d.b.cancelled }} 架次（延误 {{ d.b.delayedFlights ?? 0 }} 班）</dd>
         </dl>
-        <p class="cf-card-note" v-if="nationalMode" data-probability-rule>
-          模型只允许更严，不允许更松：规则说飞、模型说不能飞 → 停飞；规则说不能飞 → 停飞，模型不参与翻案。
-          阈值 <b>p ≥ 60%</b>（停飞）由后端 `MODEL_HOLD` 一处给出，本帧下发的改判架次按它算。
-          模型概率**不并进**规则分，是并列的第二道判据。
-        </p>
-        <p class="cf-card-note" v-else data-probability-rule>
-          概率档只允许更严，不允许更松：概率说他能飞、观测说不能飞 → 按不能飞执行；
-          概率说他不能飞、观测说能飞 → 转人工复核（置信度 &lt;0.65 直接转人工）。
-          概率档阈值 <b>0.25</b>（停飞）/ <b>0.15</b>（谨慎），与后端常量
-          <code>P_PROB_BLOCK / P_PROB_WATCH</code> 同源，界面上不另写一份。
-        </p>
+        <p class="cf-card-note" v-if="nationalMode" data-probability-rule>模型仅可加严，不可放宽：规则放行而模型判风险时停飞；规则判停飞时模型不参与推翻。阈值 p ≥ 60% 由后端 MODEL_HOLD 统一给出。模型概率与规则分并列，不合并计算。</p>
+        <p class="cf-card-note" v-else data-probability-rule>概率档仅可加严：概率判可飞而观测判不可飞时按不可飞执行；概率判不可飞而观测判可飞时转人工复核，置信度 &lt;0.65 直接转人工。阈值 0.25（停飞）/ 0.15（谨慎）与后端常量同源。</p>
       </div>
       <div class="cf-card d">
         <h3>差值（B − A）</h3>
@@ -265,9 +256,8 @@ function pctText(v){return typeof v==='number'?`${v>0?'+':''}${v}%`:'—'}
 
     <section class="cf-sample" v-if="d.sample&&d.sample.length">
       <b>改判明细（最多 20 条 · 真改判优先）</b>
-      <small class="cf-sample-note" v-if="nationalMode">只列被模型改判的班次：规则说能飞、模型概率越过阈值，最终停飞。规则分与几何两边一致，所以这里没有"看过但没动"的第二段。</small>
-      <small class="cf-sample-note" v-else>前段是档位真的变了的班次；后段「低置信 · 留痕未改判」是看过但没动的，
-        它们不计入上面的改判架次 —— 两段不可合并读。</small>
+      <small class="cf-sample-note" v-if="nationalMode">仅列被模型改判的班次：规则判可飞、模型概率越过阈值而最终停飞。规则分与几何两侧一致，故无未改判段。</small>
+      <small class="cf-sample-note" v-else>前段为档位实际变更的班次；后段「低置信 · 留痕未改判」仅记录、未改判，不计入改判架次。</small>
       <table>
         <thead><tr><th>航班</th><th>走廊</th><th>不可飞概率</th><th>置信度</th><th>规则</th><th>生效后</th><th>依据</th><th>理由</th></tr></thead>
         <tbody>

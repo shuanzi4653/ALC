@@ -81,10 +81,10 @@ const sfiText=computed(()=>{
       <h3>轨1 研判：规则与模型各说了什么</h3>
       <small>{{observedCity}} · 第 {{minute.toFixed(0)}} 分钟 · 模型 {{view.model.modelVersion||'—'}}</small>
     </div>
-    <p class="briefing-note">放行、关闭、改航的档位始终由规则给出。模型只能把结论<b>变得更保守</b>，不能让它更乐观 —— 这一条写死在服务端，不在本页面比较。</p>
+    <p class="briefing-note">放行、关闭、改航档位始终由规则给出。模型仅可加严，不可放宽；该约束在服务端实现。</p>
 
     <p class="track1-error" v-if="error" data-track1-error>{{error}}</p>
-    <p class="briefing-note" v-else-if="!observation" data-track1-empty>当前没有可研判的观测（这一轮气象源没有返回任何城市读数）。不显示档位：没有要素就没有结论。</p>
+    <p class="briefing-note" v-else-if="!observation" data-track1-empty>当前无可研判观测（本轮气象源未返回城市读数），不输出档位。</p>
     <p class="briefing-note" v-else-if="loading&&!result">正在取规则档位与模型档位…</p>
 
     <template v-if="result">
@@ -117,10 +117,7 @@ const sfiText=computed(()=>{
             <dt>置信度</dt><dd>{{confidenceText}}</dd>
             <dt>与次高的差</dt><dd>{{view.model.margin===null?'—':view.model.margin.toFixed(3)}}</dd>
           </dl>
-          <p v-else class="muted">
-            {{view.model.absentReason==='NOT_REQUESTED'?'这一轮还没有向模型发起请求。':'模型不可用：'+view.model.absentReason}}
-            没有档位可比，因此不参与裁决。
-          </p>
+          <p v-else class="muted">{{view.model.absentReason==='NOT_REQUESTED'?'本轮未向模型发起请求。':'模型不可用：'+view.model.absentReason}} 无档位可比，不参与裁决。</p>
           <p class="track1-flag warn" v-if="view.model.lowConfidence" data-track1-low>置信不足：与次高档的差距很小，这一档不宜单独作依据。</p>
           <p class="track1-flag warn" v-if="view.model.degraded" data-track1-degraded>{{view.model.degradedReason}}</p>
           <div v-if="view.model.top3.length" class="track1-top3" data-track1-top3>

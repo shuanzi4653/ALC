@@ -34,7 +34,7 @@ const runtimeText=computed(()=>{
 <template>
   <div class="briefing-block" data-ml-effect>
     <div class="briefing-head"><h3>三列对照：规则 / 模型 / 人工仲裁</h3><small>训练期 · {{snapshot.samples}} 条样本 · 测试 {{snapshot.sizes.test}} 条</small></div>
-    <p class="briefing-note">三列回答的<b>不是同一个问题</b>：规则列是运行放行那套（累减扣分、一票封顶），模型列学的是标注判据（逐要素分段、取最坏档），人工仲裁列是两者分歧样本的复核表。<b>不要把规则列与模型列当同一把尺比的两次读数</b>——它们的难度不同。</p>
+    <p class="briefing-note">三列口径不同：规则列对应运行放行判据（累减扣分、一票封顶），模型列拟合标注判据（逐要素分段、取最坏档），人工列记录两者分歧的复核结果。规则列与模型列不可直接对比。</p>
 
     <div class="ml-columns">
       <article v-for="row in snapshot.rows" :key="row.key" :class="{best:snapshot.best===row.key,unmeasured:!row.measured}"
@@ -63,10 +63,10 @@ const runtimeText=computed(()=>{
 
     <div class="ml-runtime" data-ml-runtime>
       <b>运行期一致性（最近 24 小时留痕）</b>
-      <p v-if="runtimeError">{{runtimeError}} —— 不显示比例。</p>
+      <p v-if="runtimeError">{{runtimeError}}。不显示比例。</p>
       <p v-else-if="!runtimeText">正在读取留痕…</p>
       <p v-else :class="runtimeText.state">{{runtimeText.text}}</p>
-      <small>训练期那张表衡量"能否复现判据"（0.10.1 轨1 口径，非 0.11.1 的预测能力）；这一行衡量"线上这一段时间里两边同档了几次"。两者分母不同，不能相加、不能互推。</small>
+      <small>训练期表衡量判据复现能力（0.10.1 轨1 口径），本行衡量线上同期同档次数。两者分母不同，不可相加或互推。</small>
     </div>
   </div>
 </template>

@@ -101,7 +101,8 @@ test('走廊几何取自网络载荷，取不到时跳过并计数 —— 不用
   assert.equal(stripped.lines.features.length, 0)
   assert.equal(stripped.nodes.features.length, 0)
   assert.equal(stripped.missingCorridor, stripped.total, '取不到的条数必须等于事件总数')
-  assert.match(stripped.note, /取不到走廊几何/,
+  // V1.0.9 文案改为「无走廊几何…已跳过，不以直线替代」——断言锚点随之收窄到"无走廊几何"。
+  assert.match(stripped.note, /无走廊几何/,
     '缺席必须在说明里出现 —— 静默跳过就是一条假通过')
 })
 
@@ -392,7 +393,8 @@ test('回放气象帧：对不上就说对不上，不把当前帧冒充成当�
   assert.equal(aligned.tiers.strong, 8.4)
   const off = replayWeatherFrame(WEATHER({minute: 480}), 120)
   assert.equal(off.state, 'MISALIGNED')
-  assert.match(off.note, /请勿把它读成回放时刻的天气/)
+  // V1.0.9 改为「下列数值属本帧，不代表回放时刻天气」——同样的约束，更书面。
+  assert.match(off.note, /不代表回放时刻天气/)
   // 负向对照：把状态判据去掉（永远 ALIGNED），两帧就长得一样了。
   assert.notEqual(off.state, aligned.state)
   assert.equal(replayWeatherFrame(null, 120).state, 'ABSENT')

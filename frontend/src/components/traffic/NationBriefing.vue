@@ -278,7 +278,7 @@ function clock(m){
         </template>
         <template v-else-if="variant==='briefing'">
           <h3>在飞班次情报 <small>{{ shownRows.length }} 架 · {{ sortLabel }}</small></h3>
-          <p>每行一架飞行汽车：风险分、判据来源与放行裁决。申请 / 计划 / 实际三个时刻见「处置 · 调度台账」。</p>
+          <p>每行一架飞行汽车，含风险分、判据来源与放行裁决。申请 / 计划 / 实际时刻见「处置 · 调度台账」。</p>
         </template>
         <template v-else>
           <h3>全国班次台账 <small>{{ shownRows.length }} 架在飞 · {{ upcoming.length }} 班待起飞</small></h3>
@@ -338,7 +338,7 @@ function clock(m){
               <td>—</td>
             </tr>
             <tr v-if="!shownRows.length&&!upcoming.length"><td colspan="6" class="empty">
-              {{ filterKey==='all'?'此刻没有班次':'当前筛选下没有班次 —— 换一个筛选片或点「全部」' }}</td></tr>
+              {{ filterKey==='all'?'此刻无班次':'当前筛选无班次，请切换筛选片或点「全部」' }}</td></tr>
           </tbody>
         </table>
       </div>
@@ -370,9 +370,9 @@ function clock(m){
       </section>
       <div class="nb-hd">
         <h3>机场情报 <small>{{ intel.length }} 个机场城市</small></h3>
-        <p>实况来自公开源（METAR / open-meteo）；“放行建议”是按能见度门槛算的规则派生值，不是官方结论。
+        <p>实况来自公开源（METAR / open-meteo）；放行建议为按能见度门槛派生的规则值，非官方结论。
           <template v-if="payload?.weatherMode?.virtual">
-            <b class="vvis-note">虚拟气象开启中：能见度与放行建议按合成雾区重算，温度与风仍是实况。</b>
+            <b class="vvis-note">虚拟气象开启：能见度与放行建议按合成雾区重算，温度与风保持实况。</b>
           </template>
         </p>
         <p v-if="zones.available" class="nb-zone-line">
@@ -404,7 +404,7 @@ function clock(m){
         </table>
       </div>
       <p class="nb-scope-foot" v-if="view==='intel'&&borderKm" data-scope-foot>
-        纳入范围：台湾、西藏、香港、澳门不纳入通航；外围 <b>{{ borderKm }}</b> km 缓冲带内的城市整体退出通航（保守取值）。
+        纳入范围：台湾、西藏、香港、澳门不纳入通航；外围 <b>{{ borderKm }}</b> km 缓冲带内城市整体退出通航。
         <template v-if="excluded.length">
           当前共 <b>{{ excluded.length }}</b> 城：{{ excluded.map(row=>row.name.replace(/市$/,'')+' '+row.distanceKm+' km').join('、') }}。
         </template>

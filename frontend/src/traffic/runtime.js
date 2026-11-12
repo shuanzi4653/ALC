@@ -1721,7 +1721,7 @@ export function mechanismChain(flight,plan){
          crossings===null?'':(crossings?`起降与交叉资源：已预约 ${crossings} 个交叉区`:'起降与交叉资源：无交叉区'),
          statutory===null?'':`固定管制区穿越记录 ${statutory} 条`].filter(Boolean)}
     : {absent:detour!==null&&detour>0.01
-         ?'本班次航程确实增加了，但没有成因判据可引用：不要在缺少判据时倒推出一个成因。'
+         ?'本班次航程增加，但无可用成因判据，不作推断。'
          :'本班次没有几何可讲：它没有被规划出一条替代航路。',
        headline:'',lines:detour===null?[]:[geometryEffect(detour,distance,delay)]}
 
@@ -1835,9 +1835,9 @@ export function mechanismPickerRows(flights,{basis='',query='',limit=12}={}){
 
 const CAUSE_ADVICE={
   WEATHER_BLOCKED:'该走廊在班次经过时段被回波挡住。优先改时隙或改航绕飞，两者都不可行才停止放行。',
-  WEATHER_UNAVAILABLE:'本轮没取到可核对的气象几何。先查气象源，不要在缺气象的情况下放行。',
+  WEATHER_UNAVAILABLE:'本轮未取得可核对的气象几何，须先核查气象源。',
   FINAL_WEATHER_OR_BOUNDARY_CHECK_FAILED:'最终复核未通过。核对班次经过时刻的回波与边界后再决定。',
-  NO_GEOMETRIC_PATH:'这是「几何」结论，不是气象结论。可调整起降点或走廊，不要记到气象账上。',
+  NO_GEOMETRIC_PATH:'本结论属几何范畴，非气象结论，不计入气象成因。',
   SEPARATION_RESOURCE_OR_TIME_LIMIT:'已声明高度层、起降与交叉资源或额外耗时均无法满足。先尝试改时隙或换备用高度层。',
   STATIC_AIRSPACE_BLOCKED:'起降点落在固定管制区（法规），只能等批准或改起降点，与气象无关。',
   TURN_RADIUS_OR_BOUNDARY_LIMIT:'转弯半径或边界限制。缩短航段或调整走廊走向。',
@@ -2121,11 +2121,11 @@ export function caliberBlocks(plan,weather,network){
           ?`${numeric(airspaceStatus.prohibited)} / ${numeric(airspaceStatus.approvalRequired)||0} 处`:absent(),
           note:'进入"需审批"不等于违规；只有"禁止进入"的穿越才染色。'},
         {label:'默认处置',value:'需审批（APPROVAL_REQUIRED）',
-          note:'进入需审批是默认口径；机场净空等被单独切成禁止进入的，由策略决定而不是隐藏常量。'},
+          note:'进入需审批为默认口径；机场净空等禁止进入情形由策略配置决定。'},
         {label:'高度层',value:stats&&stats.noAltitudeStacking===true?'只使用已声明高度层':absent(),
           note:'冲突用已声明高度层、时隙或地面等待解决，不叠加高度。'},
         {label:'法规依据',value:airspaceRules?legalFrameworkText(airspaceRules.legalFramework):absent(),
-          note:'管制的法源与具体条款；可据此逐条核对，而不是只给一个"依据相关规定"。'},
+          note:'管制所依据的法源与具体条款，可逐条核对。'},
         {label:'目录版本 / 取回时刻',
           value:airspaceRules
             ?`${text(airspaceRules.catalogVersion)} · ${text(airspaceRules.dataRetrievedAt)}`:absent(),
@@ -2195,7 +2195,7 @@ export const GLOSSARY=Object.freeze([
    full:'两级两规则：内核（≥45 dBZ）不可触碰；外场（≥35 dBZ）允许有界擦入。内核由外场向内收缩得到，不是强对流原轮廓。'},
   {group:'气象与回波',term:'擦入深度',plain:'允许蹭进外场多深，超过就要绕。',
    full:'外场允许的穿入深度上限。它与水平间隔「同源」（都取分离标准里的水平分量），不为强回波另立第二套标准。'},
-  {group:'气象与回波',term:'避让采样',plain:'沿着时间轴每隔一段看一眼，把这段时间的回波并起来算。',
+  {group:'气象与回波',term:'避让采样',plain:'沿时间轴分段采样，合并区间内回波计算。',
    full:'虚拟气象通道按固定步长沿时间轴扫掠，每班次取窗口内回波的并集作为避让几何；"点"是采样次数。实测通道只有一次观测，没有点。'},
   {group:'运行与处置',term:'资源或耗时不足',plain:'不是天气，是这个班次在时隙、高度层或总耗时上排不进。',
    full:'「一个名字对应五类拒绝」，按规划器检查的先后：①加完地面等待后总延误超过上限；'
@@ -2207,7 +2207,7 @@ export const GLOSSARY=Object.freeze([
   {group:'空域与风险',term:'气象派生风险区',plain:'按天气算出来的危险区（图上暖色）。',
    full:'由气象输入按本项目阈值派生，可复算。四层几何：监视层、场区、谨慎外环、禁止进入核心。它「不是」管制命令。'},
   {group:'空域与风险',term:'需审批 / 禁止进入',plain:'进去要批 / 进去不行。',
-   full:'APPROVAL_REQUIRED 与 PROHIBITED。只有"禁止进入"的穿越才染色；"需审批"是默认口径，由空域策略切换而不是隐藏常量。'},
+   full:'APPROVAL_REQUIRED 与 PROHIBITED。只有"禁止进入"的穿越才染色；"需审批"为默认口径，由空域策略切换。'},
   {group:'空域与风险',term:'雷达保护区',plain:'雷达站边上不能靠太近的一圈。',
    full:'以雷达站为中心的圆形保护范围。它是设备保护范围，不画成飞行管制几何，也不参与航路避让判据。'},
   {group:'调度与间隔',term:'走廊',plain:'起点到终点留出来的那条可以走的带子。',
@@ -2215,7 +2215,7 @@ export const GLOSSARY=Object.freeze([
   {group:'调度与间隔',term:'受气象影响改航',plain:'因为天气把路线绕弯了。',
    full:'航路被气象推移。成员资格来自「成因」（点位气象 / 雷达内核 / 雷达外场），不来自"绕行时长大不大"——长度只是几何差异的代理量。'},
   {group:'调度与间隔',term:'停止放行',plain:'这一班今天不飞了。',
-   full:'CLOSED。它是硬约束的结果，不是建议。预警中心里"深橙"必须能被拆成气象成因与非气象成因两类，否则一整屏深橙会被读成"天气导致停飞"。'},
+   full:'CLOSED，为硬约束结果，非建议。预警中心深橙项须区分气象与非气象成因。'},
   {group:'调度与间隔',term:'时隙重排',plain:'往后面挪一挪再飞。',
    full:'把冲突班次移到另一个时间片上。与"改航"是两种不同的处置：改航动的是空间，时隙重排动的是时间。'},
   {group:'调度与间隔',term:'地面等待',plain:'在地面上等着，不起飞。',
@@ -2518,7 +2518,7 @@ export function alertEventLayer(flights,network,{limit=EVENT_LAYER_LIMIT}={}){
     `与预警中心同一次求值：共 ${groups.total} 个合并事件（气象 ${groups.weatherEvents} · 非气象 ${groups.nonWeatherEvents}）`,
     `停止放行 ${groups.closedFlights} 班`,
     shown<groups.total?`地图绘制前 ${shown} 条`:null,
-    missingCorridor?`其中 ${missingCorridor} 条取不到走廊几何（该路由不在本次网络载荷里），已跳过而不是用直线顶替`:null,
+    missingCorridor?`其中 ${missingCorridor} 条无走廊几何（该路由不在本次网络载荷内），已跳过，不以直线替代`:null,
     truncated&&!missingCorridor?'其余事件请在「预警中心」查看':null,
   ].filter(Boolean).join(' · ')+'。'
   return {
@@ -3112,7 +3112,7 @@ export function replayWeatherFrame(weather,minute){
       // 左边说「未取得」、右边说「本帧是 T+0 分钟的帧」。模板一套两种情况，必有一句是假话。
       :(Number.isFinite(frameMinute)
         ?`本帧是 T+${Math.round(frameMinute)} 分钟的帧，回放指针在 T+${Math.round(at||0)} 分钟 —— `
-          +'两者不是同一刻。下面给出的仍是这一帧自己的数，请勿把它读成回放时刻的天气。'
+          +'两者非同一时刻。下列数值属本帧，不代表回放时刻天气。'
         :`回放指针在 T+${Number.isFinite(at)?Math.round(at):'—'} 分钟；`
           +'「本帧气象帧未取得」 —— 本段的气象数字不代表任何时刻的天气，要读数请先等到一帧。'),
   }

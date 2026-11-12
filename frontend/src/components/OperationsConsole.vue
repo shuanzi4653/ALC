@@ -74,7 +74,7 @@ const causeVerdict=computed(()=>{
   if(!g.total)return '本轮无调度事件'
   if(!g.closedFlights)return `${g.total} 个事件全部是时隙重排或改航，本轮无停止放行班次`
   if(!g.weatherClosedFlights)
-    return `停止放行 ${g.closedFlights} 班，其中气象成因 0 班 —— 不要把这一屏读成天气造成的`
+    return `停止放行 ${g.closedFlights} 班，气象成因 0 班`
   return `停止放行 ${g.closedFlights} 班，其中气象成因 ${g.weatherClosedFlights} 班（${Math.round(g.weatherClosedFlights/g.closedFlights*100)}%）`
 })
 const DISPOSAL_LABELS=Object.fromEntries(DISPOSAL_FLOW.map(item=>[item.key,item.label]))
@@ -222,7 +222,7 @@ const ruleRows=computed(()=>{
     {key:'bands',label:'回波分级',value:`无回波 < ${dbz(r.bandFloorDbz)} · 对流 ${dbz(r.convectiveDbz)} · 强对流 ${dbz(r.strongDbz)}`,
      note:'层状降水（下界到对流阈值之间）只展示，不构成限制，也不进入避让几何。'},
     {key:'core',label:'内核 · 禁止进入',value:`外场向内收缩 ${metres(r.coreInsetM)}`,
-     note:'内核由外场收缩得到，而不是强对流原轮廓：原轮廓在真实回波上是一圈碎点，画出来看不见。'},
+     note:'内核由外场收缩得到，非强对流原轮廓；原轮廓在真实回波上为断续碎点，无法成图。'},
     {key:'field',label:'外场 · 须绕飞',value:`擦入深度上限 ${metres(r.penetrationM)}`,
      note:'擦入深度与水平间隔同源——本项目不为强回波另立第二套标准。两级两规则：内核不可触碰，外场可有界擦边。'},
     {key:'layers',label:'高度层',value:props.session?.stats?.noAltitudeStacking===true?'只使用已声明高度层':'本计划未声明',
@@ -587,9 +587,7 @@ async function copyReceipt(row){
 </script>
 <template>
 <section class="operations-console" :data-view="view">
-  <p class="drill-banner" v-if="focus&&focus.hint" data-drill-banner>
-    <b>从首页指标下钻</b>{{focus.hint}}。本页只做导航与呈现，数值仍由本页唯一的产出点算一次。
-  </p>
+  <p class="drill-banner" v-if="focus&&focus.hint" data-drill-banner>由首页指标下钻{{focus.hint}}。本页只做导航与呈现，数值由唯一的产出点计算一次。</p>
   <template v-if="view==='alerts'">
       <section class="case-panels" v-if="casePanels" data-case-panels>
         <header>
@@ -603,15 +601,12 @@ async function copyReceipt(row){
           <div><small>按观测档应当</small><b>改航 {{ casePanels.rerouted }} · 延误 {{ casePanels.delayed }}</b></div>
           <div><small>暴露变化</small><b>{{ casePanels.exposureA }} → {{ casePanels.exposureB }} 架次</b></div>
         </div>
-        <p class="case-panels-foot">
-          这是判据层的结论：观测已越过禁飞阈值，按观测档应当处置 {{ casePanels.flightsHandled }} 班。
-          <b>下方是实时推演的事件，与这段判据不同源</b> —— 本案例只回放观测，不重跑调度。
-        </p>
+        <p class="case-panels-foot">判据层结论：观测已越过禁飞阈值，按观测档应处置 {{ casePanels.flightsHandled }} 班。下方事件来自实时推演，与本段判据不同源；本案例只回放观测，不重跑调度。</p>
       </section>
 
   <div class="operations-heading">
     <h2>预警中心 · 事件处置台 <small>{{cityName}} · {{alertGroups.total}} 个合并事件</small></h2>
-    <p>同一走廊与原因合并为一个事件。处置次序恒为：先改时隙（延迟起飞）、再改航绕飞，两者都不可行才停止放行。<b>但哪一类成因占多数，由下面对比条给出 —— 不由导语暗示。</b></p>
+    <p>同一走廊、同一原因合并为一个事件。处置次序固定：先改时隙，再改航绕飞，两者均不可行时停止放行。成因构成以下方对比条为准。</p>
   </div>
   <div class="cause-bar" v-if="alertGroups.total">
     <div class="cause-head">
@@ -680,34 +675,33 @@ async function copyReceipt(row){
     <p v-if="!shownAlerts.length" class="alerts-empty" data-alerts-empty>
       <template v-if="alertCauseFilter==='weather'&&alertGroups.closedFlights">
         <template v-if="caseMode">
-          本案例只回放观测与判据，<b>不重跑调度</b>。下方 {{alertGroups.closedFlights}} 班的停止放行来自实时推演（超出规划视界），与本次回放的气象无关 ——
-          要看气象进入决策后的差别，<button type="button" class="inline-link" data-go-deduce @click="emit('open-section','card')">见「推演 · 第 6 步 对照」</button>。
+          本案例只回放观测与判据，<b>不重跑调度</b>。下方 {{alertGroups.closedFlights}} 班停止放行来自实时推演，与本次回放的气象无关；
+          气象进入决策后的差异，<button type="button" class="inline-link" data-go-deduce @click="emit('open-section','card')">见「推演 · 第 6 步 对照」</button>。
         </template>
         <template v-else>
-          当前窗口内没有气象成因事件。停止放行的 {{alertGroups.closedFlights}} 班<b>不是天气造成的</b>，
-          原因构成：
+          当前窗口无气象成因事件。停止放行的 {{alertGroups.closedFlights}} 班<b>非天气成因</b>，构成：
           <template v-for="(row,index) in closedReasons" :key="row.key">
             <template v-if="index"> · </template><b>{{row.label}}</b> {{row.count}} 班
           </template>
-          —— 要看规则与概率各自处置了什么，<button type="button" class="inline-link" data-go-deduce @click="emit('open-section','card')">见「推演 · 第 6 步 对照」</button>。
+          ；规则与概率的处置差异，<button type="button" class="inline-link" data-go-deduce @click="emit('open-section','card')">见「推演 · 第 6 步 对照」</button>。
         </template>
       </template>
       <template v-else-if="alertCauseFilter==='weather'">
-        当前窗口内没有气象成因事件，也没有调度事件。这是<b>本帧确实没有触发</b>，不是"还没算"。
+        当前窗口无气象成因事件，亦无调度事件，属<b>本帧未触发</b>。
         <br>
-        想看判据与概率怎么算的，去
+        判据与概率口径见
         <button type="button" class="inline-link" data-go-corridor @click="emit('open-section','profile')">「走廊剖面」</button>；
-        想看逐班的申请/计划/实际，去
+        逐班申请 / 计划 / 实际见
         <button type="button" class="inline-link" data-go-ledger @click="emit('open-section','schedule')">「调度台账」</button>；
-        想复盘 AI 与规则的差别，去
+        规则与模型差异见
         <button type="button" class="inline-link" data-go-deduce @click="emit('open-section','card')">「推演 · 第 6 步 对照」</button>。
       </template>
-      <template v-else-if="alertCauseFilter==='nonWeather'">当前窗口内没有排程冲突类事件。</template>
+      <template v-else-if="alertCauseFilter==='nonWeather'">当前窗口无排程冲突类事件。</template>
       <template v-else>当前筛选范围暂无调度事件。</template>
     </p>
   </div>
   </template>
-  <template v-else-if="view==='weather'"><div class="operations-heading"><h2>气象监测 <small>{{cityName}}</small><small v-if="caseMode" class="case-scope-hint" data-case-scope>本页气象来自实时通道；回放案例的三站实测见首页横幅</small></h2><p>公开天气、合成气象和历史观测分别展示。系统派生的飞行风险区不等同于官方空域管制命令。</p><p class="operations-muted" v-if="weather?.dataType==='MODEL_ESTIMATE'" data-weather-source-split><template v-if="weatherMode==='measured'">通道是「实测气象」：<b>走廊的不可飞概率</b>由沈阳 / 长春 / 哈尔滨三站 METAR 实测推算；而本页这张<b>天气场</b>（风场点与派生风险区）来自 Open-Meteo 模式估算 —— 两者来源不同：走廊概率不看模式值，天气场也不冒充观测。</template><template v-else>通道是「虚拟气象」：<b>地图上的雷达回波与天气场走模拟通道（程序生成，不是观测）</b>；<b>走廊的不可飞概率仍按沈阳 / 长春 / 哈尔滨三站 METAR 实测推算</b>，不受本开关影响。两者来源不同 —— 回波不冒充观测，走廊概率也不看模式值。仅供演示。</template></p><WeatherSourceSwitch class="heading-switch" :mode="weatherMode" :status="weatherModeStatus" @change="emit('weather-mode-change',$event)"/></div><div class="weather-metrics"><article><small>当前数据类型</small><strong>{{weather?.dataType==='MODEL_ESTIMATE'?'公开模型估算':weather?.dataType==='SYNTHETIC_REPLAYABLE'?'合成回放':(caseMode?'历史回放 · 仅机场站观测':'数据不可用')}}</strong></article><article><small>来源 / 有效时刻</small><strong>{{weather?.provider||weather?.source||'—'}}</strong><small>{{weather?.validAt||weather?.retrievedAt||'—'}}</small></article><article><small>显示风场点</small><strong>{{weather?.winds?.length??0}}</strong></article><article><small>派生风险区域（已合并）</small><strong>{{weather?.cells?.length??0}}</strong></article></div>    <p class="operations-muted" v-if="caseMode" data-case-weather-boundary>历史回放只有机场站 METAR，<b>无雷达网格</b>；网格分档与派生风险区不可用。</p>
+  <template v-else-if="view==='weather'"><div class="operations-heading"><h2>气象监测 <small>{{cityName}}</small><small v-if="caseMode" class="case-scope-hint" data-case-scope>本页气象来自实时通道；回放案例的三站实测见首页横幅</small></h2><p>公开天气、合成气象、历史观测分列展示。派生飞行风险区不等同于官方空域管制指令。</p><p class="operations-muted" v-if="weather?.dataType==='MODEL_ESTIMATE'" data-weather-source-split><template v-if="weatherMode==='measured'">通道「实测气象」：<b>走廊不可飞概率</b>由沈阳 / 长春 / 哈尔滨三站 METAR 实测推算；本页<b>天气场</b>（风场点与派生风险区）来自 Open-Meteo 模式估算。两者来源不同：走廊概率不使用模式值，天气场不作观测口径。</template><template v-else>通道「虚拟气象」：<b>雷达回波与天气场为程序合成，非观测</b>；<b>走廊不可飞概率仍按沈阳 / 长春 / 哈尔滨三站 METAR 实测推算</b>，不受本开关影响。仅供演示。</template></p><WeatherSourceSwitch class="heading-switch" :mode="weatherMode" :status="weatherModeStatus" @change="emit('weather-mode-change',$event)"/></div><div class="weather-metrics"><article><small>当前数据类型</small><strong>{{weather?.dataType==='MODEL_ESTIMATE'?'公开模型估算':weather?.dataType==='SYNTHETIC_REPLAYABLE'?'合成回放':(caseMode?'历史回放 · 仅机场站观测':'数据不可用')}}</strong></article><article><small>来源 / 有效时刻</small><strong>{{weather?.provider||weather?.source||'—'}}</strong><small>{{weather?.validAt||weather?.retrievedAt||'—'}}</small></article><article><small>显示风场点</small><strong>{{weather?.winds?.length??0}}</strong></article><article><small>派生风险区域（已合并）</small><strong>{{weather?.cells?.length??0}}</strong></article></div>    <p class="operations-muted" v-if="caseMode" data-case-weather-boundary>历史回放只有机场站 METAR，<b>无雷达网格</b>；网格分档与派生风险区不可用。</p>
     <p class="operations-muted" v-if="weather?.qualityFlags?.length">数据质量：{{weather.qualityFlags.join(' · ')}}；航路覆盖：{{weather?.coverage?.routeCoverage||'模拟全域场'}}</p><div class="weather-cells"><article v-for="cell in weather?.cells||[]" :key="cell.id"><b>{{{RAIN:'降水',STORM:'合成雷暴',WIND:'强风',LOW_VISIBILITY:'低能见度'}[cell.kind]||cell.kind}}</b><span>{{cell.id}}</span><p>{{cell.source==='OPEN_METEO_DERIVED_RISK'?'按公开天气快照及项目阈值派生':'场区 / 谨慎外环 / 禁止进入核心分别计算后合并'}}<template v-if="cell.memberCount>1">；本区域由 {{cell.memberCount}} 个单体合并，成员：{{(cell.sources||[]).map(s=>s.split('::')[0]).join('、')}}</template></p></article></div>
   <section class="briefing" data-weather-situation>
     <div class="briefing-head">
@@ -769,10 +763,7 @@ async function copyReceipt(row){
       </li>
     </ol>
     <p class="operations-muted" v-else>本帧没有可用的点观测。</p>
-    <p class="operations-muted" v-if="situationBands.missingLocation">
-      另有 {{situationBands.missingLocation}} 条观测取不到行政区坐标，已跳过 —— 不把它们落到 (0,0)，
-      一个落在几内亚湾的点比少一个点更糟：它看起来像那里有雷暴。
-    </p>
+    <p class="operations-muted" v-if="situationBands.missingLocation">另有 {{situationBands.missingLocation}} 条观测缺行政区坐标，已跳过，不回落至 (0,0)。坐标缺失时少一点，优于错一点。</p>
     </template>
   </section>
 
@@ -824,7 +815,7 @@ async function copyReceipt(row){
   </section>
   <RegionalObservations/></template>
   <template v-else-if="view==='briefing'">
-  <div class="operations-heading"><h2>民航运行情报 <small>{{cityName}}</small></h2><p>班次选择、放行许可、逐站观测与危险天气合成一屏——选班次就在本页，不必绕调度台账。许可要素由该班次已写定的计划字段组装，不在此处重新计算；派生情报用于演示与核对，不作为真实放行依据。</p><WeatherSourceSwitch class="heading-switch" :mode="weatherMode" :status="weatherModeStatus" @change="emit('weather-mode-change',$event)"/></div>
+  <div class="operations-heading"><h2>民航运行情报 <small>{{cityName}}</small></h2><p>班次选择、放行许可、逐站观测与危险天气同屏呈现。许可要素取自该班次已写定的计划字段，不重新计算；派生情报用于演示与核对，不作为放行依据。</p><WeatherSourceSwitch class="heading-switch" :mode="weatherMode" :status="weatherModeStatus" @change="emit('weather-mode-change',$event)"/></div>
   <div class="briefing-block picker">
     <div class="briefing-head"><h3>选择班次</h3><small>共 {{pickerTotal}} 班 · 按与气象情报的相关度排序，此处列最相关的 {{pickerRows.length}} 班</small></div>
     <div class="picker-bar">
@@ -841,7 +832,7 @@ async function copyReceipt(row){
         <em v-else>{{f.fromCity}}→{{f.toCity}}</em>
       </button>
     </div>
-    <p class="briefing-note" v-else>没有匹配的班次。要按城市与运行状态筛全量班次，用「调度台账」。</p>
+    <p class="briefing-note" v-else>无匹配班次。全量筛选请使用「调度台账」。</p>
   </div>
 
   <div class="clearance-card">
@@ -850,7 +841,7 @@ async function copyReceipt(row){
       <b>{{selectedMark.label}}</b>{{selectedMark.note}}
     </p>
     <pre class="clearance-report" v-if="clearance.length"><code>{{clearance.join('\n')}}</code></pre>
-    <p class="briefing-note" v-else>在上面那一条里点一个班次，这里就给出它的放行许可——不必再去调度台账。缺报的要素写「未指派 / 未取得」：许可报文里没有留白，一个空值会被读成可以自行决定。</p>
+    <p class="briefing-note" v-else>选中上方班次后，此处给出其放行许可。缺报要素记为「未指派 / 未取得」，不以空值代替：许可报文不允许留白。</p>
   </div>
   <div class="briefing-block" data-batch-clearance>
     <div class="briefing-head"><h3>批量放行许可复核</h3><small>{{batchClearance.note}}</small></div>
@@ -868,7 +859,7 @@ async function copyReceipt(row){
     <div class="briefing-head"><h3>报文情报（METAR / SIGMET 式）</h3><small>报文读法 · 用于演示与核对，不作为真实放行依据</small></div>
     <details class="briefing-block density-fold" :open="policy.raw" data-density="raw">
       <summary>观测报文 <span>{{metarRows.length?metarRows.length+' 站':'本站帧无逐站观测'}}</span></summary>
-      <p class="briefing-note">逐站观测的报文读法。缺报的要素写 <code>//</code>——观测未报出能见度，与报出能见度 0 km 是两件事，不填补默认值。表格按严重程度排序：能见度低者在前，其次风速大者。</p>
+      <p class="briefing-note">逐站观测报文。缺报要素记 //：未报出能见度与能见度 0 km 不同，不填补默认值。按严重程度排序，能见度低者在前，其次风速大者。</p>
       <div class="metar-grid" v-if="metarRows.length">
         <article v-for="row in metarRows" :key="row.id">
           <dl><template v-for="line in row.lines" :key="line.label"><dt>{{line.label}}</dt><dd>{{line.value}}</dd></template></dl>
@@ -881,7 +872,7 @@ async function copyReceipt(row){
         <h4>逐站观测 · 可排序表格 <span>{{obsRows.length?obsRows.length+' 站':'本站帧无逐站观测'}}</span></h4>
         <button class="journal-export" :disabled="!obsRows.length" data-obs-export @click="exportObservations">导出 CSV</button>
       </div>
-      <p class="briefing-note">点列头排序。数值列默认降序（点「阵风」要的是最大的那一站排最前），文字列默认升序。缺值永远排在最后，升序降序都一样 —— 一个没报阵风的站既不是"阵风 0"，也不该在降序时顶到最前面冒充最大值。</p>
+      <p class="briefing-note">点击列头排序。数值列默认降序、文字列默认升序。缺值恒排末尾，不受排序方向影响。</p>
       <div class="table-scroll" v-if="obsSorted.length">
       <table class="observation-table">
         <thead><tr>
@@ -903,11 +894,11 @@ async function copyReceipt(row){
         </tbody>
       </table>
       </div>
-      <p class="operations-muted" v-else>本帧没有逐站观测。不显示一张空表：一张没有行的表会被读成"观测都是空的"。</p>
+      <p class="operations-muted" v-else>本帧无逐站观测，表格留空显示。</p>
     </div>
     <div class="briefing-block" data-observation-impact>
       <div class="briefing-head"><h4>观测影响面</h4><small>{{impacts.length}} 站达到需谨慎以上等级</small></div>
-      <p class="briefing-note">只有高影响与需谨慎两级的观测进入这里；正常与未定级的观测不列出——把正常站也列上，需要盯的那几站就被淹掉了。</p>
+      <p class="briefing-note">仅列出高影响与需谨慎两级观测；正常与未定级观测不列出。</p>
       <div class="impact-grid" v-if="impacts.length">
         <article v-for="row in impacts" :key="row.cityId" :class="row.level.toLowerCase()" :data-impact-city="row.cityId">
           <header><b>{{row.station}}</b><span>{{row.levelLabel}}</span></header>
@@ -937,7 +928,7 @@ async function copyReceipt(row){
   </section>
   <div class="briefing-block detour-card" data-detour-block>
     <div class="briefing-head"><h3>改航依据 · 逐班复诵</h3><small>{{detourRows.length}} 个班次因气象推移航路</small></div>
-    <p class="briefing-note">一个总数（例如"12 班改航"）无法核对；逐班带上各自的天气判据才可以。这正是本项目要讲的那件事——航道是被气象推着改的，不是排班排出来的。</p>
+    <p class="briefing-note">总数无法核对，逐班须附各自的天气判据。本表按班次列出改航依据。</p>
     <div class="detour-list" v-if="detourRows.length">
       <article v-for="row in detourRows" :key="row.id" :data-detour-row="row.id">
         <header><code>{{row.id}}</code><b>{{row.name}}</b><span>+{{row.detour}} 分</span></header>
@@ -945,7 +936,7 @@ async function copyReceipt(row){
         <small>{{row.route}}<template v-if="row.distance!=null"> · 航程 {{row.distance}} km</template></small>
       </article>
     </div>
-    <p class="briefing-note" v-else>本场景没有受气象影响改航的班次——航路未被气象推移。</p>
+    <p class="briefing-note" v-else>本场景无受气象影响改航的班次：航路未被气象推移。</p>
   </div>
   <section class="briefing" data-intel-timeline>
     <div class="briefing-head">
@@ -972,19 +963,18 @@ async function copyReceipt(row){
         <p>{{row.note}}</p>
       </article>
     </div>
-    <p class="briefing-note">登记数与已有几何数<b>不相等是正常的</b>：未取得公开定量范围的类别只登记、不生成几何。把两者合成一句"共 N 个管制区"会把这个差额抹掉，而差额正是"哪一类还不能用"的答案。</p>
+    <p class="briefing-note">登记数与几何数可以不等：未取得公开定量范围的类别只登记、不生成几何。两者分列，差额即尚不可用的类别。</p>
   </section>
   </template>
   <template v-else-if="view==='profile'">
     <div class="operations-heading"><h2>走廊剖面 <small>这条走廊几点能飞，凭什么</small></h2>
-      <p>概率来自三站 METAR 实测的 1/d² 插值；0–3 h 是本模型，3–6 h 是模式延伸，两段不合并成一条曲线。低置信（最近站距 &gt;250 km）一律降级为建议人工复核。</p></div>
+      <p>概率由三站 METAR 实测按 1/d² 插值；0–3 h 为本模型，3–6 h 为模式延伸，两段分列。最近站距 &gt;250 km 判为低置信，转人工复核。</p></div>
     <CorridorPanel :initial-id="corridorFocus" :minute="minute" :focus-pair="corridorPair"/>
   </template>
   <template v-else-if="view==='card'">
     <div class="operations-heading">
       <h2>推演 <small>一条走廊从观测到裁决</small></h2>
-      <p>四站 METAR → 1/d² 插值 → 概率合成 → 四条判据 → 四种处置的期望损失 → 与规则裁决对照。
-        每一步的数都由后端算，这一页只按算法顺序摆出来；换一条走廊、拖时间轴，整条链跟着变。</p>
+      <p>链路：METAR → 1/d² 插值 → 概率合成 → 四条判据 → 期望损失 → 与规则裁决对照。各步数值均由后端计算，本页按算法顺序呈现，随走廊与时间轴联动。</p>
     </div>
     <DeductionPanel :initial-id="corridorFocus" :minute="minute"/>
     <p class="card-archive" data-card-archive>
@@ -994,31 +984,30 @@ async function copyReceipt(row){
   </template>
   <template v-else-if="view==='counterfactual'">
     <div class="operations-heading"><h2>反事实对照 <small>用 AI 和不用，差多少</small></h2>
-      <p>同一帧、同一份规则，只摘掉最后一层模型判据 —— 差异只可能来自模型，不来自"两次抽样恰好不同"。
-        <b>默认看全国层当前帧</b>（即时可用）；要看某一次大雾的案例重放，在页内切换。</p></div>
+      <p>同一帧、同一规则，仅移除最后一层模型判据，差异只来自模型。默认显示全国层当前帧，案例重放在页内切换。</p></div>
     <CounterfactualPanel :minute="minute"/>
   </template>
   <template v-else-if="view==='ledger'">
     <div class="operations-heading"><h2>分歧台账 <small>AI 与规则不一致时，人怎么判的</small></h2>
-      <p>每条记录带时间、走廊、当时的概率与理由；否决与回滚必须填理由（后端对空理由直接 422）。空台账如实说空，不塞占位内容。</p></div>
+      <p>每条记录含时间、走廊、概率与理由；否决与回滚须填理由，空理由返回 422。无记录时显示为空。</p></div>
     <DivergencePanel/>
   </template>
   <template v-else-if="view==='mechanism'">
-  <div class="operations-heading"><h2>算法机理 <small>{{cityName}} · {{census.total}} 班</small></h2><p>把「这条走廊为什么不是直线」摊成一条因果链：气象判据 → 几何 → 时间窗。三要素全部取自当前计划自己的班次记录，本页不重算任何一个量；判据说这条走廊被挡住，与航路因此变了多少，是两句话，分开写。</p><WeatherSourceSwitch class="heading-switch" :mode="weatherMode" :status="weatherModeStatus" @change="emit('weather-mode-change',$event)"/></div>
+  <div class="operations-heading"><h2>算法机理 <small>{{cityName}} · {{census.total}} 班</small></h2><p>本页将走廊改航拆为因果链：气象判据 → 几何 → 时间窗。三要素取自当前计划的班次记录，本页不重算数值。</p><WeatherSourceSwitch class="heading-switch" :mode="weatherMode" :status="weatherModeStatus" @change="emit('weather-mode-change',$event)"/></div>
 
   <MlEffectBoard />
 
   <div class="briefing-block" data-mechanism-rule>
-    <div class="briefing-head"><h3>分级规则与几何构造</h3><small>取自本计划载荷</small></div>    <p class="briefing-note">这些阈值不是在页面上写死的：它们随计划一起下发，并由后端从各自唯一的常量读出。界面再写一份，等于让"页面引用的阈值"和"分类器实际使用的阈值"各有一份，改掉其中一处不会有任何东西变红。</p>
+    <div class="briefing-head"><h3>分级规则与几何构造</h3><small>取自本计划载荷</small></div>    <p class="briefing-note">阈值随计划下发，由后端从唯一常量读出，界面不另存副本。</p>
     <div class="mechanism-rule" v-if="rule">
       <article v-for="row in ruleRows" :key="row.key"><small>{{row.label}}</small><strong>{{row.value}}</strong><span>{{row.note}}</span></article>
     </div>
-    <p class="briefing-rule" v-else>本计划未发布分级规则——此处不引用任何阈值。缺失时唯一正确的写法是不写数，而不是退回一组看起来像规则的默认值：一个默认值会让人以为已经核对过。</p>
+    <p class="briefing-rule" v-else>本计划未发布分级规则，此处不引用阈值，亦不使用默认值。</p>
   </div>
 
   <div class="briefing-block" data-mechanism-census>
     <div class="briefing-head"><h3>判据分布</h3><small>{{census.rows.length}} 条判据 · {{census.unevaluated}} 班未进入成因判定</small></div>
-    <p class="briefing-note">每条判据后面写的是"这个判断是在哪块几何上做出来的"。点一条判据可以把下面的班次收窄到它；再点一次取消。固定管制区与作业区边界都不是气象——把它们算进"受气象影响改航"就是把非气象的成因记到气象账上。</p>
+    <p class="briefing-note">每条判据注明所依据的几何。点击可收窄下方班次，再次点击取消。固定管制区与作业区边界不计入气象成因。</p>
     <div class="mechanism-census" v-if="census.rows.length">
       <button v-for="row in census.rows" :key="row.key" class="mechanism-cause" :class="{on:basisFilter===row.key,weather:row.weather}" @click="basisFilter=basisFilter===row.key?'':row.key">
         <header><b>{{row.name}}</b><em>{{row.total}} 班</em><span v-if="row.weather">气象成因</span></header>
@@ -1027,12 +1016,12 @@ async function copyReceipt(row){
       </button>
     </div>
     <p class="briefing-note" v-else>本帧没有班次带成因判据。</p>
-    <p class="briefing-note" v-if="census.unevaluated">另有 {{census.unevaluated}} 班没有成因判据：它们在成因判定之前的判据处就结束了，不计入上面任何一条。这个数不能并进"直飞段可用"——那会把"没有被判定过"说成"判定为可用"。</p>
+    <p class="briefing-note" v-if="census.unevaluated">另有 {{census.unevaluated}} 班无成因判据，在成因判定前即已终止，不计入上述任何一条，亦不并入直飞段可用。</p>
   </div>
 
   <div class="briefing-block" data-mechanism-chain>
     <div class="briefing-head"><h3>逐班三要素</h3><small>匹配 {{picker.matched}} 班 · 此处列 {{picker.rows.length}} 班</small></div>
-    <p class="briefing-note">在这里选一个班次，下面展开它的判据、几何与时间窗。这是入口不是台账——要按城市与状态筛全量班次，用「调度台账」。</p>
+    <p class="briefing-note">选择班次后展开其判据、几何与时间窗。全量筛选请使用「调度台账」。</p>
     <div class="picker-bar">
       <input v-model="chainQuery" type="search" aria-label="搜索班次" placeholder="搜索呼号 / 起降点 / 城市">
       <span class="picker-note">{{basisFilter?`已按「${routeBasisNames[basisFilter]||basisFilter}」收窄`:'未收窄判据：气象成因的班次排在前面'}}</span>
@@ -1052,7 +1041,7 @@ async function copyReceipt(row){
         <span :class="{weather:chain.basisIsWeather}">{{chain.basisIsWeather?'受气象影响改航':(chain.ok?'非气象成因':'未进入成因判定')}}</span>
         <button class="mechanism-jump" @click="emit('select-flight',chainFlight)">在运行总览中查看</button>
       </header>
-      <p class="briefing-note" v-if="!chain.ok">本班次没有完整的因果链：{{chain.missing.length}} 个要素缺席。下面逐项写出记录里还剩什么，缺的部分不填补默认值。</p>
+      <p class="briefing-note" v-if="!chain.ok">本班次因果链不完整，缺 {{chain.missing.length}} 个要素。下列各项为记录中已有内容，缺失项不填补默认值。</p>
       <ol class="mechanism-steps">
         <li v-for="step in chain.steps" :key="step.key" :data-mechanism-step="step.key">
           <h4>{{step.label}}</h4>
@@ -1071,7 +1060,7 @@ async function copyReceipt(row){
   <Track1Panel :weather="weather" :minute="minute" :session="session" />
   <section class="mark-panel" data-ai-mark-row>
     <div class="briefing-head"><h3>结论在 AI 与规则之间的位置</h3><small>共 {{MARK_ROWS.length}} 种结局 · 当前：{{selectedMark.label}}</small></div>
-    <p class="briefing-note">数值判定由概率模型完成（覆盖全部班次）；规则负责硬阈值兜底，冲突进「推演 · 第 8 步 复核」、可回滚。本页是大模型的<b>证据检索</b>：它只改变"这次引用了哪些证据"，不改判定。</p>
+    <p class="briefing-note">数值判定由概率模型完成，规则负责硬阈值兜底，冲突进入「推演 · 第 8 步 复核」，可回滚。本页为大模型证据检索，仅影响所引用的证据，不改判定。</p>
     <ol class="verdict-marks">
       <li v-for="mark in MARK_ROWS" :key="mark.key" :class="mark.tone" :data-ai-mark="mark.key">
         <b>{{mark.label}}</b>
@@ -1083,13 +1072,13 @@ async function copyReceipt(row){
   <section class="coverage-card" data-ai-coverage>
     <div class="briefing-head"><h3>研判覆盖</h3><small>{{coverage.reviewed}} / {{coverage.total}} 班</small></div>
     <strong>{{coverage.total?(coverage.ratio*100).toFixed(0):'—'}}<i>%</i></strong>
-    <p>分母是全部 <b>{{coverage.total}}</b> 班；<b>全域提问不计入</b>。已对 <b>{{coverage.reviewed}}</b> 个班次发起过研判，尚有 <b>{{coverage.uncovered}}</b> 个未研判<template v-if="coverage.vetoed">，其中 <b>{{coverage.vetoed}}</b> 个的外模作答被规则整条否决</template>。</p>
-    <p class="briefing-note" v-if="!coverage.total">当前没有班次可供研判。不显示 0%：一个没有分母的百分比会被读成"覆盖得很差"，而实际是"还没有对象"。</p>
+    <p>分母为全部 <b>{{coverage.total}}</b> 班，<b>全域提问不计入</b>。已研判 <b>{{coverage.reviewed}}</b> 个班次，未研判 <b>{{coverage.uncovered}}</b> 个<template v-if="coverage.vetoed">，其中 <b>{{coverage.vetoed}}</b> 个的外部模型作答被规则整条否决</template>。</p>
+    <p class="briefing-note" v-if="!coverage.total">当前无班次可供研判，不显示覆盖率。</p>
   </section>
   <div class="operations-question"><textarea v-model="question" aria-label="运行研判问题" rows="3" maxlength="1200" placeholder="询问当前城市、班次的风险、绕行或等待原因"></textarea><button @click="ask" :disabled="asking||!session||session.status!=='READY'||!question.trim()">{{asking?'正在查证…':(selected?'查证并研判':'查证并研判（全域）')}}</button></div>
   <p class="operations-error" v-if="error">{{error}}</p>
-  <p v-if="answer&&lastGlobal" class="operations-muted" data-global-note><b>本次为全域提问</b>：没有挂在具体班次上，因此<b>不计入</b>下方「研判覆盖」。要让它进入覆盖统计，先在列表里选一个班次再问。这不是失败 —— 全域问答的结论无法归属到某一班，登记它等于给一个不存在的结论盖标记。</p>
-  <p v-if="!answer" class="operations-muted">研判只引用当前计划已有的证据：外部模型从证据集合里挑选编号，<b>越出集合即整条回答退回规则证据</b> —— 模型不能生成新事实，也不能绕过气象与冲突约束放行班次。</p>
+  <p v-if="answer&&lastGlobal" class="operations-muted" data-global-note>本次为全域提问，未关联具体班次，不计入「研判覆盖」。若需计入，请先选择班次再提问。</p>
+  <p v-if="!answer" class="operations-muted">研判仅引用当前计划已有证据：外部模型从证据集合中选取编号，越界即整条退回规则证据。模型不生成新事实，也不绕过气象与冲突约束。</p>
   <div v-else>
     <div class="ai-status" :class="aiStatus.key" v-if="aiStatus">
       <header>
@@ -1098,7 +1087,7 @@ async function copyReceipt(row){
         <small v-if="aiStatus.errorCode">状态码 {{aiStatus.errorCode}}</small>
         <small>证据集合 {{aiStatus.available?.length??0}} 条 · 模型选取 {{aiStatus.selected?.length??0}} 条</small>
       </header>
-      <p v-if="aiStatus.key==='vetoed'"><b>整条退回</b>：{{aiStatus.vetoed}}。越界的编号不会被静默丢弃 —— 丢掉它、其余照常作答，界面会显示"检索成功"而回答里全是没核对过的引用。</p>
+      <p v-if="aiStatus.key==='vetoed'">整条退回 {{aiStatus.vetoed}} 条。越界编号不作静默丢弃。</p>
       <p>{{aiStatus.note}}</p>
     </div>
     <p class="operations-muted">证据时刻：第 {{answer.minute.toFixed(1)}} 分钟 · {{answer.source==='deepseek'?'外部模型选取证据':'本地规则证据'}}</p>
@@ -1114,14 +1103,14 @@ async function copyReceipt(row){
   <template v-else-if="view==='reference'">
   <div class="operations-heading">
     <h2>数据口径与边界 <small>全国 · 四级口径</small></h2>
-    <p><b>两层要分开读</b>：上面一张是<b>全国态势聚合层</b>（30 个省级单元、319 市、492 条模拟航线，值随当前载荷实时变）；下面一张是<b>裁决引擎层</b>——同一套判据在<b>全国 → 大区 → 省 → 市</b>四级上逐级切片，判定真正跑在这一层。两层不是两个系统，是同一份数据的两个视角：把"319 市"读成"处处通航"、把"492 条"读成"都是载客航线"，都会读错。每一块内容都带来源角标，含义只在这里定义一次。</p>
+    <p>本页分两层。上层为全国态势聚合：30 个省级单元、319 市、492 条模拟航线，随当前载荷实时更新。下层为裁决引擎：同一套判据按全国 → 大区 → 省 → 市逐级切片，判定在此层执行。两层共用同一份数据，口径不可混读。各内容块均带来源角标，含义在此统一定义。</p>
   </div>
   <section class="caliber-ledger nation-ledger" data-nation-ledger>
     <div class="ledger-hd">
       <h3>① 全国态势聚合层 <small>当前载荷实测值<template v-if="nationFacts"> · 第 {{ nationFacts.minute }} 分钟抓取</template></small></h3>
-      <p>这一层的数字<b>随载荷实时变</b>，下面每一行都指得出字段。交通为模拟（SIM）：航线几何与班次都是本地推演，不对应任何真实航班 —— 但<b>判定确实跑在这张网上</b>（见下一层的②），所以它不是"只做示意"的装饰层。</p>
+      <p>本层数值随载荷实时更新，每行均可追溯至字段。交通为模拟（SIM）：航线几何与班次由本地推演，不对应真实航班；判定实际运行于该网络之上。</p>
     </div>
-    <p class="operations-error" v-if="nationFactsError">全国载荷读取失败：{{nationFactsError}} —— 这一层留空，不代表全国没有数据。</p>
+    <p class="operations-error" v-if="nationFactsError">全国载荷读取失败：{{nationFactsError}}。本层留空，不代表全国无数据。</p>
     <p class="ledger-loading" v-else-if="!nationLedger.length">正在读取全国载荷…</p>
     <div class="ledger-scroll" v-else>
       <table>
@@ -1140,7 +1129,7 @@ async function copyReceipt(row){
   <section class="caliber-ledger" data-caliber-ledger>
     <div class="ledger-hd">
       <h3>② 裁决引擎层 <small>全国 / 大区 / 省 / 市 · 四级同一套判据</small></h3>
-      <p>每个数字都在这里能查到定义、分子分母、出处与更新节奏。<b>分母写"—"表示它不是一个比值</b>，不是"还没填"。本层按当前作用域切片：<b>全国</b>看合计与六个大区，<b>大区</b>看区内各省，<b>省</b>看本省各市，<b>市</b>看直接相邻的航线 —— 判据、阈值与口径四级完全一致，变的只是被切片的范围。</p>
+      <p>本层给出每个数字的定义、分子分母、出处与更新节奏。分母为「—」表示该项不是比值。按当前作用域切片：全国列合计与六个大区，大区列所辖省，省列地市，市列相邻航线；判据、阈值与口径四级一致。</p>
     </div>
     <div class="ledger-scroll">
       <table class="ledge-table">
@@ -1163,9 +1152,7 @@ async function copyReceipt(row){
     <div class="ledger-grid" v-if="nationRollup.rows.length" data-nation-rollup>
       <div class="ledger-hd">
         <h3>分级切片 <small>同一套判据 · {{ scopeTrail }}</small></h3>
-        <p>这张表<b>跟着当前作用域走</b>：全国看六大区、大区看区内各省、省看本省各市，字段与①层同源、逐列可核。
-          <b>航线数不能跨级相加</b> —— 跨省/跨区航线在两端的容器里各出现一次，那是"本区涉及"，不是重复计数；
-          合计一律回原始列表数。市层没有"停飞 / 低能见"这两个字段（市块只统计本市航线与在飞），如实显示"—"。</p>
+        <p>本表随当前作用域切换：全国列六大区，大区列所辖省，省列地市，市列相邻航线；字段与①层同源。航线数不可跨级相加，跨省航线在两端各计一次，合计取原始列表数。市层不统计停飞与低能见，显示为「—」。</p>
       </div>
       <div class="ledger-scroll">
         <table>
@@ -1213,10 +1200,7 @@ async function copyReceipt(row){
   <section class="eval-grid" data-eval-block>
     <article class="eval-card" data-eval="level">
       <header><h3>核心创新层级</h3><span class="eval-badge">系统级 + 应用级</span></header>
-      <p><b>不是模型级。</b>能见度/阵风用的是现成的梯度提升树（100 棵、26 维特征、公开的校准方法），
-        模型结构不是我们的贡献。我们的贡献在<b>系统层</b>：把「气象判据 → 绕飞几何 → 时间窗」
-        这条链在同一个界面里贯通，并且每一步都能回到原始报文与回波几何；
-        以及<b>应用层</b>：用同一套判据同时回答"全国哪片天不能飞"和"这一班为什么这么判"。</p>
+      <p>创新不在模型层。能见度与阵风使用成熟的梯度提升树（100 棵、26 维特征、公开校准方法）。系统层贡献：将「气象判据 → 绕飞几何 → 时间窗」贯通于同一界面，每一步可回溯至原始报文与回波几何。应用层贡献：以同一套判据回答全国范围哪里不可飞与本班次为何如此判定。</p>
     </article>
     <article class="eval-card" data-eval="compare">
       <header><h3>与主流方案的分工</h3><span class="eval-badge quiet">用途不同，不是高下</span></header>
@@ -1230,7 +1214,7 @@ async function copyReceipt(row){
       <header><h3>需求从哪来</h3><span class="eval-badge quiet">三条线</span></header>
       <dl class="eval-rows">
         <div><dt>文献线</dt><dd>低空航路、容量评估、低能见预报三组关键词，累计 259 条命中，筛出 14 篇精读。</dd></div>
-        <div><dt>体系线</dt><dd>唐山、大连、宁德已建低空气象保障 —— 说明"要不要做"不用论证，要论证的是"怎么做得可复核"。</dd></div>
+        <div><dt>体系线</dt><dd>唐山、大连、宁德已建低空气象保障，可行性无需论证，重点在于可复核性。</dd></div>
         <div><dt>自测线</dt><dd>本项目 62 个版本迭代中沉淀的 100 条问题档案，按症状索引，每条都有根因与修法。</dd></div>
       </dl>
     </article>
@@ -1242,16 +1226,13 @@ async function copyReceipt(row){
         <div><dt>绕飞架次</dt><dd><b>2848</b> 架次</dd></div>
         <div><dt>单班追加延误</dt><dd><b>8 班 / 320 min</b>，均值 <b>0.1%</b></dd></div>
       </dl>
-      <p class="eval-src">四个数只引这一组，不与其它口径混读：它们回答的是"这套判据跑起来之后，
-        安全与效率各付出多少"，不回答"预测准不准"（准不准看上一张的 AUC / Brier / TS）。
-        验证规模：前端单测 <b>507</b> 项、浏览器逐页验收 <b>43</b> 项、后端用例 <b>604</b> 项（当前版本全绿），
-        复现命令见仓库 README。</p>
+      <p class="eval-src">四个数仅对应本组口径：衡量判据运行后的安全与效率代价，不衡量预测精度。验证规模与复现命令见仓库 README。</p>
     </article>
   </section>
 
   <div class="briefing-head glossary-head">
     <h3>术语表 · 专业与通俗两读</h3>
-    <small>共 {{glossaryTotal}} 条 · 术语本身（dBZ、内核、指纹…）不换词——它是接口、是文档、也是日志里的字段；这里只补一句给人看的话。</small>
+    <small>共 {{glossaryTotal}} 条 · 术语原名不改（dBZ、内核、指纹等），此处仅补充释义。</small>
   </div>
   <div class="glossary-bar">
     <input v-model="glossaryQuery" type="search" aria-label="搜索术语" placeholder="搜索术语或释义">
@@ -1270,13 +1251,13 @@ async function copyReceipt(row){
         </template>
       </dl>
     </section>
-    <p v-if="!glossary.length">没有匹配的术语。这一页只收本系统真正在用、并且会在界面上出现的词——收一个界面上没有的词没有意义。</p>
+    <p v-if="!glossary.length">无匹配术语。本页仅收录系统实际使用且在界面出现的术语。</p>
   </div>
   </template>
   <template v-else-if="view==='history'">
   <div class="operations-heading"><h2>运行操作与决策日志 <small>{{cityName}} · {{journal.length}} 条</small></h2>
-    <p v-if="journalSource==='session'">人工干预、系统决策、数据源变更与导出记在同一本日志里，可按类型筛选、按关键词搜索、整表导出 CSV。<b>只有「人工干预」会改变班次状态</b>——其余三类只记录事实，不参与时间轴回放。</p>
-    <p v-else>全国模式没有推演会话，这本日志<b>由当前分钟的快照重算</b>：窗口内的起飞与到达是「发生过」，绕飞 / 延期 / 停飞是「此刻仍如此」，另附数据源时刻。班次是解析式生成的，所以不需要历史表，也能逐分钟复现。<template v-if="journalWindowText"> 当前窗口 {{ journalWindowText }}。</template></p>
+    <p v-if="journalSource==='session'">人工干预、系统决策、数据源变更与导出合并记录于同一日志，支持按类型筛选、关键词搜索与 CSV 导出。仅「人工干预」改变班次状态，其余三类仅记录事实，不参与回放。</p>
+    <p v-else>全国模式无推演会话，本日志<b>按当前分钟快照重算</b>：窗口内起飞与到达记为「已发生」，绕飞 / 延期 / 停飞记为「此刻仍如此」，另附数据源时刻。班次由解析式生成，逐分钟可复现。<template v-if="journalWindowText"> 当前窗口 {{ journalWindowText }}。</template></p>
   </div>
   <div class="assistant-context" v-if="journalSource==='session'"><span title="本次运行计划的唯一编号">计划标识 {{session?.sessionId||'—'}}</span><span title="调度算法的版本号">算法版本 {{session?.version||'—'}}</span><span title="算法 + 快照 + 气象通道的联合指纹，三者相同则重跑逐字节一致">快照指纹 {{session?.fingerprint||'—'}}</span></div>
   <div class="assistant-context" v-else><span>作用域 全国</span><span>数据时刻 第 {{ Math.round(minute||60) }} 分钟</span><span>来源 派生日志（无历史表）</span></div>
@@ -1292,16 +1273,12 @@ async function copyReceipt(row){
   <p class="operations-error" v-if="journalError">{{journalError}}</p>
   <details class="replay density-fold" :open="policy.replay&&journalSource==='session'" data-density="replay">
     <summary>复盘回放 <span>按推演分钟重放全站时钟 · 另有 {{journal.length}} 条操作记录</span></summary>
-    <p class="replay-span" v-if="!journal.length" data-replay-empty>
-      本计划<b>还没有操作记录</b>（没人点过处置）—— 但时间轴照样能放：
-      它驱动的是全站时钟，地图上的航班、气象帧与走廊判据都会跟着走。
-      点「开始回放」后切到「态势」即可看画面。
-    </p>
+    <p class="replay-span" v-if="!journal.length" data-replay-empty>本计划暂无操作记录，时间轴仍可使用：它驱动全站时钟，航班、气象帧与走廊判据随之联动。点击「开始回放」后切换至「态势」查看。</p>
     <p class="replay-span" v-else-if="replaySpan" data-replay-span>
       回放的是<b>全站时间轴</b>（0–T+{{ replayMax }} 分）：地图、气象帧、走廊判据会跟着一起走。
       本计划另有 <b>{{ replaySpan.count }}</b> 条操作记录，落在
       <b>T+{{ replaySpan.from.toFixed(0) }}–T+{{ replaySpan.to.toFixed(0) }}</b> 分，
-      <template v-if="replaySpan.to<=replaySpan.from">这一段没有第二条记录 —— 表示「这段时间没有人工干预」，不是回放没做完。</template>
+      <template v-if="replaySpan.to<=replaySpan.from">该段无第二条记录，表示此期间无人工干预。</template>
       <template v-else>拖过那一段时下表会逐条点亮。</template>
     </p>
     <div class="replay-bar">
@@ -1335,7 +1312,7 @@ async function copyReceipt(row){
         {{row.actionLabel}} · {{journalTarget(row)}}<template v-if="row.detail"> · {{row.detail}}</template>
       </li>
     </ul>
-    <p class="operations-muted" v-else>这一刻没有发生任何记录。时间轴上方四个状态的合计，始终等于带分钟的条目总数。</p>
+    <p class="operations-muted" v-else>此刻无记录。上方四状态合计恒等于带分钟条目总数。</p>
     <div class="replay-weather" :data-replay-weather="replayWeather.state">
       <header><b>当时气象帧</b><span>{{replayWeather.label}}</span></header>
       <div class="replay-weather-grid">
@@ -1375,7 +1352,7 @@ async function copyReceipt(row){
   </table>
   </details>
   <p class="operations-muted" v-else-if="journalLoading">正在读取运行日志…</p>
-  <p class="operations-muted" v-else>这份计划的日志里还没有记录。系统会在 <b>计划构建完成</b>、<b>气象通道切换</b>、<b>人工暂停/恢复</b> 与 <b>导出</b> 时各写一行；若此页为空，请确认后端已按本版本启动（旧版后端不写这三类事件）。</p>
+  <p class="operations-muted" v-else>本计划暂无日志记录。系统在计划构建完成、气象通道切换、人工暂停/恢复与导出时各写一行；若本页为空，请确认后端版本。</p>
   </template>
 </section>
 </template>

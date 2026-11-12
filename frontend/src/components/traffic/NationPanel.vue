@@ -840,8 +840,8 @@ onUnmounted(()=>{
   <p class="nrn-state" v-if="loading">
     <template v-if="waitedSeconds<4">正在加载本级数据…</template>
     <template v-else>
-      正在预热 <b>{{ waitedSeconds }}s</b> —— 服务刚启动时要把雷达回波、逐市实况与概率算完，
-      首次通常 30 秒左右；算完这一次之后都是秒开。
+      正在预热 <b>{{ waitedSeconds }}s</b>。服务启动时需完成雷达回波、逐市实况与概率计算，
+      首次约 30 秒，此后即时响应。
       <button v-if="waitedSeconds>=60" @click="load">仍要重试</button>
     </template>
   </p>
@@ -911,7 +911,7 @@ onUnmounted(()=>{
                  v-model.number="lineLimit" aria-label="航线显示条数"/>
           <b>{{ lineStats.shown }}</b>
         </div>
-        <p class="nrn-linehint">按航程从长到短截取：只开 50 条时看到的是骨架，不是随机 50 条。<template v-if="lineStats.forced">另有 <b>{{ lineStats.forced }}</b> 条因为此刻有班次在飞而强制显示 —— 天上出现一架飞机，它脚下就必须有那条走廊。</template></p>
+        <p class="nrn-linehint">按航程由长至短截取：仅开启 50 条时为骨架视图，非随机抽样。<template v-if="lineStats.forced">另有 <b>{{ lineStats.forced }}</b> 条因当前有班次在飞而强制显示：在飞班次对应的走廊必须可见。</template></p>
         <button class="nrn-lineall" @click="lineLimit=0">全部关闭</button>
       </div>
 
@@ -999,7 +999,7 @@ onUnmounted(()=>{
     <div class="nrn-table" v-show="view==='alerts'">
       <div class="nrn-table-hd">
         <h3>事件处置 <small>{{ alerts.length }} 条</small></h3>
-        <p>四类：低能见度、空域受限、回波绕飞、延期起飞。规则动作自动给出处置建议，需人工确认的标为待处置。</p>
+        <p>四类事件：低能见度、空域受限、回波绕飞、延期起飞。规则动作自动给出处置建议，需人工确认者标记为待处置。</p>
       </div>
       <ul class="nrn-alerts">
         <li v-for="row in alerts" :key="row.id" :class="row.severity"

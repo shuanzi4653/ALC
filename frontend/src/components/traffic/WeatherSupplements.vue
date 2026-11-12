@@ -32,10 +32,8 @@ function emptyText(key,label){
 <template>
  <div class="weather-supplement">
   <h3>免费气象源补充通道 <span class="muted">按需取数 · 不进每轮加载</span></h3>
-  <p v-if="caseMode" class="case-scope-hint" data-case-scope>
-   本块取的是<b>此刻</b>的实测报文与模型场，与上方回放案例（2025-01-05）不是同一时次——案例的气象判据只看案例帧里的实测站，不读这里。
-  </p>
-  <p class="muted">下面两条都是免费、无需密钥的公开源。它们各自缓存 10 分钟；取数失败只影响本块，不影响运行台的天气。</p>
+  <p v-if="caseMode" class="case-scope-hint" data-case-scope>本块为当前实测报文与模型场，与上方回放案例（2025-01-05）不同时次；案例判据仅取案例帧内实测站。</p>
+  <p class="muted">以下两条均为免费、免密钥公开源，各自缓存 10 分钟；取数失败仅影响本块。</p>
 
   <section class="channel" data-channel="observations">
    <header>

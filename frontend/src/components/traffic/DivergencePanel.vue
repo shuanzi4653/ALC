@@ -98,19 +98,14 @@ function exportCsv(){
 
     <div class="dg-empty" v-if="!rows.length">
       <b v-if="scoped">本走廊还没有人工复核记录。</b>
-      <b v-else>台账是空的 —— 这是真实状态，不是加载失败。</b>
-      <p>记录产生于两处：<b>走廊页的「人工裁决」</b>（放行 / 改绕飞 / 停飞，记在本浏览器）与
-        <b>预警中心的处置按钮</b>（采纳 / 否决 / 转人工，记在服务端台账）。
-        前者只要在走廊页点过一次就会出现，不用等任何建场。</p>
+      <b v-else>台账为空，属当前状态，非加载失败。</b>
+      <p>记录来源两处：走廊页「人工裁决」（放行 / 改绕飞 / 停飞，存于本浏览器）与预警中心处置按钮（采纳 / 否决 / 转人工，存于服务端台账）。</p>
       <p v-if="scoped && allRows.length">全库共 {{ allRows.length }} 条，但都不在本走廊。</p>
       <p>本版本没有回放式补录：宁可空着，也不塞占位内容充数。</p>
     </div>
 
     <template v-else>
-      <p class="dg-note" v-if="lowConfidence">
-        其中 <b class="alc-num">{{ lowConfidence }}</b> 条发生在置信度低于 0.65 时 ——
-        此时系统本身给的处置就是"转人工"，人却做了别的判断。这批复盘价值最高，建议逐条过。
-      </p>
+      <p class="dg-note" v-if="lowConfidence">其中 {{ lowConfidence }} 条发生于置信度低于 0.65 时，此时系统建议转人工。该组复盘优先级最高。</p>
       <table class="dg-table">
         <thead>
           <tr><th>时间（UTC）</th><th>走廊</th><th>航班</th><th>不可飞概率</th><th>置信度</th>
