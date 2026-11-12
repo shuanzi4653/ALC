@@ -147,8 +147,6 @@ html[data-theme="light"] .nrn-crumb .back {
   background: #fff !important;
 }
 html[data-theme="light"] .nrn-headline { color: #0f3550; }
-html[data-theme="light"] .nrn-sub { color: #5f7d94; }
-html[data-theme="light"] .nrn-sub b { color: #1b4767; }
 
 html[data-theme="light"] .nrn-tabs { border-bottom-color: #dbe6f1; }
 html[data-theme="light"] .nrn-tabs button { color: #4a6a85; }

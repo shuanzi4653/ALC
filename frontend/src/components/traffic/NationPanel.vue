@@ -148,7 +148,6 @@ let clockRaf=null,pushTimer=null,fetchAt=0,seq=0
 const MINUTES=180
 const mapRef=ref(null)
 
-const summary=computed(()=>data.value?.summary||{})
 const rollup=computed(()=>data.value?.rollup||{level:'nation',total:{},regions:[],provinces:[],cities:[]})
 const total=computed(()=>({...(rollup.value.total||{}),...live.value}))
 const radarMeta=computed(()=>data.value?.radar||{})
@@ -819,11 +818,6 @@ onUnmounted(()=>{
       <div class="m" v-if="total.blocked"><b>{{ num(total.blocked) }}</b><span>距境外过近受限</span></div>
       <div class="m"><b>{{ num(total.lowVisCities) }}</b><span>低能见度城市</span></div>
     </div>
-    <p class="nrn-sub">
-      纳入 <b>{{ num(summary.provinces) }}</b> 省 · <b>{{ num(summary.cities) }}</b> 市 ·
-      <b>{{ num(summary.airports) }}</b> 机场 · <b>{{ num(summary.feedCities) }}</b> 市无机场（专用接驳）·
-      <b>{{ num(summary.weatherCities) }}</b> 市有实况
-    </p>
     <!-- 演示包必须自带说明，而且要说**换掉了什么、没换什么**：
          只写"虚拟气象 · 非实况"说不清边界，读者会以为整页都是假的；
          说清"回波与雾是合成的、气温风是实况"，才能既提醒又不自贬。 -->
@@ -961,9 +955,9 @@ onUnmounted(()=>{
         <i class="box"></i>{{ level==='province'||level==='city' ? '禁飞区' : '禁飞区（下钻可见）' }}
         <i class="tri"></i>应急
         <span v-if="radarScaleShown" class="nrn-dbz" data-radar-scale :title="radarScaleTip">
-          <b>{{ radarScale[0].dbz }}</b><span class="bar"
+          <span class="bar"
             ><i v-for="s in radarScale" :key="s.dbz" :style="{background:s.color}"></i></span
-          ><b>{{ radarScale[radarScale.length-1].dbz }}+</b><em>dBZ 反演</em>
+          ><em>dBZ</em>
         </span>
         <span v-if="virtualMode" class="virt">虚拟增强</span>
       </p>
@@ -1282,8 +1276,6 @@ onUnmounted(()=>{
 .nrn-metrics span{font-size:10.5px;color:#82a6bd;white-space:nowrap}
 .nrn-metrics .m.warn b{color:#ffc857}
 .nrn-metrics .m.bad b{color:#ff8d78}
-.nrn-sub{margin:0;font-size:11.5px;color:#82a6bd}
-.nrn-sub b{color:#cfe9f8;font-variant-numeric:tabular-nums}
 
 /* 双受众切换：和 tab 条同一视觉语言，但靠右，表示"换个读法"而不是"换一页" */
 .nrn-aud{margin-left:auto;display:flex;gap:4px;align-items:center}
@@ -1394,18 +1386,16 @@ html[data-theme="light"] .nrn-lineall{background:#f2f7fc;border-color:#cfdcea;co
   border:1px solid rgba(245,190,60,.75)}
 .nrn-legend i.dim{background:rgba(126,206,255,.3)}
 .nrn-legend i.star{width:9px;height:9px;background:#e03131;clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)}
-/* dBZ 色阶：12 段横条（每段 5px、6px 高）+ 两端下限，进图例行。
+/* dBZ 色阶：12 段横条（每段 4px、6px 高）+ 一个 dBZ 词，进图例行。
    注意要盖掉 .nrn-legend i 的通用规则（14px 宽、2px 高、margin-right:4px），
    否则每段之间会漏 4px 的缝。 */
 .nrn-dbz{display:inline-flex;align-items:center;gap:4px;line-height:1}
-.nrn-dbz b{font-weight:600;font-size:9.5px;color:#a6c9e0}
 .nrn-dbz em{font-style:normal;font-size:9.5px;color:#7ea6bf}
 .nrn-dbz .bar{display:inline-flex;height:6px;border-radius:2px;overflow:hidden;
   box-shadow:inset 0 0 0 1px rgba(0,0,0,.5)}
-.nrn-dbz .bar i{display:block;width:5px;height:6px;margin:0}
+.nrn-dbz .bar i{display:block;width:4px;height:6px;margin:0}
 /* 浅色下最右一格是纯白：只靠内阴影会和白底连成一片，改外描边把整条框住 */
 html[data-theme="light"] .nrn-dbz .bar{box-shadow:0 0 0 1px rgba(0,0,0,.38)}
-html[data-theme="light"] .nrn-dbz b{color:#2b5c7a}
 html[data-theme="light"] .nrn-dbz em{color:#4b6e8a}
 .nrn-legend i.box{width:10px;height:8px;background:rgba(224,49,49,.08);border:1.4px solid #e03131;border-radius:1px}
 .nrn-legend i.tri{width:0;height:0;background:none;border-left:4.5px solid transparent;
@@ -1657,7 +1647,7 @@ html[data-theme="light"] .ev-note{color:#7a5200 !important}
  * 这一档只做两件事：**把小字抬到 11px 地板**，再靠收紧内边距把高度省回来 ——
  * 抬字号会把一屏撑破，所以必须同时压缩 padding，否则地图会被挤没。 */
 @media(max-width:1500px){
-  .nrn-monitor,.nrn-legend,.nrn-sub{font-size:11px}
+  .nrn-monitor,.nrn-legend{font-size:11px}
   .nrn-block-hd span,.nrn-prov span,.nrn-city-list span{font-size:11px}
     .nrn-block-hd b,.nrn-prov b,.nrn-city-list b{font-size:11.5px}
   .nrn-block-hd em,.nrn-prov em,.nrn-city-list em{font-size:11px}
