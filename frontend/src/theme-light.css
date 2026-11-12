@@ -27,7 +27,7 @@ html[data-theme="light"] {
   --map-land: rgba(255, 255, 255, .92);
   --map-land-dim: rgba(210, 224, 238, .55);
   --map-line: rgba(72, 112, 155, .78);
-  --map-boundary: rgba(40, 90, 130, .75);
+  --map-boundary: rgba(40, 90, 130, .9);
   --map-inset-bg: rgba(255, 255, 255, .94);
   --map-inset-line: rgba(84, 124, 166, .45);
   --map-ground: rgba(236, 243, 250, .82);

@@ -1191,9 +1191,13 @@ function clickNode(node){
         <rect :x="insetBox.x" :y="insetBox.y" :width="insetBox.w" :height="insetBox.h" rx="4"
               style="fill:var(--map-inset-bg)" stroke="var(--map-inset-line)" stroke-width=".8"/>
         <g :clip-path="'url(#nmap-inset-clip)'">
+          <!-- 断续线是 10 段细长多边形，宽度不足 0.05°，只填不描时在 120 px 小图里
+               渲染成 0.3 px，等于没有。这里必须 fill + stroke 一起给：描边把不可见的
+               细条撑成一条能看清的线，否则「南海诸岛」四个字下面是一片空白。 -->
           <path v-for="shape in insetShapes" :key="'i'+shape.key" :d="shape.d"
-                :style="{fill: shape.boundary?'var(--map-boundary)':'var(--map-land-dim)'}"
-                :stroke="shape.boundary?'none':'rgba(120,165,205,.45)'" stroke-width=".6"/>
+                :style="{fill: shape.boundary?'var(--map-boundary)':'var(--map-land-dim)',
+                         stroke: shape.boundary?'var(--map-boundary)':'rgba(120,165,205,.45)',
+                         strokeWidth: shape.boundary?.9:.6}"/>
         </g>
         <text :x="insetBox.x+7" :y="insetBox.y+insetBox.h-7" class="inset-lbl">南海诸岛</text>
       </g>

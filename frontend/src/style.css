@@ -99,7 +99,7 @@ body {
   --map-land: rgba(96, 140, 180, .13);
   --map-land-dim: rgba(96, 132, 170, .05);
   --map-line: rgba(132, 180, 220, .52);
-  --map-boundary: rgba(150, 200, 235, .55);
+  --map-boundary: rgba(150, 200, 235, .8);
   --map-inset-bg: rgba(6, 18, 28, .72);
   --map-inset-line: rgba(120, 165, 205, .45);
   --map-ground: rgba(6, 16, 25, .55);
