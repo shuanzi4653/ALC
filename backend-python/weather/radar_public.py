@@ -21,8 +21,11 @@ dBZ 从哪来（必须说清）
 
 产物
 ----
-`frame = {available, ts, bands:{WEAK:[ring...], CONVECTIVE:[...], STRONG:[...]}, cells, coverage}`
-ring 是 [[lon,lat], ...] 的闭合环，已抽稀（0.03°），可直接画 SVG 多边形。
+`frame = {available, ts, bands:{WEAK:[ring...], ...}, cells, coverage,
+          image, imageBbox, imageSize, imageScope, scale, thresholdsDbz,
+          provenance, reverseLookup, maskApplied}`
+ring 是 [[lon,lat], ...] 的闭合环，已抽稀（0.02°），可直接画 SVG 多边形；
+`image` 是同一场 dBZ 的索引色 PNG（12 条图例对应 14 级色板里可达的那些档）。
 """
 from __future__ import annotations
 
@@ -103,6 +106,12 @@ NEXRAD_LUT: Tuple[Tuple[float, Tuple[int, int, int, int]], ...] = (
 
 _lock = threading.Lock()
 _memory: Dict[str, Any] = {'value': None, 'expires': 0.0}
+
+# 反查命中/失配计数（每帧重置，随载荷下发）。这不是调试信息，是**唯一的**色表漂移观测点：
+# 如果 RainViewer 换配色，全部像素会静默走进最近色回退、图上要么全 0 要么全强，
+# 而界面上看不出区别 —— 有这两个数，至少能在载荷里发现"命中率掉到 0"。
+_MISS_LOCK = threading.Lock()
+_MISS_STATS = {'hit': 0, 'miss': 0, 'resolved': 0}
 
 
 # ---------------------------------------------------------------- 瓦片与像素
@@ -246,8 +255,15 @@ def _tile_dbz_array(image) -> np.ndarray:
         out[hit] = _COLOUR_SORTED_DBZ[pos[hit]]
 
     miss = valid & ~hit
+    resolved = 0
     if miss.any():
-        out[miss] = _nearest_dbz(r[miss], g[miss], b[miss])
+        nearest = _nearest_dbz(r[miss], g[miss], b[miss])
+        out[miss] = nearest
+        resolved = int((nearest > 0).sum())
+    with _MISS_LOCK:
+        _MISS_STATS['hit'] += int(hit.sum())
+        _MISS_STATS['miss'] += int(miss.sum())
+        _MISS_STATS['resolved'] += resolved
     return out
 
 
@@ -271,12 +287,24 @@ def _despeckle_dbz(dbz: np.ndarray) -> np.ndarray:
     return cleaned
 
 
+_MASK_CACHE: Dict[Tuple[int, int, int, int, int], np.ndarray] = {}
+
+
 def _china_raster_mask(z: int, x0: int, y0: int, x1: int, y1: int):
     """墨卡托拼图栅格上的国界掩膜。实现搬到 `weather/china_geo.py`（全仓一处解析）。
 
-    这里留一层同名包装：调用点不用改，而且"掩膜从哪来"只有一条路径可查。
+    缓存**只存成功结果**：`china_geo.raster_mask` 失败时返回 None，若把 None 也缓存住，
+    就等于"一次读不到文件，进程生命周期内再也不裁国界" —— 那正是本 PR 在 `_radar()`
+    上修掉的老坑，没道理在这里重犯。
     """
-    return china_geo.raster_mask(z, x0, y0, x1, y1)
+    key = (z, x0, y0, x1, y1)
+    cached = _MASK_CACHE.get(key)
+    if cached is not None:
+        return cached
+    mask = china_geo.raster_mask(z, x0, y0, x1, y1)
+    if mask is not None:
+        _MASK_CACHE[key] = mask
+    return mask
 
 
 def _encode_nexrad_png(crop_dbz: np.ndarray, upscale: float = 1.0):
@@ -525,7 +553,8 @@ def fetch(force: bool = False) -> Dict[str, Any]:
         if not force and _memory['value'] and now < _memory['expires']:
             return _memory['value']
 
-    started = time.time()
+    started = time.time()          # 只用于 elapsedMs（对外是"墙钟秒"）
+    started_mono = time.monotonic()  # 用于 deadline：**必须与 grab() 里比较的时钟相同**
     try:
         frame = _latest_frame(_meta())
         if frame is None:
@@ -557,7 +586,9 @@ def fetch(force: bool = False) -> Dict[str, Any]:
     h_mosaic = (y1 - y0 + 1) * 256
     mosaic_dbz = np.zeros((h_mosaic, w_mosaic), dtype=np.float32)
     fetched = 0
-    deadline = started + FETCH_DEADLINE_SECONDS
+    # 这里原来写的是 `started + ...`（epoch）却拿 monotonic 去比，两者差 3 个数量级，
+    # 判据恒为 False —— 45 s 止损等于没写，实测过。
+    deadline = started_mono + FETCH_DEADLINE_SECONDS
     # 1_0 = 关掉 snow 色标。`1_1` 会让降雪区走另一张色表（实测本帧 6.76% 的回波像素
     # 是雪色 (195,255,255) 系），单表反查对它们全部返回 0 —— 冬季 30+ dBZ 的降雪带会被低估。
     tile_url_tpl = f"{frame['host']}{frame['path']}/256/{{z}}/{{x}}/{{y}}/4/1_0.png"
@@ -576,6 +607,9 @@ def fetch(force: bool = False) -> Dict[str, Any]:
             return x, y, _tile_dbz_array(image)
         except Exception:  # noqa: BLE001 - 单瓦片失败跳过
             return None
+
+    with _MISS_LOCK:
+        _MISS_STATS.update({'hit': 0, 'miss': 0, 'resolved': 0})
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=TILE_WORKERS) as pool:
         for item in pool.map(grab, tiles):
@@ -672,6 +706,9 @@ def fetch(force: bool = False) -> Dict[str, Any]:
         'scale': nexrad_scale(),
         'thresholdsDbz': dict(THRESHOLDS_DBZ),
         'provenance': _provenance(frame),
+        # 反查质量：hit=精确命中色表，miss=走进最近色回退，resolvedFromNearest=回退后仍判成回波。
+        # missRatio 长期 >0.9 且 hitPixels=0 → 色表已变，图上的 dBZ 不再可信。
+        'reverseLookup': _reverse_lookup_report(),
         'cells': total_cells,
         'bands': bands,
         'counts': {band: len(rings) for band, rings in bands.items()},
@@ -692,6 +729,19 @@ def fetch(force: bool = False) -> Dict[str, Any]:
     with _lock:
         _memory.update({'value': value, 'expires': now + TTL_SECONDS})
     return value
+
+
+def _reverse_lookup_report() -> Dict[str, Any]:
+    with _MISS_LOCK:
+        hit = int(_MISS_STATS['hit'])
+        miss = int(_MISS_STATS['miss'])
+        resolved = int(_MISS_STATS['resolved'])
+    total = hit + miss
+    ratio = round(miss / total, 4) if total else 0.0
+    return {'hitPixels': hit, 'missPixels': miss, 'resolvedFromNearest': resolved,
+            'missRatio': ratio,
+            # 一个像素都没精确命中、却又有一堆像素待判 → 色表已经不是我们认识的那张
+            'degraded': bool(total > 50000 and hit == 0)}
 
 
 def _provenance(frame: Dict[str, Any]) -> Dict[str, Any]:
@@ -758,6 +808,7 @@ def _empty(reason: str) -> Dict[str, Any]:
     out = {'available': False, 'error': reason, 'ts': None,
            'image': None, 'imageBbox': None, 'imageSize': None, 'imageScope': 'nation',
            'scale': nexrad_scale(), 'thresholdsDbz': dict(THRESHOLDS_DBZ),
+           'reverseLookup': _reverse_lookup_report(),
            'bands': {'WEAK': [], 'CONVECTIVE': [], 'STRONG': []},
            'counts': {'WEAK': 0, 'CONVECTIVE': 0, 'STRONG': 0}, 'cells': 0,
            'coverage': 0.0, 'coverageBasis': 'BBOX', 'maskApplied': False}

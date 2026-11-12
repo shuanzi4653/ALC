@@ -196,18 +196,35 @@ def _radar() -> Dict[str, Any]:
                 'scale': _radar_scale(), 'thresholdsDbz': _radar_thresholds()}
 
 
-@lru_cache(maxsize=1)
+# 国界裁剪失败的原因（只记第一条）：`_china_mask` 返回 None 时，"境外回波进绕飞判定"
+# 这件事必须能被看见 —— 以前是 `except: return None`，一条日志都没有。
+_MASK_ERROR: List[str] = []
+
+
 def _china_mask():
     """国界并集，用来把回波裁到国内。
 
     实现搬到 `weather/china_geo.py`：那边同时供**矢量环裁剪**与**栅格贴图掩膜**，
     两套国界从此同源（以前是两处各自解析 china.json，理论上可以解析出两个国界）。
+
+    这里**不挂 lru_cache**：`china_geo.union_mask()` 自己缓存成功结果，而失败（缺文件）
+    必须允许下次重试 —— 缓存住 None 就等于"一次读不到，整进程都不裁国界"。
     """
     from weather import china_geo
     try:
-        return china_geo.union_mask()
-    except Exception:  # noqa: BLE001 - 缺文件时宁愿不裁，也不要打崩整页
+        mask = china_geo.union_mask()
+    except Exception as exc:  # noqa: BLE001 - 缺文件时宁愿不裁，也不要打崩整页
+        if not _MASK_ERROR:
+            _MASK_ERROR.append(f'{type(exc).__name__}: {str(exc)[:100]}')
         return None
+    _MASK_ERROR.clear()     # 恢复了就把错误清掉：这个字段读的是"现在"，不是历史
+    return mask
+
+
+def mask_status() -> Dict[str, Any]:
+    """国界裁剪到底有没有生效。载荷里两个字段都用它，别再各算一遍。"""
+    ok = _china_mask() is not None
+    return {'vectorClipped': ok, 'maskError': (_MASK_ERROR[0] if _MASK_ERROR else None)}
 
 
 # 每帧的环数统计：{band: {kept, total}}。供载荷里的 truncated 字段与界面提示用。
@@ -1065,6 +1082,7 @@ def _payload_locked(level: str = 'nation', ident: Optional[str] = None,
         for node in body.get('nodes') or []:
             if model_probs and node['name'] in model_probs:
                 node['pLowVis'] = model_probs[node['name']]
+        _mask = mask_status()
         return {**body,
                 'minute': minute,
                 'radar': ({
@@ -1101,7 +1119,13 @@ def _payload_locked(level: str = 'nation', ident: Optional[str] = None,
                     'provenance': radar.get('provenance'),
                     'coverage': radar.get('coverage'),
                     'coverageBasis': radar.get('coverageBasis'),
+                    # 两条裁剪链各自的状态：maskApplied=贴图栅格掩膜，
+                    # vectorClipped=矢量环按国界并集裁剪。任一为 false，
+                    # 说明境外回波可能已经进入绕飞判定 —— 界面上必须看得见。
                     'maskApplied': radar.get('maskApplied'),
+                    'vectorClipped': _mask['vectorClipped'],
+                    'maskError': _mask['maskError'],
+                    'reverseLookup': radar.get('reverseLookup'),
                     # 瓦片直链：前端按墨卡托贴图，边界比矢量多边形更像真实回波
                     'tiles': radar.get('tiles_url'),
                     'virtual': False,

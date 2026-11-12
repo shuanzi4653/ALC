@@ -143,3 +143,41 @@ def test_png_palette_is_index_aligned():
     # 索引 1 对应 NEXRAD_LUT 第一档（10 dBZ 浅青）
     assert tuple(palette[3:6]) == radar_public.NEXRAD_LUT[0][1][:3]
     assert struct.calcsize('B') == 1
+
+def test_fetch_deadline_uses_one_clock():
+    """止损判据必须与它比较的时钟同源。
+
+    这里守的是一次真实事故：`started = time.time()`（epoch）却拿 `time.monotonic()`
+    去比，两者差三个数量级，判据恒为 False —— 45 s 全局止损等于没写。
+    """
+    source = io.open(radar_public.__file__, encoding='utf-8').read()
+    assert 'started_mono = time.monotonic()' in source
+    assert 'deadline = started_mono + FETCH_DEADLINE_SECONDS' in source
+    assert 'deadline = started + FETCH_DEADLINE_SECONDS' not in source
+
+
+def test_mask_cache_keeps_only_success():
+    """掩膜缓存只存成功结果：缓存住 None 等于"一次读不到，整进程都不裁国界"。"""
+    bounds = radar_public._tile_bounds(radar_public.TILE_ZOOM, radar_public.BBOX)
+    radar_public._MASK_CACHE.clear()
+    first = radar_public._china_raster_mask(radar_public.TILE_ZOOM, *bounds)
+    second = radar_public._china_raster_mask(radar_public.TILE_ZOOM, *bounds)
+    assert first is not None
+    assert second is first, '第二次应命中缓存（同一对象），否则每帧白算 8.5 M 像素'
+
+
+def test_reverse_lookup_report_is_shipped():
+    """反查失配统计必须随载荷下发：它是色表漂移的唯一观测点。"""
+    report = radar_public._reverse_lookup_report()
+    for key in ('hitPixels', 'missPixels', 'resolvedFromNearest', 'missRatio', 'degraded'):
+        assert key in report
+    assert report['degraded'] is False
+
+
+def test_mask_status_reports_both_clipping_paths():
+    """国界裁剪两条链都要能被看见（矢量环 / 贴图栅格）。"""
+    from traffic import nation
+
+    status = nation.mask_status()
+    assert status['vectorClipped'] is True
+    assert status['maskError'] is None

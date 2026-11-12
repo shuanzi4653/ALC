@@ -205,8 +205,10 @@ const radarScale=computed(()=>{
 const scaleSource=computed(()=>{
   const r=props.data?.radar
   if(!r) return '数据未就绪'
-  if(r.virtual) return '模拟回波（演示包）'
+  // 先判"有没有"，再判"是不是虚拟"：虚拟气象 + 取数失败时，
+  // 原来会写成「模拟回波（演示包）」，可屏幕上根本没有回波。
   if(r.available===false) return '本帧无数据'
+  if(r.virtual) return '模拟回波（演示包）'
   return '图像反演（估）· 非观测'
 })
 
@@ -225,9 +227,13 @@ const radarImage=computed(()=>{
   const href=r?.image
   const b=r?.imageBbox
   if(!href||!b||b.length<4||b[2]<=b[0]||b[3]<=b[1]) return null
-  // 贴图只在全国层用：后端只出全国那一张，省/市层要把它放大 6–8 倍，
-  // 插值出来的颜色根本不在色阶里（操作员取样一个颜色却查不到 dBZ）。那两层走矢量环。
+  // 贴图只在全国层、且是"全国视野"时用。三种情况必须回退矢量环：
+  //  · 省/市层：后端只出全国那一张，要放大 6–8 倍，插值出来的颜色不在色阶里；
+  //  · 走廊页（lockView / soloCorridor）：视野锁在单条走廊上，实测 <image> 元素
+  //    宽 2438 px 铺在 864 px 的画布上，回波呈明显阶梯，还把底图压死；
+  //  · 后端显式声明这张图不是给当前层级用的（imageScope）。
   if((r?.imageScope||'nation')!=='nation') return null
+  if(props.lockView||props.soloCorridor) return null
   if(level.value!=='nation') return null
   const [x0,y0]=project(b[0],b[3])
   const [x1,y1]=project(b[2],b[1])
@@ -1411,10 +1417,16 @@ function clickNode(node){
   </svg>
   <!-- dBZ 色阶。条数/颜色/标签全部来自载荷 `radar.scale`（后端由"可达档位"推导）。
        图例是**刻度尺**不是直方图：它说明"什么颜色对应多少 dBZ"，与这一帧下了多少雨无关，
-       所以晴空也显示、也不等真实数据。也不该凑成 LUT 的 14 级 —— 10 与 65 两档结构性不可达。
+       所以晴空也显示（`radarImage` 为 null 时除外，见下）、也不等真实数据。
+       也不该凑成 LUT 的 14 级 —— 10 与 65 两档结构性不可达。
        标签一律是**下限**（35 那格跨 3 dBZ、60 那格跨 10 dBZ，等高但不等步长），
-       所以 aria-label 必须写成区间，否则就是"标签错位"这个原始缺陷的缩小版。 -->
-  <div v-if="props.radarOn" class="nmap-radar-scale" data-radar-scale
+       所以 aria-label 必须写成区间，否则就是"标签错位"这个原始缺陷的缩小版。
+
+       显示条件跟 `radarImage` 走而不是跟 `radarOn` 走：这张尺量的是**贴图**的 12 档颜色。
+       省/市层与走廊页回退矢量环，那三层用的是一套柔色（见 .echo-weak/.echo-convective/
+       .echo-strong），屏幕上一个颜色都对不上这 12 格 —— 那时候摆一把量不到的尺，
+       比不摆更误导。 -->
+  <div v-if="props.radarOn && radarImage" class="nmap-radar-scale" data-radar-scale
        role="img" :aria-label="scaleAria">
     <div class="scale-head">
       <span class="scale-title">dBZ</span>
@@ -1460,6 +1472,8 @@ html[data-theme="light"] .nmap-radar-img{opacity:.90}
 .scale-title{font-size:11px;font-weight:700;color:#e6f4ff;letter-spacing:.4px}
 .scale-vcp{font-size:8px;color:#8ab4d4;letter-spacing:.2px}
 .scale-bar{display:flex;flex-direction:column;width:34px;border-radius:2px;overflow:hidden;border:1px solid rgba(0,0,0,.45)}
+/* 70 dBZ 是纯白块，浅色面板也是白的 —— 只靠外边框会看成"缺了一格" */
+html[data-theme="light"] .scale-bar{border-color:rgba(0,0,0,.55);box-shadow:inset 0 0 0 1px rgba(0,0,0,.18)}
 .scale-step{height:11px;display:flex;align-items:center;justify-content:flex-end;padding-right:3px;position:relative}
 .scale-step em{font-style:normal;font-size:8.5px;font-weight:700;line-height:1;color:#000000;
   text-shadow:0 0 2px rgba(255,255,255,.85)}

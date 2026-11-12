@@ -126,3 +126,19 @@ test('图例数值来自 payload，不与 dbz.py 的阈值各说各话', () => {
   assert.match(dbzPy, /CONVECTIVE_DBZ = 35\.0/)
   assert.match(dbzPy, /STRONG_DBZ = 45\.0/)
 })
+test('走廊页（lockView / soloCorridor）也回退矢量环', () => {
+  const computed = map.slice(map.indexOf('const radarImage=computed'), map.indexOf('// —— 回波环 ——'))
+  assert.match(computed, /props\.lockView\|\|props\.soloCorridor/,
+    '走廊页视野锁在单条走廊上，全国贴图铺上去是 2438px 铺 864px 的阶梯')
+})
+
+test('图例只在贴图真的上屏时显示（矢量回退那三层不认这 12 格颜色）', () => {
+  assert.match(map, /v-if="props\.radarOn && radarImage"[\s\S]{0,200}data-radar-scale/,
+    '图例是位图的刻度尺：省/市层与走廊页回退矢量环时不该出现')
+})
+
+test('来源文案先判有无数据、再判虚实', () => {
+  const block = map.slice(map.indexOf('const scaleSource=computed'), map.indexOf('const scaleAria=computed'))
+  assert.ok(block.indexOf("available===false") < block.indexOf('r.virtual'),
+    '虚拟气象取数失败时不该写成「模拟回波」')
+})
