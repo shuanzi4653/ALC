@@ -403,10 +403,14 @@ def test_the_two_tile_fetches_really_overlap(monkeypatch):
     assert elapsed < delay * 1.8, '两块瓦片看起来是串行取的（%.3f s）' % elapsed
 
 
-def test_a_partly_failed_attempt_is_not_a_usable_frame(monkeypatch):
-    """一块成功、一块失败 => 这个时次**不算**可用，与串行时的结论一致。
+def test_a_partly_failed_attempt_is_still_a_frame_but_names_the_hole(monkeypatch):
+    """一块成功、一块失败 ⇒ 这一档**可用**，缺的那块必须写进 missingTiles。
 
-    并发没有放宽「完整帧」的定义：只有两块都在手里，这一帧才是测量。
+    2026-11-13 改的契约。原来这里要求"两块都在手里这一帧才是测量"，结果在源站
+    只发三张网格的日子里（(6,3) 全天 404），每一档都被判不可用，屏幕上写
+    「雷达槽号 未取得」，而其实三张好图就在手里。缺一张的正确说法是
+    "这一块没有数据"，不是"这个时次没有数据" —— 前者能画图并标出缺角，
+    后者什么都给不出。
     """
     body = bytes(cma_tiles.TILE_SIZE * cma_tiles.TILE_SIZE * cma_tiles.BYTES_PER_CELL)
 
@@ -418,5 +422,20 @@ def test_a_partly_failed_attempt_is_not_a_usable_frame(monkeypatch):
     monkeypatch.setattr(cma_tiles, 'fetch_tile', fake_fetch)
     cma_tiles._CACHE.clear()
     result = cma_tiles.frame(zoom=ZOOM, grid=((6, 2), (6, 3)), force=True)
+    assert result['available'] is True
+    assert result['missingTiles'] == [[6, 3]]
+    assert result['gridTiles'] == [(6, 2)]
+    assert result['error'] is None
+
+
+def test_a_slot_with_no_readable_tile_is_still_unusable(monkeypatch):
+    """两块都失败 ⇒ 仍不可用。容错容的是"缺角"，不是"什么都没有"。"""
+
+    def fake_fetch(slot, zoom=3, x=6, y=3, opener=None):
+        raise cma_tiles.RadarTileUnavailable('boom-%d,%d' % (x, y))
+
+    monkeypatch.setattr(cma_tiles, 'fetch_tile', fake_fetch)
+    cma_tiles._CACHE.clear()
+    result = cma_tiles.frame(zoom=ZOOM, grid=((6, 2), (6, 3)), force=True)
     assert result['available'] is False
-    assert '(6,3)' in result['error']
+    assert '(6,2)' in result['error'] or '(6,3)' in result['error']

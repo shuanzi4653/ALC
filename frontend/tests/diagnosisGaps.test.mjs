@@ -402,6 +402,36 @@ test('回放气象帧：对不上就说对不上，不把当前帧冒充成当�
   assert.equal(replayWeatherFrame(WEATHER({radar: {available: false, regions: []}}), 30).tiers.strong, null)
 })
 
+test('雷达帧取到了但没有对流回波 —— 槽号照给，面积写 0，不许写「未取得」', () => {
+  // 2026-11-13 线上：后端只有在派生几何非空时才发 `kind:'RADAR'` 的 region。
+  // 而"这一帧只有 19.5 km² 层状降水、0 km² 对流"同样会得到空的 regions ——
+  // 界面于是把"取到了、只是没有对流回波"写成「雷达槽号 未取得」，
+  // 与"真的没取到"长得一模一样。槽号属于**帧**，不在 region 里。
+  const quiet = WEATHER({
+    minute: 180,
+    radar: {
+      available: true, mode: 'measured', regions: [],
+      summary: {channel: 'CMA_RADAR_TILES', available: true,
+        slot: '2026-11-12T19:24:00Z', slotAgeMinutes: 11.8,
+        bands: {STRATIFORM: {components: 1, areaKm2: 19.5},
+          CONVECTIVE: {components: 0, areaKm2: 0},
+          STRONG: {components: 0, areaKm2: 0}}},
+    },
+  })
+  const view = replayWeatherFrame(quiet, 180)
+  assert.equal(view.state, 'ALIGNED')
+  assert.equal(view.radarSlot, '2026-11-12T19:24:00Z')
+  // 0 是"取了、没有达到阈值"，null 才是"没取到"。两者不能混成一个「未取得」。
+  assert.equal(view.tiers.stratiform, 19.5)
+  assert.equal(view.tiers.convective, 0)
+  assert.equal(view.tiers.strong, 0)
+  // 负向对照：真的没取到时，槽号必须是 null，面积必须是 null。
+  const down = replayWeatherFrame(WEATHER({minute: 180,
+    radar: {available: false, regions: [], summary: {available: false}}}), 180)
+  assert.equal(down.radarSlot, null)
+  assert.equal(down.tiers.strong, null)
+})
+
 // =============================================================================
 // 图层清单：三处副本收成一处的**回执**
 // =============================================================================

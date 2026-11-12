@@ -2,6 +2,8 @@
 import {computed,onMounted,ref} from 'vue'
 import {requestJson} from '../../api.js'
 import {pct} from '../../traffic/runtime.js'
+import {deliverCsv,csvDeliveryText} from '../../traffic/clipboard.js'
+const csvNote=ref('')
 
 const props=defineProps({
   focusCorridor:{type:String,default:''},
@@ -60,15 +62,12 @@ const decided=computed(()=>counts.value.ACCEPT+counts.value.REJECT+counts.value.
 const acceptRate=computed(()=>decided.value?counts.value.ACCEPT/decided.value:null)
 const lowConfidence=computed(()=>rows.value.filter(r=>typeof r.confidence==='number'&&r.confidence<0.65).length)
 
-function exportCsv(){
+async function exportCsv(){
   const head='at,corridorId,flightId,p,confidence,ruleLevel,verdict,operator,note\n'
   const body=rows.value.map(r=>[r.at,r.corridorId||'',r.flightId||'',r.p??'',r.confidence??'',
     r.ruleLevel??'',r.verdict||'',r.operator||'',
     '"'+String(r.note||'').replace(/"/g,'""')+'"'].join(',')).join('\n')
-  const blob=new Blob([head+body],{type:'text/csv;charset=utf-8'})
-  const url=URL.createObjectURL(blob),a=document.createElement('a')
-  a.href=url;a.download='divergence-ledger.csv';a.click()
-  setTimeout(()=>URL.revokeObjectURL(url),1000)
+  csvNote.value=csvDeliveryText(await deliverCsv(head+body,'divergence-ledger.csv'))
 }
 </script>
 

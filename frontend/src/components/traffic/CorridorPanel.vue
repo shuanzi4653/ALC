@@ -3,6 +3,8 @@ import {computed,onBeforeUnmount,onMounted,ref,watch} from 'vue'
 import {requestJson,postAction} from '../../api.js'
 import {pct,riskTone,verdictTone,hourLabel,criterionValueText,visibilityText} from '../../traffic/runtime.js'
 import {withCase,activeCase} from '../../traffic/caseMode.js'
+import {deliverCsv,csvDeliveryText} from '../../traffic/clipboard.js'
+const csvNote=ref('')
 
 const props=defineProps({initialId:{type:String,default:''},
   minute:{type:Number,default:0},
@@ -117,14 +119,12 @@ async function record(verdict){
   }catch(e){recorded.value='记录失败：'+e.message}
   finally{busy.value=false}
 }
-function exportCsv(){
+async function exportCsv(){
   if(!detail.value)return
   const head='km,p_unsafe,sigma\n'
   const body=(detail.value.samples||[]).map(s=>`${s.km},${s.p},${s.sigma}`).join('\n')
-  const blob=new Blob([head+body],{type:'text/csv;charset=utf-8'})
-  const url=URL.createObjectURL(blob),a=document.createElement('a')
-  a.href=url;a.download=`${detail.value.corridorId}-profile.csv`;a.click()
-  setTimeout(()=>URL.revokeObjectURL(url),1000)
+  // 走剪贴板优先的交付，不弹下载条（理由见 traffic/clipboard.js）
+  csvNote.value=csvDeliveryText(await deliverCsv(head+body,`${detail.value.corridorId}-profile.csv`))
 }
 </script>
 

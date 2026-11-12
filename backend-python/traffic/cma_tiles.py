@@ -17,8 +17,20 @@ MISSING = 32767
 SCALE = 0.1
 CADENCE_MINUTES = 6
 TIMEOUT_SECONDS = 20
-MAX_LOOKBACK_STEPS = 12
+# 回看窗口 = 36 档 × 6 分钟 = 3.6 小时。
+#
+# 原来是 12 档（72 分钟），依据是"产品 6 分钟一版，一小时足够追上"。这个依据
+# 只对**源站正常发布**成立。2026-11-13 凌晨实测：源站最后一版停在 01:54 +08，
+# 到 03:10 已停更 76 分钟，12 档刚好差 4 分钟够不着 —— 屏幕上于是整块显示
+# 「雷达槽号 未取得」，而源站并没有坏，只是这一夜走得慢。
+# 放宽到 3.6 小时后，这种情况会拿到 01:54 那帧，并按 slotAgeMinutes 如实标出
+# "X 分钟前"，而不是宣称没有数据。
+MAX_LOOKBACK_STEPS = 36
+# 命中一帧就缓存 5 分钟；但如果命中的是**旧帧**（源站停更中），只能缓存 2 分钟，
+# 否则源站恢复发布后界面还要再看 5 分钟的旧图。
 CACHE_SECONDS = 300
+STALE_CACHE_SECONDS = 120
+STALE_SLOT_MINUTES = 30
 
 # 分档阈值改由 `weather/dbz.py` 定义、这里**再导出同名常量**：
 # 名字与取值一字未变（radar_field.py 与三个雷达测试文件不用动），但全仓只剩一个赋值点。
@@ -42,6 +54,13 @@ _WARNED = set()
 DEFAULT_GRID = ((5, 2), (6, 2), (5, 3), (6, 3))
 
 TILE_FETCH_WORKERS = 2
+# 探测阶段的并发：36 个时次各试两个坐标，6 路并发约 2 秒；串行要十几秒。
+PROBE_WORKERS = 6
+# 一批探测多少个时次。正常情况（源站在发最新一版）第一批就命中，
+# 后面的批次根本不发请求 —— 响应变慢只发生在源站真的停更时。
+PROBE_BATCH = 12
+# 整轮探测的时间预算。超了就按"这一轮没取到"返回，而不是让首屏一直转圈。
+PROBE_BUDGET_SECONDS = 25
 
 def _fetch_one(attempt, zoom, x, y):
     try:
@@ -122,6 +141,51 @@ def sample_stats(rows):
         'minDbz': min(present), 'maxDbz': max(present),
     }
 
+def _probe_slot(attempt, zoom, probes):
+    """问一句"这一档还在发布吗"：命中任意一个坐标就算在，不关心命中几个。
+
+    探测与取图分开，是被 3.6 小时回看窗口逼出来的：36 档 × 4 张 = 144 次请求，
+    串行要十几秒，而绝大多数时候答案在第一档。先每档只试两个坐标，代价约 1/2。
+    """
+    last = '探测坐标为空'
+    for x, y in probes:
+        try:
+            fetch_tile(attempt, zoom, x, y)
+            return attempt, None
+        except RadarTileUnavailable as exc:
+            last = f'({x},{y}) {exc}'
+    return attempt, last
+
+def _latest_available_slot(slot, zoom, tiles):
+    """从新到旧找第一个仍在发布的时次；返回 (时次, 试了几档, 首条错误)。"""
+    probes = list(tiles[:2]) if len(tiles) > 1 else list(tiles)
+    deadline = time.monotonic() + PROBE_BUDGET_SECONDS
+    tried = 0
+    first_error = None
+    # 最常见的情形是"最新一档就在"。先单独问这一档，命中就直接返回，
+    # 常态路径只有 1–2 次请求；批量探测留给源站真的停更的时候。
+    attempt, error = _probe_slot(slot, zoom, probes)
+    tried += 1
+    if error is None:
+        return attempt, tried, None
+    first_error = f'{slot:%Y-%m-%d %H:%M}Z {error}'
+    for batch_start in range(1, MAX_LOOKBACK_STEPS, PROBE_BATCH):
+        if time.monotonic() > deadline:
+            break
+        batch = [slot - dt.timedelta(minutes=CADENCE_MINUTES * step)
+                 for step in range(batch_start,
+                                   min(batch_start + PROBE_BATCH, MAX_LOOKBACK_STEPS))]
+        if not batch:
+            break
+        with concurrent.futures.ThreadPoolExecutor(
+                max_workers=max(1, min(PROBE_WORKERS, len(batch)))) as pool:
+            outcomes = list(pool.map(lambda item: _probe_slot(item, zoom, probes), batch))
+        tried += len(batch)
+        for attempt, error in outcomes:
+            if error is None:
+                return attempt, tried, None
+    return None, tried, first_error
+
 def frame(zoom=3, grid=None, now=None, force=False):
     key = (zoom, tuple(sorted(grid)) if grid else None)
     cached = _CACHE.get(key)
@@ -140,47 +204,60 @@ def frame(zoom=3, grid=None, now=None, force=False):
     _warn_once('public', '使用免凭据公开雷达瓦片；该接口无服务等级保证，失败时不产出任何风险几何。')
 
     slot = latest_slot(now)
-    cells = []
-    errors = []
-    used_slot = None
-    for step in range(MAX_LOOKBACK_STEPS):
-        attempt = slot - dt.timedelta(minutes=CADENCE_MINUTES * step)
-        gathered = []
-        failure = None
-        for (x, y), body, error in _fetch_tiles(attempt, zoom, tiles):
-            if error is not None:
-                failure = f'({x},{y}) {error}'
-                break
-            gathered.append((x, y, body))
-        if failure is None:
-            used_slot = attempt
-            cells = [(x, y, decode_tile(body)) for x, y, body in gathered]
-            break
-        errors.append(f'{attempt:%Y-%m-%d %H:%M}Z {failure}')
+    used_slot, tried, probe_error = _latest_available_slot(slot, zoom, tiles)
 
     if used_slot is None:
         value = {'available': False, 'provenance': provenance,
-                 'error': '最近 ' + str(MAX_LOOKBACK_STEPS) + ' 个时次均不可用：' + '; '.join(errors[:3]),
-                 'slot': None, 'cells': [], 'degreesPerCell': tile_degrees_per_cell(zoom),
+                 'error': f'最近 {tried} 个时次（{tried * CADENCE_MINUTES} 分钟）均不可用：'
+                          f'{probe_error}',
+                 'slot': None, 'cells': [], 'missingTiles': [list(t) for t in tiles],
+                 'degreesPerCell': tile_degrees_per_cell(zoom),
+                 'relay': relay_instructions(zoom, grid)}
+        _CACHE[key] = {'expires': now_monotonic + 60, 'value': value}
+        return {**value, 'cache': 'MISS'}
+
+    # 逐坐标容错：**缺一张不等于这一档没发布。**
+    #
+    # 原来这里只要有一张失败就整档 break。而源站 2026-11-13 实测四张网格里
+    # (6,3) 全天 404、其余三张正常 —— 于是每一档都被判"不可用"，36 档全废，
+    # 屏幕上写「雷达槽号 未取得」。缺的坐标照实记进 missingTiles（缺测与
+    # "那一块没有回波"在图上长得一样，必须说出来），能用的照常拼。
+    gathered = []
+    missing = []
+    for (x, y), body, error in _fetch_tiles(used_slot, zoom, tiles):
+        if error is not None:
+            missing.append([x, y])
+            continue
+        gathered.append((x, y, body))
+
+    if not gathered:
+        value = {'available': False, 'provenance': provenance,
+                 'error': f'{used_slot:%Y-%m-%d %H:%M} +08 这一档探测时在、取全档时全部失败'
+                          f'（{len(missing)} 张），按不可用处理',
+                 'slot': None, 'cells': [], 'missingTiles': missing,
+                 'degreesPerCell': tile_degrees_per_cell(zoom),
                  'relay': relay_instructions(zoom, grid)}
         _CACHE[key] = {'expires': now_monotonic + 60, 'value': value}
         return {**value, 'cache': 'MISS'}
 
     instant = slot_instant(used_slot)
-    combined = [value for _, _, rows in cells for row in rows for value in row]
+    cells = [(x, y, decode_tile(body)) for x, y, body in gathered]
+    age_minutes = round((dt.datetime.now(dt.timezone.utc) - instant).total_seconds() / 60, 1)
     value = {
         'available': True, 'provenance': provenance,
         'error': None,
         'slot': instant.isoformat().replace('+00:00', 'Z'),
         'slotLocal': f'{used_slot:%Y-%m-%d %H:%M} +08',
-        'slotAgeMinutes': round((dt.datetime.now(dt.timezone.utc) - instant).total_seconds() / 60, 1),
+        'slotAgeMinutes': age_minutes,
         'cells': cells, 'degreesPerCell': tile_degrees_per_cell(zoom),
         'gridTiles': sorted((x, y) for x, y, _ in cells),
+        'missingTiles': missing,
         'stats': sample_stats([r for _, _, rows in cells for r in rows]),
-        'lookbackStepsUsed': len(errors),
+        'lookbackStepsUsed': tried,
         'relay': {'needed': False},
     }
-    _CACHE[key] = {'expires': now_monotonic + CACHE_SECONDS, 'value': value}
+    ttl = STALE_CACHE_SECONDS if age_minutes > STALE_SLOT_MINUTES else CACHE_SECONDS
+    _CACHE[key] = {'expires': now_monotonic + ttl, 'value': value}
     return {**value, 'cache': 'MISS'}
 
 RELAY_TILE_BYTES = TILE_SIZE * TILE_SIZE * BYTES_PER_CELL

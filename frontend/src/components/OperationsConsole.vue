@@ -8,6 +8,7 @@ import WeatherSupplements from './traffic/WeatherSupplements.vue'
 import Track1Panel from './traffic/Track1Panel.vue'
 import CorridorPanel from './traffic/CorridorPanel.vue'
 import {isCaseMode} from '../traffic/caseMode.js'
+import {deliverCsv,csvDeliveryText} from '../traffic/clipboard.js'
 import {metarLines,metarOrder,sigmetRows,clearanceReport,operationalTime,detourMinutesShort,routeBasisNames,isWeatherDetour,radarRuleBlock,routeBasisCensus,mechanismChain,mechanismPickerRows,groupAlerts,
   caliberBlocks,glossaryGroups,airspaceIntel,timelineIntel,replayBuckets,replaySlice,receiptText,densityPolicy,SOURCE_BADGES,
   DISPOSAL_FLOW,disposalStateLabel,disposalNextActions,disposalAction,
@@ -23,8 +24,11 @@ const props=defineProps({
   corridorFocus:{type:String,default:''},
   corridorPair:{type:Object,default:null},
   aiReviewed:{type:Object,default:()=>({})}})
-const emit=defineEmits(['select-flight','weather-mode-change','locate-event','ai-reviewed','open-section','seek','open-corridor'])
+const emit=defineEmits(['select-flight','weather-mode-change','locate-event','ai-reviewed','open-section','seek','open-corridor','replay-state'])
 const caseMode=isCaseMode()
+// 回放是否在跑。声明得这么靠前，是因为同样靠前的 `replayWeather` 要读它
+// （回放中的帧滞后属设计使然，不该按"帧错了"告警）。
+const replayPlaying=ref(false)
 const stationRows=computed(()=>{
   const rows=props.weather?.stationVisibility||[]
   return rows.map(r=>({
@@ -141,12 +145,21 @@ function sortObs(key){
   obsDir.value=(OBSERVATION_COLUMNS.find(column=>column.key===key)?.numeric)?'desc':'asc'
 }
 const obsSortMark=key=>obsSortKey.value!==key?'':(obsDir.value==='asc'?'▲':'▼')
-function exportObservations(){
+// 导出即"能带走"：默认写剪贴板，不弹下载条（见 traffic/clipboard.js）。
+// 交付结果要落在界面上：点完没有任何反馈，用户会以为按钮坏了，然后连点三次。
+const csvNote=ref('')
+let csvNoteTimer=null
+function announceCsv(result){
+  csvNote.value=csvDeliveryText(result)
+  if(csvNoteTimer)clearTimeout(csvNoteTimer)
+  csvNoteTimer=setTimeout(()=>{csvNote.value=''},8000)
+}
+onBeforeUnmount(()=>{if(csvNoteTimer)clearTimeout(csvNoteTimer)})
+
+async function exportObservations(){
   if(!obsRows.value.length)return
-  const blob=new Blob(['\ufeff'+observationCsv(obsSorted.value)],{type:'text/csv;charset=utf-8'})
-  const url=URL.createObjectURL(blob),link=document.createElement('a')
-  link.href=url;link.download=`逐站观测-${(props.session?.sessionId||'session').slice(0,12)}.csv`
-  document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url)
+  announceCsv(await deliverCsv(observationCsv(obsSorted.value),
+    `逐站观测-${(props.session?.sessionId||'session').slice(0,12)}.csv`))
 }
 const impacts=computed(()=>observationImpact(props.weather,props.flights,props.network))
 const batchClearance=computed(()=>batchClearanceRows(props.flights,{limit:24}))
@@ -169,7 +182,7 @@ const replayWeather=computed(()=>{
   // 空窗分两级：计划还在建 → BUILDING；计划就绪但帧没回来 → LOADING。
   // 两级之外才是 ABSENT（真读不到，此时会有错误条说明原因）。
   const stage=props.weather?'':(planBuilding.value?'BUILDING':'LOADING')
-  return replayWeatherFrame(props.weather,replayMinute.value,stage)
+  return replayWeatherFrame(props.weather,replayMinute.value,stage,replayPlaying.value)
 })
 const sigmet=computed(()=>sigmetRows(props.weather))
 const clearance=computed(()=>clearanceReport(props.selected?.atcClearance))
@@ -263,7 +276,12 @@ async function loadJournal(){
   if(id){
     try{
       const rows=await requestJson('/api/traffic/journal?sessionId='+id)
-      if(Array.isArray(rows)&&rows.length){
+      // 只有"实质记录"才算这本账有内容。导出/打点这类 I/O 痕迹不算 ——
+      // 否则点一次导出，session 账从空变成 1 条，账本立刻翻过去，
+      // 全国那 140 条从页面上消失（评审看到的"点一下就废"正是这个）。
+      const substantive=Array.isArray(rows)
+        ?rows.filter(row=>String(row?.kind||'').toUpperCase()!=='EXPORT'):[]
+      if(substantive.length){
         journalSource.value='session'
         journal.value=rows
         journalLoading.value=false
@@ -359,15 +377,13 @@ const aiStatus=computed(()=>{
 async function exportJournal(){
   const rows=[...journalRows.value].reverse()
   if(!rows.length)return
-  const blob=new Blob(['\ufeff'+journalCsv(rows)],{type:'text/csv;charset=utf-8'})
-  const url=URL.createObjectURL(blob),link=document.createElement('a')
-  link.href=url;link.download=`运行日志-${(props.session?.sessionId||'session').slice(0,12)}.csv`
-  document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url)
-  try{
-    await postAction('/api/traffic/operations/note',{sessionId:props.session.sessionId,format:'csv',rows:rows.length})
-    await loadJournal()
-  }catch(_){
-  }
+  announceCsv(await deliverCsv(journalCsv(rows),
+    `运行日志-${(props.session?.sessionId||'session').slice(0,12)}.csv`))
+  // 导出要留痕，但**不重载本页**：写进去的是一条 EXPORT 记录，重载后
+  // session 账从空变成 1 条，于是账本选择翻到 session，整页从 140 条掉到 1 条
+  // —— 演示时点一下"导出 CSV"，日志就"废了"。留痕下次进来照样看得见。
+  try{await postAction('/api/traffic/operations/note',{sessionId:props.session.sessionId,format:'csv',rows:rows.length})}
+  catch(_){}
 }
 
 const policy=computed(()=>densityPolicy(props.density))
@@ -554,11 +570,21 @@ const replayMinute=computed(()=>Number(props.minute)||0)
 const replayMax=computed(()=>Number(props.maxMinute)||480)
 const replayView=computed(()=>replaySlice(journal.value,replayMinute.value))
 function jumpReplay(minute){emit('seek',Math.max(0,Math.min(replayMax.value,minute)))}
-const replayPlaying=ref(false)
 let replayTimer=null
-function stopReplay(){replayPlaying.value=false;if(replayTimer)clearInterval(replayTimer);replayTimer=null}
+// 回放会驱动**全站时钟**，所以顶栏必须知道它在跑：
+// 原来只改 minute、不改任何播放状态，顶栏就一直写着「已暂停」，
+// 而画面在动 —— 评审看到的正是"顶栏说暂停、数字却在变"。
+function stopReplay(){
+  const was=replayPlaying.value
+  replayPlaying.value=false
+  if(replayTimer)clearInterval(replayTimer);replayTimer=null
+  if(was)emit('replay-state',false)
+}
+// 2 分钟一步、240 ms 一步：480 分钟约 58 秒走完，既不快到看不清，
+// 也不慢到气象帧每次都追不上（见 TrafficWorkbench 的桶宽分档）。
+const REPLAY_STEP_MINUTES=2, REPLAY_TICK_MS=240
 function replayStep(){
-  const next=Math.min(replayMax.value,replayMinute.value+2)
+  const next=Math.min(replayMax.value,replayMinute.value+REPLAY_STEP_MINUTES)
   emit('seek',next)
   if(next>=replayMax.value)stopReplay()
 }
@@ -566,7 +592,8 @@ function toggleReplay(){
   if(replayPlaying.value){stopReplay();return}
   if(replayMinute.value>=replayMax.value)emit('seek',0)
   replayPlaying.value=true
-  replayTimer=setInterval(replayStep,180)
+  emit('replay-state',true)
+  replayTimer=setInterval(replayStep,REPLAY_TICK_MS)
 }
 onBeforeUnmount(stopReplay)
 const replaySpan=computed(()=>{
@@ -1192,8 +1219,10 @@ async function copyReceipt(row){
       </button>
     </div>
     <input v-model="journalQuery" type="search" aria-label="搜索运行日志" placeholder="搜索班次 / 内容 / 明细">
-    <button class="journal-export" :disabled="!journalRows.length" @click="exportJournal">导出 CSV</button>
+    <button class="journal-export" :disabled="!journalRows.length" @click="exportJournal"
+            title="复制为 CSV 文本，不触发浏览器下载条；需要文件时粘贴到表格另存">导出 CSV</button>
   </div>
+  <p class="csv-note" v-if="csvNote" role="status" data-csv-note>{{csvNote}}</p>
   <p class="operations-error" v-if="journalError">{{journalError}}</p>
   <details class="replay density-fold" :open="policy.replay&&journalSource==='session'" data-density="replay">
     <summary>复盘回放 <span>按推演分钟重放全站时钟 · 另有 {{journal.length}} 条操作记录</span></summary>
@@ -1242,7 +1271,9 @@ async function copyReceipt(row){
       <div class="replay-weather-grid">
         <article><small>帧分钟</small><strong>{{replayWeather.minute==null?'未取得':'T+'+replayWeather.minute}}</strong></article>
         <article><small>回放指针</small><strong>{{replayWeather.requested==null?'未取得':'T+'+replayWeather.requested}}</strong></article>
-        <article><small>网格单元</small><strong>{{replayWeather.minute==null?'—':replayWeather.cells}}</strong></article>
+        <!-- 网格单元为 0 不是"零个网格"，是这张帧没有逐格数据（全国模式走逐站观测）。
+             写 0 会被读成"取了但全空"，写 — 才是"本帧不提供这一项"。 -->
+        <article><small>网格单元</small><strong>{{replayWeather.minute==null||!replayWeather.cells?'—':replayWeather.cells}}</strong></article>
         <article><small>逐站观测</small><strong>{{replayWeather.minute==null?'—':replayWeather.observations}}<i v-if="replayWeather.minute!=null"> 站</i></strong></article>
         <article><small>雷达槽号</small><strong>{{replayWeather.radarSlot||'未取得'}}</strong></article>
         <article><small>数据源</small><strong>{{replayWeather.provider||'未取得'}}</strong></article>
@@ -1406,7 +1437,9 @@ async function copyReceipt(row){
 .journal-chip:hover{border-color:#65cce5!important}
 .journal-chip.on{background:#204658!important;border-color:#398098!important;color:#eaf7ff}
 .journal-chip.on em{color:#a9f0ff}
-.journal-bar input{flex:0 1 260px;min-width:160px;background:#12293a!important;border:1px solid #2b4a5e!important;
+/* 搜索框吃掉剩余宽度：否则记录条数变多（79 → 140）时筛芯片变宽，
+   把「导出 CSV」挤到第二行、孤零零靠右 —— 一屏数据量不同，版式就跟着变。 */
+.journal-bar input{flex:1 1 200px;min-width:150px;background:#12293a!important;border:1px solid #2b4a5e!important;
   color:#d3e6f0;border-radius:7px;padding:8px 11px;font:inherit;font-size:12px}
 .journal-bar input::placeholder{color:#5f8098}
 tbody tr.jump{cursor:pointer}
@@ -1416,6 +1449,9 @@ html[data-theme="light"] tbody tr.jump:hover{background:#eef6fd}
   border:1px solid #2b5f70!important;color:#bfeaf6!important;border-radius:7px;cursor:pointer}
 .journal-export:hover:not(:disabled){border-color:#65cce5!important}
 .journal-export:disabled{opacity:.45;cursor:not-allowed}
+/* 导出的回执：一行、贴在筛选条下面。不要 toast —— 演示时浮层会盖住表格。 */
+.csv-note{margin:8px 0 0;font-size:12px;line-height:1.7;color:#9fd9e2;
+  padding:6px 10px;border-left:2px solid #37768c;background:#12283a;border-radius:0 5px 5px 0;max-width:760px}
 .journal-kind{display:inline-block;font-size:12px;letter-spacing:.5px;padding:3px 7px;border-radius:4px;
   white-space:nowrap;background:#1b3145;color:#9fc4d8}
 .journal-kind.manual{background:#10333f;color:#8fe6f7}
@@ -1694,6 +1730,8 @@ html[data-theme="light"] tbody tr.jump:hover{background:#eef6fd}
 .replay-weather{margin-top:16px;padding:15px 17px;background:#132330;border:1px solid #274355;border-radius:8px}
 .replay-weather[data-replay-weather="ALIGNED"]{border-left:3px solid #4fbf9a}
 .replay-weather[data-replay-weather="MISALIGNED"]{border-left:3px solid #d98a2b}
+/* 回放中指针领先 1–2 档是设计使然：用中性蓝，不用告警橙。 */
+.replay-weather[data-replay-weather="FOLLOWING"]{border-left:3px solid #4a86a6}
 .replay-weather[data-replay-weather="ABSENT"]{border-left:3px solid #6d3a46}
 .replay-weather[data-replay-weather="PENDING"]{border-left:3px solid #3f6f8a}
 .replay-weather>header{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:12px}

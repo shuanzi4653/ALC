@@ -3062,7 +3062,7 @@ export function disposalNextActions(state){
 // 这里**只读取、不重算**：把当前气象帧按它自己的 `minute` 与回放时刻对齐，并明确
 // 说出两者是否同一刻。对不上时说的是"该帧不是回放时刻的帧"，而不是把当前帧
 // 当成当时的帧摆上去 —— 那正是 0.9.26 之前"计划与地图不是同一个世界"的同型错误。
-export function replayWeatherFrame(weather,minute,pending=false){
+export function replayWeatherFrame(weather,minute,pending=false,following=false){
   const frame=weather&&typeof weather==='object'?weather:null
   // 0.11.25（B-4）：**ABSENT 也必须返回同一套键。**
   //
@@ -3098,12 +3098,45 @@ export function replayWeatherFrame(weather,minute,pending=false){
   const radar=frame.radar||null
   const regions=radar&&Array.isArray(radar.regions)?radar.regions:[]
   const record=regions.find(item=>item&&item.kind==='RADAR')||null
+  const radarSummary=radar&&typeof radar.summary==='object'?radar.summary:null
   const bands=record&&record.bands&&typeof record.bands==='object'?record.bands:null
+  // **槽号不在 region 里也能有。**
+  //
+  // 后端只有在派生几何非空时才发布 `kind:'RADAR'` 的 region；而"这一帧没有
+  // ≥35 dBZ 的回波"（晴天、或回波都在海上）同样会产生空的 region 列表 ——
+  // 于是界面把"取到了、只是没有对流回波"写成「雷达槽号 未取得」，与真的没取到
+  // 长得一模一样。槽号属于**帧**，`summary.slot` 在 available 时一定在。
+  const radarSlot=(record&&record.slot)||(radarSummary&&radarSummary.slot)||null
+  const summaryBands=radarSummary&&radarSummary.bands&&typeof radarSummary.bands==='object'
+    ?radarSummary.bands:null
   const areaOf=key=>{
-    const raw=bands?bands[key]:null
+    // 两个来源都要看：region 是逐档几何的权威，summary 在"没有几何"时仍带逐档面积。
+    const raw=(bands?bands[key]:null)||(summaryBands?summaryBands[key]:null)
     return raw&&Number.isFinite(Number(raw.areaKm2))?Number(raw.areaKm2):null
   }
   const aligned=Number.isFinite(frameMinute)&&Number.isFinite(at)&&Math.abs(frameMinute-at)<0.5
+  // 回放中的错位是**设计使然**，不是故障。
+  //
+  // 回放每 240 ms 推进 2 分钟，而气象帧按 6 分钟的发布档取回 —— 指针必然领先
+  // 1–2 档。原来这一支和"页面持有一张别的时刻的帧"共用同一个 MISALIGNED 黄框，
+  // 于是回放一开就整块告警，看着像坏了；而它其实只是"还在跟"。暂停后由调用方
+  // 补取一次，自然对齐。
+  if(!aligned&&following&&frameMinute<=at+0.5)return {
+    state:'FOLLOWING',
+    minute:Number.isFinite(frameMinute)?frameMinute:null,
+    requested:Number.isFinite(at)?at:null,
+    cells:Array.isArray(frame.cells)?frame.cells.length:0,
+    observations:Array.isArray(frame.observations)?frame.observations.length:0,
+    provider:frame.provider||frame.source||null,
+    dataType:frame.dataType||null,
+    radarAvailable:!!(radar&&radar.available),
+    radarSlot,
+    tiers:{stratiform:areaOf('STRATIFORM'),convective:areaOf('CONVECTIVE'),strong:areaOf('STRONG')},
+    label:'气象帧正在跟随回放',
+    note:`回放指针在 T+${Math.round(at||0)} 分钟，手上的帧是 T+${Math.round(frameMinute)} 的那一次求值。`
+      +'回放按 6 分钟一档取帧、指针每步走 2 分钟，因此指针会领先 1–2 档；'
+      +'暂停回放后自动对齐到当前分钟。',
+  }
   return {
     state:aligned?'ALIGNED':'MISALIGNED',
     minute:Number.isFinite(frameMinute)?frameMinute:null,
@@ -3113,7 +3146,7 @@ export function replayWeatherFrame(weather,minute,pending=false){
     provider:frame.provider||frame.source||null,
     dataType:frame.dataType||null,
     radarAvailable:!!(radar&&radar.available),
-    radarSlot:record?record.slot:null,
+    radarSlot,
     tiers:{stratiform:areaOf('STRATIFORM'),convective:areaOf('CONVECTIVE'),strong:areaOf('STRONG')},
     label:aligned
       ?`回放时刻的气象帧（T+${String(Math.floor((at||0)/60)).padStart(2,'0')}:${String(Math.round((at||0)%60)).padStart(2,'0')}）`

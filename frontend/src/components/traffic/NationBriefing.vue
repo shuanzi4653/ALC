@@ -1,6 +1,11 @@
 <script setup>
 import {computed,onMounted,onUnmounted,ref,watch} from 'vue'
 import {requestJson} from '../../api.js'
+import {deliverCsv,csvDeliveryText} from '../../traffic/clipboard.js'
+// 导出的回执（一行字，取代浏览器下载条）
+const csvNote=ref('')
+let csvTimer=null
+onUnmounted(()=>{if(csvTimer)clearTimeout(csvTimer)})
 
 // 全国台账 / 全国情报：**同一份表，两个入口**。
 //   ① 全国航线网页里的「台账」「情报」两个视图；
@@ -152,8 +157,10 @@ const sortLabel=computed(()=>{
   const name=SORT_LABEL[sortKey.value]||sortKey.value
   return (sortDir.value==='asc'?name.replace('从高到低','从低到高').replace('从早到晚','从晚到早'):name)
 })
-/** 导出台账（前端生成，不占后端接口）：一行一班次，列与表头一致，UTF-8 BOM 保证 Excel 不乱码。 */
-function exportLedger(){
+/** 导出台账（前端生成，不占后端接口）：一行一班次，列与表头一致。
+ *  交付方式走 deliverCsv：默认写剪贴板，不弹浏览器下载条（演示时那条下载条
+ *  会横在页面底部，挡住备案号与最后一行）。 */
+async function exportLedger(){
   const list=shownRows.value
   if(!list.length) return
   const head=['班次','类型','起点','终点','航线','高度(m)','申请','计划','实际','裁决','风险']
@@ -163,12 +170,10 @@ function exportLedger(){
       row.requestAt||'',row.planAt||'',row.actualAt||'',row.decisionLabel||'',row.riskLevel||'']
       .map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(','))
   }
-  const blob=new Blob(['\ufeff'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'})
-  const url=URL.createObjectURL(blob)
-  const a=document.createElement('a')
-  a.href=url; a.download=`全国班次台账-${new Date().toISOString().slice(0,10)}.csv`
-  document.body.appendChild(a); a.click(); a.remove()
-  setTimeout(()=>URL.revokeObjectURL(url),1000)
+  const result=await deliverCsv(lines.join('\r\n'),`全国班次台账-${new Date().toISOString().slice(0,10)}.csv`)
+  csvNote.value=csvDeliveryText(result)
+  if(csvTimer)clearTimeout(csvTimer)
+  csvTimer=setTimeout(()=>{csvNote.value=''},8000)
 }
 
 const filterCounts=computed(()=>{
@@ -299,8 +304,9 @@ function clock(m){
         <input v-model="query" type="search" class="nb-q" aria-label="搜索班次或城市"
                placeholder="搜索班次 / 城市 / 航线"/>
         <button class="nb-export" :disabled="!shownRows.length" @click="exportLedger"
-                title="把当前筛选结果导成 CSV（前端生成，不请求后端）">导出 CSV</button>
+                title="把当前筛选结果复制为 CSV 文本（前端生成，不请求后端，不弹下载条）">导出 CSV</button>
       </div>
+      <p class="nb-csvnote" v-if="csvNote" role="status" data-csv-note>{{ csvNote }}</p>
 
       <div class="nb-scroll">
         <table class="ledger">
@@ -440,6 +446,8 @@ function clock(m){
   border:1px solid rgba(70,110,140,.4);background:transparent;color:#9fc6dd}
 .nb-export:hover:not(:disabled){border-color:rgba(76,141,255,.55);color:#cfe6f5}
 .nb-export:disabled{opacity:.45;cursor:not-allowed}
+.nb-csvnote{margin:6px 0 0;font-size:11px;line-height:1.7;color:#9fd9e2;max-width:760px}
+html[data-theme="light"] .nb-csvnote{color:#17475e}
 html[data-theme="light"] .nb-q{background:#fff !important;color:#16324a !important;border-color:#cfdcea !important}
 html[data-theme="light"] .nb-q::placeholder{color:#7d97ad}
 html[data-theme="light"] .nb-export{color:#31556f !important;border-color:#cfdcea !important}

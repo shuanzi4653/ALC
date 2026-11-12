@@ -364,12 +364,18 @@ function rowPhase(f){return phaseNames[flightPhase(f,minute.value)]}
 // 同参数在飞行中就不重复发：loadOperations 就绪时会补一次，generate 的 READY 分支
 // 随后还会显式调一次，两次的 (会话, 分钟, 城市) 相同，取回来的是同一份数据。
 let weatherInflight=''
+// 回放时的最小请求间隔：6 分钟桶在 240 ms/步 下约 0.7 秒触发一次，
+// 而一次气象请求要几百毫秒。不设间隔就会瀑布式并发，全都是过期结果。
+let weatherNextAllowedAt=0
+const WEATHER_REPLAY_MIN_GAP_MS=650
 async function loadWeather(){
   if(!ready.value)return
+  if(Date.now()<weatherNextAllowedAt)return
   const key=session.value.sessionId,t=minute.value
   const sig=`${key}|${t}|${city.value||''}`
   if(weatherInflight===sig)return
   weatherInflight=sig
+  if(replayActive.value)weatherNextAllowedAt=Date.now()+WEATHER_REPLAY_MIN_GAP_MS
   const token=++weatherGeneration
     try{const value=await requestJson(`/api/traffic/weather?seed=${session.value.seed}&scenario=${session.value.scenario}&minute=${t}${city.value?'&cityId='+encodeURIComponent(city.value):''}${caseQuery()}`);if(!disposed&&token===weatherGeneration&&key===session.value?.sessionId){weather.value=value;maybeRelayRadar(value)}}
   catch(e){
@@ -649,11 +655,30 @@ watch([activeSection,ready,minute,scenario],loadOverviewRibbon)
 
 watch(activeSection,value=>{
   if(HASH_GUARD.value)writeHash(value)
-  playing.value=false
+  // 这里原来还有一句 `playing.value=false`：切分节就暂停推演。
+  // 结果是从态势切到日志再切回来，时钟停在 T+01:00、地图与班次都不再动 ——
+  // 评审把它记成"菜单切走回不来"。播放状态属于操作者，不属于导航。
+  // 切页时只停复盘回放（它有自己的计时器，跨页继续跑会和推演时钟抢 minute）。
+  if(replayActive.value)replayActive.value=false
 })
 
 watch([activeSection,mapExpanded],async()=>{await nextTick();if(workbench.value)workbench.value.scrollTop=0})
-watch(()=>weatherBucket(minute.value),loadWeather)
+// 复盘回放是第三种时钟状态：它驱动 minute，但 playing 仍是 false。
+const replayActive=ref(false)
+// 桶宽分档：常态按 2 分钟一桶（判据跟着分钟走），**回放时按 6 分钟一桶**。
+// 回放 2 分钟一步、240 ms 一步，用 2 分钟桶等于每 0.24 秒发一次气象请求，
+// 请求永远追不上指针 —— 屏幕上就出现"帧分钟 T+162 / 回放指针 T+164"的错位。
+// 6 分钟正好是雷达与实况的发布档：一桶一取，回放停下时再补一次对齐。
+const WEATHER_BUCKET_LIVE=2, WEATHER_BUCKET_REPLAY=6
+watch(()=>weatherBucket(minute.value,replayActive.value?WEATHER_BUCKET_REPLAY:WEATHER_BUCKET_LIVE),loadWeather)
+function onReplayState(active){
+  replayActive.value=!!active
+  if(active)return
+  // 回放结束：强制补一次，把帧对齐到指针停下的那一分钟。
+  // 不能指望上面的 watch —— 停下的分钟可能还落在同一个 6 分钟桶里。
+  weatherNextAllowedAt=0
+  loadWeather()
+}
 watch(city,()=>{weather.value=null;loadWeather()})
 // 气象帧的补取放在 `loadOperations()` 就绪那一刻（见该函数），**不用 watch(ready)**：
 // 同一个 tick 里 ready 会 true→false→true，Vue 批处理掉中间态，watch 回调拿到的
@@ -706,7 +731,12 @@ onUnmounted(()=>{
          左边那个是**推演时刻**，暂停时会停住。以前只有一个"时间基准"，
          用户暂停后看到它也停了，会以为整站卡死。 -->
     <span class="nav-clock" data-wall-clock :title="'本机时区的当前时间，与推演无关，暂停时照常走'">北京时间 {{ wallClock }}</span>
-    <span class="nav-timebase" data-time-basis :class="{paused:!topPlaying}" :title="`推演时刻：运行第 ${Math.round(topMinute)} 分钟${topPlaying?'（播放中）':'（已暂停）'}`">推演 {{ clock(topMinute) }}<template v-if="!topPlaying"> · 已暂停</template></span>
+    <!-- 三态：播放中 / 已暂停 / 回放中。
+         「回放中」必须是独立一格：复盘回放会驱动全站时钟，但那时 `playing` 仍是
+         false，原来于是写成「已暂停」—— 顶栏说暂停、数字却在跳，评审一眼就抓到。 -->
+    <span class="nav-timebase" data-time-basis
+          :class="{paused:!topPlaying&&!replayActive,replaying:replayActive}"
+          :title="`推演时刻：运行第 ${Math.round(topMinute)} 分钟${replayActive?'（复盘回放中，由回放驱动）':(topPlaying?'（播放中）':'（已暂停）')}`">推演 {{ clock(topMinute) }}<template v-if="replayActive"> · 回放中</template><template v-else-if="!topPlaying"> · 已暂停</template></span>
     <span class="relay-pill" v-if="radarRelay.status!=='idle'" role="status" data-radar-relay
           :class="radarRelay.status" :title="'实测雷达' + radarRelay.detail">
       雷达 {{ radarRelay.status==='ok' ? (radarRelay.slot||'').slice(11,16) : radarRelay.status==='running' ? '代取中' : '代取失败' }}
@@ -779,7 +809,7 @@ onUnmounted(()=>{
                  :hide-tabs="false" @scope-change="onScopeChange"
                  @open-corridor="openCorridor" @tick="onNationTick" @open-card="onOpenCard"/>
   </section>
-  <OperationsConsole v-if="!['home','overview','schedule','national'].includes(activeSection)&&!['briefing','weather','profile','alerts','assistant','card'].includes(activeSection)" :corridor-focus="corridorFocus" :corridor-pair="corridorPair" :view="activeSection" :session="session" :network="network" :flights="scoped" :weather="weather" :selected="selected" :minute="minute" :city-name="cityName" :operations="operations" :density="density" :focus="drillFocus" :weather-mode="weatherMode" :weather-mode-status="weatherModeStatus" :alert-flights="scoped" :event-focus="eventFocus" :ai-reviewed="aiReviewed" @select-flight="chooseFlight" @weather-mode-change="onWeatherModeChange" @locate-event="locateEvent" @ai-reviewed="onAiReviewed" @open-section="onOpenSection" @seek="minute=$event" @open-corridor="openCorridor" :max-minute="playbackMax"/>
+  <OperationsConsole v-if="!['home','overview','schedule','national'].includes(activeSection)&&!['briefing','weather','profile','alerts','assistant','card'].includes(activeSection)" :corridor-focus="corridorFocus" :corridor-pair="corridorPair" :view="activeSection" :session="session" :network="network" :flights="scoped" :weather="weather" :selected="selected" :minute="minute" :city-name="cityName" :operations="operations" :density="density" :focus="drillFocus" :weather-mode="weatherMode" :weather-mode-status="weatherModeStatus" :alert-flights="scoped" :event-focus="eventFocus" :ai-reviewed="aiReviewed" @select-flight="chooseFlight" @weather-mode-change="onWeatherModeChange" @locate-event="locateEvent" @ai-reviewed="onAiReviewed" @open-section="onOpenSection" @seek="minute=$event" @open-corridor="openCorridor" @replay-state="onReplayState" :max-minute="playbackMax"/>
   <!-- 调度台账：处置大类下的第二个页签。情报已经并到「气象监测」，这里只剩台账。 -->
   <section class="traffic-page scope-page" v-if="activeSection==='schedule'">
     <div class="scope-bar" data-scope-bar>
@@ -1060,6 +1090,8 @@ html[data-theme="light"] .ledger-note p{color:#5b7a92 !important}
 .nav-group.active em{color:var(--alc-info)}
 .nav-timebase{font-size:12px;color:#93a4bc;white-space:nowrap;padding:3px 8px;border:1px solid rgba(147,164,188,.28);border-radius:999px}
 .nav-timebase.paused{color:#ffc857;border-color:rgba(220,170,60,.45)}
+/* 回放中：青蓝，与"已暂停"的琥珀分开 —— 两种状态在同一位置出现，颜色必须不同。 */
+.nav-timebase.replaying{color:#7fd4e8;border-color:rgba(90,180,205,.5)}
 .nav-clock{font-size:12px;color:#cfe6f5;white-space:nowrap;padding:3px 8px;
   border:1px solid rgba(147,164,188,.28);border-radius:999px;font-variant-numeric:tabular-nums}
 .nav-tour{position:fixed;right:16px;bottom:56px;z-index:120;max-width:360px}
