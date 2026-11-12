@@ -81,7 +81,7 @@
         <DeduceSection name="criteria" no="2" title="判据" tag="RULE"
                        :summary="sumCriteria" :force="forceSeq" :force-dir="forceDir"
                        :tone="passCount === (data.criteria || []).length ? 'ok' : 'bad'">
-          <BarThreshold :rows="criteriaRows" title="各判据的实测值与阈值" unit="条长＝实测占阈值的比例，越过 100% 即不通过"
+          <BarThreshold :rows="criteriaRows" title="各判据的实测值与阈值" unit="条长＝实测值距阈值的接近程度，触及虚线即达阈值"
                         aria="各判据实测值与阈值对照" />
           <table class="dd-tbl" data-tbl="criteria">
             <thead><tr><th>判据</th><th>阈值</th><th>实测</th><th>结论</th></tr></thead>
@@ -166,7 +166,8 @@
 
         <!-- ⑦ 网络层对照：同一帧、同一规则，移除模型层 -->
         <DeduceSection name="compare" no="7" title="网络层对照" tag="A/B"
-                       :summary="sumCompare" :force="forceSeq" :force-dir="forceDir">
+                       :summary="sumCompare" :default-open="caseMode"
+                       :force="forceSeq" :force-dir="forceDir">
           <CounterfactualPanel :minute="minute" />
         </DeduceSection>
 
@@ -190,6 +191,7 @@ import BarThreshold from '../charts/BarThreshold.vue'
 import Gauge from '../charts/Gauge.vue'
 import OptionBars from '../charts/OptionBars.vue'
 import Timeline from '../charts/Timeline.vue'
+import { activeCase } from '../../traffic/caseMode.js'
 
 const props = defineProps({
   flight: { type: Object, default: null },
@@ -201,6 +203,10 @@ const props = defineProps({
   // 日志写什么、推演结论就写什么 —— 两处读同一份，不许各说各话。
   review: { type: Object, default: null },
 })
+
+// 带 ?case= 进来的人就是要看那次案例的对照（旧链接 `#/compare/counterfactual?case=…`
+// 现在重定向到推演）。默认展开 ⑦ 段，否则"跳转过来了但什么都没看见"。
+const caseMode = Boolean(activeCase())
 
 const data = ref(null)
 const busy = ref(false)
@@ -321,13 +327,29 @@ const visChartRows = computed(() => {
 })
 
 // ── 段 2：判据图（条长＝实测占阈值的比例，阈值线固定在 100%） ──
-const criteriaRows = computed(() => (data.value?.criteria || []).map((c) => ({
-  label: c.label,
-  value: Math.round((c.ratio || 0) * 100),
-  threshold: 100,
-  display: c.display,
-  fail: !c.pass,
-})))
+// 条长必须朝**危险**方向归一，而不是直接画 ratio。
+//
+// 后端的 ratio 对 higherBetter 的判据（能见度）会钳在 1：实测 32.7 km、阈值 5 km，
+// ratio 就是 1.0。照着画出来是"条顶到 100% 线、结论却写通过" —— 同一张图上，
+// 顶格本该表示越线，于是读者只能得出"这图画错了"。实测截图里就是这样。
+//
+// 这里按 higherBetter 重新算危险度：越小越好的取 实测/阈值，越大越好的取 阈值/实测，
+// 两者都变成"离阈值还有多远"。阈值线固定 100%，触线即达阈值。
+const criteriaRows = computed(() => (data.value?.criteria || []).map((c) => {
+  const th = Number(c.threshold)
+  const ac = Number(c.actual)
+  let danger
+  if (!(th > 0)) danger = ac > 0 ? 1 : 0        // 阈值为 0 的判据（穿回波），非零即触线
+  else if (c.higherBetter) danger = th / Math.max(ac, 1e-6)
+  else danger = ac / th
+  return {
+    label: c.label,
+    value: Math.max(0, Math.min(1.25, danger)) * 100,   // 留一点余量显示"越线了"
+    threshold: 100,
+    display: c.display,
+    fail: !c.pass,
+  }
+}))
 
 // ── 段 5：三方案代价 ──
 const lossRows = computed(() => (options.value || []).map((o) => ({

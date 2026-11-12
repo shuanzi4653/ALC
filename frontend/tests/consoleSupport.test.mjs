@@ -338,10 +338,13 @@ test('every KPI that can be drilled actually lands on a section that exists',()=
   // 只写 `Object.keys(SECTION_NAMES)` 是测不出"少了一个分节"的 —— 少一项之后
   // 剩下的仍然自洽。写死清单则会在删掉一个分节时立刻变红。
   const SECTIONS=Object.keys(SECTION_NAMES)
-  // V1.0.5：'briefing' 并入 'weather'；V1.1.0：'mechanism'（0.10.1 历史页）下线，13 个分节。
+  // V1.0.5：'briefing' 并入 'weather'；V1.1.0：'mechanism'（0.10.1 历史页）下线；
+  // V1.1.1：'counterfactual' 与 'ledger' 并入推演的 ⑦⑧ 段，独立页下线 —— 11 个分节。
+  // 这两个不是"藏起来"，是**不再是可分节**：路由表、导航、命令面板里都不存在了，
+  // 只剩 LEGACY_SECTION_HASHES 把旧链接接到 card。
   assert.deepEqual(SECTIONS,
     ['home','overview','national','schedule','alerts','weather','reference','assistant','history',
-     'profile','card','counterfactual','ledger'],
+     'profile','card'],
     '分节清单变了：新增/删除分节必须同时改这里、drillTarget 的落点、NAV_GROUPS 的归组、与 docs/NAMING.md §1')
   // 0.11.1（Beta）新增四项（手册 §10）：走廊剖面 / 模型卡 / 反事实对照 / 分歧台账。
   // 这里改成"清单 + 归组同时验"：只改清单不归组，那四页永远不会出现在导航上，

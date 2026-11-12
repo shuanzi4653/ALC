@@ -1284,7 +1284,7 @@ function clickNode(node){
       </g>
 
       <!-- 6.5 选中班次的航线。全国层平时不画航线，这一条是唯一的例外：
-           "我点的这架，从哪来、到哪去"必须当场答得出来。
+           当前选中班次的起降点须当场可读。
            已飞段实线、未飞段虚线 —— 用 pathLength=100 归一化后拿 dasharray 截断，
            比自己切路径稳（航路是贝塞尔弧，切不出干净的子路径）。 -->
       <g v-if="pickedFlight&&pickedLine" class="nmap-pick" fill="none" stroke-linecap="round">

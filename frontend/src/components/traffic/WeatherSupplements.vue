@@ -24,7 +24,7 @@ const spreadRows=()=>modelSpreadRows(state.value.models.data)
 function emptyText(key,label){
   const slot=state.value[key]
   if(slot.error)return `取数失败：${slot.error}`
-  if(!slot.data)return `未取数 —— 点上面的按钮取一次${label}`
+  if(!slot.data)return `未取数，点击上方按钮获取${label}`
   return `已取数，但没有返回任何${label}`
 }
 </script>

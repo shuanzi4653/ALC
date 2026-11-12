@@ -8,8 +8,6 @@ import WeatherSupplements from './traffic/WeatherSupplements.vue'
 import Track1Panel from './traffic/Track1Panel.vue'
 import CorridorPanel from './traffic/CorridorPanel.vue'
 import {isCaseMode} from '../traffic/caseMode.js'
-const CounterfactualPanel = defineAsyncComponent(() => import('./traffic/CounterfactualPanel.vue'))
-const DivergencePanel = defineAsyncComponent(() => import('./traffic/DivergencePanel.vue'))
 import {metarLines,metarOrder,sigmetRows,clearanceReport,operationalTime,detourMinutesShort,routeBasisNames,isWeatherDetour,radarRuleBlock,routeBasisCensus,mechanismChain,mechanismPickerRows,groupAlerts,
   caliberBlocks,glossaryGroups,airspaceIntel,timelineIntel,replayBuckets,replaySlice,receiptText,densityPolicy,SOURCE_BADGES,
   DISPOSAL_FLOW,disposalStateLabel,disposalNextActions,disposalAction,
@@ -53,7 +51,7 @@ watch(()=>[caseMode,activeCaseId,props.session?.status],async()=>{
     casePanels.value=panels?{...panels,corridorsAtBan:typeof high==='number'?high:null}:null
   }catch(_){casePanels.value=null}
 },{immediate:true})
-const question=ref('当前运行有哪些风险，为什么需要绕行或暂停？'),answer=ref(null),asking=ref(false),error=ref('')
+const question=ref('当前风险班次与绕行、暂停建议'),answer=ref(null),asking=ref(false),error=ref('')
 const lastGlobal=ref(false)
 let token=0
 const alertGroups=computed(()=>groupAlerts(props.flights))
@@ -222,7 +220,7 @@ const ruleRows=computed(()=>{
     {key:'core',label:'内核 · 禁止进入',value:`外场向内收缩 ${metres(r.coreInsetM)}`,
      note:'内核由外场收缩得到，非强对流原轮廓；原轮廓在真实回波上为断续碎点，无法成图。'},
     {key:'field',label:'外场 · 须绕飞',value:`擦入深度上限 ${metres(r.penetrationM)}`,
-     note:'擦入深度与水平间隔同源——本项目不为强回波另立第二套标准。两级两规则：内核不可触碰，外场可有界擦边。'},
+     note:'擦入深度与水平间隔同源，强回波不另立第二套标准。两级两规则：内核不可触碰，外场可有界擦边。'},
     {key:'layers',label:'高度层',value:props.session?.stats?.noAltitudeStacking===true?'只使用已声明高度层':'本计划未声明',
      note:'冲突用已声明高度层、时隙或地面等待解决，不叠加高度。'},
   ]
@@ -965,19 +963,9 @@ async function copyReceipt(row){
   </section>
   </template>
   <template v-else-if="view==='profile'">
-    <div class="operations-heading"><h2>走廊剖面 <small>这条走廊几点能飞，凭什么</small></h2>
+    <div class="operations-heading"><h2>走廊剖面 <small>单条走廊的可飞时段与判据</small></h2>
       <p>概率由三站 METAR 实测按 1/d² 插值；0–3 h 为本模型，3–6 h 为模式延伸，两段分列。最近站距 &gt;250 km 判为低置信，转人工复核。</p></div>
     <CorridorPanel :initial-id="corridorFocus" :minute="minute" :focus-pair="corridorPair"/>
-  </template>
-  <template v-else-if="view==='counterfactual'">
-    <div class="operations-heading"><h2>对照 <small>移除模型判据后的差异</small></h2>
-      <p>同一帧、同一规则，仅移除最后一层模型判据，差异只来自模型。默认显示全国层当前帧，案例重放在页内切换。</p></div>
-    <CounterfactualPanel :minute="minute"/>
-  </template>
-  <template v-else-if="view==='ledger'">
-    <div class="operations-heading"><h2>分歧台账 <small>AI 与规则不一致时，人怎么判的</small></h2>
-      <p>每条记录含时间、走廊、概率与理由；否决与回滚须填理由，空理由返回 422。无记录时显示为空。</p></div>
-    <DivergencePanel/>
   </template>
   <template v-else-if="view==='assistant'">
   <div class="operations-heading"><h2>大模型取证</h2><p>{{selected?'当前班次：'+selected.name:'取证范围：全网调度计划'}} · 数值由概率模型算（覆盖全部班次），本页只做证据检索 · 共享同一场景与数据快照</p></div>
@@ -1127,11 +1115,11 @@ async function copyReceipt(row){
       <p>方法贡献不在模型层。能见度与阵风使用成熟的梯度提升树（100 棵、26 维特征、公开校准方法）。系统层贡献：将「气象判据 → 绕飞几何 → 时间窗」贯通于同一界面，每一步可回溯至原始报文与回波几何。应用层贡献：以同一套判据回答全国范围哪里不可飞与本班次为何如此判定。</p>
     </article>
     <article class="eval-card" data-eval="compare">
-      <header><h3>与既有做法的分工</h3><span class="eval-badge quiet">用途不同，不是高下</span></header>
+      <header><h3>与既有做法的分工</h3><span class="eval-badge quiet">用途不同</span></header>
       <dl class="eval-rows">
-        <div><dt>单站气象保障</dt><dd>站级 METAR/TAF 深算，回答"本场能不能起降"。我们做全网可下钻的态势聚合，站级深算不是我们的目标。</dd></div>
-        <div><dt>通用航路规划</dt><dd>给定空域与气象后求最优路径。我们把判据、几何、时间窗整链留痕，结论可被逐行复核。</dd></div>
-        <div><dt>商业 UTM 平台</dt><dd>空域管理与计费。我们不发空域管制指令，只给放行建议与证据，边界写在每一块内容上。</dd></div>
+        <div><dt>单站气象保障</dt><dd>站级 METAR/TAF 深算，回答本场起降条件。本系统做全网可下钻的态势聚合，站级深算不在范围内。</dd></div>
+        <div><dt>通用航路规划</dt><dd>给定空域与气象后求最优路径。本系统对判据、几何与时间窗整链留痕，结论可逐行复核。</dd></div>
+        <div><dt>商业 UTM 平台</dt><dd>空域管理与计费。本系统不发布空域管制指令，只给出放行建议与证据，边界标注于各内容块。</dd></div>
       </dl>
     </article>
     <article class="eval-card" data-eval="demand">

@@ -82,7 +82,7 @@ TILE_WORKERS = 16
 TILE_RETRIES = 1
 TILE_BACKOFF_SECONDS = 0.6
 MAX_IMAGE_EDGE = 4096.0          # 出图长边上限（再大只是给浏览器添解码负担）
-USER_AGENT = 'ALC-tianchuang/1.1.0 (radar echo; contact: project maintainer)'
+USER_AGENT = 'ALC-tianchuang/1.1.1 (radar echo; contact: project maintainer)'
 BBOX = (73.0, 15.5, 136.0, 54.5)  # 与全国视图一致
 ROUND_PIXELS = 2.0                # 每 2 像素取一个点
 

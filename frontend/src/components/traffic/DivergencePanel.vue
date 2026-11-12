@@ -129,9 +129,9 @@ function exportCsv(){
 
     <footer class="dg-foot">
       <span v-if="data?.note && !allRows.length">{{ data.note }}</span>
-      <span>服务端台账按工作区隔离（<code>X-ALC-Workspace</code>），换工作区看不到彼此的记录；
-        「本机值班员 · 走廊页」那几行是浏览器本地记录，换设备看不到。</span>
-      <span>否决与回滚必须带理由：后端对空理由直接 422，不接受"点了就算"。</span>
+      <span>服务端台账按工作区（<code>X-ALC-Workspace</code>）隔离，工作区之间互不可见；
+        标注「本机值班员 · 走廊页」的记录存放于浏览器本地，更换设备后不再显示。</span>
+      <span>否决与回滚须填写理由，理由为空时接口返回 422。</span>
     </footer>
   </template>
 </section>

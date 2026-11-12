@@ -47,12 +47,17 @@ test('子页名一律来自 SECTION_NAMES，不在这里写第二份中文名', 
   assert.ok(table, '找不到 SECTION_NAMES 的定义块')
   // 0.11.22：`card` 的显示名从「模型卡」改为「推演」—— 名字改了，判据不变：
   // 这四个名字都必须只在 `SECTION_NAMES` 里出现一次。
-  for (const name of ['走廊剖面', '推演', '反事实对照', '分歧台账']) {
+  for (const name of ['走廊剖面', '推演']) {
     const hits = (src.match(new RegExp(name, 'g')) || []).length
     const inTable = (table.match(new RegExp(name, 'g')) || []).length
     assert.ok(hits >= 1, `${name} 没有出现在分节表里`)
     // 允许注释里出现（解释性文字），但**不允许** NAV_GROUPS 再写一遍：那会变成第二来源。
     assert.ok(inTable >= 1, `${name} 不在 SECTION_NAMES 里`)
+  }
+  // V1.1.1：这两个名字随独立页一起下线。它们只该以"旧链接 → card"的注释形式出现，
+  // 不许再被当成分节名（有分节名就会有人再给它做一个入口）。
+  for (const gone of ['反事实对照', '分歧台账']) {
+    assert.ok(!(new RegExp(`['\"]${gone}['\"]:`, 'g').test(src)), `${gone} 仍被当成键写在分节表里`)
   }
 })
 
@@ -70,7 +75,8 @@ test('每个分节都归了组：漏挂一项的页面永远打不开，而构�
 test('分节 → 分组 → 默认子页：三层反查闭环', () => {
   assert.equal(groupOfSection('profile'), 'corridor')
   assert.equal(groupOfSection('card'), 'verify')
-  assert.equal(groupOfSection('ledger'), 'review')
+  // V1.1.1：ledger 不再是分节，反查必须为空 —— 静默归到某一组才是问题
+  assert.equal(groupOfSection('ledger'), '')
   assert.equal(groupOfSection('home'), 'situation')
   // 未知键不硬塞进任何一组 —— 塞进去会让"我点错了"变成"系统把我带到别处"。
   assert.equal(groupOfSection('nope'), '')

@@ -576,8 +576,8 @@ function applyHash(){
 }
 
 const TOUR_STEPS=[
-  {key:'brief',label:'结论条',text:'页首是当前作用域的一句话结论：多少条航线、几架在飞、几架绕飞或暂缓。下面的地图和右栏是它的明细。'},
-  {key:'nav',label:'五个功能区',text:'态势 / 走廊 / 处置 / 推演 / 日志。点一次换页，没有先后顺序；每一页都能下钻到省和市。'},
+  {key:'brief',label:'结论条',text:'页首为当前作用域的一句话结论：航线总数、在飞班次、绕飞与暂缓班次。地图与右栏为其明细。'},
+  {key:'nav',label:'五个功能区',text:'态势、走廊、处置、推演、日志。切换无先后顺序；每一页均可下钻至省与市。'},
 ]
 const RAIL_KEY='alc.railCollapsed'
 const railCollapsed=ref(false)
@@ -677,7 +677,7 @@ onUnmounted(()=>{
          没下钻时是静态标签；下钻之后变成一个按钮，点一下回全国 —— 否则从带 scope 的
          链接进来，用户只能靠浏览器后退才知道"现在看的是河北省"。 -->
     <button v-if="scopeDrilled" class="wb-scope wb-scope-jump" data-scope-jump
-            :title="`当前作用域：${scopeTrailText}（全国 → 大区 → 省 → 市）；点一下回到全国`"
+            :title="`当前作用域：${scopeTrailText}（全国 → 大区 → 省 → 市）；点击返回全国`"
             @click="resetNationScope">{{ scopeTrailText }} · 回全国</button>
     <span v-else class="wb-scope" data-scope-label>{{ cityName }}</span>
     <!-- 两个时间分开写：右边那个是**真实的北京时间**，每秒走；
@@ -721,7 +721,7 @@ onUnmounted(()=>{
     <div class="toolbar-cando" data-can-do>
       <b>本页功能</b>
       <span v-for="item in canDo" :key="item">{{ item }}</span>
-    </div><label>运行情景 <select v-model="scenario" :disabled="busy"><option value="live">公开天气驱动 / 模拟交通</option><option value="clear">无气象声明 / 交通交汇</option><option value="unknown">气象中断 / 暂停放行</option></select></label><button class="primary" @click="generate" :disabled="busy||!network">{{busy?buildLabel:'重新调度'}}</button><label class="settings-density" data-density-switch><span>信息密度</span><select aria-label="信息密度" v-model="density" :title="densityNote"><option v-for="tier in DENSITY_TIERS" :key="tier.key" :value="tier.key">{{tier.label}}</option></select></label><label class="settings-density" data-operator-switch><span>操作员角色</span><select aria-label="操作员角色" v-model="operator" title="决定你能做哪些写操作：观察员只读；值班员可暂停/恢复/处置；管理员可切换气象通道" @change="applyOperator"><option value="observer">观察员（只读）</option><option value="duty">值班员（处置）</option><option value="admin">管理员（切通道）</option></select></label><span class="traffic-session">{{sessionLabel}} · {{ready?'运行计划已就绪':'等待计算'}} · {{session?.weatherSnapshot?.dataType==='MODEL_ESTIMATE'||session?.weatherSnapshot?.dataType==='PROVIDER_CURRENT_ESTIMATE_OR_OBSERVATION_UNVERIFIED'?'天气为公开来源（非本系统合成）':'本场景未声明气象'}}</span><details class="traffic-repro" data-repro-params :open="densityPolicy(density).engineering"><summary>工程信息 · 复现参数</summary><dl><div><dt>数据快照编号</dt><dd>{{ready?session.seed:'—'}}</dd></div><div><dt>计划标识</dt><dd>{{session?.sessionId?.slice(0,12)||'—'}}</dd></div><div><dt>计划修订</dt><dd>{{session?.planRevision??'—'}}</dd></div><div><dt>算法版本</dt><dd>{{session?.version||'—'}}</dd></div><div><dt>算法标识</dt><dd data-algorithm-identity :title="algorithmIdentityNote">{{algorithmIdentityLabel||'—'}}</dd></div><div><dt>算法指纹</dt><dd>{{session?.fingerprint||'—'}}</dd></div><div><dt>气象通道</dt><dd>{{weatherModeIsVirtual(weatherMode)?'虚拟气象':'实测气象'}}</dd></div></dl><p>快照编号、算法指纹与气象通道三者一致时，重跑得到逐字节相同的运行计划。本区只读。</p></details></section>
+    </div><label>运行情景 <select v-model="scenario" :disabled="busy"><option value="live">公开天气驱动 / 模拟交通</option><option value="clear">无气象声明 / 交通交汇</option><option value="unknown">气象中断 / 暂停放行</option></select></label><button class="primary" @click="generate" :disabled="busy||!network">{{busy?buildLabel:'重新调度'}}</button><label class="settings-density" data-density-switch><span>信息密度</span><select aria-label="信息密度" v-model="density" :title="densityNote"><option v-for="tier in DENSITY_TIERS" :key="tier.key" :value="tier.key">{{tier.label}}</option></select></label><label class="settings-density" data-operator-switch><span>操作员角色</span><select aria-label="操作员角色" v-model="operator" title="决定可执行的写操作：观察员只读；值班员可暂停、恢复、处置；管理员可切换气象通道" @change="applyOperator"><option value="observer">观察员（只读）</option><option value="duty">值班员（处置）</option><option value="admin">管理员（切通道）</option></select></label><span class="traffic-session">{{sessionLabel}} · {{ready?'运行计划已就绪':'等待计算'}} · {{session?.weatherSnapshot?.dataType==='MODEL_ESTIMATE'||session?.weatherSnapshot?.dataType==='PROVIDER_CURRENT_ESTIMATE_OR_OBSERVATION_UNVERIFIED'?'天气为公开来源（非本系统合成）':'本场景未声明气象'}}</span><details class="traffic-repro" data-repro-params :open="densityPolicy(density).engineering"><summary>工程信息 · 复现参数</summary><dl><div><dt>数据快照编号</dt><dd>{{ready?session.seed:'—'}}</dd></div><div><dt>计划标识</dt><dd>{{session?.sessionId?.slice(0,12)||'—'}}</dd></div><div><dt>计划修订</dt><dd>{{session?.planRevision??'—'}}</dd></div><div><dt>算法版本</dt><dd>{{session?.version||'—'}}</dd></div><div><dt>算法标识</dt><dd data-algorithm-identity :title="algorithmIdentityNote">{{algorithmIdentityLabel||'—'}}</dd></div><div><dt>算法指纹</dt><dd>{{session?.fingerprint||'—'}}</dd></div><div><dt>气象通道</dt><dd>{{weatherModeIsVirtual(weatherMode)?'虚拟气象':'实测气象'}}</dd></div></dl><p>快照编号、算法指纹与气象通道三者一致时，重跑得到逐字节相同的运行计划。本区只读。</p></details></section>
   <div class="traffic-error" v-if="error" role="alert">{{error}} <button @click="network?generate():initialize()" :disabled="busy">重试</button></div>
   <div class="traffic-channel-warning" v-if="!error&&channelMismatch&&ready" role="status"><span>{{channelMismatch}}</span><button @click="generate" :disabled="busy">{{busy?'正在重建':`按${weatherModeIsVirtual(weatherMode)?'虚拟':'实测'}通道重新调度`}}</button></div>
 
@@ -768,7 +768,7 @@ onUnmounted(()=>{
         （`DENSITY_POLICY.ledger` 必须有界面消费点，否则切档位屏幕上什么都不变 ——
         消费点就是下面这条 `<details>`；别处再挂一份会让"密度变了、屏幕没变"。） -->
     <details class="ledger-note density-fold" :open="densityPolicy(density).ledger" data-density="ledger">
-      <summary>这一页的数怎么来的</summary>
+      <summary>本页数值的来源</summary>
       <p>台账按当前分钟快照重算：起降时刻为计划值，绕飞与停飞为此刻裁决结果。交通为模拟派生（SIM），气象与雷达来自公开源，两者不合并为综合风险值。</p>
     </details>
     <!-- 给组件一个确定高度的槽位：它内部靠 flex:1 让表体滚动，父级不给高度就不滚 -->

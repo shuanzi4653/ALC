@@ -801,7 +801,7 @@ onUnmounted(()=>{
       <!-- 双受众：同一套几何两种读法，不做第二套数据 -->
       <div class="nrn-aud" v-if="view==='map'" data-audience-switch>
         <button :class="{on:audience==='ops'}" @click="setAudience('ops')"
-                title="运行视角：看航线穿不穿净空、绕飞代价多少">运行视角</button>
+                title="运行视角：净空穿越与绕飞代价">运行视角</button>
         <button :class="{on:audience==='airspace'}" @click="setAudience('airspace')"
                 title="空域视角：看净空边界、禁飞等级与待审穿越">空域视角</button>
         <button class="policy" v-if="audience==='airspace'" @click="switchZonePolicy"
@@ -992,7 +992,7 @@ onUnmounted(()=>{
                       :minute="minute" :density="density" :selected-id="selectedId"
                       @select="pickFlight"/>
     </div>
-    <!-- 情报 = 两张表：先"在飞班次情报"（这一班为什么这么判），再"空域情报"（机场与净空）。
+    <!-- 情报 = 两张表：先「在飞班次情报」（该班次的判定依据），再「空域情报」（机场与净空）。
          两段都吃同一份 payload，不再各自发一次请求。 -->
     <div class="nrn-table" v-show="view==='intel'">
       <NationBriefing view="ledger" variant="briefing"

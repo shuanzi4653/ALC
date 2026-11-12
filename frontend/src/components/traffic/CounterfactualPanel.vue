@@ -46,7 +46,7 @@ function buildNational(payload){
   const axis=payload?.counterfactual?.modelAxis
   const total=(payload?.flights||[]).length
   if(!axis||!axis.applicable){
-    return {status:'NO_MODEL', note:'本帧没有拿到模型概率（限流或模型文件缺失），模型轴做不出来 —— 不画一条 0 差异的假对照。'}
+    return {status:'NO_MODEL', note:'本帧未取得模型概率（限流或模型文件缺失），无法生成模型轴，不以 0 差异的对照代填。'}
   }
   const k=axis.changedCount||0
   const withModel=axis.withModel||{}, withoutModel=axis.withoutModel||{}
@@ -209,7 +209,7 @@ function pctText(v){return typeof v==='number'?`${v>0?'+':''}${v}%`:'—'}
         关闭模型：<span class="alc-num">{{ d.a.exposure }}</span> 架次暴露于不可飞走廊；
         启用模型：<span class="alc-num">{{ d.b.exposure }}</span> 架次。
       </template>
-      <!-- 案例模式才有"用几次绕飞/延误换掉多少暴露"这笔账；全国层两边都没有额外动作，
+      <!-- 案例模式才有绕飞与延误架次换取暴露量这笔账；全国层两侧均无额外动作，
            那句话会变成"用停飞，换掉 32 架次"，读起来像漏了主语。 -->
       <template v-if="head.saved>0 && !nationalMode">即以 <span class="alc-num">{{ head.actions||'停飞' }}</span>
         换掉 <span class="alc-num">{{ head.saved }}</span> 架次的风险暴露。</template>

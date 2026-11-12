@@ -14,12 +14,12 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   NAV_GROUPS, SECTION_NAMES, ENTRY_LABELS, HIDDEN_SECTIONS,
-  navEntryCount, entryOf, entryTabs, groupOfSection, sectionFromHash,
+  navEntryCount, entryOf, entryTabs, groupOfSection, sectionFromHash, SECTION_HASHES,
 } from '../src/traffic/runtime.js'
 
 const ENTRIES = NAV_GROUPS.flatMap((group) => group.subs.map((sub) => ({ ...sub, group })))
 
-test('导航入口是 7 个（V1.0.5 合并后），而视图是 13 个', () => {
+test('导航入口是 7 个（V1.0.5 合并后），而视图是 11 个', () => {
   // V1.0.5：8 → 7、15 → 14（两处都是合并）；V1.1.0 下线 mechanism → 13。
   //   · 「运行情报」并入「气象监测」（同一屏两张表，没必要两个入口）；
   //   · 走廊组只剩「走廊剖面」（运行情报搬走后它本来就只有一项）。
@@ -27,7 +27,8 @@ test('导航入口是 7 个（V1.0.5 合并后），而视图是 13 个', () => 
   // 而不是顺手再加一个左侧按钮。
   assert.equal(navEntryCount(), 7,
     `入口数变成 ${navEntryCount()}：新增页面必须挂进已有入口或明确新增一个入口，不允许回到"一页一个按钮"`)
-  assert.equal(Object.keys(SECTION_NAMES).length, 13, '视图总数：V1.1.0 下线 mechanism 后为 13')
+  assert.equal(Object.keys(SECTION_NAMES).length, 11,
+    '视图总数：V1.1.0 下线 mechanism（13）；V1.1.1 下线 counterfactual 与 ledger（11）')
 })
 
 test('被删掉的分节必须留旧 hash 映射，否则老链接会静默跳首页', () => {
@@ -36,6 +37,24 @@ test('被删掉的分节必须留旧 hash 映射，否则老链接会静默跳�
   const legacy = sectionFromHash('#/corridor/briefing')
   assert.equal(legacy, 'weather', '旧地址应落到气象监测，而不是首页')
   assert.ok(!('briefing' in SECTION_NAMES), 'briefing 已并入 weather，不该还留在分节表里')
+})
+
+test('并入推演的两个页与 0.10.1 历史页：旧链接都必须落到 card，而不是首页', () => {
+  // 这条是 V1.1.1 的教训。V1.1.0 删了 mechanism 的分节，却**没有**登记旧 hash，
+  // 于是 `#/model/mechanism` 实测落到 `#/situation/home` —— 用户以为页面坏了；
+  // 而 `#/compare/counterfactual`（反事实）当时连分节都还在，独立页照样打开，
+  // 等于"声明并入了推演、实际给它留了两个入口"，两个入口还各有一套取数。
+  //
+  // 判据写成"等于 card"，不是"不等于 home"：落到 weather 或 reference 同样是错的，
+  // 只是错得不那么显眼。
+  for (const legacyHash of ['#/compare/counterfactual', '#/compare/ledger', '#/model/mechanism']) {
+    assert.equal(sectionFromHash(legacyHash), 'card', `${legacyHash} 必须落到推演页`)
+  }
+  // 反向：这三个 hash 不许再出现在 SECTION_HASHES 里 —— 一旦有人加回去，
+  // 独立页就会复活，而 sectionFromHash 会先命中 SECTION_HASHES 那个分支。
+  for (const dead of ['compare/counterfactual', 'compare/ledger', 'model/mechanism']) {
+    assert.ok(!Object.values(SECTION_HASHES).includes(dead), `${dead} 又出现在路由表里了`)
+  }
 })
 
 test('每个视图恰好属于一个入口，且入口的锚点必须在自己的 members 里', () => {
@@ -94,8 +113,9 @@ test('折叠掉的视图仍然能反查到入口（双向闭环）', () => {
   }
   assert.equal(entryOf('schedule').key, 'alerts')
   assert.equal(entryOf('assistant').key, 'alerts')
-  // 0.11.22：台账与复盘对照并入推演，入口只剩「日志」（history）。
-  assert.equal(entryOf('ledger').key, 'history')
+  // V1.1.1：`ledger` / `counterfactual` 已不是分节（并入推演的 ⑦⑧ 段），
+  // 不再有"藏在日志组下面、只能深链打开"的入口 —— 旧链接由 LEGACY_SECTION_HASHES 接走。
+  assert.equal(entryOf('ledger'), null, 'ledger 不再是分节，不该还能反查到入口')
   assert.equal(entryOf('reference').key, 'card')
 })
 
@@ -107,11 +127,14 @@ test('tab 条：三个合并入口的视图数正确，且隐藏视图与锚点�
   // 都不许出现与入口同名的项（那正是重复按钮的成因）。
   assert.deepEqual(labels('alerts'), ['调度台账', '大模型取证'])
   assert.deepEqual(labels('card'), ['口径与来源'])
-  // 0.11.22：`counterfactual` 入口已不存在 —— 它和 `ledger` 都挂到「日志」下面，
-  // 且都在 `HIDDEN_SECTIONS` 里，所以日志入口的 tab 条应当是空的（单视图外观）。
+  // V1.1.1：日志入口下只剩 history 一个视图 → tab 条为空（单视图外观）。
   assert.deepEqual(labels('history'), [])
-  assert.ok(HIDDEN_SECTIONS.has('counterfactual') && HIDDEN_SECTIONS.has('ledger'),
-    '复盘对照与分歧台账必须仍能被过滤掉，否则导航里会冒出两个只剩深链的页')
+  // 反过来钉住"它们真的没了"：这两个 key 既不在分节表、也不在导航里。
+  // 只断言"不在 HIDDEN 里"是不够的 —— 全删之后 HIDDEN 里当然也没有。
+  assert.ok(!('counterfactual' in SECTION_NAMES), 'counterfactual 已并入推演 ⑦ 段，不该还是分节')
+  assert.ok(!('ledger' in SECTION_NAMES), 'ledger 已并入推演 ⑧ 段，不该还是分节')
+  assert.ok(!NAV_GROUPS.some((g) => g.subs.some((s) => s.members.includes('counterfactual'))),
+    'counterfactual 又出现在导航的 members 里')
   for (const key of ['alerts', 'card', 'history']) {
     const entry = entryOf(key)
     assert.ok(!labels(key).includes(entry.label),
@@ -120,10 +143,10 @@ test('tab 条：三个合并入口的视图数正确，且隐藏视图与锚点�
   // 单视图入口没有 tab 条 —— 有一行空 tab 比没有更让人困惑
   assert.deepEqual(labels('home'), [])
   assert.deepEqual(labels('profile'), [])
-  // V1.1.0：mechanism 整页下线（旧链接重定向到 card）；counterfactual 与 ledger
-  // 仍挂在「日志」下但属于"可达但不并排"，不该出现在 tab 里
-  assert.ok(HIDDEN_SECTIONS.has('counterfactual'))
-  assert.ok(HIDDEN_SECTIONS.has('ledger'))
-  assert.ok(!labels('card').includes(SECTION_NAMES.mechanism),
-    '算法机理不该出现在「检验结论」的 tab 条里')
+  // V1.1.0：mechanism 整页下线；V1.1.1：counterfactual 与 ledger 随之下线。
+  // 三者都不是分节，所以 `SECTION_NAMES.mechanism` 本身就是 undefined ——
+  // tab 条不可能含它。真正要守的是"没有残留的中文名冒充分节名"。
+  assert.ok(!('mechanism' in SECTION_NAMES), 'mechanism 已下线，不该还是分节')
+  assert.ok(!labels('card').some((l) => /算法机理/.test(l)),
+    '算法机理不该出现在「推演」的 tab 条里')
 })

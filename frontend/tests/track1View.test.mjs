@@ -47,7 +47,13 @@ test('同档：记为一致，但措辞不许说成"互相验证"', () => {
   assert.equal(view.decision, 'CONSISTENT')
   assert.equal(view.finalLevel, 'DANGER')
   // 模型的标签本来就来自一份判据，所以"一致"不是独立印证。
-  assert.match(TRACK1_DECISIONS.CONSISTENT.note, /不是"互相验证"/)
+  // V1.1.1 文案改为「此处可确认的是一致性，而非相互验证」，含义比原句更强
+  // （明确否定"相互验证"）。断言随之锚到两件事：必须说"一致性"、必须带否定，
+  // 而不是绑死某个字面短语 —— 否则每次改措辞都要改测试，测试就成了文案的副本。
+  assert.match(TRACK1_DECISIONS.CONSISTENT.note, /一致性/)
+  assert.match(TRACK1_DECISIONS.CONSISTENT.note, /而非|不是|不能/)
+  assert.ok(!/互相印证|相互印证|验证通过/.test(TRACK1_DECISIONS.CONSISTENT.note),
+    '不得把两条同源路径说成相互印证')
 })
 
 test('模型缺席：显示"未参与"，且绝不显示成一个档位', () => {

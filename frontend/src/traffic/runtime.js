@@ -1179,7 +1179,7 @@ const AVOIDANCE_ABSENT_REASONS={
   RADAR_UNAVAILABLE:'本次构建未取到可用的雷达回波，计划不加入回波避让几何',
   CHANNEL_CHANGED_DURING_BUILD:'构建期间气象通道被切换，本计划不使用回波避让几何',
   VIRTUAL_FRAME_NOT_SYNTHETIC:'虚拟通道取帧拿到的不是生成的模拟回波（取帧未走生成器），本计划不使用回波避让几何',
-  VIRTUAL_FRAME_UNAVAILABLE:'虚拟通道取帧失败 —— 模拟回波本不应取不到，本计划不使用回波避让几何',
+  VIRTUAL_FRAME_UNAVAILABLE:'虚拟通道取帧失败。模拟回波不应缺失，本计划不使用回波避让几何',
 }
 export function avoidanceAbsentReason(reason){
   if(!reason)return '本计划没有声明回波避让几何的来源'
@@ -1624,12 +1624,12 @@ export const BASIS_MACHINERY=Object.freeze({
   LOW_VISIBILITY:Object.freeze({
     construction:'低能见度两档缓冲圆（站点读数派生，非实测雾区边界）',
     detail:'能见度低于禁飞阈值的一档是不可触碰的深灰内核；偏低一档只让航路绕开，'
-      +'起降点落在该圆内时该圆不约束本班次 —— 否则"能见度偏低"会变成"不许起飞"。',
+      +'起降点位于该圆内时，该圆不约束本班次；否则能见度偏低将被判为禁止起飞。',
   }),
   RADAR_CORE:Object.freeze({
     construction:'回波内核几何，不可触碰',
-    detail:'内核不是强对流原轮廓，而是危险外场向内收缩一段深度后得到的内部 ——'
-      +'原轮廓在真实回波上是一圈碎点，画出来看不见。',
+    detail:'内核由危险外场向内收缩一段深度得到，非强对流原轮廓；'
+      +'原轮廓在真实回波上为断续碎点，无法成图。',
   }),
   RADAR_FIELD:Object.freeze({
     construction:'回波外场几何，允许有界擦边',
@@ -1904,8 +1904,6 @@ export const SECTION_CAN_DO=Object.freeze({
   history:['按时间倒着看运行日志','筛出人工干预','导出 CSV'],
   profile:['生成一句解读（模板或大模型）','看判据与来源站号','改风险偏好做反事实'],
   card:['看三条基线的胜负','看混淆矩阵与可靠性曲线','导出模型卡 JSON'],
-  counterfactual:['切换三档风险偏好','看改判明细','导出对照结果'],
-  ledger:['看模型与规则的分歧','按走廊筛选','导出分歧台账 CSV'],
 })
 
 // 裁决引擎层的口径总账（V1.0.6：由旧三省运行网改为全国四级）。
@@ -1929,12 +1927,12 @@ export const CALIBER_LEDGER=Object.freeze([
    source:'`traffic.airborne`；逐班对象见 `flights[]`（含起降时刻、许可与裁决）',
    refresh:'每拖一格时间轴（1 分钟）',owner:'后端'},
   {key:'releaseRate',name:'放行率',
-   definition:'在飞班次中决定不是 HOLD 的占比。直飞与绕飞都算放行 —— 绕飞是"换一条航路走"，不是"没走"',
+   definition:'在飞班次中未判为 HOLD 的占比。直飞与绕飞均计为放行：绕飞改变航路，仍属执行',
    numerator:'放行班次（RELEASE + DETOUR = 在飞 − 停飞）',denominator:'在飞班次',
    source:'`traffic.airborne` 与 `traffic.hold` 之差；前端不重算',
    refresh:'每拖一格时间轴（1 分钟）',owner:'后端'},
   {key:'hold',name:'停飞班次',
-   definition:'决定为 HOLD 的班次：规则风险 ≥0.75、模型低能见概率 ≥0.60、或航路压在强回波内且找不到可脱离的小绕方案 —— 任一命中即停飞',
+   definition:'决定为 HOLD 的班次：规则风险 ≥0.75、模型低能见概率 ≥0.60，或航路位于强回波内且无可脱离的小绕方案；任一条件命中即为停飞',
    numerator:'HOLD 班次（在飞的子集）',denominator:'在飞班次',
    source:'`traffic.hold`；每条判据写在 `flights[].drivers[]`，界面上逐班可查',
    refresh:'每拖一格时间轴（1 分钟）',owner:'规则引擎 + 模型'},
@@ -1959,7 +1957,7 @@ export const CALIBER_LEDGER=Object.freeze([
    source:'`summary.lowVisCities` 与 `summary.cities`；逐市读数见 `intel[]`',
    refresh:'每次取实况（约 10 分钟一轮）',owner:'规则引擎'},
   {key:'model',name:'模型概率覆盖',
-   definition:'拿到 ml-v3 低能见概率的城市占比。p ≥0.35 提示、p ≥0.60 与规则分**并列**触发延期 —— 是第二道判据，不并进规则分，谁也别替谁背书',
+   definition:'拿到 ml-v3 低能见概率的城市占比。p ≥0.35 提示，p ≥0.60 与规则分**并列**触发延期；二者为两道并列判据，不合并计分',
    numerator:'有概率输出的城市',denominator:'当前作用域城市数',
    source:'`modelCard.liveCoverage.cities`、`modelCard.fallback.probSource`（取不到时标 RULE 并给原因）',
    refresh:'每次取逐市小时数据',owner:'模型'},
@@ -1977,7 +1975,7 @@ export const SECTION_NAMES=Object.freeze({
   home:'运行首页',overview:'运行总览',national:'全国航线网',schedule:'调度台账',
   alerts:'事件处置台',weather:'气象监测',reference:'口径与来源',
   assistant:'大模型取证',history:'运行日志',
-  profile:'走廊剖面',card:'推演',counterfactual:'反事实对照',ledger:'分歧台账',
+  profile:'走廊剖面',card:'推演',
 })
 export function sectionName(key){
   return SECTION_NAMES[key]||'未命名分节'
@@ -2091,7 +2089,7 @@ export function caliberBlocks(plan,weather,network){
           note:'两通道的判据相同、输入不同，所以读数必须分开报。'},
       ],
       boundary:'「亮温不能换算成 dBZ」，本系统任何位置都不做这个换算；'
-        +'「雷达回波不等于空域管制」——有回波只说明要绕飞，不说明这片空域被关闭。',
+        +'「雷达回波不等于空域管制」：有回波只表示需要绕飞，不表示该空域被关闭。',
     },
     {
       key:'risk',title:'气象派生风险区',source:cells?SOURCE_BADGES.DERIVED:SOURCE_BADGES.ABSENT,
@@ -2113,7 +2111,7 @@ export function caliberBlocks(plan,weather,network){
       rows:[
         {label:'登记站点',value:numeric(airspaceStatus&&airspaceStatus.sites)!==null
           ?`${numeric(airspaceStatus.sites)} 处`:absent(),
-          note:'含已登记但未取得定量范围的类别——那一类只登记、不生成几何。'},
+          note:'含已登记但未取得定量范围的类别；该类只登记，不生成几何。'},
         {label:'已有几何',value:numeric(airspaceStatus&&airspaceStatus.withGeometry)!==null
           ?`${numeric(airspaceStatus.withGeometry)} 处`:absent(),
           note:'能画出来的站点数；与登记数不等是正常的，差额就是"待补范围"。'},
@@ -2129,7 +2127,7 @@ export function caliberBlocks(plan,weather,network){
         {label:'目录版本 / 取回时刻',
           value:airspaceRules
             ?`${text(airspaceRules.catalogVersion)} · ${text(airspaceRules.dataRetrievedAt)}`:absent(),
-          note:'空域目录自身的版本与取回时间——它不是推演数据，不随快照变化。'},
+          note:'空域目录自身的版本与取回时间，不属于推演数据，不随快照变化。'},
         {label:'发布方声明',value:text(catalogOwnerDisclaimer),
           note:'空域目录自带的声明，本页原样转述一次，不再第二处重写。'},
       ],
@@ -2146,8 +2144,8 @@ export function caliberBlocks(plan,weather,network){
         {label:'推演跨度',value:`${TIMELINE_SPAN_MINUTES} 分钟`,
           note:'所有时刻都是相对场景基准时刻的分钟偏移，不是墙钟。'},
       ],
-      boundary:'「交通数据一律是模拟的」。本项目不声称任何一条航迹对应真实航班，'
-        +'也不需要真实航班数据来演示——被验证的是调度算法，不是某一天的航班表。',
+      boundary:'「交通数据一律是模拟的」。本系统不声称任何一条航迹对应真实航班，'
+        +'演示亦不依赖真实航班数据：被验证的对象是调度算法，而非某一日的航班表。',
     },
     {
       key:'manual',title:'人工操作与留痕',source:SOURCE_BADGES.MANUAL,
@@ -2158,7 +2156,7 @@ export function caliberBlocks(plan,weather,network){
         {label:'影响范围',value:'仅本地执行时刻',
           note:'人工操作改变的是"这一班什么时候放"，不改已发布的计划本身。'},
         {label:'处置对象',value:'事件（航线 + 成因 + 是否关闭）',
-          note:'「按事件记，不按班次记」——同一成因影响多个班次时，处置一个事件等于处置一批班次。'},
+          note:'按事件记录而非按班次记录：同一成因影响多个班次时，一次处置覆盖整批班次。'},
       ],
       boundary:'人工操作不进入时间轴回放通道。回放只重演算法产出的计划与人工干预，'
         +'把"计划构建完成""导出"这类留痕混进去，回放会把日志当成一次班次操作。',
@@ -2213,7 +2211,7 @@ export const GLOSSARY=Object.freeze([
   {group:'调度与间隔',term:'走廊',plain:'起点到终点留出来的那条可以走的带子。',
    full:'计划航路的空间范围。走廊是算法的产出：直线走廊是最简单的解，被气象推开之后才变成折线。'},
   {group:'调度与间隔',term:'受气象影响改航',plain:'因为天气把路线绕弯了。',
-   full:'航路被气象推移。成员资格来自「成因」（点位气象 / 雷达内核 / 雷达外场），不来自"绕行时长大不大"——长度只是几何差异的代理量。'},
+   full:'航路被气象推移。成员资格取自成因（点位气象、雷达内核、雷达外场），不取自绕行时长；时长仅为几何差异的代理量。'},
   {group:'调度与间隔',term:'停止放行',plain:'这一班今天不飞了。',
    full:'CLOSED，为硬约束结果，非建议。预警中心深橙项须区分气象与非气象成因。'},
   {group:'调度与间隔',term:'时隙重排',plain:'往后面挪一挪再飞。',
@@ -2225,7 +2223,7 @@ export const GLOSSARY=Object.freeze([
   {group:'算法与复现',term:'数据快照编号',plain:'这一次用的是哪一份数据。',
    full:'生成计划时使用的数据快照标识。与算法指纹、气象通道三者相同，重跑即得到逐字节相同的计划。'},
   {group:'算法与复现',term:'气象通道',plain:'用的是真天气还是排练用的天气。',
-   full:'measured（实测，默认）与 virtual（虚拟）。「通道必须进缓存键」——同一份快照在两个通道下是两个不同的问题，共用一个答案就会把 A 的结论答给 B。'},
+   full:'measured（实测，默认）与 virtual（虚拟）。通道须计入缓存键：同一快照在两个通道下对应两个不同问题，共用答案会导致结论错配。'},
   {group:'算法与复现',term:'单一求值',plain:'一个数只在一个地方算一次，别处只许拿来用。',
    full:'同一个量在整个系统里只有一个产出点，其余位置只做导航与呈现。违反它的症状是"同一屏两个数"，而这类错误不会让构建与测试变红。'},
 ])
@@ -2347,7 +2345,7 @@ export function timelineIntel(plan,weather,journal){
     SOURCE_BADGES.SIM)
   push('valid','气象有效时刻',
     text((weather&&(weather.validAt||weather.retrievedAt))),
-    '气象帧自称的时刻；与场景基准时刻不一致时要说明差多少。',
+    '气象帧自称的时刻；与场景基准时刻不一致时须注明差值。',
     SOURCE_BADGES.PUBLIC)
   if(radar){
     const slots=numeric(radar.sweepSlots),stride=numeric(radar.sweepStrideMinutes)
@@ -2388,7 +2386,7 @@ export function airspaceIntel(plan,flights,weather,network){
   push('official','官方固定管制区',
     numeric(status&&status.sites)!==null
       ?`登记 ${numeric(status.sites)} 处 · 有几何 ${numeric(status.withGeometry)||0} 处`:absent(),
-    '冷色。来自公布几何，不随天气变化；与气象派生风险区分开统计，不合并。登记多于几何是正常的 —— 差额是"未取得公开定量范围"。',
+    '冷色。来自公布几何，不随天气变化；与气象派生风险区分开统计，不合并。登记数多于几何数属正常，差额为未取得公开定量范围的类别。',
     SOURCE_BADGES.OFFICIAL,numeric(status&&status.sites)?'normal':'muted')
   push('enforcement','其中禁入 / 需审批',
     numeric(status&&status.prohibited)!==null
@@ -2429,7 +2427,7 @@ export const DRILL_TARGETS=Object.freeze({
   accepted:{section:'schedule',status:'ALL',hint:'「调度台账」逐条列出全部受理班次'},
   // V1.0.5：运行情报并入气象监测，落点跟着改（否则点 KPI 静默无反应）
   detour:{section:'weather',hint:'「在飞班次情报」逐班给改航判据与绕飞量，落点就是气象监测页的两张表'},
-  delay:{section:'schedule',status:'HOLD',hint:'「调度台账」按运行状态筛出等待放行的班次，逐班看延误是怎么来的'},
+  delay:{section:'schedule',status:'HOLD',hint:'「调度台账」按运行状态筛出等待放行的班次，逐班列出延误成因'},
   weather:{section:'alerts',cause:'weather',hint:'「预警中心 · 事件处置台」只留气象成因的事件，每条带走廊与建议'},
   risk:{section:'weather',hint:'「气象监测」逐区域列出成员、来源与合并口径'},
   alerts:{section:'alerts',hint:'「预警中心 · 事件处置台」按成因列出待处置事件，每条带一键处置'},
@@ -2460,7 +2458,7 @@ export const MAP_LAYERS=Object.freeze([
   {key:'radar',label:'雷达回波',dot:'d-radar',rowDot:'radar-dot',
    title:'雷达回波：≥45 dBZ 内核禁止进入，35–45 dBZ 须绕飞'},
   {key:'zones',label:'固定管制区',dot:'d-zone',rowDot:'fixed-zone-dot',
-   title:'官方固定管制区（冷色），与气象派生风险区不是一回事'},
+   title:'官方固定管制区（冷色），与气象派生风险区分为两类'},
   {key:'events',label:'运行事件',dot:'d-event',rowDot:'event-dot',
    title:'预警中心同一份合并事件（同一次 groupAlerts 求值）：深橙＝停止放行、橙＝气象成因、蓝＝非气象成因。点事件节点跳到预警中心那一条'},
   {key:'observations',label:'观测等级点',dot:'d-obs',rowDot:'obs-dot',
@@ -2936,7 +2934,7 @@ export function weatherImpact(plan,flights,network){
     weatherFlights:weatherRows.reduce((sum,row)=>sum+row.count,0),
     otherFlights:otherRows.reduce((sum,row)=>sum+row.count,0),
     note:rows.length
-      ?'按各班次已写定的航路成因统计 —— 这是规划时写下的归属，不是事后用几何交出来的第二遍判定。'
+      ?'按各班次已写定的航路成因统计。该归属在规划阶段确定，不由事后几何求交二次判定。'
       :'本次计划没有任何班次被改航：全部按直线走廊放行。',
   }
 }
@@ -2986,14 +2984,14 @@ export function weatherEvolution(plan,flights,{step=60,span=TIMELINE_SPAN_MINUTE
       ? {state:'SINGLE_OBSERVATION',slots:null,strideMinutes:null,
          from:avoidance.slot||null,to:null,
          note:`本通道只有一次实测观测${avoidance.slotAgeMinutes!=null?`（取回时已过期 ${avoidance.slotAgeMinutes} 分钟）`:''}，`
-           +'按声明语义覆盖整个计划窗口。「本通道不提供逐时回波序列」 —— 投影一张实测回波向前就是编造预报。'}
+           +'按声明语义覆盖整个计划窗口。本通道不提供逐时回波序列；将实测回波向前投影等同于编造预报。'}
       : {state:'NOT_INCLUDED',slots:null,strideMinutes:null,from:null,to:null,
          note:'本计划未纳入雷达避让几何：'+(avoidanceAbsentReason(avoidance&&avoidance.reason)||'未声明原因')})
   const peak=buckets.reduce((best,row)=>(row.detoured>((best&&best.detoured)||0)?row:best),null)
   return {
     stepMinutes:width,spanMinutes:span,buckets,evolution,
     peak,bucketCount:buckets.length,
-    note:'运行结果轴按班次自己的起降分钟分桶（与推演指针无关）；避让几何轴说的是这份计划的避让几何是怎么沿时间取得的。'
+    note:'运行结果轴按班次自身的起降分钟分桶，与推演指针无关；避让几何轴说明本计划的避让几何沿时间的取得方式。'
       +(peak&&peak.detoured?`受气象影响改航最集中的时段是 ${relativeClock(peak.from)}–${relativeClock(peak.to)}（${peak.detoured} 班）。`:''),
   }
 }
@@ -3111,10 +3109,10 @@ export function replayWeatherFrame(weather,minute){
       // `Math.round(frameMinute||0)` —— `undefined||0` 就是 0，于是同一段文字里
       // 左边说「未取得」、右边说「本帧是 T+0 分钟的帧」。模板一套两种情况，必有一句是假话。
       :(Number.isFinite(frameMinute)
-        ?`本帧是 T+${Math.round(frameMinute)} 分钟的帧，回放指针在 T+${Math.round(at||0)} 分钟 —— `
+        ?`本帧是 T+${Math.round(frameMinute)} 分钟的帧，回放指针在 T+${Math.round(at||0)} 分钟；`
           +'两者非同一时刻。下列数值属本帧，不代表回放时刻天气。'
         :`回放指针在 T+${Number.isFinite(at)?Math.round(at):'—'} 分钟；`
-          +'「本帧气象帧未取得」 —— 本段的气象数字不代表任何时刻的天气，要读数请先等到一帧。'),
+          +'「本帧气象帧未取得」：本段气象数值不代表任何时刻的天气，须先取得一帧再读数。'),
   }
 }
 
@@ -3188,7 +3186,7 @@ export const TRACK1_LEVEL_LABELS = Object.freeze({
 export const TRACK1_DECISIONS = Object.freeze({
   CONSISTENT: {
     key: 'CONSISTENT', label: '规则与模型同档', tone: 'ok',
-    note: '两条路径给出同一个档位。这里能说的只有"一致"，不是"互相验证"——模型的标签本来就来自一份判据。',
+    note: '两条路径给出同一档位。此处可确认的是一致性，而非相互验证：模型标签本身即源自判据。',
   },
   MODEL_STICTER: {
     key: 'MODEL_STICTER', label: '模型更保守，已采纳', tone: 'warn',
@@ -3200,7 +3198,7 @@ export const TRACK1_DECISIONS = Object.freeze({
   },
   MODEL_UNAVAILABLE: {
     key: 'MODEL_UNAVAILABLE', label: '模型未参与', tone: 'muted',
-    note: '这一轮只有规则在工作。界面不显示"模型判了什么"——因为它没有判，编一个档位比留空更糟。',
+    note: '本轮仅规则生效。界面不显示模型判定结果：模型未参与判定，留空优于填充默认档位。',
   },
   UNKNOWN: {
     key: 'UNKNOWN', label: '无法判定', tone: 'muted',
@@ -3565,19 +3563,19 @@ const NAV_SPEC = [
     // V1.0.6：`national` 已并入 `home`（首页就是全国四级），这里只是保留可深链的旧键。
     subs: ['home', { key: 'overview', members: ['overview', 'national'] }, 'weather'] },
   // V1.0.5：情报已并入「气象监测」，走廊组只剩"这条线本身"。
-  { key: 'corridor', no: 2, label: '走廊', subtitle: '这条走廊几点能飞，凭什么',
+  { key: 'corridor', no: 2, label: '走廊', subtitle: '单条走廊的可飞时段与判据',
     subs: ['profile'] },
-  { key: 'dispatch', no: 3, label: '处置', subtitle: 'AI 与规则谁说了算',
-    subs: [{ key: 'alerts', label: ENTRY_LABELS.alerts, hint: '一批事件该怎么做、谁在什么时候飞',
+  { key: 'dispatch', no: 3, label: '处置', subtitle: 'AI 判据与规则判据的分工',
+    subs: [{ key: 'alerts', label: ENTRY_LABELS.alerts, hint: '事件处置建议与班次时刻',
               members: ['alerts', 'schedule', 'assistant'] }] },
-  { key: 'verify', no: 4, label: '推演', subtitle: '一条走廊怎么被判成不可飞',
+  { key: 'verify', no: 4, label: '推演', subtitle: '单条走廊的判定链路',
     subs: [{ key: 'card', label: ENTRY_LABELS.card, hint: '三个目标的指标，以及这些口径的依据',
               members: ['card', 'reference'] }] },
   // 0.11.22：复盘对照与分歧台账**已并入「推演」**，这里只剩日志。
   // 但两者仍写进 `members` —— 归属要成立（否则"这个页面永远打不开"），
   // 显示靠 `HIDDEN_SECTIONS` 过滤：导航与 tab 都不出现，深链仍可达。
   { key: 'review', no: 5, label: '日志', subtitle: '按帧回放与操作留痕',
-    subs: [{ key: 'history', members: ['history', 'counterfactual', 'ledger'] }] },
+    subs: [{ key: 'history', members: ['history'] }] },
 ]
 /**
  * 每个分节**自己**的一句话（0.11.4 / W-20）。
@@ -3587,7 +3585,7 @@ const NAV_SPEC = [
  * 这里一句一页，判据是：把这句话念给没看过系统的人听，他能判断该不该点它。
  */
 export const SECTION_HINTS = Object.freeze({
-  home: '一屏态势：这一级有多少航线、几架在飞、哪里低能见度',
+  home: '一屏态势：本级的航线数、在飞班次与低能见度分布',
   national: '全国航线网四级：全国 → 华北/东北/华东/中南/西南/西北 → 省 → 市；逐级加载、返回即释放',
   overview: '逐班台账：申请、计划、实际与裁决，可下钻到省市',
   weather: '逐市实况、回波与雾区，标来源与数据时效',
@@ -3596,8 +3594,6 @@ export const SECTION_HINTS = Object.freeze({
   assistant: '大模型的证据检索与判定留痕',
   schedule: '逐班次的申请、计划与实际',
   card: '选城市或班次，看观测 → 判据 → 裁决的完整链路',
-  counterfactual: '同一份计划，AI 与规则各自处置了什么（已并入推演）',
-  ledger: '人与系统判定不一致的逐条记录（已并入推演）',
   history: '运行日志与按帧回放',
   reference: '口径、阈值与每一条数据的来源（全国 → 大区 → 省 → 市 四级）',
 })
@@ -3617,7 +3613,7 @@ export const SECTION_HINTS = Object.freeze({
 // 但导航与 tab 条里不再出现第二个"全国"。
 // 之所以留在 members 里，是为了 `entryOf('national')` 仍能返回它的入口 ——
 // 去掉的话，从旧链接进来时 `activeGroup` 会是空，导航整条消失。
-export const HIDDEN_SECTIONS = Object.freeze(new Set(['counterfactual', 'ledger', 'national']))
+export const HIDDEN_SECTIONS = Object.freeze(new Set(['national']))
 
 // 0.11.17（U-5）：13 个页面各自一个地址。**映射表只有这一份** ——
 // 导航、深链接、探针、答辩时给评委的链接都读它，避免"同一个页面两个 slug"。
@@ -3635,7 +3631,6 @@ export const SECTION_HASHES = Object.freeze({
   profile: 'corridor/profile',
   alerts: 'dispatch/console', schedule: 'dispatch/ledger', assistant: 'dispatch/evidence',
   card: 'model/card', reference: 'model/reference',
-  counterfactual: 'compare/counterfactual', ledger: 'compare/ledger',
   history: 'compare/log',
 })
 
@@ -3651,6 +3646,12 @@ export function sectionHash(section) {
  */
 export const LEGACY_SECTION_HASHES = Object.freeze({
   'corridor/briefing': 'weather',      // V1.0.5：运行情报 → 气象监测
+  // V1.1.1：反事实对照与分歧台账并入推演的 ⑦⑧ 段，独立页下线。
+  // 不登记这三条，`sectionFromHash` 查不到就静默回落首页 —— 收藏了旧链接的人
+  // 会以为"页面坏了"，而不是"搬到了推演里"。
+  'compare/counterfactual': 'card',    // 反事实对照 → 推演
+  'compare/ledger': 'card',            // 分歧台账 → 推演
+  'model/mechanism': 'card',           // V1.1.0：算法机理（0.10.1 历史页）→ 推演
 })
 
 /** hash → 视图。非法/空 hash 一律回落到 `home`（不要抛、不要留在空白页）。 */
