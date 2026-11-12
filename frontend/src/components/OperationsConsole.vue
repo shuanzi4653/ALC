@@ -174,7 +174,13 @@ const MARK_ROWS=Object.freeze(Object.values(AI_MARKS))
 // 计划在构建中时是"还在算"，不是"读不到"。这两句话在界面上差一个词，读者理解差一整层：
 // 前者会等，后者会以为故障。只认明确的构建态，session 为空不算（nation 模式本就没有）。
 const planBuilding=computed(()=>{
-  if(!props.session)return true          // 首次轮询还没回来：同样属于"还在算"
+  // `null` 不等于"还在算"。
+  //
+  // 这一句原来是 `if(!props.session)return true`，而全国模式下**本来就没有会话**
+  // （日志读 /traffic/v2/nation/journal），于是复盘回放的面板永远写着
+  // 「运行计划生成中 · 帧分钟 未取得 · 雷达槽号 未取得」——顶栏的雷达却是好的。
+  // 没有会话时唯一正确的说法是"正在载入气象帧"（下一级 LOADING）。
+  if(!props.session)return false
   const st=props.session.status
   return st==='BUILDING'||st==='QUEUED'||st==='PENDING'
 })

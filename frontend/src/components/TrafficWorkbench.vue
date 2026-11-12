@@ -330,7 +330,14 @@ function chooseFlight(f){
   ensureFullFlight(f.id)
 }
 async function loadOperations(){
-  const id=session.value?.sessionId;if(!id)return
+  const id=session.value?.sessionId
+  if(!id){
+    // 全国模式没有会话：这份"运行日志"读的是 /traffic/v2/nation/journal，
+    // 但气象帧仍要取一次（复盘回放要它）。原来这里直接 return，于是
+    // nation 模式的回放面板永远停在「运行计划生成中」。
+    if(!weather.value)loadWeather()
+    return
+  }
   const data=await requestJson('/api/traffic/operations?sessionId='+id)
   if(session.value?.sessionId===id){
     operations.value=data;operationsReady.value=true
@@ -369,15 +376,22 @@ let weatherInflight=''
 let weatherNextAllowedAt=0
 const WEATHER_REPLAY_MIN_GAP_MS=650
 async function loadWeather(){
-  if(!ready.value)return
   if(Date.now()<weatherNextAllowedAt)return
-  const key=session.value.sessionId,t=minute.value
+  // 全国模式没有推演会话（首页 / 日志 / 推演都读全国载荷），但同一时刻的气象帧
+  // 是一条公开可取的帧 —— 不取，复盘回放就只能永远写「未取得」。
+  // 原来这里第一句是 `if(!ready.value)return`，而 ready 以 session 为前提，
+  // 于是 nation 模式下 weather 恒为 null：面板显示「运行计划生成中」，
+  // 帧分钟、槽号、三档面积全是「未取得」，可顶栏的雷达明明是好的。
+  const s=session.value
+  const key=s?.sessionId||`nation|${seed.value}|${scenario.value}`
+  const seedArg=s?.seed??seed.value, scenarioArg=s?.scenario??scenario.value
+  const t=minute.value
   const sig=`${key}|${t}|${city.value||''}`
   if(weatherInflight===sig)return
   weatherInflight=sig
   if(replayActive.value)weatherNextAllowedAt=Date.now()+WEATHER_REPLAY_MIN_GAP_MS
   const token=++weatherGeneration
-    try{const value=await requestJson(`/api/traffic/weather?seed=${session.value.seed}&scenario=${session.value.scenario}&minute=${t}${city.value?'&cityId='+encodeURIComponent(city.value):''}${caseQuery()}`);if(!disposed&&token===weatherGeneration&&key===session.value?.sessionId){weather.value=value;maybeRelayRadar(value)}}
+    try{const value=await requestJson(`/api/traffic/weather?seed=${seedArg}&scenario=${scenarioArg}&minute=${t}${city.value?'&cityId='+encodeURIComponent(city.value):''}${caseQuery()}`);if(!disposed&&token===weatherGeneration&&key===(session.value?.sessionId||`nation|${seed.value}|${scenario.value}`)){weather.value=value;maybeRelayRadar(value)}}
   catch(e){
     if(token===weatherGeneration){weather.value=null;error.value='气象图层读取失败，本帧已作废（推演继续）：'+e.message}
   }
@@ -557,6 +571,9 @@ async function initialize(){
   loadWeatherMode()
   try{network.value=await requestJson('/api/traffic/network');if(!disposed)await generate()}
   catch(e){error.value=e.message}
+  // 建计划失败（全国模式常见：本就不需要会话）时也要有一帧气象：
+  // 复盘回放、气象监测与首页的实况栏都读它。
+  finally{if(!disposed&&!weather.value)loadWeather()}
 }
 
 const HASH_GUARD=ref(true)

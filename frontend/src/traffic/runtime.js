@@ -3086,7 +3086,7 @@ export function replayWeatherFrame(weather,minute,pending=false,following=false)
     tiers:{stratiform:null,convective:null,strong:null},
     note:pending==='BUILDING'
       ?'运行计划尚未建成，建成后自动载入回放时刻的气象帧，无需刷新。'
-      :'运行计划已就绪，气象帧正在载入，通常数秒内完成。'}
+      :'气象帧请求已发出，通常数秒内完成；到时本区自动填上帧分钟、槽号与三档面积。'}
   if(!frame)return {state:'ABSENT',label:'未取得气象帧',
     minute:null,requested:Number.isFinite(Number(minute))?Number(minute):null,
     cells:0,observations:0,provider:null,dataType:null,
