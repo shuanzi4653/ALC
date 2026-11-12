@@ -4,6 +4,13 @@
 > 实际落地走的是**免凭据**路线（`image.data.cma.cn` 公开雷达瓦片），而非本文推荐的主力渠道。
 > 本文保留作**调研史料**：它记录了对五条渠道的逐项核查与许可约束，写论文时可以引用
 > 「为什么选它」的论证。**运行时的实测/虚拟通道见 §6（2026-09-18 增）。**
+>
+> **后续变更（2026-11-12，V1.0.6 / V1.0.7）**：全国层的回波主通道已改为 **RainViewer 公开瓦片**
+> （`api.rainviewer.com` + `tilecache.rainviewer.com`，免密钥，z6 / 10 分钟一帧），dBZ 由瓦片颜色
+> 按官方色表**反查**（`IMAGE_COLOUR_REVERSE_LOOKUP`），`image.data.cma.cn` 那条只剩城市层旧轨的 relay 入口。
+> 口径与判定见 README「[雷达回波与气象数据源](../README.md#雷达回波与气象数据源)」与
+> [`weather/radar_public.py`](../backend-python/weather/radar_public.py)。本文 §3.3 关于
+> `IMAGE_COLOUR_REVERSE_LOOKUP` 的引用纪律依然有效，且已落到载荷 `provenance` 里。
 
 > 背景：`backend-python/traffic/cma_radar.py` 已按中国气象数据网的接口合同实现完毕，
 > 但 `userId` / `pwd` 未取得，雷达链路整体悬空。本文记录**真实检索到的替代渠道**，
