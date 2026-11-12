@@ -6,10 +6,8 @@ import RegionalObservations from './RegionalObservations.vue'
 import WeatherSourceSwitch from './traffic/WeatherSourceSwitch.vue'
 import WeatherSupplements from './traffic/WeatherSupplements.vue'
 import Track1Panel from './traffic/Track1Panel.vue'
-import MlEffectBoard from './traffic/MlEffectBoard.vue'
 import CorridorPanel from './traffic/CorridorPanel.vue'
 import {isCaseMode} from '../traffic/caseMode.js'
-const DeductionPanel = defineAsyncComponent(() => import('./traffic/DeductionPanel.vue'))
 const CounterfactualPanel = defineAsyncComponent(() => import('./traffic/CounterfactualPanel.vue'))
 const DivergencePanel = defineAsyncComponent(() => import('./traffic/DivergencePanel.vue'))
 import {metarLines,metarOrder,sigmetRows,clearanceReport,operationalTime,detourMinutesShort,routeBasisNames,isWeatherDetour,radarRuleBlock,routeBasisCensus,mechanismChain,mechanismPickerRows,groupAlerts,
@@ -954,7 +952,7 @@ async function copyReceipt(row){
   <section class="briefing" data-intel-airspace>
     <div class="briefing-head">
       <h3>空域与资源情报</h3>
-      <small>官方固定管制区与气象派生风险区<b>分开报</b>，不合并成一个总数</small>
+      <small>固定管制区与气象派生风险区<b>分列统计</b>，不合并为一个总数</small>
     </div>
     <div class="intel-grid">
       <article v-for="row in airspace" :key="row.key" :class="intelTone(row)">
@@ -971,19 +969,8 @@ async function copyReceipt(row){
       <p>概率由三站 METAR 实测按 1/d² 插值；0–3 h 为本模型，3–6 h 为模式延伸，两段分列。最近站距 &gt;250 km 判为低置信，转人工复核。</p></div>
     <CorridorPanel :initial-id="corridorFocus" :minute="minute" :focus-pair="corridorPair"/>
   </template>
-  <template v-else-if="view==='card'">
-    <div class="operations-heading">
-      <h2>推演 <small>一条走廊从观测到裁决</small></h2>
-      <p>链路：METAR → 1/d² 插值 → 概率合成 → 四条判据 → 期望损失 → 与规则裁决对照。各步数值均由后端计算，本页按算法顺序呈现，随走廊与时间轴联动。</p>
-    </div>
-    <DeductionPanel :initial-id="corridorFocus" :minute="minute"/>
-    <p class="card-archive" data-card-archive>
-      <button @click="emit('open-section','mechanism')">历史版本 0.10.1 · 算法机理（学的是判据，不是天气）</button>
-      <span>这一页描述的模型不是当前在跑的那个；它的 0.977 属于"复现判据"口径，与上面的数字不可比较。</span>
-    </p>
-  </template>
   <template v-else-if="view==='counterfactual'">
-    <div class="operations-heading"><h2>反事实对照 <small>用 AI 和不用，差多少</small></h2>
+    <div class="operations-heading"><h2>对照 <small>移除模型判据后的差异</small></h2>
       <p>同一帧、同一规则，仅移除最后一层模型判据，差异只来自模型。默认显示全国层当前帧，案例重放在页内切换。</p></div>
     <CounterfactualPanel :minute="minute"/>
   </template>
@@ -991,68 +978,6 @@ async function copyReceipt(row){
     <div class="operations-heading"><h2>分歧台账 <small>AI 与规则不一致时，人怎么判的</small></h2>
       <p>每条记录含时间、走廊、概率与理由；否决与回滚须填理由，空理由返回 422。无记录时显示为空。</p></div>
     <DivergencePanel/>
-  </template>
-  <template v-else-if="view==='mechanism'">
-  <div class="operations-heading"><h2>算法机理 <small>{{cityName}} · {{census.total}} 班</small></h2><p>本页将走廊改航拆为因果链：气象判据 → 几何 → 时间窗。三要素取自当前计划的班次记录，本页不重算数值。</p><WeatherSourceSwitch class="heading-switch" :mode="weatherMode" :status="weatherModeStatus" @change="emit('weather-mode-change',$event)"/></div>
-
-  <MlEffectBoard />
-
-  <div class="briefing-block" data-mechanism-rule>
-    <div class="briefing-head"><h3>分级规则与几何构造</h3><small>取自本计划载荷</small></div>    <p class="briefing-note">阈值随计划下发，由后端从唯一常量读出，界面不另存副本。</p>
-    <div class="mechanism-rule" v-if="rule">
-      <article v-for="row in ruleRows" :key="row.key"><small>{{row.label}}</small><strong>{{row.value}}</strong><span>{{row.note}}</span></article>
-    </div>
-    <p class="briefing-rule" v-else>本计划未发布分级规则，此处不引用阈值，亦不使用默认值。</p>
-  </div>
-
-  <div class="briefing-block" data-mechanism-census>
-    <div class="briefing-head"><h3>判据分布</h3><small>{{census.rows.length}} 条判据 · {{census.unevaluated}} 班未进入成因判定</small></div>
-    <p class="briefing-note">每条判据注明所依据的几何。点击可收窄下方班次，再次点击取消。固定管制区与作业区边界不计入气象成因。</p>
-    <div class="mechanism-census" v-if="census.rows.length">
-      <button v-for="row in census.rows" :key="row.key" class="mechanism-cause" :class="{on:basisFilter===row.key,weather:row.weather}" @click="basisFilter=basisFilter===row.key?'':row.key">
-        <header><b>{{row.name}}</b><em>{{row.total}} 班</em><span v-if="row.weather">气象成因</span></header>
-        <p>{{row.construction}}</p>
-        <small>{{row.detoured}} 班航程增加 · {{row.delayed}} 班地面等待</small>
-      </button>
-    </div>
-    <p class="briefing-note" v-else>本帧没有班次带成因判据。</p>
-    <p class="briefing-note" v-if="census.unevaluated">另有 {{census.unevaluated}} 班无成因判据，在成因判定前即已终止，不计入上述任何一条，亦不并入直飞段可用。</p>
-  </div>
-
-  <div class="briefing-block" data-mechanism-chain>
-    <div class="briefing-head"><h3>逐班三要素</h3><small>匹配 {{picker.matched}} 班 · 此处列 {{picker.rows.length}} 班</small></div>
-    <p class="briefing-note">选择班次后展开其判据、几何与时间窗。全量筛选请使用「调度台账」。</p>
-    <div class="picker-bar">
-      <input v-model="chainQuery" type="search" aria-label="搜索班次" placeholder="搜索呼号 / 起降点 / 城市">
-      <span class="picker-note">{{basisFilter?`已按「${routeBasisNames[basisFilter]||basisFilter}」收窄`:'未收窄判据：气象成因的班次排在前面'}}</span>
-    </div>
-    <div class="picker-chips" v-if="picker.rows.length">
-      <button v-for="f in picker.rows" :key="f.id" class="picker-chip"
-              :class="{on:f.id===chainId,hit:isWeatherDetour(f)}" @click="chainId=f.id">
-        <b>{{f.name||f.id}}</b>
-        <em>{{routeBasisNames[f.routeBasis]||f.routeBasis}}</em>
-      </button>
-    </div>
-    <p class="briefing-note" v-else>没有匹配的班次。</p>
-
-    <article class="mechanism-chain" v-if="chain" data-mechanism-detail>
-      <header>
-        <code>{{chain.id}}</code><b>{{chain.name}}</b>
-        <span :class="{weather:chain.basisIsWeather}">{{chain.basisIsWeather?'受气象影响改航':(chain.ok?'非气象成因':'未进入成因判定')}}</span>
-        <button class="mechanism-jump" @click="emit('select-flight',chainFlight)">在运行总览中查看</button>
-      </header>
-      <p class="briefing-note" v-if="!chain.ok">本班次因果链不完整，缺 {{chain.missing.length}} 个要素。下列各项为记录中已有内容，缺失项不填补默认值。</p>
-      <ol class="mechanism-steps">
-        <li v-for="step in chain.steps" :key="step.key" :data-mechanism-step="step.key">
-          <h4>{{step.label}}</h4>
-          <p class="mechanism-headline" v-if="step.headline">{{step.headline}}</p>
-          <p class="mechanism-absent" v-if="step.absent">{{step.absent}}</p>
-          <p class="mechanism-line" v-for="(line,index) in step.lines" :key="index">{{line}}</p>
-        </li>
-      </ol>
-    </article>
-    <p class="briefing-note" v-else>在上面选一个班次，这里就展开它的三要素。</p>
-  </div>
   </template>
   <template v-else-if="view==='assistant'">
   <div class="operations-heading"><h2>大模型取证</h2><p>{{selected?'当前班次：'+selected.name:'取证范围：全网调度计划'}} · 数值由概率模型算（覆盖全部班次），本页只做证据检索 · 共享同一场景与数据快照</p></div>
@@ -1193,17 +1118,16 @@ async function copyReceipt(row){
     </section>
   </div>
 
-  <!-- ===== 评审四问（V1.0.6）=====
-       创新层级 / 与主流方案对比 / 需求从哪来 / 成效是多少 —— 这四件事方案 PDF 里都写了，
-       但评委现场点开系统时看不到。放在口径页而不是新开一页：这一页的定位就是
-       "把话说清楚"，多开一页反而要再解释一遍为什么有这一页。 -->
+  <!-- ===== 方法与需求依据 =====
+       方法层级 / 与既有做法的分工 / 需求依据 / 可复算的效果，四块放在口径页：
+       这一页的定位就是把口径说清楚，另开一页反而要再解释一次为什么有那一页。 -->
   <section class="eval-grid" data-eval-block>
     <article class="eval-card" data-eval="level">
-      <header><h3>核心创新层级</h3><span class="eval-badge">系统级 + 应用级</span></header>
-      <p>创新不在模型层。能见度与阵风使用成熟的梯度提升树（100 棵、26 维特征、公开校准方法）。系统层贡献：将「气象判据 → 绕飞几何 → 时间窗」贯通于同一界面，每一步可回溯至原始报文与回波几何。应用层贡献：以同一套判据回答全国范围哪里不可飞与本班次为何如此判定。</p>
+      <header><h3>方法层级</h3><span class="eval-badge">系统级 + 应用级</span></header>
+      <p>方法贡献不在模型层。能见度与阵风使用成熟的梯度提升树（100 棵、26 维特征、公开校准方法）。系统层贡献：将「气象判据 → 绕飞几何 → 时间窗」贯通于同一界面，每一步可回溯至原始报文与回波几何。应用层贡献：以同一套判据回答全国范围哪里不可飞与本班次为何如此判定。</p>
     </article>
     <article class="eval-card" data-eval="compare">
-      <header><h3>与主流方案的分工</h3><span class="eval-badge quiet">用途不同，不是高下</span></header>
+      <header><h3>与既有做法的分工</h3><span class="eval-badge quiet">用途不同，不是高下</span></header>
       <dl class="eval-rows">
         <div><dt>单站气象保障</dt><dd>站级 METAR/TAF 深算，回答"本场能不能起降"。我们做全网可下钻的态势聚合，站级深算不是我们的目标。</dd></div>
         <div><dt>通用航路规划</dt><dd>给定空域与气象后求最优路径。我们把判据、几何、时间窗整链留痕，结论可被逐行复核。</dd></div>
@@ -1211,7 +1135,7 @@ async function copyReceipt(row){
       </dl>
     </article>
     <article class="eval-card" data-eval="demand">
-      <header><h3>需求从哪来</h3><span class="eval-badge quiet">三条线</span></header>
+      <header><h3>需求依据</h3><span class="eval-badge quiet">三条线</span></header>
       <dl class="eval-rows">
         <div><dt>文献线</dt><dd>低空航路、容量评估、低能见预报三组关键词，累计 259 条命中，筛出 14 篇精读。</dd></div>
         <div><dt>体系线</dt><dd>唐山、大连、宁德已建低空气象保障，可行性无需论证，重点在于可复核性。</dd></div>
@@ -1219,7 +1143,7 @@ async function copyReceipt(row){
       </dl>
     </article>
     <article class="eval-card wide" data-eval="effect">
-      <header><h3>应用成效（稳定组 · 可复算）</h3><span class="eval-badge quiet">口径见上一张总账</span></header>
+      <header><h3>效果（稳定组 · 可复算）</h3><span class="eval-badge quiet">口径见上一张总账</span></header>
       <dl class="eval-rows four">
         <div><dt>进入不可飞走廊</dt><dd><b>0</b> 架次</dd></div>
         <div><dt>回波压线改判</dt><dd><b>−100%</b>（改为绕飞或停飞）</dd></div>

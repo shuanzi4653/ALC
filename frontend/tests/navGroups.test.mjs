@@ -126,7 +126,7 @@ test('置信度门限 0.65：写在一处，前端不各写一份', () => {
 test('前端不重算概率：组件里不出现自己的阈值比较', () => {
   // 这条防的是"前端顺手把 p>=0.8 再判一次"。一旦发生，后端改阈值时界面会静默停留在旧口径，
   // 而所有既有判据都是绿的 —— 因为它们测的是 runtime.js 里那一份。
-  for (const file of ['CorridorPanel.vue', 'ModelCardPanel.vue', 'CounterfactualPanel.vue', 'DivergencePanel.vue']) {
+  for (const file of ['CorridorPanel.vue', 'CounterfactualPanel.vue', 'DivergencePanel.vue']) {
     const src = readFileSync(new URL(`../src/components/traffic/${file}`, import.meta.url), 'utf8')
     assert.doesNotMatch(src, /0\.8\s*<=|>=\s*0\.8|>\s*0\.8/, `${file} 里出现了自己的 0.8 阈值判断`)
     assert.doesNotMatch(src, /0\.5\s*<=|>=\s*0\.5/, `${file} 里出现了自己的 0.5 阈值判断`)

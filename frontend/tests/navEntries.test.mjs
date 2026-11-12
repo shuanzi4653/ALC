@@ -19,15 +19,15 @@ import {
 
 const ENTRIES = NAV_GROUPS.flatMap((group) => group.subs.map((sub) => ({ ...sub, group })))
 
-test('导航入口是 7 个（V1.0.5 合并后），而视图是 14 个', () => {
-  // V1.0.5：8 → 7、15 → 14。两处都是**合并**，不是裁功能：
+test('导航入口是 7 个（V1.0.5 合并后），而视图是 13 个', () => {
+  // V1.0.5：8 → 7、15 → 14（两处都是合并）；V1.1.0 下线 mechanism → 13。
   //   · 「运行情报」并入「气象监测」（同一屏两张表，没必要两个入口）；
   //   · 走廊组只剩「走廊剖面」（运行情报搬走后它本来就只有一项）。
   // 保留这条断言的意义：以后每加一页，必须想清楚它挂哪个入口，
   // 而不是顺手再加一个左侧按钮。
   assert.equal(navEntryCount(), 7,
     `入口数变成 ${navEntryCount()}：新增页面必须挂进已有入口或明确新增一个入口，不允许回到"一页一个按钮"`)
-  assert.equal(Object.keys(SECTION_NAMES).length, 14, '视图总数不该被改（折叠的是导航，不是功能）')
+  assert.equal(Object.keys(SECTION_NAMES).length, 13, '视图总数：V1.1.0 下线 mechanism 后为 13')
 })
 
 test('被删掉的分节必须留旧 hash 映射，否则老链接会静默跳首页', () => {
@@ -120,8 +120,10 @@ test('tab 条：三个合并入口的视图数正确，且隐藏视图与锚点�
   // 单视图入口没有 tab 条 —— 有一行空 tab 比没有更让人困惑
   assert.deepEqual(labels('home'), [])
   assert.deepEqual(labels('profile'), [])
-  // mechanism 挂在「检验结论」下，但它是"可达但不并排"，不该出现在 tab 里
-  assert.ok(HIDDEN_SECTIONS.has('mechanism'))
+  // V1.1.0：mechanism 整页下线（旧链接重定向到 card）；counterfactual 与 ledger
+  // 仍挂在「日志」下但属于"可达但不并排"，不该出现在 tab 里
+  assert.ok(HIDDEN_SECTIONS.has('counterfactual'))
+  assert.ok(HIDDEN_SECTIONS.has('ledger'))
   assert.ok(!labels('card').includes(SECTION_NAMES.mechanism),
     '算法机理不该出现在「检验结论」的 tab 条里')
 })

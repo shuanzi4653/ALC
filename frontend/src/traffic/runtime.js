@@ -1898,7 +1898,7 @@ export const SECTION_CAN_DO=Object.freeze({
   schedule:['按城市或班次号搜索','翻页看全量台账','点行选中后看单班处置'],
   alerts:['按严重度筛选事件','定位到地图上的事件位置','把事件带进研判页'],
   weather:['切换实测/虚拟通道','看逐站 METAR 与风险区','导出本帧观测'],
-  mechanism:['按 8 步看一条走廊怎么被判出来','换走廊或拖时间轴重算','看第 8 步的复核记录'],
+
   reference:['在总账表里查分母与来源','看来源角标的含义','核对边界声明'],
   assistant:['发起一次逐班研判','看模型档位与置信度','把否决理由写进台账'],
   history:['按时间倒着看运行日志','筛出人工干预','导出 CSV'],
@@ -1975,7 +1975,7 @@ export const SECTION_NAMES=Object.freeze({
   // 一个分节只放一个视图 —— 原来态势页里还嵌着"台账/情报/处置"四个页内 tab，
   // 与左侧导航里的同名入口重复，点两处都能到同一屏。
   home:'运行首页',overview:'运行总览',national:'全国航线网',schedule:'调度台账',
-  alerts:'事件处置台',weather:'气象监测',mechanism:'算法机理',reference:'口径与来源',
+  alerts:'事件处置台',weather:'气象监测',reference:'口径与来源',
   assistant:'大模型取证',history:'运行日志',
   profile:'走廊剖面',card:'推演',counterfactual:'反事实对照',ledger:'分歧台账',
 })
@@ -2433,9 +2433,9 @@ export const DRILL_TARGETS=Object.freeze({
   weather:{section:'alerts',cause:'weather',hint:'「预警中心 · 事件处置台」只留气象成因的事件，每条带走廊与建议'},
   risk:{section:'weather',hint:'「气象监测」逐区域列出成员、来源与合并口径'},
   alerts:{section:'alerts',hint:'「预警中心 · 事件处置台」按成因列出待处置事件，每条带一键处置'},
-  sweep:{section:'mechanism',hint:'「算法机理」给出判据、几何与时间窗三要素'},
+  sweep:{section:'card',hint:'「推演」按观测、判据、概率、处置四段给出这一班的链路'},
   ai:{section:'assistant',hint:'「大模型取证」逐条列出五种结局，含默认的那一种（未经模型取证）'},
-  model:{section:'mechanism',hint:'「算法机理」的三列对照：规则 / 模型 / 人工仲裁的训练期指标，含分母与来源'},
+  model:{section:'card',hint:'「推演」逐段给出观测、判据、概率与处置代价，每段可折叠并附来源'},
 })
 const DRILL_FALLBACK=Object.freeze({section:'overview',hint:'总览给出本数与规模'})
 export function drillTarget(key){
@@ -3572,7 +3572,7 @@ const NAV_SPEC = [
               members: ['alerts', 'schedule', 'assistant'] }] },
   { key: 'verify', no: 4, label: '推演', subtitle: '一条走廊怎么被判成不可飞',
     subs: [{ key: 'card', label: ENTRY_LABELS.card, hint: '三个目标的指标，以及这些口径的依据',
-              members: ['card', 'reference', 'mechanism'] }] },
+              members: ['card', 'reference'] }] },
   // 0.11.22：复盘对照与分歧台账**已并入「推演」**，这里只剩日志。
   // 但两者仍写进 `members` —— 归属要成立（否则"这个页面永远打不开"），
   // 显示靠 `HIDDEN_SECTIONS` 过滤：导航与 tab 都不出现，深链仍可达。
@@ -3596,7 +3596,6 @@ export const SECTION_HINTS = Object.freeze({
   assistant: '大模型的证据检索与判定留痕',
   schedule: '逐班次的申请、计划与实际',
   card: '选城市或班次，看观测 → 判据 → 裁决的完整链路',
-  mechanism: '历史版本 0.10.1 的判据模型（非当前在跑的）',
   counterfactual: '同一份计划，AI 与规则各自处置了什么（已并入推演）',
   ledger: '人与系统判定不一致的逐条记录（已并入推演）',
   history: '运行日志与按帧回放',
@@ -3618,7 +3617,7 @@ export const SECTION_HINTS = Object.freeze({
 // 但导航与 tab 条里不再出现第二个"全国"。
 // 之所以留在 members 里，是为了 `entryOf('national')` 仍能返回它的入口 ——
 // 去掉的话，从旧链接进来时 `activeGroup` 会是空，导航整条消失。
-export const HIDDEN_SECTIONS = Object.freeze(new Set(['mechanism', 'counterfactual', 'ledger', 'national']))
+export const HIDDEN_SECTIONS = Object.freeze(new Set(['counterfactual', 'ledger', 'national']))
 
 // 0.11.17（U-5）：13 个页面各自一个地址。**映射表只有这一份** ——
 // 导航、深链接、探针、答辩时给评委的链接都读它，避免"同一个页面两个 slug"。
@@ -3635,7 +3634,7 @@ export const SECTION_HASHES = Object.freeze({
   overview: 'situation/overview', weather: 'situation/weather',
   profile: 'corridor/profile',
   alerts: 'dispatch/console', schedule: 'dispatch/ledger', assistant: 'dispatch/evidence',
-  card: 'model/card', reference: 'model/reference', mechanism: 'model/mechanism',
+  card: 'model/card', reference: 'model/reference',
   counterfactual: 'compare/counterfactual', ledger: 'compare/ledger',
   history: 'compare/log',
 })

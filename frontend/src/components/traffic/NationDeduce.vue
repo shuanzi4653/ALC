@@ -2,11 +2,18 @@
   <!-- 行内 flex 而不是靠类：父组件的 `.nrn-side>*{flex:0 0 auto}` 带了两个 scope 属性，
        同特异性时谁后加载谁生效（实测压不住），于是板子按内容高度撑破侧栏、盖住下面的卡片。 -->
   <div class="dd" data-deduce-board :style="{ flex: '1 1 auto', minHeight: 0 }">
-    <!-- 没有选中班次：这一页的立题行在上方，这里说清"下一步做什么" -->
-    <div v-if="!flight" class="dd-empty">
-      <b>先立题</b>
-      <p>请先在上方选择城市与班次，本页随后给出该班次的观测、判据、概率、反事实与代价对比。</p>
-      <p class="quiet">未选中班次时本页不输出默认结果，以避免展示与当前班次无关的模板化链路。</p>
+    <!-- 没有班次可推：区分「没选」与「选了但这条走廊此刻没班次」。
+         此前两种情况共用一句"先立题"，点了一条只有绕飞方案、没有在飞班次的走廊时，
+         读者会以为是自己没选中。 -->
+    <div v-if="!flight" class="dd-empty" data-deduce-empty>
+      <b>{{ corridor ? '该走廊此刻没有在飞班次' : '等待选择班次' }}</b>
+      <p v-if="corridor">
+        {{ short(corridor.fromName) }} → {{ short(corridor.toName) }}（{{ corridor.id }}）在当前时刻没有班次<template
+          v-if="corridor.attrText">；走廊属性：{{ corridor.attrText }}</template>。
+        <template v-if="corridor.statusText && corridor.statusText !== '无班次'">它的班次状态是「{{ corridor.statusText }}」。</template>
+      </p>
+      <p v-else>请在地图或左侧列表中选择一个班次，本页给出该班次的观测、判据、概率与处置代价。</p>
+      <p class="quiet">推演按「这一班、这一分钟」取数。换一条有班次的走廊，或把时间轴移到该走廊有班的时刻。</p>
     </div>
 
     <template v-else>
@@ -29,68 +36,82 @@
       <p v-else-if="err" class="dd-state bad">链路取不到 · {{ err }}<button @click="load">重试</button></p>
 
       <template v-else-if="data">
+        <!-- 八段各自折叠：折叠态留一行关键值，展开才铺图与表 -->
+        <div class="dd-tools" data-deduce-tools>
+          <button type="button" @click="forceAll(1)">全部展开</button>
+          <button type="button" @click="forceAll(-1)">全部折叠</button>
+          <span>共八段 · 点标题折叠或展开</span>
+        </div>
+
         <!-- ① 观测 -->
-        <section class="dd-seg" data-seg="observe">
-          <h4><i>1</i>观测 <em>PUBLIC</em></h4>
-          <div class="dd-vis" v-for="row in visRows" :key="row.name">
-            <span class="nm">{{ short(row.name) }}</span>
-            <span class="track">
-              <i class="fill" :class="{low: row.low}" :style="{ width: row.pct + '%' }"></i>
-              <i class="mark" :style="{ left: row.thresholdPct + '%' }" title="判据阈值"></i>
-            </span>
-            <b :class="{low: row.low}">{{ row.text }}</b>
-          </div>
+        <DeduceSection name="observe" no="1" title="观测" tag="PUBLIC"
+                       :summary="sumObserve" :default-open="true" :force="forceSeq" :force-dir="forceDir">
+          <BarThreshold :rows="visChartRows" title="端点能见度与阈值" unit="虚线＝判据阈值 5 km"
+                        aria="两端机场能见度与阈值对照" />
+          <table class="dd-tbl" data-tbl="stations">
+            <thead><tr><th>站</th><th>能见度</th><th>风</th><th>本班次中的作用</th></tr></thead>
+            <tbody>
+              <tr>
+                <td>{{ short(data.observed.fromName) }}</td>
+                <td>{{ data.observed.fromVis || '无实况' }}</td>
+                <td>{{ data.observed.fromWind == null ? '—' : data.observed.fromWind + ' m/s' }}</td>
+                <td>起点</td>
+              </tr>
+              <tr>
+                <td>{{ short(data.observed.toName) }}</td>
+                <td>{{ data.observed.toVis || '无实况' }}</td>
+                <td>{{ data.observed.toWind == null ? '—' : data.observed.toWind + ' m/s' }}</td>
+                <td>终点</td>
+              </tr>
+            </tbody>
+          </table>
           <p class="dd-line">
             <span>端点风速</span><b>{{ windText }}</b>
             <span class="src" :class="data.observed.radarOk ? 'ok' : 'absent'">
               {{ data.observed.radarOk ? '回波可用' : '回波不可用' }}
             </span>
           </p>
-          <p class="dd-echo" :class="{hit: data.observed.hasDetour}">
+          <p class="dd-echo" :class="{ hit: data.observed.hasDetour }">
             {{ data.observed.echo }}
             <template v-if="data.observed.echoTs"><em>· {{ clock(data.observed.echoTs) }}</em></template>
           </p>
-        </section>
+        </DeduceSection>
 
-        <!-- ② 判据：逐条过/不过 -->
-        <section class="dd-seg" data-seg="criteria">
-          <h4><i>2</i>判据 <em>{{ passCount }}/{{ (data.criteria || []).length }} 通过</em></h4>
-          <div class="dd-crit" v-for="c in data.criteria" :key="c.key" :class="{fail: !c.pass}">
-            <div class="row">
-              <span class="flag">{{ c.pass ? '✓' : '✗' }}</span>
-              <span class="lb">{{ c.label }}</span>
-              <span class="th">阈值 {{ thresholdText(c) }}</span>
-              <b>{{ c.display }}</b>
-            </div>
-            <div class="bar">
-              <i :class="{fail: !c.pass}" :style="{ width: Math.max(3, c.ratio * 100) + '%' }"></i>
-            </div>
-            <p v-if="c.note" class="note">{{ c.note }}</p>
-          </div>
-          <p v-if="!(data.criteria || []).length" class="dd-line quiet">该班次无此项</p>
-        </section>
+        <!-- ② 判据 -->
+        <DeduceSection name="criteria" no="2" title="判据" tag="RULE"
+                       :summary="sumCriteria" :force="forceSeq" :force-dir="forceDir"
+                       :tone="passCount === (data.criteria || []).length ? 'ok' : 'bad'">
+          <BarThreshold :rows="criteriaRows" title="各判据的实测值与阈值" unit="条长＝实测占阈值的比例，越过 100% 即不通过"
+                        aria="各判据实测值与阈值对照" />
+          <table class="dd-tbl" data-tbl="criteria">
+            <thead><tr><th>判据</th><th>阈值</th><th>实测</th><th>结论</th></tr></thead>
+            <tbody>
+              <tr v-for="c in data.criteria" :key="c.key" :class="{ bad: !c.pass }">
+                <td>{{ c.label }}</td>
+                <td>{{ thresholdText(c) }}</td>
+                <td>{{ c.display }}</td>
+                <td>{{ c.pass ? '通过' : '不通过' }}</td>
+              </tr>
+              <tr v-if="!(data.criteria || []).length"><td colspan="4">该班次无此项</td></tr>
+            </tbody>
+          </table>
+        </DeduceSection>
 
         <!-- ③ 概率与裁决 -->
-        <section class="dd-seg" data-seg="verdict">
-          <h4><i>3</i>概率与裁决 <em>DERIVED</em></h4>
-          <div class="dd-risk">
-            <b :class="tone">{{ num(data.flight.riskP, 2) }}</b>
-            <div class="meter">
-              <i class="zone watch"></i><i class="zone hold"></i>
-              <i class="needle" :style="{ left: Math.min(100, data.flight.riskP * 100) + '%' }"></i>
-            </div>
-            <div class="scale"><span>0</span><span>预警 0.35</span><span>延期 0.75</span><span>1</span></div>
-          </div>
+        <DeduceSection name="verdict" no="3" title="概率与裁决" tag="DERIVED"
+                       :summary="sumVerdict" :force="forceSeq" :force-dir="forceDir" :tone="tone">
+          <Gauge :p="data.flight.riskP || 0" title="不可飞概率落在哪一档" unit="阈值由后端单一常量给出"
+                 aria="不可飞概率与三档区间" />
           <p class="dd-verd-line">裁决：<b :class="tone">{{ data.flight.decisionLabel }}</b></p>
           <ul class="dd-drivers" v-if="(drivers || []).length">
             <li v-for="(text, i) in drivers" :key="'d' + i">{{ text }}</li>
           </ul>
-          <p v-else class="dd-line quiet">本班次无触发项（依据为空 = 没有任何阈值被越过，不是"没算"）</p>
-        </section>
+          <p v-else class="dd-line quiet">本班次无触发项（依据为空＝没有任何阈值被越过，不是「没算」）</p>
+        </DeduceSection>
 
         <!-- ④ 反事实 -->
-        <section class="dd-seg" data-seg="counter">
-          <h4><i>4</i>反事实 <em>DERIVED</em></h4>
+        <DeduceSection name="counter" no="4" title="反事实" tag="DERIVED"
+                       :summary="sumCounter" :force="forceSeq" :force-dir="forceDir">
           <div class="dd-cf">
             <span>不绕飞暴露</span>
             <span class="track"><i :style="{ width: expPct(data.observed.exposureDirect) + '%' }"></i></span>
@@ -101,56 +122,79 @@
             <span class="track"><i class="good" :style="{ width: expPct(data.observed.exposureDetour) + '%' }"></i></span>
             <b>{{ num(data.observed.exposureDetour, 1) }} 分</b>
           </div>
+          <table class="dd-tbl" data-tbl="counter">
+            <thead><tr><th>方案</th><th>暴露时长</th><th>差值</th></tr></thead>
+            <tbody>
+              <tr><td>不绕飞（直飞）</td><td>{{ num(data.observed.exposureDirect, 1) }} 分</td><td>基准</td></tr>
+              <tr><td>绕飞</td><td>{{ num(data.observed.exposureDetour, 1) }} 分</td>
+                <td>{{ exposureGain }}</td></tr>
+            </tbody>
+          </table>
           <p class="dd-line quiet" v-if="!bothExposureZero">两行是同一架、同一分钟下的两个反事实：不绕会暴露多久，绕了还剩多久。</p>
-          <p class="dd-line quiet" v-else>两行都是 0：本帧航路没有压上强回波，不存在"不绕"这个选项。这是结论，不是缺数据。</p>
-        </section>
+          <p class="dd-line quiet" v-else>两行都是 0：本帧航路没有压上强回波，不存在「不绕」这个选项。这是结论，不是缺数据。</p>
+        </DeduceSection>
 
         <!-- ⑤ 期望损失 -->
-        <section class="dd-seg" data-seg="loss">
-          <h4><i>5</i>期望损失 <em>三个方案对比</em></h4>
-          <div class="dd-opt" v-for="opt in options" :key="opt.key"
-               :class="{ best: opt.recommended, off: !opt.available }">
-            <div class="row">
-              <span class="lb">{{ opt.label }}</span>
-              <b>{{ opt.available ? num(opt.cost, 2) : '不可用' }}</b>
-              <span v-if="opt.recommended" class="badge">推荐</span>
-            </div>
-            <div class="bar">
-              <i :style="{ width: costPct(opt) + '%' }"></i>
-            </div>
-            <p class="parts">
-              风险 {{ num(opt.riskP, 2) }} · 时间 {{ num(opt.delayMin, 0) }} 分
-              · 增量 {{ num(opt.extraKm, 0) }} km
-            </p>
-            <p class="note" v-if="!opt.available">{{ opt.note }}</p>
-          </div>
+        <DeduceSection name="loss" no="5" title="期望损失" tag="三方案"
+                       :summary="sumLoss" :force="forceSeq" :force-dir="forceDir">
+          <OptionBars :rows="lossRows" title="三个方案的期望代价" unit="条越短越好；推荐项标绿"
+                      aria="三个处置方案的期望代价对比" />
           <p class="dd-formula">{{ data.expectedLoss.formula }}</p>
-          <p class="dd-line quiet">
-            系数写在这里，读者可以自己复算：风险 1.0 / 每小时 0.6 / 每公里 0.02。
-            延期按推迟 60 分钟计，且<b>不假设</b>天气会好转。
-          </p>
-        </section>
+          <table class="dd-tbl" data-tbl="coefficients">
+            <thead><tr><th>项</th><th>系数</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr><td>风险</td><td>1.0</td><td>概率 × 事故代价</td></tr>
+              <tr><td>时间</td><td>0.6 / 小时</td><td>延期按推迟 60 分钟计，不假设天气会好转</td></tr>
+              <tr><td>里程</td><td>0.02 / km</td><td>绕飞带来的额外航程</td></tr>
+              <tr><td>取消</td><td>固定项</td><td>兜底项，不参与最优比较</td></tr>
+            </tbody>
+          </table>
+        </DeduceSection>
 
         <!-- ⑥ 结论与边界 -->
-        <section class="dd-seg" data-seg="conclusion">
-          <h4><i>6</i>结论与边界 <em>OFFICIAL 边界</em></h4>
+        <DeduceSection name="conclusion" no="6" title="结论与边界" tag="OFFICIAL"
+                       :summary="sumConclusion" :force="forceSeq" :force-dir="forceDir" :tone="tone">
+          <Timeline :points="timelinePoints" title="本班次的时刻轴" unit="申请 / 计划 / 实际 / 当前"
+                    aria="班次申请、计划、实际与当前时刻" />
           <p class="dd-concl">{{ finalConclusion }}</p>
           <p class="dd-rv" v-if="review">
             这条人工裁决写在「{{ flight.id }}」上，走廊页、推演页与日志同步同一份记录。
           </p>
           <p class="dd-disc">{{ data.discipline }}</p>
           <p class="dd-line quiet" v-if="data.generatedAt">生成于 {{ clock(data.generatedAt) }} · 第 {{ data.minute }} 分钟</p>
-        </section>
+        </DeduceSection>
+
+        <!-- ⑦ 网络层对照：同一帧、同一规则，移除模型层 -->
+        <DeduceSection name="compare" no="7" title="网络层对照" tag="A/B"
+                       :summary="sumCompare" :force="forceSeq" :force-dir="forceDir">
+          <CounterfactualPanel :minute="minute" />
+        </DeduceSection>
+
+        <!-- ⑧ 分歧台账：人与算法不一致的逐条记录 -->
+        <DeduceSection name="ledger" no="8" title="分歧台账" tag="人工"
+                       :summary="sumLedger" :force="forceSeq" :force-dir="forceDir">
+          <DivergencePanel compact :focus-corridor="data.corridorId" />
+        </DeduceSection>
       </template>
     </template>
   </div>
 </template>
 
+
 <script setup>
 import { computed, onUnmounted, ref, watch } from 'vue'
+import DeduceSection from './DeduceSection.vue'
+import CounterfactualPanel from './CounterfactualPanel.vue'
+import DivergencePanel from './DivergencePanel.vue'
+import BarThreshold from '../charts/BarThreshold.vue'
+import Gauge from '../charts/Gauge.vue'
+import OptionBars from '../charts/OptionBars.vue'
+import Timeline from '../charts/Timeline.vue'
 
 const props = defineProps({
   flight: { type: Object, default: null },
+  // 当前所在走廊（走廊行对象）：没有班次时用它把"没有班次"和"没有选中"分开
+  corridor: { type: Object, default: null },
   minute: { type: Number, default: 0 },
   paused: { type: Boolean, default: true },
   // 人工裁决（走廊页记录的那一条）。有它就以它为准：
@@ -256,6 +300,99 @@ const windText = computed(() => {
 })
 
 const options = computed(() => data.value?.expectedLoss?.options || [])
+
+// ── 折叠：批量展开/折叠用"计数 + 方向"，连续两次同向点击也能触发 ──
+const forceSeq = ref(0)
+const forceDir = ref(1)
+function forceAll(dir) { forceDir.value = dir; forceSeq.value += 1 }
+
+// ── 段 1：能见度图（数值统一折算成 km，缺测按 0 画、文本写"无实况"） ──
+const visChartRows = computed(() => {
+  const o = data.value?.observed
+  if (!o) return []
+  const mk = (name, text) => {
+    const m = /([\d.]+)\s*(km|m)?/.exec(String(text || ''))
+    let km = null
+    if (m) { const v = parseFloat(m[1]); km = m[2] === 'm' ? v / 1000 : v }
+    return { label: short(name), value: km == null ? 0 : km, threshold: 5,
+             display: text || '无实况', fail: km != null && km < 5 }
+  }
+  return [mk(o.fromName, o.fromVis), mk(o.toName, o.toVis)]
+})
+
+// ── 段 2：判据图（条长＝实测占阈值的比例，阈值线固定在 100%） ──
+const criteriaRows = computed(() => (data.value?.criteria || []).map((c) => ({
+  label: c.label,
+  value: Math.round((c.ratio || 0) * 100),
+  threshold: 100,
+  display: c.display,
+  fail: !c.pass,
+})))
+
+// ── 段 5：三方案代价 ──
+const lossRows = computed(() => (options.value || []).map((o) => ({
+  label: o.label,
+  cost: o.cost || 0,
+  display: o.available === false ? '不可用' : num(o.cost, 2),
+  parts: `风险 ${num(o.riskP, 2)} · 时间 ${num(o.delayMin, 0)} 分 · 增量 ${num(o.extraKm, 0)} km`,
+  recommended: !!o.recommended,
+  available: o.available !== false,
+})))
+
+// ── 段 6：时刻轴 ──
+const timelinePoints = computed(() => {
+  const f = props.flight || {}
+  const out = []
+  const push = (label, iso, kind) => {
+    const m = /(\d{2}):(\d{2})/.exec(String(iso || ''))
+    if (!m) return
+    out.push({ label, minute: (+m[1]) * 60 + (+m[2]), text: `${m[1]}:${m[2]}`, kind })
+  }
+  push('申请', f.requestAt, 'request')
+  push('计划', f.planAt, 'planned')
+  push('实际', f.actualAt, 'actual')
+  if (typeof props.minute === 'number') {
+    const h = String(Math.floor(props.minute / 60)).padStart(2, '0')
+    const mm = String(props.minute % 60).padStart(2, '0')
+    out.push({ label: '当前', minute: props.minute, text: `${h}:${mm}`, kind: 'now' })
+  }
+  return out
+})
+
+// ── 折叠态的一行摘要：折叠不等于"没了"，读者要能一眼看到这一段判成什么 ──
+const sumObserve = computed(() => {
+  const o = data.value?.observed
+  if (!o) return ''
+  const a = o.fromVis || '无实况'
+  const b = o.toVis || '无实况'
+  return `${short(o.fromName)} ${a} · ${short(o.toName)} ${b}${o.radarOk ? '' : ' · 回波不可用'}`
+})
+const sumCriteria = computed(() => `${passCount.value}/${(data.value?.criteria || []).length} 通过`)
+const sumVerdict = computed(() => {
+  const f = data.value?.flight
+  return f ? `${f.decisionLabel} · 概率 ${num(f.riskP, 2)}（${f.riskLevelLabel}）` : ''
+})
+const exposureGain = computed(() => {
+  const o = data.value?.observed
+  if (!o) return '—'
+  const d = (o.exposureDirect || 0) - (o.exposureDetour || 0)
+  if (d > 0) return `少 ${d.toFixed(1)} 分`
+  if (d < 0) return `多 ${Math.abs(d).toFixed(1)} 分`
+  return '无变化'
+})
+const sumCounter = computed(() => {
+  const o = data.value?.observed
+  if (!o) return ''
+  return `暴露 ${num(o.exposureDirect, 1)} → ${num(o.exposureDetour, 1)} 分`
+})
+const sumLoss = computed(() => {
+  const r = (options.value || []).find((o) => o.recommended)
+  return r ? `推荐 ${r.label} · 代价 ${num(r.cost, 2)}` : '无推荐项'
+})
+const sumConclusion = computed(() => (finalConclusion.value || '').slice(0, 46))
+const sumCompare = computed(() => '同一帧移除模型层后的差异，展开读取')
+const sumLedger = computed(() => '人与算法判定不一致的逐条记录，展开读取')
+
 const maxCost = computed(() => Math.max(0.01, ...options.value.map(o => o.cost || 0)))
 function costPct(opt) {
   // 不可用方案不参与比较：画成一根灰条，否则它会被误读成"最便宜"
@@ -437,4 +574,28 @@ html[data-theme="light"] .dd-formula{background:rgba(60,100,140,.07)}
 html[data-theme="light"] .dd-verd{border-color:#cfdcea;color:#31556f}
 html[data-theme="light"] .dd-empty p{color:#5b7a92}
 html[data-theme="light"] .dd-empty p.quiet{color:#6b8399}
+
+/* 折叠工具栏与段内表格 */
+.dd-tools{display:flex;align-items:center;gap:6px;margin:1px 0 5px 0}
+.dd-tools button{background:none;border:1px solid rgba(90,150,190,.45);color:#9dbccf;
+  border-radius:4px;padding:1px 7px;font-size:10px;cursor:pointer}
+.dd-tools button:hover{background:rgba(30,70,100,.5)}
+.dd-tools span{font-size:9.5px;color:#6f92a8;margin-left:auto}
+.dd-tbl{width:100%;border-collapse:collapse;font-size:10px;margin:3px 0 5px 0}
+.dd-tbl th{text-align:left;font-weight:600;color:#8fb2c8;padding:2px 4px;
+  border-bottom:1px solid rgba(70,110,140,.45)}
+.dd-tbl td{padding:2px 4px;color:#cfe0ec;border-bottom:1px solid rgba(70,110,140,.18)}
+.dd-tbl tr.bad td{color:#ff8d78}
+.dd-tbl tr:last-child td{border-bottom:0}
+.dd-empty b{display:block;font-size:12.5px;color:#dfeefb;margin-bottom:4px}
+.dd-empty p{font-size:11px;line-height:1.65;color:#8fb2c8}
+.dd-empty p.quiet{color:#6f92a8;margin-top:4px}
+html[data-theme="light"] .dd-tools button{color:#3d637d;border-color:#c9dced}
+html[data-theme="light"] .dd-tools button:hover{background:#eef5fb}
+html[data-theme="light"] .dd-tools span{color:#5b7386}
+html[data-theme="light"] .dd-tbl th{color:#40607a;border-bottom-color:#c9dced}
+html[data-theme="light"] .dd-tbl td{color:#17364d;border-bottom-color:#e6eef6}
+html[data-theme="light"] .dd-tbl tr.bad td{color:#a8321f}
+html[data-theme="light"] .dd-empty b{color:#12395c}
+html[data-theme="light"] .dd-empty p{color:#40607a}
 </style>

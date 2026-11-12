@@ -73,7 +73,7 @@ function fitView(){
 function refitCurrent(){
   if(props.soloCorridor){
     const line=(corridors.value||[])[0]
-    if(line&&line.pts) focusPts(line.pts)
+    if(line&&line.pts) focusPts(line.pts,30)
     return
   }
   if(props.selectedId&&pickedLine.value) focusPts(pickedLine.value.pts)
@@ -951,7 +951,7 @@ const pickedMarks=computed(()=>{
 
 // 选中一架就把它那条航线摊到视野里：全国层一条航路只有十几像素，
 // 不放大根本看不出"从哪到哪"。放大到航线占屏约六成就够，不顶边。
-function focusPts(pts){
+function focusPts(pts,maxScale){
   if(!pts||pts.length<2) return false
   let minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9
   for(const [x,y] of pts){
@@ -964,7 +964,10 @@ function focusPts(pts){
   const padX=.88, padY=.72
   // 上限从 4.2 提到 6：机场接驳这类 130 km 的短航线，4.2 倍下一个屏只有几十像素宽，
   // 读者看不出"这是从哪到哪"。长航线由 min() 里的比例项决定，不受这个上限影响。
-  const next=Math.max(1,Math.min(6,Math.min(VIEW.w*padX/w,VIEW.h*padY/h)))
+  // 单条走廊（soloCorridor）再放宽到 30：180 km 的接驳航线在 1400 px 画布上
+  // 要放到约 25—30 倍才填得满，6 倍下仍然只是一小段。
+  const cap=Math.max(1,Math.min(60,Number(maxScale)||6))
+  const next=Math.max(1,Math.min(cap,Math.min(VIEW.w*padX/w,VIEW.h*padY/h)))
   const cx=(minX+maxX)/2, cy=(minY+maxY)/2
   centerWorld(cx,cy,next)
   return next>1.02
@@ -1027,11 +1030,15 @@ function onMove(e){
 function onUp(){dragging.value=false;dragStart=null}
 function resetView(){zoom.value=1;pan.value={x:0,y:0}}
 // 缩放到指定经纬框（定位回波 / 定位雾区用）。留 18% 余量，别贴边。
-function fitBounds(b){
+// maxZoom：本函数原先固定 9 倍上限。9 倍只够看清省级范围，一条 180 km 的
+// 机场接驳航线在 1400 px 画布上仍只有几十像素，看不出走向。调用方可以按场景给上限：
+// 「定位回波/雾区」保持 9，单条走廊推演给到 30。
+function fitBounds(b,maxZoom){
   if(!b||b.length<4||b[2]<=b[0]||b[3]<=b[1]) return false
   const nw=project(b[0],b[3]), se=project(b[2],b[1])
   const w=Math.abs(se[0]-nw[0])||1, h=Math.abs(se[1]-nw[1])||1
-  const next=Math.max(1,Math.min(9,Math.min(VIEW.w/w,VIEW.h/h)*0.82))
+  const cap=Math.max(1,Math.min(60,Number(maxZoom)||9))
+  const next=Math.max(1,Math.min(cap,Math.min(VIEW.w/w,VIEW.h/h)*0.82))
   const cx=(nw[0]+se[0])/2, cy=(nw[1]+se[1])/2
   centerWorld(cx,cy,next)
   return true

@@ -38,7 +38,7 @@ const props=defineProps({
   // 不给提示的话用户看到的就是一张空地图，不知道从哪下手。
   hint:{type:String,default:''},
 })
-const emit=defineEmits(['scope-change','open-corridor','tick'])
+const emit=defineEmits(['scope-change','open-corridor','tick','open-card'])
 
 const level=ref('nation')
 const ident=ref('')
@@ -69,7 +69,10 @@ const evidenceErr=ref('')
 const minute=ref(60)
 // 地图上的飞行汽车是"活的"：默认就在走（像 Flightradar24 那样打开就在动），
 // 随时可暂停、可拖时间轴。推进由本地 rAF 负责，后端快照每分钟对齐一次。
-const playing=ref(true)
+// 推演页（mode='card'）按"这一班、这一分钟"取数，时间轴必须停住：
+// 否则镜头每推进一分钟，在飞的航班就换一批，选中态被反复清空、地图逐帧重绘（表现为闪烁）。
+const playing=ref(props.mode!=='card')
+watch(()=>props.mode,(m)=>{ if(m==='card') playing.value=false })
 const speed=ref(1)                    // 分钟/秒：0.25≈15×、1=60×、5=300×
 // 连续时刻（浮点分钟）。minute 是整数、驱动后端取数；frameMinute 只驱动地图插值，
 // 两者差值永远在 [0,1) 内 —— 飞机因此是"滑过去"的，不是整分钟一格一格跳。
@@ -97,6 +100,9 @@ function onCorridorPick(row){
   if(!row) return
   const f=(flights.value||[]).find(x=>x.corridor===row.id)
   if(f) pickFlight(f)
+  // 走廊页点一条有班次的走廊 = 选中这一班 + 进推演看它的完整链路。
+  // 推演页本身不再跳（已经在推演里），只换选中的班次。
+  if(props.mode==='corridor'&&f) emit('open-card')
 }
 // 虚拟气象演示包：后端 ?virtual=1 生成合成回波并**重算**绕飞与停飞，
 // 不是前端加一层滤镜 —— 关掉立刻回到真实回波，两条路径互不污染。

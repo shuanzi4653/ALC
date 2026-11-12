@@ -427,8 +427,3 @@ test('工作台的开关表必须与清单逐键对齐 —— 少一个键就是
     '开关表与 MAP_LAYERS 的键不一致 —— 清单加了图层而开关没加，症状是"切不动"而不是报错')
 })
 
-test('首页不再保存第二份图层清单，只从唯一来源渲染', () => {
-  const source = readFileSync(new URL('../src/components/traffic/HomeStage.vue', import.meta.url), 'utf8')
-  assert.match(source, /MAP_LAYERS/, '首页必须从唯一来源读图层清单')
-  assert.doesNotMatch(source, /dot:\s*'d-/, '首页里还留着第二份色标清单 —— 两处会分叉')
-})

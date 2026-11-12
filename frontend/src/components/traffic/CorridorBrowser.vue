@@ -15,6 +15,7 @@
           <b>{{ row.fromShort }} → {{ row.toShort }}</b>
           <span class="meta">{{ row.id }} · {{ row.kindLabel }} · {{ row.lengthKm }} km</span>
           <em :class="row.tone">{{ row.statusText }}</em>
+          <i v-if="row.attrText" class="cb-attr" :title="row.attrText">{{ row.attrText }}</i>
           <i v-if="row.review" class="rv" :title="row.review.reason">人工 · {{ reviewLabel(row.review.action) }}</i>
         </li>
         <li v-if="!shown.length" class="empty">没有匹配的走廊</li>
@@ -72,7 +73,7 @@
 
       <!-- 推演模式：六段链路（复用 NationDeduce，逐班独立取数） -->
       <div class="cb-deduce" v-else>
-        <NationDeduce :flight="activeFlight" :minute="minute" :paused="true"
+        <NationDeduce :flight="activeFlight" :corridor="active" :minute="minute" :paused="true"
                       :review="active && active.review ? active.review : null"/>
       </div>
     </div>
@@ -126,16 +127,23 @@ const rows = computed(() => {
     const blocked = !!c.borderBlocked
     const detour = !!c.detour
     const hold = f ? f.decision === 'HOLD' : false
-    const tone = blocked ? 'bad' : (detour ? 'warn' : (hold ? 'warn' : (review ? 'ok' : 'quiet')))
+    // 状态列只表示**此刻这一班**怎么样；走廊自身的属性（有没有绕飞方案、是否边界受限）
+    // 另起一列。此前两者挤在 statusText 一个词里：走廊有绕飞方案就写「绕飞」，
+    // 于是"有绕飞方案但此刻没班次"的行看起来像在飞，点进去只能看到空面板（实测索引 1-7 全是这样）。
+    const tone = review ? 'ok' : (!f ? 'quiet' : (hold || blocked ? 'warn' : 'ok'))
     const statusText = review ? reviewLabel(review.action)
-      : blocked ? '停飞' : detour ? '绕飞' : hold ? '延期'
-      : f ? '直飞' : '无班次'
+      : !f ? '无班次'
+      : blocked ? '边界受限' : (f.decisionLabel || (hold ? '延期' : '直飞'))
+    const attrText = [
+      detour && c.detour && c.detour.shiftKm ? `绕飞方案 +${Math.round(c.detour.shiftKm)} km` : '',
+      blocked ? '穿越限制区' : '',
+    ].filter(Boolean).join(' · ')
     return {
       id: c.id, fromName: c.fromName, toName: c.toName,
       fromShort: short(c.fromName), toShort: short(c.toName),
       kindLabel: c.kindLabel || c.kind || '—', lengthKm: c.lengthKm,
       detourKm: (c.detour && c.detour.shiftKm) || 0,
-      blocked, detour, hold, tone, statusText,
+      blocked, detour, hold, tone, statusText, attrText,
       flightId: f ? f.id : '', riskP: f ? f.riskP : 0,
       departAt: f ? f.departAt : '', arriveAt: f ? f.arriveAt : '',
       altM: f ? f.altM : null, decision: f ? f.decision : '',
@@ -279,12 +287,15 @@ function reviewLabel(action) {
 .cb-rows em.bad { color: #ff8d78; } .cb-rows em.warn { color: #ffc857; }
 .cb-rows em.ok { color: #6fe0a8; } .cb-rows em.quiet { color: #7d9cb3; }
 .cb-rows .rv { font-style: normal; font-size: 9px; color: #8ef0ff; }
+/* 走廊属性（绕飞方案 / 穿越限制区）：与班次状态分列，避免"有绕飞方案"被读成"在飞" */
+.cb-rows .cb-attr { font-style: normal; font-size: 9px; color: #6f92a8;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cb-rows li.empty { cursor: default; color: #6f92a8; font-size: 10.5px; border-left-color: transparent; }
 
 .cb-main { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
 .cb-map { position: relative; flex: 1 1 auto; min-height: 380px; border-radius: 8px; overflow: hidden;
   border: 1px solid rgba(70,110,140,.3); }
-.cb-map.short { flex: 0 0 360px; min-height: 360px; }
+.cb-map.short { flex: 0 0 auto; height: clamp(260px, 34vh, 460px); min-height: 260px; }
 .cb-mapnote { position: absolute; left: 8px; bottom: 6px; margin: 0; font-size: 9.5px;
   color: #7d9cb3; background: rgba(6,18,28,.7); padding: 2px 6px; border-radius: 3px; }
 
@@ -345,6 +356,7 @@ html[data-theme="light"] .cb-mapnote { background: rgba(255,255,255,.85); color:
 /* 列表里的状态字与徽标：深色主题用的是"暗底上的亮色"（#ffc857/#ff8d78/#6fe0a8），
    搬到白底上对比度只有 1.3–1.5，必须换成同色系的深色版，而不是沿用。 */
 html[data-theme="light"] .cb-rows em.warn { color: #8a5a00; }
+html[data-theme="light"] .cb-rows .cb-attr { color: #5b7386; }
 html[data-theme="light"] .cb-rows em.bad { color: #a8321f; }
 html[data-theme="light"] .cb-rows em.ok { color: #0f7a52; }
 html[data-theme="light"] .cb-rows em.quiet { color: #5b7a92; }

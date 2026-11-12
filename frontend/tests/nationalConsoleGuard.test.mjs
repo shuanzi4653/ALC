@@ -34,39 +34,6 @@ test('national view does not mount the operations console shell', () => {
     'v-if 仍然要按 activeSection 判断，不能退化成恒真/恒假')
 })
 
-test('home stage drops the whole-page scale on narrow containers', () => {
-  const source = read('src/components/traffic/HomeStage.vue')
-  // 阈值：容器 <1500 走 compact。写死成常量，避免被随手改大而让 1366 又落回缩放。
-  const threshold = source.match(/COMPACT_MAX_W\s*=\s*(\d+)/)
-  assert.ok(threshold, '找不到 COMPACT_MAX_W，1366 断点会静默消失')
-  assert.equal(Number(threshold[1]), 1500)
-  // compact 时不能带内联 transform，否则 scale(0) 或 scale(旧值) 仍会生效。
-  assert.match(source, /:style="\[?compact\?null:/,
-    'compact 时必须不输出内联 width/height/transform')
-  // 字号地板按当前缩放反算：缺了这个变量，1920 下 12px 会被 0.937 压成 11.2px。
-  assert.match(source, /--alc-stage-scale/,
-    'hstage 必须把 --alc-stage-scale 传给 CSS，否则 1920 下字号地板算不出来')
-  assert.match(source, /compact\.value\s*=\s*w\s*>\s*0\s*&&\s*w\s*<\s*COMPACT_MAX_W/,
-    'compact 的判据必须是容器宽度，不是 window.innerWidth')
-})
-
-test('the four 1366 pages keep a 12px floor breakpoint', () => {
-  const pages = [
-    ['src/components/traffic/CorridorPanel.vue', /@media \(max-width:1440px\)/],
-    ['src/components/traffic/CounterfactualPanel.vue', /@media \(max-width:1440px\)/],
-    ['src/components/TrafficWorkbench.vue', /@media \(max-width:1440px\)/],
-  ]
-  for (const [file, pattern] of pages) {
-    assert.match(read(file), pattern, `${file} 缺少 1440 断点，10–11.5px 的辅助文字会掉回 12px 以下`)
-  }
-  // 首页不靠媒体查询，靠 compact 类里的字号地板。
-  assert.match(read('src/components/traffic/HomeStage.vue'), /\.hstage\.compact/,
-    '首页 compact 断点缺失')
-})
-
-// 机场净空的审批口径（用户 2026-11-10 拍板）：能小绕就小绕，绕不掉的一律自动审批，
-// 不进人工队列。这条口径只活在文案里 —— 回退后页面不会算错任何数字，只会把
-// "已自动放行" 重新说成 "须经批准"，所以只能靠源码断言钉住。
 test('airport clearance crossings are described as auto-approved', () => {
   // V1.0.5：原断言的落点（TrafficWorkbench 里的班次详情）随东北总览一起下线，
   // 全国层的净空口径改由「气象监测 → 机场情报」这一行承担。

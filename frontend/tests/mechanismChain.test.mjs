@@ -301,32 +301,6 @@ test('选择条按判据收窄、可搜索，气象成因排在前面', () => {
 
 // ------------------------------------------------- 静态断言：分节真的挂上去了
 
-test('「算法机理」进了导航，并且落在 OperationsConsole 的分支上', () => {
-  // 导航名在 0.9.26 第十轮收敛到**唯一来源**（`runtime.js::SECTION_NAMES`）：
-  // 工作台、下钻落点提示、文档模块表三处说的是同一件事。所以判据是两半 ——
-  // ① 唯一来源里有这一项；② 工作台真的引用它，而不是又写了一份。
-  // 只断言 ① 会漏掉"工作台自己另写一份"；只断言 ② 会漏掉"表里没有这一项"。
-  assert.equal(SECTION_NAMES.mechanism, '算法机理', '唯一来源里必须有这一项')
-  assert.match(view, /const sections=SECTION_NAMES/, '工作台必须引用唯一来源，不能自带副本')
-  assert.ok(console_.includes("view==='mechanism'"), 'OperationsConsole 必须有对应分支')
-  // 挂载条件不得把新分节排除掉（`v-if="!['home','overview','schedule']..."`）。
-  const guard = /OperationsConsole\s+v-if="!\[([^\]]*)\]/.exec(view)
-  assert.ok(guard, '找不到 OperationsConsole 的挂载条件')
-  assert.ok(!guard[1].includes('mechanism'), `挂载条件排除了 mechanism：${guard[1]}`)
-})
-
-test('三要素由数据驱动渲染，标签不在模板里再写一遍', () => {
-  assert.ok(console_.includes('step.label'), '标签必须来自 MECHANISM_ELEMENTS')
-  assert.ok(console_.includes('data-mechanism-step="step.key"'), '每一步都要有可探测的钩子')
-  for (const hook of ['data-mechanism-rule', 'data-mechanism-census', 'data-mechanism-chain', 'data-mechanism-detail']) {
-    assert.ok(console_.includes(hook), `缺少 ${hook}`)
-  }
-  // 三个组装/读数函数都必须真的被调用，否则分节会渲染成空白。
-  for (const call of ['radarRuleBlock(props.session)', 'routeBasisCensus(props.flights)', 'mechanismChain(']) {
-    assert.ok(console_.includes(call), `OperationsConsole 没有调用 ${call}`)
-  }
-})
-
 test('新分节的文案里不得出现面向评审/教师的措辞', () => {
   // 项目内不得出现"我该向评审/老师说明什么"这类叙述 —— 这是一个完整的程序，
   // 不是一份答辩稿。判据是关键词，不是语气。

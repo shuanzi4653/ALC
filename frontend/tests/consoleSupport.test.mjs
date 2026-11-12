@@ -338,9 +338,9 @@ test('every KPI that can be drilled actually lands on a section that exists',()=
   // 只写 `Object.keys(SECTION_NAMES)` 是测不出"少了一个分节"的 —— 少一项之后
   // 剩下的仍然自洽。写死清单则会在删掉一个分节时立刻变红。
   const SECTIONS=Object.keys(SECTION_NAMES)
-  // V1.0.5：'briefing'（运行情报）并入 'weather'（气象监测），14 个分节。
+  // V1.0.5：'briefing' 并入 'weather'；V1.1.0：'mechanism'（0.10.1 历史页）下线，13 个分节。
   assert.deepEqual(SECTIONS,
-    ['home','overview','national','schedule','alerts','weather','mechanism','reference','assistant','history',
+    ['home','overview','national','schedule','alerts','weather','reference','assistant','history',
      'profile','card','counterfactual','ledger'],
     '分节清单变了：新增/删除分节必须同时改这里、drillTarget 的落点、NAV_GROUPS 的归组、与 docs/NAMING.md §1')
   // 0.11.1（Beta）新增四项（手册 §10）：走廊剖面 / 模型卡 / 反事实对照 / 分歧台账。
@@ -387,7 +387,9 @@ test('every KPI that can be drilled actually lands on a section that exists',()=
 // `indexOf` 会切到脚本里去 —— 所以只取 `<template>` 块。
 const CONSOLE_SRC=readFileSync(new URL('../src/components/OperationsConsole.vue',import.meta.url),'utf8')
 const WORKBENCH_SRC=readFileSync(new URL('../src/components/TrafficWorkbench.vue',import.meta.url),'utf8')
-const HOME_SRC=readFileSync(new URL('../src/components/traffic/HomeStage.vue',import.meta.url),'utf8')
+// V1.1.0：`HomeStage.vue` 已随 0.10.1 遗留组件一起删除，首屏只剩 SituationBrief。
+// 保留这个空串是为了让下面"首屏源码并集"的写法不必改写 —— 判据本身仍读 BRIEF_SRC。
+const HOME_SRC=''
 // 0.11.2：首屏的"四个带基线的数字"搬进了 `SituationBrief.vue`（手册 §3.2 L2）。
 // 下钻这件事仍然必须在**首屏**上可点，所以判据读的是"首屏那两块源码"的并集，
 // 而不是死盯某一个文件 —— 否则搬一次家，判据就静默失效了。
@@ -436,7 +438,11 @@ const WORKBENCH_RANGES={
 }
 
 /** 某一节在页面上实际渲染的那一段模板。台账/总览在工作台里，其余在控制台里。 */
+const DEDUCE_SRC=readFileSync(new URL('../src/components/traffic/NationDeduce.vue',import.meta.url),'utf8')
 function landing(section){
+  // V1.1.0：推演页由 NationPanel→CorridorBrowser→NationDeduce 渲染，
+  // 不在 OperationsConsole 的分支里，落点直接取 NationDeduce 的模板。
+  if(section==='card') return stripComments(DEDUCE_SRC)
   // 总览 = 全国台的台账视图；气象监测 = 全国台 + 两张情报表。
   // 两者都不在 OperationsConsole 里，也不在 Workbench 的一行标签里 ——
   // 承诺的落点（指标块、情报筛选）写在组件内部，所以直接取组件源码。
@@ -466,7 +472,7 @@ const EVIDENCE_STEPS={
   // V1.0.5：运行情报并入气象监测 —— 第二下进情报筛选，第三下看班次表内筛选
   weather:{second:['data-intel-filters'],third:['data-filter']},
   alerts:{second:['data-alert-key'],third:['data-disposal-action']},
-  mechanism:{second:['data-mechanism-census'],third:['data-mechanism-detail','data-mechanism-step']},
+  card:{second:['data-deduce-tools'],third:['data-tbl']},
   assistant:{second:['data-ai-mark-row'],third:['data-ai-coverage']},
 }
 
@@ -474,7 +480,7 @@ test('三次点击的路径在页面上真的存在，而不只是一张写着"�
   // 第 1 次点击：首屏那一格必须**真的可点**，并且带着自己的键发出去。
   assert.match(HOME_SCREEN_SRC,/data-kpi-drill/,'首屏 KPI 的数值必须是一个可点的控件，而不是一段文字')
   assert.match(HOME_SCREEN_SRC,/data-drill-key/,'发出的键必须是这一格自己的键，否则点哪一格都去同一页')
-  assert.match(HOME_SRC,/emit\('drill'/,'首屏要把"去哪一页"交给父组件，不能自己硬跳')
+  // 原来还断言 HomeStage 里的 emit('drill')；该组件 V1.1.0 已删除，首屏只剩 SituationBrief。
 
   for(const [key,target] of Object.entries(DRILL_TARGETS)){
     const steps=EVIDENCE_STEPS[target.section]

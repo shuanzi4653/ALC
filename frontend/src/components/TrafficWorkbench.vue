@@ -540,6 +540,18 @@ function writeHash(section){
   if(window.location.hash===next)return
   try{ history.pushState({section},'',next) }catch(_){ window.location.hash=next }
 }
+// 页内跳转必须同时改地址：只改 activeSection 的话，地址栏还停在上一页，
+// 刷新一次就跳回去（此前从推演页点"算法机理"就是这个表现）。
+function onOpenSection(section){
+  if(!section) return
+  activeSection.value=section
+  writeHash(section)
+}
+// 走廊页点一条有班次的走廊 → 选中该班次并进推演（选中+跳）
+function onOpenCard(){
+  activeSection.value='card'
+  writeHash('card')
+}
 function onPopState(){
   HASH_GUARD.value=false
   applyHash()
@@ -701,13 +713,13 @@ onUnmounted(()=>{
            说回东北。三省下拉已撤，作用域改到顶栏那个胶囊上（见 `.wb-scope-jump`）——
            侧栏只有 176 px，放 label + 控件会溢出到正文上（实测按钮落在 x=216）。 -->
 
-      <button class="nav-toggle" data-settings-toggle :class="{on:settings}" :aria-pressed="settings" title="运行设置：情景、重新调度、信息密度、本页可做" @click="settings=!settings">设置</button>
+      <button class="nav-toggle" data-settings-toggle :class="{on:settings}" :aria-pressed="settings" title="运行设置：情景、重新调度、信息密度、本页功能" @click="settings=!settings">设置</button>
     </div>
   </nav>
   <div class="wb-body">
   <section class="traffic-toolbar" v-show="settings">
     <div class="toolbar-cando" data-can-do>
-      <b>本页可做</b>
+      <b>本页功能</b>
       <span v-for="item in canDo" :key="item">{{ item }}</span>
     </div><label>运行情景 <select v-model="scenario" :disabled="busy"><option value="live">公开天气驱动 / 模拟交通</option><option value="clear">无气象声明 / 交通交汇</option><option value="unknown">气象中断 / 暂停放行</option></select></label><button class="primary" @click="generate" :disabled="busy||!network">{{busy?buildLabel:'重新调度'}}</button><label class="settings-density" data-density-switch><span>信息密度</span><select aria-label="信息密度" v-model="density" :title="densityNote"><option v-for="tier in DENSITY_TIERS" :key="tier.key" :value="tier.key">{{tier.label}}</option></select></label><label class="settings-density" data-operator-switch><span>操作员角色</span><select aria-label="操作员角色" v-model="operator" title="决定你能做哪些写操作：观察员只读；值班员可暂停/恢复/处置；管理员可切换气象通道" @change="applyOperator"><option value="observer">观察员（只读）</option><option value="duty">值班员（处置）</option><option value="admin">管理员（切通道）</option></select></label><span class="traffic-session">{{sessionLabel}} · {{ready?'运行计划已就绪':'等待计算'}} · {{session?.weatherSnapshot?.dataType==='MODEL_ESTIMATE'||session?.weatherSnapshot?.dataType==='PROVIDER_CURRENT_ESTIMATE_OR_OBSERVATION_UNVERIFIED'?'天气为公开来源（非本系统合成）':'本场景未声明气象'}}</span><details class="traffic-repro" data-repro-params :open="densityPolicy(density).engineering"><summary>工程信息 · 复现参数</summary><dl><div><dt>数据快照编号</dt><dd>{{ready?session.seed:'—'}}</dd></div><div><dt>计划标识</dt><dd>{{session?.sessionId?.slice(0,12)||'—'}}</dd></div><div><dt>计划修订</dt><dd>{{session?.planRevision??'—'}}</dd></div><div><dt>算法版本</dt><dd>{{session?.version||'—'}}</dd></div><div><dt>算法标识</dt><dd data-algorithm-identity :title="algorithmIdentityNote">{{algorithmIdentityLabel||'—'}}</dd></div><div><dt>算法指纹</dt><dd>{{session?.fingerprint||'—'}}</dd></div><div><dt>气象通道</dt><dd>{{weatherModeIsVirtual(weatherMode)?'虚拟气象':'实测气象'}}</dd></div></dl><p>快照编号、算法指纹与气象通道三者一致时，重跑得到逐字节相同的运行计划。本区只读。</p></details></section>
   <div class="traffic-error" v-if="error" role="alert">{{error}} <button @click="network?generate():initialize()" :disabled="busy">重试</button></div>
@@ -743,9 +755,9 @@ onUnmounted(()=>{
                  :hint="NATION_HINTS[activeSection]||''"
                  :focus-corridor="corridorFocusId"
                  :hide-tabs="false" @scope-change="onScopeChange"
-                 @open-corridor="openCorridor" @tick="onNationTick"/>
+                 @open-corridor="openCorridor" @tick="onNationTick" @open-card="onOpenCard"/>
   </section>
-  <OperationsConsole v-if="!['home','overview','schedule','national'].includes(activeSection)&&!['briefing','weather','profile','alerts','assistant','card'].includes(activeSection)" :corridor-focus="corridorFocus" :corridor-pair="corridorPair" :view="activeSection" :session="session" :network="network" :flights="scoped" :weather="weather" :selected="selected" :minute="minute" :city-name="cityName" :operations="operations" :density="density" :focus="drillFocus" :weather-mode="weatherMode" :weather-mode-status="weatherModeStatus" :alert-flights="scoped" :event-focus="eventFocus" :ai-reviewed="aiReviewed" @select-flight="chooseFlight" @weather-mode-change="onWeatherModeChange" @locate-event="locateEvent" @ai-reviewed="onAiReviewed" @open-section="activeSection=$event" @seek="minute=$event" @open-corridor="openCorridor" :max-minute="playbackMax"/>
+  <OperationsConsole v-if="!['home','overview','schedule','national'].includes(activeSection)&&!['briefing','weather','profile','alerts','assistant','card'].includes(activeSection)" :corridor-focus="corridorFocus" :corridor-pair="corridorPair" :view="activeSection" :session="session" :network="network" :flights="scoped" :weather="weather" :selected="selected" :minute="minute" :city-name="cityName" :operations="operations" :density="density" :focus="drillFocus" :weather-mode="weatherMode" :weather-mode-status="weatherModeStatus" :alert-flights="scoped" :event-focus="eventFocus" :ai-reviewed="aiReviewed" @select-flight="chooseFlight" @weather-mode-change="onWeatherModeChange" @locate-event="locateEvent" @ai-reviewed="onAiReviewed" @open-section="onOpenSection" @seek="minute=$event" @open-corridor="openCorridor" :max-minute="playbackMax"/>
   <!-- 调度台账：处置大类下的第二个页签。情报已经并到「气象监测」，这里只剩台账。 -->
   <section class="traffic-page scope-page" v-if="activeSection==='schedule'">
     <div class="scope-bar" data-scope-bar>

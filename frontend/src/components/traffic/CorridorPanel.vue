@@ -206,7 +206,7 @@ function exportCsv(){
       <p class="corr-window">建议窗口：<b>{{ windowText }}</b>（可飞性 &gt;50%）</p>
       <p class="corr-window-note" v-if="probabilityRow && detail.verdict && detail.verdict !== '可飞'"
          data-threshold-scales>建议窗口与停飞判据口径不同：窗口按可飞性 &gt;50% 的选班偏好取，用于比较时段；本条当前不可飞概率 {{ pct(detail.pMax) }}，已触发停飞判据（≥25%），用于判断能否放行。窗口时段仅为概率较低时段，不代表免复核。</p>
-      <p class="corr-window-note" v-if="hasExtension">3–6 h 一段来自模式逐时值按历史频率校准，<b>不是本模型</b>；引用时请写清。</p>
+      <p class="corr-window-note" v-if="hasExtension">3–6 h 一段为模式逐时值按历史频率校准，<b>非本模型输出</b>，引用时须注明。</p>
     </section>
 
     <section class="corr-criteria">
