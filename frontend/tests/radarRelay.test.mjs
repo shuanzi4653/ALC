@@ -332,3 +332,27 @@ test('中继状态条的主语只有一个来源（模板里的 <b>实测雷达<
     assert.doesNotMatch(text, /实测雷达/, `中继文案不得重复主语：${text}`)
   }
 })
+
+test('整档未发布（全抛）+ 上一档只缺一张（抛错）—— 用取到的三张照常回传', async () => {
+  // 2026-11-12 23:5x 线上实况：23:48/23:54 两张都没发布（四张全 404）；
+  // 23:42/23:36 发了 (6,2)(5,2)(5,3)，(6,3) 不发。
+  // 跨域 404 的错误页不带 ACAO，浏览器读不到 → 抛 TypeError，与"被 CORS 拒"同形。
+  // 判据：同档只要有一张取到，抛错的那几张就是真缺；整档全抛就是"这一档没发布"，
+  // 不能把坐标判死 —— 否则下一档连能用的都不再试了。
+  const relay = instructions({ grid: [[5, 2], [6, 2], [5, 3], [6, 3]], maxLookbackSteps: 4 })
+  const slots = radarRelaySlots(Date.UTC(2026, 9, 15, 7, 24), 480, 6, 4)
+  const unpublished = new Set([slots[0].path])
+  const fetchImpl = stubFetch((url) => {
+    if (!url.includes('/tiles/')) return response({ payload: { ttlSeconds: 600 } })
+    const path = url.split(url.includes('/tiles/radar') ? '/tiles/radar/' : '/tiles/')[1].split('/').slice(0, 3).join('/')
+    if (unpublished.has(path)) throw new TypeError('Failed to fetch')
+    if (url.endsWith('/3/3/6.bin')) throw new TypeError('Failed to fetch')   // (6,3) 这一轮不发
+    return response()
+  })
+  const result = await relayRadarTiles(relay, { fetchImpl, nowMs: Date.UTC(2026, 9, 15, 7, 24) })
+  assert.equal(result.ok, true)
+  assert.equal(result.slot, '2026-10-15 15:18')
+  assert.deepEqual(result.missing, ['6,3'])
+  const body = JSON.parse(fetchImpl.calls.at(-1).options.body)
+  assert.deepEqual(body.tiles.map(t => [t.x, t.y]).sort(), [[5, 2], [5, 3], [6, 2]])
+})

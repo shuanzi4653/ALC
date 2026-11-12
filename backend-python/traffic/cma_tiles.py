@@ -35,7 +35,11 @@ _OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 _CACHE = {}
 _WARNED = set()
 
-DEFAULT_GRID = ((6, 2), (6, 3))
+# zoom 3 覆盖中国本土的最小完整块：x ∈ {5,6}、y ∈ {2,3}，四张。
+# 早先只写 (6,2)+(6,3) 两张，是"当时能取到的那两张"，不是覆盖；2026-11-12
+# 源站发 (5,2)(6,2)(5,3) 三张、不发 (6,3)，按旧网格就只能拼出东北一角。
+# 四张全发是完整覆盖，缺哪张由 ingest_tiles 的 missingTiles 如实记录。
+DEFAULT_GRID = ((5, 2), (6, 2), (5, 3), (6, 3))
 
 TILE_FETCH_WORKERS = 2
 
