@@ -163,64 +163,6 @@ function tilesFor(template,minZoom,maxZoom){
   return out
 }
 // —— 雷达回波（NEXRAD 多级基本反射率贴图 + 累积嵌套多边形兜底） ——
-// 图例色阶：条数与颜色**全部来自载荷** `radar.scale`（后端由"可达档位"推出，12 条）。
-// 兜底表只在下发缺失时用（老缓存帧）；它与后端 nexrad_scale() 的一致性由
-// tests/radarScale.test.mjs 静态比对 radar_public.py，改一头不改另一头会立刻红。
-const FALLBACK_SCALE=[
-  {dbz:15,until:20,color:'#00ec00'},{dbz:20,until:25,color:'#00c400'},
-  {dbz:25,until:30,color:'#009000'},{dbz:30,until:35,color:'#90e400'},
-  {dbz:35,until:38,color:'#ffff00'},{dbz:38,until:42,color:'#f4b800'},
-  {dbz:42,until:45,color:'#ff8200'},{dbz:45,until:50,color:'#ff3400'},
-  {dbz:50,until:55,color:'#ec0000'},{dbz:55,until:60,color:'#bc0000'},
-  {dbz:60,until:70,color:'#ec00e4'},{dbz:70,until:null,color:'#ffffff'}]
-
-// WCAG 相对亮度：色块上的数字要按底色自动选墨色。
-// 原来一律黑字 + 白描边，深红 #bc0000 上只有 3.1:1，7.5px 一糊就成了圆点。
-function _luminance(hex){
-  const m=/^#?([0-9a-f]{6})$/i.exec(String(hex||''))
-  if(!m) return 1
-  const n=parseInt(m[1],16)
-  const ch=[(n>>16)&255,(n>>8)&255,n&255].map(v=>{
-    const c=v/255
-    return c<=0.03928?c/12.92:Math.pow((c+0.055)/1.055,2.4)
-  })
-  return 0.2126*ch[0]+0.7152*ch[1]+0.0722*ch[2]
-}
-function _needsWhiteInk(hex){
-  const L=_luminance(hex)
-  return (1.05/(L+0.05)) > ((L+0.05)/0.05)
-}
-
-const radarScale=computed(()=>{
-  const rows=props.data?.radar?.scale
-  const list=Array.isArray(rows)&&rows.length?rows:FALLBACK_SCALE
-  // 从上到下由强到弱：专业雷达图例的惯例，也与"越红越危险"的直觉一致
-  return list.map(row=>({...row,inkWhite:_needsWhiteInk(row.color)}))
-    .sort((a,b)=>b.dbz-a.dbz)
-})
-
-// 标题按来源切三态。**不能**统一写"基数据"：实测帧的 dBZ 是从图片颜色反算的
-// （provenance.method = IMAGE_COLOUR_REVERSE_LOOKUP），虚拟帧更是合成场 ——
-// 把推断写成基数据，是把"未验证"说成"已验证"。
-const scaleSource=computed(()=>{
-  const r=props.data?.radar
-  if(!r) return '数据未就绪'
-  // 先判"有没有"，再判"是不是虚拟"：虚拟气象 + 取数失败时，
-  // 原来会写成「模拟回波（演示包）」，可屏幕上根本没有回波。
-  if(r.available===false) return '本帧无数据'
-  if(r.virtual) return '模拟回波（演示包）'
-  return '图像反演（估）· 非观测'
-})
-
-const scaleAria=computed(()=>{
-  const rows=radarScale.value
-  const spans=rows.map(s=>s.until?`${s.dbz} 到 ${s.until}`:`${s.dbz} 以上`).join('、')
-  const thr=props.data?.radar?.thresholdsDbz
-  const tail=thr?`；${thr.convective} 以上需绕飞，${thr.strong} 以上禁止进入`:''
-  return `雷达反射率色阶（${scaleSource.value}）：${spans} dBZ，共 ${rows.length} 档${tail}`
-})
-
-// —— 雷达回波（NEXRAD 多级基本反射率贴图 + 累积嵌套多边形兜底） ——
 const radarImage=computed(()=>{
   if(!props.radarOn) return null
   const r=props.data?.radar
@@ -1415,28 +1357,6 @@ function clickNode(node){
       </g>
     </g>
   </svg>
-  <!-- dBZ 色阶。条数/颜色/标签全部来自载荷 `radar.scale`（后端由"可达档位"推导）。
-       图例是**刻度尺**不是直方图：它说明"什么颜色对应多少 dBZ"，与这一帧下了多少雨无关，
-       所以晴空也显示（`radarImage` 为 null 时除外，见下）、也不等真实数据。
-       也不该凑成 LUT 的 14 级 —— 10 与 65 两档结构性不可达。
-       标签一律是**下限**（35 那格跨 3 dBZ、60 那格跨 10 dBZ，等高但不等步长），
-       所以 aria-label 必须写成区间，否则就是"标签错位"这个原始缺陷的缩小版。
-
-       显示条件跟 `radarImage` 走而不是跟 `radarOn` 走：这张尺量的是**贴图**的 12 档颜色。
-       省/市层与走廊页回退矢量环，那三层用的是一套柔色（见 .echo-weak/.echo-convective/
-       .echo-strong），屏幕上一个颜色都对不上这 12 格 —— 那时候摆一把量不到的尺，
-       比不摆更误导。 -->
-  <div v-if="props.radarOn && radarImage" class="nmap-radar-scale" data-radar-scale
-       role="img" :aria-label="scaleAria">
-    <div class="scale-head">
-      <span class="scale-title">dBZ</span>
-      <span class="scale-vcp">{{ scaleSource }}</span>
-    </div>
-    <div class="scale-bar">
-      <span v-for="s in radarScale" :key="s.dbz" class="scale-step"
-            :class="{ink:s.inkWhite}" :style="{background:s.color}"><em>{{ s.dbz }}</em></span>
-    </div>
-  </div>
   <div v-if="tip" class="nmap-tip" :style="{left:tip.x+'px', top:tip.y+'px'}" :class="{flip:tipFlip}">
     <b>{{ tip.title }}</b>
     <span v-for="(row,i) in tip.rows" :key="'t'+i" :class="row.cls||''">{{ row.text }}</span>
@@ -1464,24 +1384,6 @@ function clickNode(node){
 }
 .nmap-radar-img{image-rendering:auto;opacity:.95;pointer-events:none}
 html[data-theme="light"] .nmap-radar-img{opacity:.90}
-.nmap-radar-scale{position:absolute;right:14px;left:auto;top:16px;z-index:25;pointer-events:none;
-  background:rgba(4,14,24,.82);border:1px solid rgba(64,136,192,.35);
-  backdrop-filter:blur(6px);border-radius:4px;padding:6px 7px;
-  display:flex;flex-direction:column;gap:5px;box-shadow:0 4px 14px rgba(0,0,0,.45)}
-.scale-head{display:flex;flex-direction:column;gap:1px}
-.scale-title{font-size:11px;font-weight:700;color:#e6f4ff;letter-spacing:.4px}
-.scale-vcp{font-size:8px;color:#8ab4d4;letter-spacing:.2px}
-.scale-bar{display:flex;flex-direction:column;width:34px;border-radius:2px;overflow:hidden;border:1px solid rgba(0,0,0,.45)}
-/* 70 dBZ 是纯白块，浅色面板也是白的 —— 只靠外边框会看成"缺了一格" */
-html[data-theme="light"] .scale-bar{border-color:rgba(0,0,0,.55);box-shadow:inset 0 0 0 1px rgba(0,0,0,.18)}
-.scale-step{height:11px;display:flex;align-items:center;justify-content:flex-end;padding-right:3px;position:relative}
-.scale-step em{font-style:normal;font-size:8.5px;font-weight:700;line-height:1;color:#000000;
-  text-shadow:0 0 2px rgba(255,255,255,.85)}
-/* 深色块上黑字只有 3.1:1（#bc0000），7.5px 配白描边会糊成圆点 —— 按底色亮度自动翻白 */
-.scale-step.ink em{color:#ffffff;text-shadow:0 0 2px rgba(0,0,0,.75)}
-html[data-theme="light"] .nmap-radar-scale{background:rgba(255,255,255,.88);border-color:rgba(180,205,225,.7);box-shadow:0 3px 10px rgba(0,0,0,.15)}
-html[data-theme="light"] .scale-title{color:#103450}
-html[data-theme="light"] .scale-vcp{color:#4b6e8a}
 
 /* 回波配色：按 dBZ 色阶（绿→黄→红）实心填充，**不描边**。
    描边会让三档变成"等高线"，而真实雷达是色块。嵌套关系由后端累计掩膜保证，

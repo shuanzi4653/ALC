@@ -153,6 +153,38 @@ const rollup=computed(()=>data.value?.rollup||{level:'nation',total:{},regions:[
 const total=computed(()=>({...(rollup.value.total||{}),...live.value}))
 const radarMeta=computed(()=>data.value?.radar||{})
 // 每档上限 200 片是硬截断：一旦不显示"被截掉了"，读者会以为图上就是全部回波。
+// dBZ 色阶（图例）。原来挂在地图右上角，103×183 px：1366 下占画布高 36%，压住东北空域，
+// 而且容器 pointer-events:none —— 点它会穿透下去下钻到省。现在压成一条 6px 高的横条，
+// 放进底部图例行，跟着"城市/航线/绕飞"一起读。
+// 与后端 nexrad_scale() 的一致性由 tests/radarScale.test.mjs 静态比对，改一头会立刻红。
+const FALLBACK_SCALE=[
+  {dbz:15,until:20,color:'#00ec00'},{dbz:20,until:25,color:'#00c400'},
+  {dbz:25,until:30,color:'#009000'},{dbz:30,until:35,color:'#90e400'},
+  {dbz:35,until:38,color:'#ffff00'},{dbz:38,until:42,color:'#f4b800'},
+  {dbz:42,until:45,color:'#ff8200'},{dbz:45,until:50,color:'#ff3400'},
+  {dbz:50,until:55,color:'#ec0000'},{dbz:55,until:60,color:'#bc0000'},
+  {dbz:60,until:70,color:'#ec00e4'},{dbz:70,until:null,color:'#ffffff'}]
+
+const radarScale=computed(()=>{
+  const rows=data.value?.radar?.scale
+  const list=Array.isArray(rows)&&rows.length?rows:FALLBACK_SCALE
+  return [...list].sort((a,b)=>a.dbz-b.dbz)      // 横条从左到右：弱 → 强
+})
+
+// 只在"贴图真的在屏幕上"时显示：省/市层与走廊页回退矢量环，那三层是另一套柔色，
+// 摆一把 12 格的尺反而量不到。后端也只在 nation 层下发 image，两边口径一致。
+const radarScaleShown=computed(()=>!!data.value?.radar?.image)
+
+const radarScaleTip=computed(()=>{
+  const rows=radarScale.value
+  if(!rows.length) return ''
+  const spans=rows.map(s=>s.until?`${s.dbz}–${s.until}`:`${s.dbz}+`).join('、')
+  const thr=data.value?.radar?.thresholdsDbz
+  const tail=thr?`；${thr.convective} 以上需绕飞，${thr.strong} 以上禁止进入`:''
+  const method=data.value?.radar?.virtual?'模拟回波（演示包）':'图像反演（估）· 非观测'
+  return `雷达反射率色阶（${method}）：${spans} dBZ${tail}`
+})
+
 const echoStats=computed(()=>radarMeta.value.stats||{truncated:false,totalRings:0,keptRings:0,cap:200})
 const border=computed(()=>data.value?.border||{})
 const fog=computed(()=>data.value?.fog||{available:false,counts:{},bands:{},cities:[]})
@@ -928,6 +960,11 @@ onUnmounted(()=>{
         <i class="line warn"></i>绕飞
         <i class="box"></i>{{ level==='province'||level==='city' ? '禁飞区' : '禁飞区（下钻可见）' }}
         <i class="tri"></i>应急
+        <span v-if="radarScaleShown" class="nrn-dbz" data-radar-scale :title="radarScaleTip">
+          <b>{{ radarScale[0].dbz }}</b><span class="bar"
+            ><i v-for="s in radarScale" :key="s.dbz" :style="{background:s.color}"></i></span
+          ><b>{{ radarScale[radarScale.length-1].dbz }}+</b><em>dBZ 反演</em>
+        </span>
         <span v-if="virtualMode" class="virt">虚拟增强</span>
       </p>
       <p class="nrn-legend air" v-else>
@@ -1357,6 +1394,19 @@ html[data-theme="light"] .nrn-lineall{background:#f2f7fc;border-color:#cfdcea;co
   border:1px solid rgba(245,190,60,.75)}
 .nrn-legend i.dim{background:rgba(126,206,255,.3)}
 .nrn-legend i.star{width:9px;height:9px;background:#e03131;clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)}
+/* dBZ 色阶：12 段横条（每段 5px、6px 高）+ 两端下限，进图例行。
+   注意要盖掉 .nrn-legend i 的通用规则（14px 宽、2px 高、margin-right:4px），
+   否则每段之间会漏 4px 的缝。 */
+.nrn-dbz{display:inline-flex;align-items:center;gap:4px;line-height:1}
+.nrn-dbz b{font-weight:600;font-size:9.5px;color:#a6c9e0}
+.nrn-dbz em{font-style:normal;font-size:9.5px;color:#7ea6bf}
+.nrn-dbz .bar{display:inline-flex;height:6px;border-radius:2px;overflow:hidden;
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.5)}
+.nrn-dbz .bar i{display:block;width:5px;height:6px;margin:0}
+/* 浅色下最右一格是纯白：只靠内阴影会和白底连成一片，改外描边把整条框住 */
+html[data-theme="light"] .nrn-dbz .bar{box-shadow:0 0 0 1px rgba(0,0,0,.38)}
+html[data-theme="light"] .nrn-dbz b{color:#2b5c7a}
+html[data-theme="light"] .nrn-dbz em{color:#4b6e8a}
 .nrn-legend i.box{width:10px;height:8px;background:rgba(224,49,49,.08);border:1.4px solid #e03131;border-radius:1px}
 .nrn-legend i.tri{width:0;height:0;background:none;border-left:4.5px solid transparent;
   border-right:4.5px solid transparent;border-bottom:8px solid #ff3b30;margin-right:6px}

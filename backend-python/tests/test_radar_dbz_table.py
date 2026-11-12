@@ -181,3 +181,46 @@ def test_mask_status_reports_both_clipping_paths():
     status = nation.mask_status()
     assert status['vectorClipped'] is True
     assert status['maskError'] is None
+
+def test_tiles_over_land_skips_offshore_tiles():
+    """整块落在境外的瓦片不该去拉：掩膜会把它们抹成 0，拉了也是白拉。
+
+    全国 bbox 130 张瓦片、陆地只占 29.7% —— 这一条同时是"对免密钥服务的礼貌"。
+    """
+    import numpy as np
+
+    mask = np.zeros((256, 512), dtype=bool)
+    mask[0:256, 0:256] = True            # 只有左边那格是陆地
+    tiles = [(0, 0), (1, 0)]
+    assert radar_public._tiles_over_land(tiles, mask, 0, 0) == [(0, 0)]
+
+
+def test_tiles_over_land_keeps_everything_without_mask():
+    """遮罩缺失时宁可多拉，也不能因为读不到底图就少画一块。"""
+    tiles = [(0, 0), (1, 0)]
+    assert radar_public._tiles_over_land(tiles, None, 0, 0) == tiles
+
+
+def test_despeckle_keeps_two_pixel_cells():
+    """只删完全孤立的单点。
+
+    原来是 `nbrs <= 1`：两点宽的回波带里每个点都只有 1 个邻居，会被整条删掉
+    （实测 (4,4)+(4,5) 双双清零）—— 细长的真实回波带就是这么消失的。
+    """
+    import numpy as np
+
+    field = np.zeros((8, 8), dtype=np.float32)
+    field[4, 4] = 30.0
+    field[4, 5] = 30.0
+    field[7, 7] = 30.0                   # 这个才是孤立点
+    out = radar_public._despeckle_dbz(field)
+    assert float(out[4, 4]) == 30.0 and float(out[4, 5]) == 30.0, '两点宽的线不该被删'
+    assert float(out[7, 7]) == 0.0, '孤立单点仍要当杂波剔掉'
+
+
+def test_image_is_nation_level_only():
+    """省/市载荷不再重复带那张 32 KB 的全国图（前端也按 imageScope + level 双门控）。"""
+    nation_py = Path(__file__).resolve().parents[1] / 'traffic' / 'nation.py'
+    source = io.open(nation_py, encoding='utf-8').read()
+    assert "nation_level = (level == 'nation')" in source
+    assert source.count("radar.get('image') if nation_level else None") == 2

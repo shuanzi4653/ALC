@@ -696,7 +696,9 @@ html[data-theme="light"] .nmap .tag-bg.key {
 }
 
 /* ---------- 图例图标（深色版是浅蓝/白点，浅底上会消失） ---------- */
-html[data-theme="light"] .nrn-legend i { background: #2a6f9e !important; }
+/* `> i` 而不是 ` i`：dBZ 色阶横条里也有 <i>（12 段颜色，靠内联 style 上色），
+   通配会把整条染成单色 —— 浅色下曾整条变蓝。颜色段是 .nrn-dbz .bar 的后代，不是图例项。 */
+html[data-theme="light"] .nrn-legend > i { background: #2a6f9e !important; }
 html[data-theme="light"] .nrn-legend i.dot { background: #12314a !important; }
 html[data-theme="light"] .nrn-legend i.warn { background: #b8860b !important; }
 html[data-theme="light"] .nrn-legend i.emergency { background: #d4380d !important; }

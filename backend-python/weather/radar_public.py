@@ -76,7 +76,11 @@ TIMEOUT_SECONDS = 20.0           # 仅用于取帧清单（一个请求）
 TILE_TIMEOUT_SECONDS = 6.0       # 单张瓦片：20 s × ceil(130/24) 波 = 最坏 120 s，前端 90 s 先崩
 FETCH_DEADLINE_SECONDS = 45.0    # 全局止损：到点就用手上已有的拼，绝不把首屏拖过 90 s
 MIN_TILE_RATIO = 0.9             # 少于九成瓦片就不发布这一帧（缺块的图会被缓存成"实况"）
-TILE_WORKERS = 32                # 实测 24 线程 6.9 s / 8 线程 19.6 s；32 ≈ 4 波
+# 16 线程不是"越快越好"的取舍：按陆地过滤后只需 60–80 张，16 线程 ≈ 4–5 波，
+# 对免密钥公共服务也比 32 并发更克制。TILE_RETRIES 只在 429/503 上重试一次。
+TILE_WORKERS = 16
+TILE_RETRIES = 1
+TILE_BACKOFF_SECONDS = 0.6
 MAX_IMAGE_EDGE = 4096.0          # 出图长边上限（再大只是给浏览器添解码负担）
 USER_AGENT = 'ALC-tianchuang/1.0.7 (radar echo; contact: project maintainer)'
 BBOX = (73.0, 15.5, 136.0, 54.5)  # 与全国视图一致
@@ -267,6 +271,27 @@ def _tile_dbz_array(image) -> np.ndarray:
     return out
 
 
+def _tiles_over_land(tiles, mask, x0: int, y0: int):
+    """只保留与陆地掩膜相交的瓦片。
+
+    掩膜之外的回波最后会被整片抹成 0（`np.where(china_mask, ...)`），
+    也就是说**拉了也是白拉**。全国 bbox 有 130 张瓦片，陆地只占 29.7%，
+    按块筛一遍能省掉四成请求 —— 这既省时间，也是对免密钥公共服务的基本礼貌。
+
+    遮罩缺失时返回全部瓦片：宁可多拉，也不能因为读不到底图就少画一块。
+    """
+    if mask is None:
+        return list(tiles)
+    kept = []
+    for tx, ty in tiles:
+        oy = (ty - y0) * 256
+        ox = (tx - x0) * 256
+        block = mask[oy:oy + 256, ox:ox + 256]
+        if block.size and block.any():
+            kept.append((tx, ty))
+    return kept
+
+
 def _despeckle_dbz(dbz: np.ndarray) -> np.ndarray:
     """剔除 8 邻域内孤立的 1–2 像素杂波点，保留真实降水回波胞结构。"""
     # 用 uint8 而不是 int32 累加：8.5 M 像素的 8 个切片原来峰值吃到 144.9 MB，
@@ -283,7 +308,9 @@ def _despeckle_dbz(dbz: np.ndarray) -> np.ndarray:
         if not (dx == 0 and dy == 0)
     )
     cleaned = dbz.copy()
-    cleaned[nbrs <= 1] = 0.0
+    # 原来是 `nbrs <= 1`：两点宽的回波带里每个点都只有 1 个邻居，会被**整条删掉**
+    # （实测 (4,4)+(4,5) 双双清零）。孤立单点才是杂波，成对/成线的是真实细回波。
+    cleaned[nbrs == 0] = 0.0
     return cleaned
 
 
@@ -581,7 +608,11 @@ def fetch(force: bool = False) -> Dict[str, Any]:
         return _empty(f'缺少图像库：{str(exc)[:60]}')
 
     x0, y0, x1, y1 = _tile_bounds(TILE_ZOOM, BBOX)
-    tiles = [(x, y) for x in range(x0, x1 + 1) for y in range(y0, y1 + 1)]
+    all_tiles = [(x, y) for x in range(x0, x1 + 1) for y in range(y0, y1 + 1)]
+    # 掩膜先算（它有缓存），用它筛掉整块在境外的瓦片
+    china_mask = _china_raster_mask(TILE_ZOOM, x0, y0, x1, y1)
+    tiles = _tiles_over_land(all_tiles, china_mask, x0, y0)
+    skipped_tiles = len(all_tiles) - len(tiles)
     w_mosaic = (x1 - x0 + 1) * 256
     h_mosaic = (y1 - y0 + 1) * 256
     mosaic_dbz = np.zeros((h_mosaic, w_mosaic), dtype=np.float32)
@@ -598,9 +629,15 @@ def fetch(force: bool = False) -> Dict[str, Any]:
             return None          # 全局止损：到点就不再发新请求，用手上已有的拼
         x, y = pair
         try:
-            response = httpx.get(tile_url_tpl.format(z=TILE_ZOOM, x=x, y=y),
-                                 timeout=TILE_TIMEOUT_SECONDS,
-                                 headers={'User-Agent': USER_AGENT})
+            for attempt in range(TILE_RETRIES + 1):
+                response = httpx.get(tile_url_tpl.format(z=TILE_ZOOM, x=x, y=y),
+                                     timeout=TILE_TIMEOUT_SECONDS,
+                                     headers={'User-Agent': USER_AGENT})
+                if response.status_code in (429, 503) and attempt < TILE_RETRIES:
+                    # 限流就退一步再来一次，别把 130 张一次性砸过去
+                    time.sleep(TILE_BACKOFF_SECONDS * (attempt + 1))
+                    continue
+                break
             if response.status_code != 200 or not response.content:
                 return None
             image = Image.open(_io.BytesIO(response.content)).convert('RGBA')
@@ -628,7 +665,7 @@ def fetch(force: bool = False) -> Dict[str, Any]:
 
     # 先掩膜、再去噪：去噪只看 8 邻域，在境外那 70% 上算是白算，
     # 而且原来的 int32 累加在 8.5 M 像素上峰值吃到 144.9 MB。
-    china_mask = _china_raster_mask(TILE_ZOOM, x0, y0, x1, y1)
+    # （掩膜在取瓦片前就算过了，这里只做形状校验，不重复计算。）
     masked = china_mask is not None and china_mask.shape == mosaic_dbz.shape
     if masked:
         mosaic_dbz = np.where(china_mask, mosaic_dbz, 0.0)
@@ -680,14 +717,19 @@ def fetch(force: bool = False) -> Dict[str, Any]:
 
     bands, total_cells = bands_from_cells(cells)
 
-    # 覆盖率的分母改用**陆域**：掩膜只留陆地，陆地只占 bbox 的 29.7%，
-    # 分母不跟着改，同一场天气的覆盖率会莫名掉到三分之一。
-    echo_area = total_cells * (GRID_DEG ** 2)
+    # 覆盖率：分子分母都做 **cos(纬度) 面积权重**。
+    # 以前两边都是"经纬度平方"，而纬度越高 1° 经度越短 —— 高纬回波会被系统性高估；
+    # 分母又只用 bbox（陆地只占 29.7%），同一场天气的覆盖率会莫名掉到三分之一。
+    pixel_deg = 360.0 / (2 ** TILE_ZOOM) / 256.0
+    pixel_area = pixel_deg * pixel_deg
+    rows = np.arange(h_mosaic, dtype=np.float64) + 0.5
+    merc = np.pi * (1.0 - 2.0 * (y0 + rows / 256.0) / (2 ** TILE_ZOOM))
+    row_weight = np.cos(np.arctan(np.sinh(merc)))
+    echo_area = sum(math.cos(math.radians(cy * GRID_DEG)) for (_cx, cy) in grid_max) * (GRID_DEG ** 2)
     if masked:
-        land_ratio = float(china_mask.mean()) or 1.0
-        land_area = _bbox_area(BBOX) * land_ratio
+        land_area = float((row_weight * china_mask.sum(axis=1)).sum()) * pixel_area
     else:
-        land_area = _bbox_area(BBOX)
+        land_area = float(row_weight.sum() * w_mosaic) * pixel_area
 
     value = {
         'available': True,
@@ -695,7 +737,7 @@ def fetch(force: bool = False) -> Dict[str, Any]:
         'ts': datetime.fromtimestamp(frame['time'], tz=timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
         'zoom': TILE_ZOOM,
         'gridDeg': GRID_DEG,
-        'tiles': {'asked': len(tiles), 'fetched': fetched},
+        'tiles': {'asked': len(tiles), 'fetched': fetched, 'skippedOffshore': skipped_tiles},
         'tiles_url': tile_url_tpl,
         'image': image_uri,
         'imageBbox': image_bbox,

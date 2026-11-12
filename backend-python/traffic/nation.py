@@ -1083,6 +1083,9 @@ def _payload_locked(level: str = 'nation', ident: Optional[str] = None,
             if model_probs and node['name'] in model_probs:
                 node['pLowVis'] = model_probs[node['name']]
         _mask = mask_status()
+        # 贴图只有全国层用得上（前端也按 imageScope + level 双门控）。
+        # 省/市层把同一张 32 KB 的全国图塞进每次载荷，纯属浪费 —— 这里直接不发。
+        nation_level = (level == 'nation')
         return {**body,
                 'minute': minute,
                 'radar': ({
@@ -1092,9 +1095,9 @@ def _payload_locked(level: str = 'nation', ident: Optional[str] = None,
                     'source': radar.get('source'),
                     'counts': {band: len(rings) for band, rings in radar.get('bands', {}).items()},
                     'bands': radar.get('bands', {}),
-                    'image': radar.get('image'),
-                    'imageBbox': radar.get('imageBbox'),
-                    'imageSize': radar.get('imageSize'),
+                    'image': radar.get('image') if nation_level else None,
+                    'imageBbox': radar.get('imageBbox') if nation_level else None,
+                    'imageSize': radar.get('imageSize') if nation_level else None,
                     'imageScope': radar.get('imageScope'),
                     'scale': radar.get('scale'),
                     'thresholdsDbz': radar.get('thresholdsDbz'),
@@ -1110,9 +1113,9 @@ def _payload_locked(level: str = 'nation', ident: Optional[str] = None,
                     'counts': {band: len(rings) for band, rings
                                in _radar_clipped(radar.get('ts') or 'none').items()},
                     'bands': _radar_clipped(radar.get('ts') or 'none'),
-                    'image': radar.get('image'),
-                    'imageBbox': radar.get('imageBbox'),
-                    'imageSize': radar.get('imageSize'),
+                    'image': radar.get('image') if nation_level else None,
+                    'imageBbox': radar.get('imageBbox') if nation_level else None,
+                    'imageSize': radar.get('imageSize') if nation_level else None,
                     'imageScope': radar.get('imageScope'),
                     'scale': radar.get('scale'),
                     'thresholdsDbz': radar.get('thresholdsDbz'),
@@ -1128,6 +1131,7 @@ def _payload_locked(level: str = 'nation', ident: Optional[str] = None,
                     'reverseLookup': radar.get('reverseLookup'),
                     # 瓦片直链：前端按墨卡托贴图，边界比矢量多边形更像真实回波
                     'tiles': radar.get('tiles_url'),
+                    'tilesInfo': radar.get('tiles'),
                     'virtual': False,
                     'stats': radar_stats(radar.get('ts') or 'none'),
                 }),

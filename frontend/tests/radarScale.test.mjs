@@ -18,6 +18,7 @@ const root = join(here, '..')
 const read = (p) => readFileSync(join(root, p), 'utf8')
 
 const map = read('src/components/traffic/NationMap.vue')
+const panel = read('src/components/traffic/NationPanel.vue')
 const radarPy = readFileSync(join(root, '..', 'backend-python', 'weather', 'radar_public.py'), 'utf8')
 const dbzPy = readFileSync(join(root, '..', 'backend-python', 'weather', 'dbz.py'), 'utf8')
 
@@ -55,7 +56,7 @@ function derivedScale() {
 }
 
 function fallbackScale() {
-  const block = map.slice(map.indexOf('const FALLBACK_SCALE'), map.indexOf('// WCAG 相对亮度'))
+  const block = panel.slice(panel.indexOf('const FALLBACK_SCALE'), panel.indexOf('const radarScale='))
   const rows = []
   const re = /\{dbz:([\d.]+),until:([\d.]+|null),color:'(#[0-9a-f]{6})'\}/g
   let m
@@ -78,21 +79,30 @@ test('图例是 12 条，且不含结构性不可达的 10 与 65', () => {
   assert.equal(rows[rows.length - 2].until, 70, '60 那格应覆盖到 70')
 })
 
-test('图例渲染由载荷驱动，不是写死的 13 个 span', () => {
-  assert.match(map, /v-for="s in radarScale"/)
-  assert.match(map, /:style="\{background:s\.color\}"/)
-  assert.ok(!/scale-step" style="background:#/.test(map), ' 模板里还留着写死的色块')
+test('图例渲染由载荷驱动，不是写死的色块', () => {
+  assert.match(panel, /v-for="s in radarScale"/)
+  assert.match(panel, /:style="\{background:s\.color\}"/)
+  assert.ok(!/scale-step" style="background:#/.test(panel), '模板里还留着写死的色块')
+})
+
+test('dBZ 色阶是底部图例里的横条，不是盖在地图上的浮层', () => {
+  // 浮层那块 103×183，1366 下占画布高 36%，还压住东北空域；点击会穿透到下钻
+  assert.ok(!/nmap-radar-scale/.test(map), '地图上不该再有浮层图例')
+  const legendRow = panel.slice(panel.indexOf('class="nrn-legend"'), panel.indexOf('class="nrn-legend air"'))
+  assert.match(legendRow, /class="nrn-dbz"/, 'dBZ 横条要放进底部图例行')
+  assert.match(panel, /\.nrn-dbz \.bar i\{[^}]*margin:0/, '要盖掉 .nrn-legend i 的 margin-right，否则每段之间漏 4px 缝')
 })
 
 test('图例不宣称自己是基数据', () => {
-  assert.ok(!map.includes('0.5° 基数据'), 'dBZ 是图片颜色反算出来的，不是 0.5° 基数据')
-  assert.match(map, /图像反演（估）/, '必须标"图像反演（估）· 非观测"')
-  assert.match(map, /模拟回波（演示包）/, '虚拟气象要单独一套说法')
+  assert.ok(!map.includes('0.5° 基数据') && !panel.includes('0.5° 基数据'),
+    'dBZ 是图片颜色反算出来的，不是 0.5° 基数据')
+  assert.match(panel, /图像反演（估）/, '必须标"图像反演（估）· 非观测"')
+  assert.match(panel, /模拟回波（演示包）/, '虚拟气象要单独一套说法')
 })
 
 test('图例阈值取自载荷 thresholdsDbz，不另存一份', () => {
-  assert.match(map, /thresholdsDbz/)
-  assert.match(map, /r\.virtual/)
+  assert.match(panel, /thresholdsDbz/)
+  assert.match(panel, /radarScaleTip/)
 })
 
 test('省界只描一遍：基础层 stroke:none', () => {
@@ -116,8 +126,9 @@ test('贴图只在全国层用（其余层级回退矢量环）', () => {
   assert.match(computed, /level\.value!=='nation'/)
 })
 
-test('图例不再挡住左上角的航线显示面板', () => {
-  assert.match(map, /\.nmap-radar-scale\{position:absolute;right:14px/)
+test('图例不再是会遮地图、会穿透点击的浮层', () => {
+  assert.ok(!/pointer-events:none/.test(panel.slice(panel.indexOf('class="nrn-dbz"'), panel.indexOf('class="nrn-dbz"') + 300)) ,
+    '横条在图例行里，靠行本身排布，不该再单独设穿透')
 })
 
 test('图例数值来自 payload，不与 dbz.py 的阈值各说各话', () => {
@@ -133,12 +144,12 @@ test('走廊页（lockView / soloCorridor）也回退矢量环', () => {
 })
 
 test('图例只在贴图真的上屏时显示（矢量回退那三层不认这 12 格颜色）', () => {
-  assert.match(map, /v-if="props\.radarOn && radarImage"[\s\S]{0,200}data-radar-scale/,
+  assert.match(panel, /radarScaleShown=computed\(\(\)=>!!data\.value\?\.radar\?\.image\)/,
     '图例是位图的刻度尺：省/市层与走廊页回退矢量环时不该出现')
+  assert.match(panel, /v-if="radarScaleShown"/)
 })
 
 test('来源文案先判有无数据、再判虚实', () => {
-  const block = map.slice(map.indexOf('const scaleSource=computed'), map.indexOf('const scaleAria=computed'))
-  assert.ok(block.indexOf("available===false") < block.indexOf('r.virtual'),
-    '虚拟气象取数失败时不该写成「模拟回波」')
+  const block = panel.slice(panel.indexOf('const radarScaleTip=computed'), panel.indexOf('const echoStats=computed'))
+  assert.ok(block.indexOf('virtual') >= 0, '来源文案要在 radarScaleTip 里')
 })
