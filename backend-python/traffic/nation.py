@@ -168,33 +168,46 @@ def _corridor_rows() -> List[Dict[str, Any]]:
     return list(_network().get('corridors') or [])
 
 
+def _radar_scale() -> List[Dict[str, Any]]:
+    """图例色阶（12 条，由可达档位推出）。取不到就返回空表，前端有兜底。"""
+    try:
+        from weather.radar_public import nexrad_scale
+        return nexrad_scale()
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def _radar_thresholds() -> Dict[str, float]:
+    """四键阈值：与 cma_tiles / weather_control / weather_sim 下发的形状一致。"""
+    try:
+        from weather.dbz import THRESHOLDS_DBZ
+        return dict(THRESHOLDS_DBZ)
+    except Exception:  # noqa: BLE001
+        return {}
+
+
 def _radar() -> Dict[str, Any]:
     """取全国公开雷达拼图（内部自带 10 分钟内存+磁盘缓存；异常短期冷却，不永久锁死）。"""
     try:
         from weather import radar_public
         return radar_public.fetch()
     except Exception as exc:  # noqa: BLE001
-        return {'available': False, 'error': str(exc)[:80], 'bands': {}, 'counts': {}}
+        return {'available': False, 'error': str(exc)[:80], 'bands': {}, 'counts': {},
+                'scale': _radar_scale(), 'thresholdsDbz': _radar_thresholds()}
 
 
-@lru_cache(maxsize=2)
+@lru_cache(maxsize=1)
 def _china_mask():
-    """国界并集（34 个省级单元），用来把回波裁到国内。跟建网工具用的是同一份区划。
+    """国界并集，用来把回波裁到国内。
 
-    区划数据里有自相交的环（天津—河北那段著名的 `side location conflict`），
-    直接 union 会抛拓扑异常，所以每个省先 make_valid 再并。
+    实现搬到 `weather/china_geo.py`：那边同时供**矢量环裁剪**与**栅格贴图掩膜**，
+    两套国界从此同源（以前是两处各自解析 china.json，理论上可以解析出两个国界）。
     """
-    from shapely import make_valid
-    from shapely.ops import unary_union
-    shapes = []
-    for geometry in _province_shapes().values():
-        try:
-            fixed = make_valid(geometry)
-            if not fixed.is_empty:
-                shapes.append(fixed)
-        except Exception:  # noqa: BLE001
-            continue
-    return unary_union(shapes) if shapes else None
+    from weather import china_geo
+    try:
+        return china_geo.union_mask()
+    except Exception:  # noqa: BLE001 - 缺文件时宁愿不裁，也不要打崩整页
+        return None
 
 
 # 每帧的环数统计：{band: {kept, total}}。供载荷里的 truncated 字段与界面提示用。
@@ -421,9 +434,12 @@ def _virtual_radar(bucket: int) -> Dict[str, Any]:
             from weather import radar_public
             image_pair = radar_public.virtual_nexrad_image(bucket, _VIRTUAL_CELLS)
         except Exception:  # noqa: BLE001
-            image_pair = (None, None)
-        _VIRTUAL_CACHE[('image', bucket)] = image_pair
-    image_uri, image_bbox = image_pair
+            image_pair = (None, None, None)
+        # **失败不写缓存**：写进去就永久了。这个 PR 刚在 `_radar()` 上修掉同样的坑
+        # （lru_cache 把一次失败永久缓存），没道理在这里再犯一次。
+        if image_pair[0]:
+            _VIRTUAL_CACHE[('image', bucket)] = image_pair
+    image_uri, image_bbox, image_size = image_pair
     # stats 与真实帧同构（_radar_clipped 之后由 radar_stats 产出）：前端与"口径与来源"页
     # 读的是同一组字段，虚拟模式不该让它们变成 None —— 那会让"回波 199 片"在切到虚拟后消失。
     counts = {k: len(v) for k, v in bands.items()}
@@ -441,6 +457,17 @@ def _virtual_radar(bucket: int) -> Dict[str, Any]:
         'virtual': True,
         'image': image_uri,
         'imageBbox': image_bbox,
+        'imageSize': image_size,
+        'imageScope': 'nation',
+        # 色阶与阈值与真实帧**同一份**：虚拟气象换的是数据，不该换判读标准。
+        'scale': _radar_scale(),
+        'thresholdsDbz': _radar_thresholds(),
+        'provenance': {
+            'provider': 'VIRTUAL',
+            'method': 'SIMULATION_ASSUMPTION_UNVERIFIED',
+            'qualityFlags': ['SYNTHETIC', 'NOT_OBSERVED'],
+            'projection': 'EPSG:3857',
+        },
         'bands': bands,
         'counts': counts,
         'stats': stats,
@@ -657,17 +684,11 @@ def _detour_table(radar_ts: str) -> Dict[str, Dict[str, Any]]:
     return table
 
 
-@lru_cache(maxsize=2)
+@lru_cache(maxsize=1)
 def _province_shapes() -> Dict[str, Any]:
-    from shapely.geometry import shape
-    asset = ROOT / 'frontend' / 'src' / 'assets' / 'china.json'
-    payload = json.loads(asset.read_text(encoding='utf-8'))
-    out: Dict[str, Any] = {}
-    for feature in payload.get('features') or []:
-        name = (feature.get('properties') or {}).get('name')
-        if name and feature.get('geometry'):
-            out[name] = shape(feature['geometry'])
-    return out
+    """省名 -> 几何。解析点在 `weather/china_geo.py`，这里只是同义词。"""
+    from weather import china_geo
+    return china_geo.shapes()
 
 
 def _cities_by_province() -> Dict[str, List[Dict[str, Any]]]:
@@ -1055,6 +1076,11 @@ def _payload_locked(level: str = 'nation', ident: Optional[str] = None,
                     'bands': radar.get('bands', {}),
                     'image': radar.get('image'),
                     'imageBbox': radar.get('imageBbox'),
+                    'imageSize': radar.get('imageSize'),
+                    'imageScope': radar.get('imageScope'),
+                    'scale': radar.get('scale'),
+                    'thresholdsDbz': radar.get('thresholdsDbz'),
+                    'provenance': radar.get('provenance'),
                     'coverage': None,
                     'tiles': None,
                     'virtual': True,
@@ -1068,7 +1094,14 @@ def _payload_locked(level: str = 'nation', ident: Optional[str] = None,
                     'bands': _radar_clipped(radar.get('ts') or 'none'),
                     'image': radar.get('image'),
                     'imageBbox': radar.get('imageBbox'),
+                    'imageSize': radar.get('imageSize'),
+                    'imageScope': radar.get('imageScope'),
+                    'scale': radar.get('scale'),
+                    'thresholdsDbz': radar.get('thresholdsDbz'),
+                    'provenance': radar.get('provenance'),
                     'coverage': radar.get('coverage'),
+                    'coverageBasis': radar.get('coverageBasis'),
+                    'maskApplied': radar.get('maskApplied'),
                     # 瓦片直链：前端按墨卡托贴图，边界比矢量多边形更像真实回波
                     'tiles': radar.get('tiles_url'),
                     'virtual': False,

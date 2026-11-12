@@ -22,10 +22,12 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from weather import metar_history, national_metar
+from weather import china_geo, metar_history, national_metar
 
 from . import service as traffic
 
+# 底图路径不再写在这里：解析点统一在 `weather/china_geo.py`（后端独立打包时会回退到
+# `backend-python/data/china.json`，两处都不存在时**抛错**而不是静默少一批省）。
 ASSET_PATH = Path(__file__).resolve().parents[2] / 'frontend' / 'src' / 'assets' / 'china.json'
 CORRIDOR_PATH = Path(__file__).resolve().parents[2] / 'data' / 'traffic' / 'national-corridors.json'
 
@@ -64,8 +66,7 @@ def provinces() -> Tuple[Dict[str, Any], ...]:
     底图共 35 个要素，其中 `100000_JD` 是**南海诸岛示意要素**（无 adcode、无名称），
     不是行政单元，这里显式排除 —— 所以省级单元实为 **34**（大陆 31 + 港澳台 3）。
     """
-    with ASSET_PATH.open('r', encoding='utf-8') as handle:
-        payload = json.load(handle)
+    payload = china_geo.load()
     rows: List[Dict[str, Any]] = []
     for feature in payload.get('features') or []:
         props = feature.get('properties') or {}
@@ -115,8 +116,7 @@ def station_provinces() -> Counter:
 def _province_shapes() -> Dict[int, Any]:
     """省界多边形（经纬度），用于把报文站归属到省。底图与前端同一份。"""
     from shapely.geometry import shape
-    with ASSET_PATH.open('r', encoding='utf-8') as handle:
-        payload = json.load(handle)
+    payload = china_geo.load()
     shapes: Dict[int, Any] = {}
     for feature in payload.get('features') or []:
         props = feature.get('properties') or {}

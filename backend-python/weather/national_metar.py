@@ -87,11 +87,9 @@ NORTH_PROVINCES = ('北京市', '天津市', '河北省', '山西省', '内蒙�
 
 @lru_cache(maxsize=2)
 def province_bounds() -> Dict[str, Any]:
-    import json
-    from pathlib import Path
     from shapely.geometry import shape
-    asset = Path(__file__).resolve().parents[2] / 'frontend' / 'src' / 'assets' / 'china.json'
-    payload = json.loads(asset.read_text(encoding='utf-8'))
+    from . import china_geo
+    payload = china_geo.load()
     out: Dict[str, Any] = {}
     for feature in payload.get('features') or []:
         name = (feature.get('properties') or {}).get('name')

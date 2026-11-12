@@ -20,10 +20,16 @@ TIMEOUT_SECONDS = 20
 MAX_LOOKBACK_STEPS = 12
 CACHE_SECONDS = 300
 
-ECHO_FLOOR_DBZ = 15.0
-CONVECTIVE_DBZ = 35.0
-STRONG_DBZ = 45.0
-SEVERE_DBZ = 60.0
+# 分档阈值改由 `weather/dbz.py` 定义、这里**再导出同名常量**：
+# 名字与取值一字未变（radar_field.py 与三个雷达测试文件不用动），但全仓只剩一个赋值点。
+# 以前这里是权威、`weather/radar_public.py` 里自己又打了一遍 32/41，两边就那么漂开了。
+from weather.dbz import (  # noqa: F401  (再导出)
+    CONVECTIVE_DBZ,
+    ECHO_FLOOR_DBZ,
+    SEVERE_DBZ,
+    STRONG_DBZ,
+    THRESHOLDS_DBZ,
+)
 
 _OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 _CACHE = {}

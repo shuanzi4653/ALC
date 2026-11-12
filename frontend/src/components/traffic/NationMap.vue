@@ -163,18 +163,79 @@ function tilesFor(template,minZoom,maxZoom){
   return out
 }
 // —— 雷达回波（NEXRAD 多级基本反射率贴图 + 累积嵌套多边形兜底） ——
+// 图例色阶：条数与颜色**全部来自载荷** `radar.scale`（后端由"可达档位"推出，12 条）。
+// 兜底表只在下发缺失时用（老缓存帧）；它与后端 nexrad_scale() 的一致性由
+// tests/radarScale.test.mjs 静态比对 radar_public.py，改一头不改另一头会立刻红。
+const FALLBACK_SCALE=[
+  {dbz:15,until:20,color:'#00ec00'},{dbz:20,until:25,color:'#00c400'},
+  {dbz:25,until:30,color:'#009000'},{dbz:30,until:35,color:'#90e400'},
+  {dbz:35,until:38,color:'#ffff00'},{dbz:38,until:42,color:'#f4b800'},
+  {dbz:42,until:45,color:'#ff8200'},{dbz:45,until:50,color:'#ff3400'},
+  {dbz:50,until:55,color:'#ec0000'},{dbz:55,until:60,color:'#bc0000'},
+  {dbz:60,until:70,color:'#ec00e4'},{dbz:70,until:null,color:'#ffffff'}]
+
+// WCAG 相对亮度：色块上的数字要按底色自动选墨色。
+// 原来一律黑字 + 白描边，深红 #bc0000 上只有 3.1:1，7.5px 一糊就成了圆点。
+function _luminance(hex){
+  const m=/^#?([0-9a-f]{6})$/i.exec(String(hex||''))
+  if(!m) return 1
+  const n=parseInt(m[1],16)
+  const ch=[(n>>16)&255,(n>>8)&255,n&255].map(v=>{
+    const c=v/255
+    return c<=0.03928?c/12.92:Math.pow((c+0.055)/1.055,2.4)
+  })
+  return 0.2126*ch[0]+0.7152*ch[1]+0.0722*ch[2]
+}
+function _needsWhiteInk(hex){
+  const L=_luminance(hex)
+  return (1.05/(L+0.05)) > ((L+0.05)/0.05)
+}
+
+const radarScale=computed(()=>{
+  const rows=props.data?.radar?.scale
+  const list=Array.isArray(rows)&&rows.length?rows:FALLBACK_SCALE
+  // 从上到下由强到弱：专业雷达图例的惯例，也与"越红越危险"的直觉一致
+  return list.map(row=>({...row,inkWhite:_needsWhiteInk(row.color)}))
+    .sort((a,b)=>b.dbz-a.dbz)
+})
+
+// 标题按来源切三态。**不能**统一写"基数据"：实测帧的 dBZ 是从图片颜色反算的
+// （provenance.method = IMAGE_COLOUR_REVERSE_LOOKUP），虚拟帧更是合成场 ——
+// 把推断写成基数据，是把"未验证"说成"已验证"。
+const scaleSource=computed(()=>{
+  const r=props.data?.radar
+  if(!r) return '数据未就绪'
+  if(r.virtual) return '模拟回波（演示包）'
+  if(r.available===false) return '本帧无数据'
+  return '图像反演（估）· 非观测'
+})
+
+const scaleAria=computed(()=>{
+  const rows=radarScale.value
+  const spans=rows.map(s=>s.until?`${s.dbz} 到 ${s.until}`:`${s.dbz} 以上`).join('、')
+  const thr=props.data?.radar?.thresholdsDbz
+  const tail=thr?`；${thr.convective} 以上需绕飞，${thr.strong} 以上禁止进入`:''
+  return `雷达反射率色阶（${scaleSource.value}）：${spans} dBZ，共 ${rows.length} 档${tail}`
+})
+
+// —— 雷达回波（NEXRAD 多级基本反射率贴图 + 累积嵌套多边形兜底） ——
 const radarImage=computed(()=>{
   if(!props.radarOn) return null
   const r=props.data?.radar
   const href=r?.image
   const b=r?.imageBbox
   if(!href||!b||b.length<4||b[2]<=b[0]||b[3]<=b[1]) return null
+  // 贴图只在全国层用：后端只出全国那一张，省/市层要把它放大 6–8 倍，
+  // 插值出来的颜色根本不在色阶里（操作员取样一个颜色却查不到 dBZ）。那两层走矢量环。
+  if((r?.imageScope||'nation')!=='nation') return null
+  if(level.value!=='nation') return null
   const [x0,y0]=project(b[0],b[3])
   const [x1,y1]=project(b[2],b[1])
   const w=x1-x0, h=y1-y0
   if(!(w>0&&h>0)) return null
-  const frame=String(r?.ts||props.minute||'')
-  return {href,x:x0,y:y0,w,h,frame}
+  // 不再带 frame：`:key` 会让换帧时旧元素立即销毁、新图从 0 淡入，
+  // 回波整体消失 260ms；虚拟气象来回跨桶时更会把同一张图重复解码。
+  return {href,x:x0,y:y0,w,h}
 })
 // —— 回波环 ——
 // 几何在后端已经做过栅格闭运算（补孔）+ 几何闭运算（磨角）+ Chaikin（成曲线），
@@ -1121,7 +1182,7 @@ function clickNode(node){
       <g>
         <path v-for="shape in shapes" :key="shape.key" :d="shape.d"
               :style="{fill: shape.boundary?'var(--map-boundary)':'var(--map-land)',
-                       stroke: shape.boundary?'none':'var(--map-line)'}"
+                       stroke: 'none'}"
               :opacity="shape.boundary||shape.live||level==='nation'?1:.55"
               stroke-width=".7" vector-effect="non-scaling-stroke" :class="{clickable:shape.live&&!shape.boundary}"
               @click="clickShape(shape)">
@@ -1131,11 +1192,13 @@ function clickNode(node){
 
       <!-- 2 雷达：优先渲染后端合成的高清 NEXRAD 基本反射率贴图，无贴图时回退到累积嵌套矢量面 -->
       <g v-if="radarImage||radarRings.length" :clip-path="'url(#nmap-china-clip)'" pointer-events="none">
-        <image v-if="radarImage" :key="'ri-'+radarImage.frame"
+        <!-- 不挂 :key、不挂 echo-in：两者叠加会让每次换帧都"旧图先没、新图再淡入"，
+             回波整体消失 260 ms。浏览器对同一 URI 不重解码、对不同 URI 保持旧像素直到就绪。 -->
+        <image v-if="radarImage"
                :x="radarImage.x" :y="radarImage.y"
                :width="radarImage.w" :height="radarImage.h"
                :href="radarImage.href" preserveAspectRatio="none"
-               class="echo-in nmap-radar-img"/>
+               class="nmap-radar-img"/>
         <g v-else class="nmap-echo" :class="{'echo-virt':virtualMode}" filter="url(#nmap-echo-grain)">
           <g v-if="echoGhost.length" class="nmap-echo-ghost">
             <path v-for="(ring,index) in echoGhost" :key="'g'+index" :d="ring.d"
@@ -1154,11 +1217,13 @@ function clickNode(node){
               stroke="rgba(206,232,255,.35)" stroke-width=".8"/>
       </g>
 
-      <!-- 3 省界线：叠在雷达回波与雾区之上，使省界在回波区内依然清晰可辨 -->
+      <!-- 3 省界线：**全图唯一的描边**（基础层已改成 stroke:none）。
+           以前两层都描，且几何完全重合：无回波区叠到 α0.77（浅色 0.95，省界像黑框），
+           有回波区被不透明色块盖住只剩一层 —— 同一条线在图上两种重量。 -->
       <g pointer-events="none">
         <path v-for="bshape in shapes" :key="'b-'+bshape.key" :d="bshape.d"
-              fill="none" :stroke="bshape.boundary?'none':'var(--map-line)'"
-              :opacity="bshape.boundary||bshape.live||level==='nation'?1:.55"
+              v-show="!bshape.boundary" fill="none" stroke="var(--map-line)"
+              :opacity="bshape.live||level==='nation'?1:.55"
               stroke-width=".7" vector-effect="non-scaling-stroke"/>
       </g>
       <!-- 3.5 南海诸岛小图：全国层才显示，保证地图完整 -->
@@ -1344,25 +1409,20 @@ function clickNode(node){
       </g>
     </g>
   </svg>
-  <div v-if="props.radarOn && (radarImage || radarRings.length)" class="nmap-radar-scale" aria-hidden="true">
+  <!-- dBZ 色阶。条数/颜色/标签全部来自载荷 `radar.scale`（后端由"可达档位"推导）。
+       图例是**刻度尺**不是直方图：它说明"什么颜色对应多少 dBZ"，与这一帧下了多少雨无关，
+       所以晴空也显示、也不等真实数据。也不该凑成 LUT 的 14 级 —— 10 与 65 两档结构性不可达。
+       标签一律是**下限**（35 那格跨 3 dBZ、60 那格跨 10 dBZ，等高但不等步长），
+       所以 aria-label 必须写成区间，否则就是"标签错位"这个原始缺陷的缩小版。 -->
+  <div v-if="props.radarOn" class="nmap-radar-scale" data-radar-scale
+       role="img" :aria-label="scaleAria">
     <div class="scale-head">
       <span class="scale-title">dBZ</span>
-      <span class="scale-vcp">0.5° 基数据</span>
+      <span class="scale-vcp">{{ scaleSource }}</span>
     </div>
     <div class="scale-bar">
-      <span class="scale-step" style="background:#ffffff"><em>70</em></span>
-      <span class="scale-step" style="background:#a840dc"><em>65</em></span>
-      <span class="scale-step" style="background:#ec00e4"><em>60</em></span>
-      <span class="scale-step" style="background:#bc0000"><em>55</em></span>
-      <span class="scale-step" style="background:#ec0000"><em>50</em></span>
-      <span class="scale-step" style="background:#ff3400"><em>45</em></span>
-      <span class="scale-step" style="background:#ff8200"><em>40</em></span>
-      <span class="scale-step" style="background:#f4b800"><em>35</em></span>
-      <span class="scale-step" style="background:#ffff00"><em>30</em></span>
-      <span class="scale-step" style="background:#009000"><em>25</em></span>
-      <span class="scale-step" style="background:#00c400"><em>20</em></span>
-      <span class="scale-step" style="background:#00ec00"><em>15</em></span>
-      <span class="scale-step" style="background:#00dcdc"><em>10</em></span>
+      <span v-for="s in radarScale" :key="s.dbz" class="scale-step"
+            :class="{ink:s.inkWhite}" :style="{background:s.color}"><em>{{ s.dbz }}</em></span>
     </div>
   </div>
   <div v-if="tip" class="nmap-tip" :style="{left:tip.x+'px', top:tip.y+'px'}" :class="{flip:tipFlip}">
@@ -1392,7 +1452,7 @@ function clickNode(node){
 }
 .nmap-radar-img{image-rendering:auto;opacity:.95;pointer-events:none}
 html[data-theme="light"] .nmap-radar-img{opacity:.90}
-.nmap-radar-scale{position:absolute;left:14px;top:16px;z-index:25;pointer-events:none;
+.nmap-radar-scale{position:absolute;right:14px;left:auto;top:16px;z-index:25;pointer-events:none;
   background:rgba(4,14,24,.82);border:1px solid rgba(64,136,192,.35);
   backdrop-filter:blur(6px);border-radius:4px;padding:6px 7px;
   display:flex;flex-direction:column;gap:5px;box-shadow:0 4px 14px rgba(0,0,0,.45)}
@@ -1400,8 +1460,11 @@ html[data-theme="light"] .nmap-radar-img{opacity:.90}
 .scale-title{font-size:11px;font-weight:700;color:#e6f4ff;letter-spacing:.4px}
 .scale-vcp{font-size:8px;color:#8ab4d4;letter-spacing:.2px}
 .scale-bar{display:flex;flex-direction:column;width:34px;border-radius:2px;overflow:hidden;border:1px solid rgba(0,0,0,.45)}
-.scale-step{height:10px;display:flex;align-items:center;justify-content:flex-end;padding-right:3px;position:relative}
-.scale-step em{font-style:normal;font-size:7.5px;font-weight:700;line-height:1;color:#000000;text-shadow:0 0 2px rgba(255,255,255,.9)}
+.scale-step{height:11px;display:flex;align-items:center;justify-content:flex-end;padding-right:3px;position:relative}
+.scale-step em{font-style:normal;font-size:8.5px;font-weight:700;line-height:1;color:#000000;
+  text-shadow:0 0 2px rgba(255,255,255,.85)}
+/* 深色块上黑字只有 3.1:1（#bc0000），7.5px 配白描边会糊成圆点 —— 按底色亮度自动翻白 */
+.scale-step.ink em{color:#ffffff;text-shadow:0 0 2px rgba(0,0,0,.75)}
 html[data-theme="light"] .nmap-radar-scale{background:rgba(255,255,255,.88);border-color:rgba(180,205,225,.7);box-shadow:0 3px 10px rgba(0,0,0,.15)}
 html[data-theme="light"] .scale-title{color:#103450}
 html[data-theme="light"] .scale-vcp{color:#4b6e8a}
