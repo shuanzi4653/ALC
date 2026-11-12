@@ -7,11 +7,8 @@ import CorridorBrowser from './CorridorBrowser.vue'
 import NationMap from './NationMap.vue'
 import NationBriefing from './NationBriefing.vue'
 import {parseScope,scopeKey} from '../../traffic/scope.js'
-import {probeGPU,gpuLabel} from '../../traffic/gpu.js'
 
-// 三维单独切包：maplibre + 地形瓦片只在真进三维时才加载。
 // 首页首屏用不到它，没必要为它多等一个 chunk。
-const NationGlobe=defineAsyncComponent(()=>import('./NationGlobe.vue'))
 
 // 全国运行台：态势 / 台账 / 情报 / 处置 四个视图共用同一份 `payload`。
 //
@@ -37,12 +34,11 @@ const props=defineProps({
   // 从左侧导航进入时隐藏内部 tab 条：导航已经表达了"我在哪一页"，
   // 再挂一条「态势/台账/情报/处置」只会和导航打架
   // （例如从「大模型取证」进来却看到「台账」高亮）。
-  hideTabs:{type:Boolean,default:false},
   // 从导航进来时的一句"该做什么"。这些页面共用一张图，
   // 不给提示的话用户看到的就是一张空地图，不知道从哪下手。
   hint:{type:String,default:''},
 })
-const emit=defineEmits(['scope-change','open-corridor'])
+const emit=defineEmits(['scope-change','open-corridor','tick'])
 
 const level=ref('nation')
 const ident=ref('')
@@ -50,6 +46,21 @@ const trail=ref([{level:'nation',id:'',label:'全国'}])
 const data=ref(null)
 const view=ref(props.initialView||'map')
 const error=ref(''),loading=ref(false)
+// 首屏"到底是在转圈还是卡住了"：冷启动实测要 30 秒左右（进程刚起、雷达帧/319 城实况/模型概率
+// 都要联网算），只写一句"正在加载"会让人以为坏了。这里记开始时间，每秒更新一次已等待秒数。
+const loadingSince=ref(0)
+const waitedSeconds=ref(0)
+let waitTimer=0
+watch(loading,(on)=>{
+  clearInterval(waitTimer)
+  if(!on){ waitedSeconds.value=0; return }
+  loadingSince.value=Date.now()
+  waitedSeconds.value=0
+  waitTimer=setInterval(()=>{
+    waitedSeconds.value=Math.round((Date.now()-loadingSince.value)/1000)
+  },1000)
+})
+onUnmounted(()=>clearInterval(waitTimer))
 const busy=ref('')
 const evidence=ref(null)
 const evidenceBusy=ref(false)
@@ -65,8 +76,6 @@ const speed=ref(1)                    // 分钟/秒：0.25≈15×、1=60×、5=3
 const frameMinute=ref(60)
 const radarOn=ref(true)
 const fogOn=ref(true)
-const terrainOn=ref(false)
-const tilt=ref(false)
 const virtualMode=ref(false)
 const density=ref('full')
 const selectedId=ref('')
@@ -74,11 +83,7 @@ const selectedCorridor=ref('')
 const followId=ref('')
 
 // —— 视角：平面 / 倾斜（SVG 透视）/ 三维（maplibre 真透视） ——
-// 三维之前先问 GPU 能不能扛。软件渲染（SwiftShader）下进去就是拖死页面，
 // 所以按钮点了也会被挡回来，并说清"为什么不能看"，而不是默默什么都不发生。
-const gpu=probeGPU()
-const threeD=ref(false)
-const liftNote=ref('')
 const fps=ref(0)
 // —— 双受众视角 ——
 // 同一套几何两种读法：运行视角看航线与班次，空域视角看净空边界与等级。
@@ -97,6 +102,9 @@ function onCorridorPick(row){
 // 不是前端加一层滤镜 —— 关掉立刻回到真实回波，两条路径互不污染。
 const virtualWx=ref(false)
 const wxVirtual=computed(()=>!!data.value?.radar?.virtual)
+// 换掉了什么由后端说（weatherMode.replaced / untouched），前端不复述 ——
+// 两边各写一份的话，改了一处另一处就成了假话。
+const wxMode=computed(()=>data.value?.weatherMode || {})
 // —— 航线显示：三档开关 + 条数上限（用户要"人工决定开多少个"） ——
 const LINE_KEY='alc.traffic.lines'
 const lineKinds=ref({cross:true,feed:true,intra:false})
@@ -114,7 +122,18 @@ const lineStats=computed(()=>{
   const pick=rows.filter(r=>(r.kind==='CROSS'&&lineKinds.value.cross)
     ||(r.kind==='AIRPORT_FEED'&&lineKinds.value.feed)
     ||(r.kind==='INTRA'&&lineKinds.value.intra))
-  return {total:rows.length,matched:pick.length,shown:Math.min(pick.length,Math.max(0,lineLimit.value))}
+  // 图上"在飞必画"：地图会把在飞班次所在的走廊并进显示集合（不管筛选与上限）。
+  // 这里的 shown 必须与地图同口径，否则按钮上写 291、图上却有 328 条。
+  const base=pick.slice().sort((a,b)=>(b.lengthKm||0)-(a.lengthKm||0))
+    .slice(0,Math.max(0,lineLimit.value))
+  const shown=new Set(base.map(r=>r.id))
+  const flying=new Set(flights.value.filter(f=>f.decision!=='HOLD').map(f=>f.corridor))
+  let forced=0
+  for(const row of rows){
+    if(shown.has(row.id)||!flying.has(row.id)) continue
+    shown.add(row.id);forced+=1
+  }
+  return {total:rows.length,matched:pick.length,shown:shown.size,forced}
 })
 const zoneBusy=ref(false)
 const zoneErr=ref('')
@@ -174,10 +193,10 @@ async function loadEvidence(){
 }
 function clearEvidence(){evidence.value=null;evidenceErr.value=''}
 
-// 立体与平面是两套渲染，但"定位/复位"对用户是同一个动作：按当前模式找对那个组件。
-const globeRef=ref(null)
+// 定位/复位只对平面图这一套。
+const globeRef=ref(null)   // 已下线三维，保留 ref 只为兼容模板里的旧引用
 function activeMap(){
-  return threeD.value?globeRef.value:(mapRef.value||null)
+  return mapRef.value||null
 }
 function locateLayer(kind){
   followId.value=''
@@ -188,41 +207,6 @@ function resetMap(){
   followId.value=''
   activeMap()?.resetView?.()
 }
-
-// —— 视角切换（含 WebGL 护栏） ——
-function toggle3d(){
-  if(threeD.value){threeD.value=false;liftNote.value='';return}
-  const probe=gpu||probeGPU()
-  if(!probe.ok){
-    // 不进三维，直接给倾斜视图 + 原因。静默失败是最糟的选择：
-    // 用户会以为是按钮坏了，然后反复点。
-    tilt.value=true
-    threeD.value=false
-    liftNote.value=`本机没开硬件加速，真实三维会拖死页面：${probe.reason}。已切到倾斜视图（同样的俯角，不依赖 GPU）`
-    return
-  }
-  threeD.value=true
-  tilt.value=false
-  liftNote.value=''
-  ensureZones()
-}
-function toggleTilt(){
-  tilt.value=!tilt.value
-  if(tilt.value){threeD.value=false}
-  liftNote.value=''
-}
-function onGlobeDegrade(info){
-  // ③ 看门狗触发：退出三维，落到倾斜视图，并说明是帧率问题而不是数据问题
-  threeD.value=false
-  tilt.value=true
-  liftNote.value=`三维帧率只有 ${info?.fps ?? '?'} fps（连续 3 秒低于 20），已自动降级为倾斜视图。多半是显卡驱动没走上硬件加速`
-}
-function onGlobeUnsupported(probe){
-  threeD.value=false
-  tilt.value=true
-  liftNote.value=`真实三维不可用：${probe?.reason||'本机 WebGL 未启用'}。已切到倾斜视图`
-}
-function onGlobeFps(value){fps.value=value}
 
 // —— 净空几何按需取 ——
 // 287 个 28 点环约 250 KB，放进主载荷会让首屏多 0.2 秒，所以走独立接口、按需取。
@@ -254,7 +238,13 @@ const alerts=computed(()=>data.value?.alerts||[])
 const intel=computed(()=>data.value?.intel||[])
 const upcoming=computed(()=>data.value?.upcoming||[])
 
+// 数字占位：载荷未到时显示"——"，而不是 0。0 是"算过，确实没有"，两者不能混。
+function num(v){ return data.value ? (v??0) : '—' }
+
 const headline=computed(()=>{
+  // 还没拿到本级载荷时**不能**输出"0 条航线 · 在飞 0 架"：
+  // 冷启动要等 30 秒左右，这行 0 会被读成"系统说全国没有航线"。
+  if(!data.value) return '正在读取本级航线网…'
   const t=total.value
   // 不再以"全国/华北"开头：面包屑上一行已经写明在哪一级，
   // 两行连着读会变成"全国 全国 492 条航线…"。这里只讲这一刻的数字。
@@ -289,6 +279,10 @@ function shortName(name){
     .replace(/(朝鲜族|蒙古族|藏族|苗族|侗族|彝族|哈尼族|壮族|傣族|白族|土家族|布依族|傈僳族|景颇族|羌族|回族|维吾尔族)$/,'')
 }
 
+// 这批 flights 数据"自己是哪一分钟"的（后端 payload.minute）。
+// 地图的本地推进以它为基准，不再以"请求的分钟"为基准 ——
+// 否则分钟一翻、新数据还在路上，adv 归零 → 飞机倒退一分钟再被弹回（V1.0.4 #5）。
+const flightsMinute=ref(-1)
 async function loadFlights(){
   const now=Date.now()
   if(now<fetchAt) return
@@ -300,6 +294,7 @@ async function loadFlights(){
       {timeoutMs:20000})
     if(my!==seq) return
     flights.value=payload.flights||[]
+    flightsMinute.value=Number.isFinite(payload.minute)?payload.minute:Math.round(minute.value)
     byProvince.value=payload.byProvince||{}
     byCity.value=payload.byCity||{}
     live.value={...live.value,...(payload.traffic||{})}
@@ -322,8 +317,18 @@ async function load(){
   try{
     data.value=await requestJson(
       `/api/traffic/v2/nation?level=${encodeURIComponent(level.value)}&id=${encodeURIComponent(ident.value)}&minute=${Math.round(minute.value)}${virtualWx.value?'&virtual=1':''}`,
-      {timeoutMs:45000})
+      // 冷启动实测 30 秒上下（进程刚起时的第一次全国载荷），45 秒的旧上限会把"正在预热"
+      // 直接判成失败；抬到 90 秒，并靠上面的"已等待 Ns"让人知道它还在动。
+      {timeoutMs:90000})
     flights.value=data.value?.flights||[]
+    flightsMinute.value=Number.isFinite(data.value?.minute)?data.value.minute:Math.round(minute.value)
+    // 层级以服务端为准：请求的是 city、后端兜底成 province 时，界面必须跟着回落，
+    // 不能一边显示"临沧市"的面包屑、一边给全省的数字与城市列表。
+    if(data.value?.level&&data.value.level!==level.value) level.value=data.value.level
+    const gotId=data.value?.id==null?'':String(data.value.id)
+    if(gotId!==ident.value&&['region','province','city'].includes(level.value)) ident.value=gotId
+    trail.value=trailFrom(data.value)
+    emitScope()
     live.value={...(data.value?.traffic||{})}
     byProvince.value={}
     byCity.value={}
@@ -333,15 +338,32 @@ async function load(){
   finally{loading.value=false}
 }
 
+// —— 面包屑 = 层级链，不是点击历史（V1.0.4）——
+// 以前 `go()` 把点击目标 append 到 trail 尾部：在市级点一下地图空白（底图多边形是背景）
+// 就会拼出「全国 › 临沧市 › 云南省」这种不存在的路径，页面还停在省口径 ——
+// 用户看到的是"我点了临沧，右边却在讲云南别的机场"。
+// 现在 trail 由**服务端返回的层级字段**重建（nation→region→province→city 恒为一条链），
+// 后端把 city 兜底成 province 时，链也自动只到省，不会多出一个假的市级。
+function trailFrom(d){
+  const chain=[{level:'nation',id:'',label:'全国'}]
+  if(!d) return chain
+  // 只认 payload 里**当前层级**的 province 字段。
+  // 不能拿 `provinces[0]` 兜底：大区层的 `provinces` 是"本区所有省"，
+  // 取第一个会把「华北」错拼成「全国›华北›北京市」（实测就是这样退不回去的）。
+  const prov=d.province||null
+  if(d.region&&d.region.name) chain.push({level:'region',id:d.region.id||'',label:d.region.name})
+  else if(prov&&prov.regionLabel) chain.push({level:'region',id:prov.region||'',label:prov.regionLabel})
+  if(prov&&prov.name) chain.push({level:'province',id:prov.name,label:prov.name})
+  if(d.level==='city'&&d.city&&d.city.name) chain.push({level:'city',id:d.city.name,label:d.city.name})
+  return chain
+}
 function go(nextLevel,nextId,nextLabel){
   level.value=nextLevel
   ident.value=nextId||''
-  if(nextLevel==='nation') trail.value=[{level:'nation',id:'',label:'全国'}]
-  else{
-    const cut=trail.value.findIndex(item=>item.level===nextLevel)
-    if(cut>=0) trail.value=trail.value.slice(0,cut)
-    trail.value=[...trail.value,{level:nextLevel,id:nextId||'',label:nextLabel||nextId}]
-  }
+  // 先把链改成"到目标为止"的合理前缀，等载荷回来再用 trailFrom 校正
+  const rank={nation:0,region:1,province:2,city:3}
+  const keep=trail.value.filter(item=>rank[item.level]<rank[nextLevel])
+  trail.value=[...keep,{level:nextLevel,id:nextId||'',label:nextLabel||nextId}]
   emitScope()
   load()
 }
@@ -364,7 +386,9 @@ function back(){
   load()
 }
 function drill(nextLevel,nextId,label){
-  if(nextLevel==='province'&&level.value==='province') return
+  // 市级是本项目最低一级：到了市，点底图多边形（它在市级只是背景）不应该往上跳。
+  // 以前会跳回省，还留下一条「全国›临沧市›云南省」的假路径。
+  if(nextLevel==='province'&&(level.value==='province'||level.value==='city')) return
   if(nextLevel==='city'&&level.value==='city') return
   go(nextLevel,nextId,label)
 }
@@ -406,9 +430,26 @@ function startClock(){
 // 拖时间轴：连续时钟要跟着跳，否则会被下一帧拉回去
 function onSeek(){ frameMinute.value=minute.value; loadFlights() }
 
+// 顶栏要显示"推演时刻"，但全国台有自己的 minute（0–1440），和旧 session（0–480）
+// 不是一个量，所以由这里把真实状态报上去，不让顶栏去猜。
+let tickAt=0
+watch([minute,playing],([m,on])=>{
+  const now=Date.now()
+  if(now-tickAt<500&&on) return
+  tickAt=now
+  emit('tick',{minute:Number(m)||0,playing:!!on})
+},{immediate:true})
+
+// 打开任何对象（班次 / 事件 / 走廊）之前先停表。
+// 时间在跑的时候点开一架飞机，选中的瞬间它在 A 点，读两行字它已经飘到 B 点；
+// 推演结论里的"当前时刻"也会跟着变，同一句话读两次不一样。
+// 只停推演时钟，右上角北京时间（nav-timebase）走的是真实时间，不受影响。
+function pauseForInspect(){ playing.value=false }
+
 // 事件卡片的点击：一条事件聚合了多个城市，点开时先进第一个成员城市，
 // 该班次若还在飞就同时选中它 —— 否则读者只能对着"青海省 · 2 处"猜是哪两处。
 function openAlert(row){
+  pauseForInspect()
   const places=row.places||[]
   // 用户要的落点变了：处置点开不再"切到城市让用户自己找"，而是**直接进那个班次的走廊**，
   // 在那里做人工裁决。走廊号就藏在班次 id 里（NC-0270#-1 → NC-0270），不用再查表。
@@ -443,6 +484,7 @@ function openAlert(row){
 }
 
 function pickFlight(flight){
+  pauseForInspect()
   if(selectedId.value!==flight.id){followId.value='';clearEvidence()}
   selectedId.value=flight.id
   selectedCorridor.value=''
@@ -451,6 +493,7 @@ function toggleFollow(){
   followId.value=followId.value===selectedId.value?'':selectedId.value
 }
 function pickCorridor(line){
+  pauseForInspect()
   selectedCorridor.value=line.id
   selectedId.value=''
   followId.value=''
@@ -559,6 +602,20 @@ const wxRows=computed(()=>{
   return rows.slice(0,level.value==='nation'?40:60)
 })
 const wxTotal=computed(()=>(data.value?.nodes||[]).filter(n=>n.weather).length)
+// 市级右栏只讲这一座城（V1.0.4，用户第 4 条）：
+// 省 / 机场 / 航线 / 在飞 / 相邻 + 该市自己的实况 + 与它相连的走廊。
+// 以前这一屏会退回"本省城市 13 个节点"，用户点了临沧却在读云南别的机场。
+const cityCard=computed(()=>{
+  if(level.value!=='city') return null
+  const c=data.value?.city
+  if(!c||!c.name) return null
+  const wx=wxRows.value.find(row=>row.name===c.name)||null
+  const lines=(data.value?.corridors||[]).map(row=>({
+    id:row.id,fromName:row.fromName,toName:row.toName,lengthKm:row.lengthKm,
+    kindLabel:row.kindLabel||'',blocked:!!row.borderBlocked,detour:!!row.detour,
+  }))
+  return {city:c,wx,lines}
+})
 // 实况从哪来、是不是旧的、是不是还在补 —— "0/0" 必须能解释成"补数中"而不是"没有"
 const weatherMeta=computed(()=>data.value?.weatherMeta||{})
 const wxRefreshing=computed(()=>!!weatherMeta.value.refreshing)
@@ -652,18 +709,37 @@ watch(()=>props.scopeKey,(key)=>{
   if(scopeReady) load()
 },{immediate:true})
 
+/**
+ * 键盘：空格播放/暂停、左右键 ±1 分钟。
+ *
+ * 为什么放在这个组件里而不是工作台：这一页的播放与时刻是**本组件自己的** minute
+ * （0–1440），工作台那套是旧 session 的 0–480，两边不是一个量，接过去必然错位。
+ *
+ * 输入框内一律跳过 —— 否则在搜索框里按空格会变成"播放"，那是最烦人的一类 bug。
+ */
+function onMapKey(event){
+  if(event.ctrlKey||event.metaKey||event.altKey) return
+  const tag=(event.target&&event.target.tagName||'').toLowerCase()
+  if(tag==='input'||tag==='textarea'||tag==='select'||(event.target&&event.target.isContentEditable)) return
+  if(event.code==='Space'){ event.preventDefault(); playing.value=!playing.value; return }
+  if(event.key==='ArrowLeft'){ event.preventDefault(); playing.value=false; minute.value=Math.max(0,minute.value-1); return }
+  if(event.key==='ArrowRight'){ event.preventDefault(); playing.value=false; minute.value=Math.min(1440,minute.value+1) }
+}
+
 onMounted(()=>{
   scopeReady=true
   frameMinute.value=minute.value
   startClock()
   measureViewport()
   window.addEventListener('resize',measureViewport)
+  window.addEventListener('keydown',onMapKey)
   load()
   // 推送计时用独立定时器：不能和推演播放共用一个变量，否则一开播就把计时器顶掉
   pushTimer=setInterval(()=>{pushAge.value+=1},1000)
 })
 onUnmounted(()=>{
   window.removeEventListener('resize',measureViewport)
+  window.removeEventListener('keydown',onMapKey)
   if(clockRaf) cancelAnimationFrame(clockRaf)
   clockRaf=null
   if(pushTimer) clearInterval(pushTimer)
@@ -696,29 +772,45 @@ onUnmounted(()=>{
           {{ zonePolicy==='PROHIBITED'?'一律禁飞':'可申请穿越' }}</button>
       </div>
     </div>
-    <p class="nrn-headline" data-nation-headline>{{ headline }}</p>
+    <!-- 指标块代替"492 条航线 · 在飞 111 架 · 绕飞 2 架…"那一长串。
+         以前五个数用间隔号串成一句，哪个数对应哪个指标要靠位置猜；
+         数字位数一变整行还会左右挪，读起来像在动。现在一块一个指标：
+         上面是数字（等宽、定宽），下面是名称，变动时给 ▲/▼。 -->
+    <div class="nrn-metrics" data-nation-headline>
+      <div class="m"><b>{{ num(total.corridors) }}</b><span>航线</span></div>
+      <div class="m"><b>{{ num(total.airborne) }}</b><span>在飞</span></div>
+      <div class="m" :class="{warn:total.delayed>0}"><b>{{ num(total.delayed) }}</b><span>绕飞</span></div>
+      <!-- 「停飞」= 班次决定为 HOLD（天气/边界），这是读者真正关心的那一格。
+           以前这一格放的是 borderBlocked（距境外过近受限的走廊），实测长期为 0，
+           而天气造成的停飞被塞进「延期」，于是"回波压境但停飞 0 架"。 -->
+      <div class="m" :class="{bad:total.hold>0}"><b>{{ num(total.hold) }}</b><span>停飞</span></div>
+      <div class="m" v-if="total.blocked"><b>{{ num(total.blocked) }}</b><span>距境外过近受限</span></div>
+      <div class="m"><b>{{ num(total.lowVisCities) }}</b><span>低能见度城市</span></div>
+    </div>
     <p class="nrn-sub">
-      纳入 <b>{{ summary.provinces }}</b> 省 · <b>{{ summary.cities }}</b> 市 ·
-      <b>{{ summary.airports }}</b> 机场 · <b>{{ summary.feedCities }}</b> 市无机场（专用接驳）·
-      <b>{{ summary.weatherCities }}</b> 市有实况
-      <!-- 演示包必须自带角标：合成回波看起来和实况一模一样，
-           不在页头挂一个"虚拟"，任何人截图出去都会当成真实天气。 -->
-      <em class="nrn-virt" v-if="wxVirtual" data-virtual-badge>
-        虚拟气象 · 合成回波，非实况
-      </em>
+      纳入 <b>{{ num(summary.provinces) }}</b> 省 · <b>{{ num(summary.cities) }}</b> 市 ·
+      <b>{{ num(summary.airports) }}</b> 机场 · <b>{{ num(summary.feedCities) }}</b> 市无机场（专用接驳）·
+      <b>{{ num(summary.weatherCities) }}</b> 市有实况
+    </p>
+    <!-- 演示包必须自带说明，而且要说**换掉了什么、没换什么**：
+         只写"虚拟气象 · 非实况"说不清边界，读者会以为整页都是假的；
+         说清"回波与雾是合成的、气温风是实况"，才能既提醒又不自贬。 -->
+    <p class="nrn-virt-note" v-if="wxVirtual" data-virtual-badge>
+      <b>虚拟气象（演示包）</b>
+      <span>{{ wxMode.note || '回波为合成对流系统、雾区按虚拟能见度派生；气温、风等要素仍为公开源实况。' }}</span>
     </p>
   </header>
 
-  <nav class="nrn-tabs" data-nation-tabs v-if="!hideTabs">
-    <button :class="{on:view==='map'}" @click="view='map'">态势</button>
-    <button :class="{on:view==='ledger'}" @click="view='ledger'">台账 <em>{{ flights.length }}</em></button>
-    <button :class="{on:view==='intel'}" @click="view='intel'">情报 <em>{{ intel.length }}</em></button>
-    <button :class="{on:view==='alerts'}" @click="view='alerts'">处置 <em :class="{bad:alerts.length}">{{ alerts.length }}</em></button>
-  </nav>
-
   <!-- 推演页的"立题"行：先选对象，再看链路。不给选择器的话，
        这一页只能靠在地图上盲点，点不中就什么都没发生。 -->
-  <p class="nrn-state" v-if="loading">正在加载本级数据…</p>
+  <p class="nrn-state" v-if="loading">
+    <template v-if="waitedSeconds<4">正在加载本级数据…</template>
+    <template v-else>
+      正在预热 <b>{{ waitedSeconds }}s</b> —— 服务刚启动时要把雷达回波、逐市实况与概率算完，
+      首次通常 30 秒左右；算完这一次之后都是秒开。
+      <button v-if="waitedSeconds>=60" @click="load">仍要重试</button>
+    </template>
+  </p>
   <p class="nrn-state bad" v-else-if="error">本级不可用 · {{ error }}<button @click="load">重试</button></p>
 
   <!-- 注意：这两条必须是**各自独立**的 v-if。
@@ -739,7 +831,10 @@ onUnmounted(()=>{
     <!-- ================= 态势 ================= -->
     <div class="nrn-map" v-show="view==='map'" v-if="mode!=='corridor'&&mode!=='card'">
       <div class="nrn-tools">
-        <button class="play" @click="togglePlay">{{ playing?'Ⅱ 暂停':'▶ 推演' }}</button>
+        <!-- 文案用"播放/暂停"而不是"推演"：右侧同名入口也叫推演，一个按钮一个页面同名，
+             新人会以为点它跳页。快捷键写在 title 里，不占按钮宽度。 -->
+        <button class="play" @click="togglePlay"
+                :title="playing?'暂停时间轴（空格）· 左右键逐分钟':'播放时间轴（空格）· 左右键逐分钟'">{{ playing?'Ⅱ 暂停':'▶ 播放' }}</button>
         <input type="range" min="0" :max="MINUTES" step="1" v-model.number="minute"
                @input="onSeek" aria-label="推演时间"/>
         <b class="clock">{{ clock(minute) }}</b>
@@ -753,23 +848,18 @@ onUnmounted(()=>{
           回波<em v-if="echoStats.keptRings" class="nrn-cnt">{{ echoStats.keptRings }}</em></button>
         <button :class="{on:fogOn}" @click="fogOn=!fogOn" :disabled="!fog.available">雾区</button>
         <button :class="{on:lineStats.shown>0}" @click="linePanel=!linePanel"
-                :title="'显示哪些航线：跨省主干 / 机场接驳 / 省内短途；条数可以自己拖'">
+                :title="`显示哪些航线：跨省主干 / 机场接驳 / 省内短途；条数可以自己拖${lineStats.forced?`。其中 ${lineStats.forced} 条因为此刻有班次在飞而强制显示`:''}`">
           航线 {{ lineStats.shown }}/{{ lineStats.total }}</button>
-        <button :class="{on:virtualWx}" @click="toggleVirtual"
-                :title="'虚拟气象演示包：在后端生成合成回波，并按同一套判定重算绕飞与停飞；非实况'">
-          虚拟气象</button>
+        <button :class="{on:virtualWx}" @click="toggleVirtual" data-virtual-toggle
+                :title="'虚拟气象：把雷达回波换成合成对流系统、把雾区按虚拟能见度重算；气温与风仍是实况。裁决走同一套判据'">
+          {{ virtualWx?'虚拟气象 · 开':'实测气象' }}</button>
         <button :class="{on:zoneOn}" @click="zoneOn=!zoneOn; zoneOn&&ensureZones()"
                 :title="'禁飞区：机场净空 + 强回波，红色多边形框；关掉连绕飞一起隐藏'">禁飞</button>
-        <button :class="{on:terrainOn}" @click="terrainOn=!terrainOn">地形</button>
-        <button :class="{on:tilt}" @click="toggleTilt">倾斜</button>
-        <button :class="{on:threeD}" @click="toggle3d"
-                :title="gpu.ok?('真实三维 · '+gpuLabel(gpu)):(gpu.reason||'本机 WebGL 不可用')">三维</button>
-        <button :class="{on:virtualMode}" @click="virtualMode=!virtualMode"
-                :title="'虚拟增强：回波与绕飞/停飞在图上更醒目，用于演示'">{{ virtualMode?'虚拟':'实测' }}</button>
-        <select v-model="density" aria-label="信息密度">
+        <select v-model="density" aria-label="信息密度"
+                title="精简：只有航线和城市名；标准：城市胶囊 + 航班编号与高度；详细：再加速度与状态">
+          <option value="min">精简</option>
           <option value="full">标准</option>
-          <option value="slim">精简</option>
-          <option value="min">极简</option>
+          <option value="slim">详细</option>
         </select>
         <button :disabled="!radarBBox" @click="locateLayer('radar')">定位回波</button>
         <button :disabled="!fog.bbox" @click="locateLayer('fog')">定位雾区</button>
@@ -787,27 +877,18 @@ onUnmounted(()=>{
                  v-model.number="lineLimit" aria-label="航线显示条数"/>
           <b>{{ lineStats.shown }}</b>
         </div>
-        <p class="nrn-linehint">按航程从长到短截取：只开 50 条时看到的是骨架，不是随机 50 条。</p>
+        <p class="nrn-linehint">按航程从长到短截取：只开 50 条时看到的是骨架，不是随机 50 条。<template v-if="lineStats.forced">另有 <b>{{ lineStats.forced }}</b> 条因为此刻有班次在飞而强制显示 —— 天上出现一架飞机，它脚下就必须有那条走廊。</template></p>
         <button class="nrn-lineall" @click="lineLimit=0">全部关闭</button>
       </div>
 
-      <p class="nrn-lift" v-if="liftNote" data-lift-note>{{ liftNote }}</p>
 
-      <!-- 三维＝maplibre 真透视（俯角/旋转/DEM/体块），但先进能力探测：
-           软件渲染（SwiftShader）一律不进，直接退到倾斜视图并说明原因。
-           这是 V1.0.1 两次把 Edge 拖死的教训 —— 卡死的是浏览器 GPU，不是服务器。
-           倾斜＝不依赖 WebGL 的 CSS 透视，轻、稳、切页不卡，代价是没有真实高程。 -->
+      <!-- V1.0.5：三维 / 倾斜 / 地形三档全部下线，只保留平面矢量图。
+           理由是那三档各有各的别扭（透视下标签要反向缩放、地形色带和回波抢注意力），
+           而这一页要回答的是"哪片天不能飞"，不是"山有多高"。 -->
       <div class="nrn-canvas">
-      <NationGlobe v-if="threeD" ref="globeRef" :data="data" :flights="flights"
-                   :minute="minute" :frame-minute="frameMinute"
-                   :radar-on="radarOn" :fog-on="fogOn" :density="density"
-                   :selected-id="selectedId" :selected-corridor="selectedCorridor"
-                   :follow-id="followId" :zones="zoneOn?zoneGeom:null" :audience="audience"
-                   @drill="drill" @select-flight="pickFlight" @select-corridor="pickCorridor"
-                   @degrade="onGlobeDegrade" @unsupported="onGlobeUnsupported" @fps="onGlobeFps"/>
-      <NationMap v-else ref="mapRef" :data="data" :flights="flights" :minute="minute"
-                 :frame-minute="frameMinute"
-                 :radar-on="radarOn" :fog-on="fogOn" :terrain-on="terrainOn" :tilt="tilt"
+      <NationMap ref="mapRef" :data="data" :flights="flights" :minute="minute"
+                 :frame-minute="frameMinute" :data-minute="flightsMinute"
+                 :radar-on="radarOn" :fog-on="fogOn"
                  :density="density" :virtual-mode="virtualMode" :audience="audience"
                  :zone-bands="zoneOn&&zoneGeom?zoneGeom.bands:null"
                  :line-kinds="lineKinds" :line-limit="lineLimit" :zone-policy="zonePolicy"
@@ -827,7 +908,7 @@ onUnmounted(()=>{
         <span>停飞 {{ border.blockedCorridors||0 }} 条<template v-if="(border.blockedNames||[]).length">（{{ (border.blockedNames||[]).slice(0,3).join('、') }}{{ (border.blockedNames||[]).length>3?' 等':'' }}）</template></span>
         <span>改线 {{ border.reroutedCorridors||0 }} 条</span>
         <span v-if="fog.available" title="能见度低于 3 km 计低能见度；低于 1.5 km 计浓雾">低能见度 {{ fog.counts.cities }} 城（浓雾 {{ fog.counts.BAN }}）</span>
-        <span v-if="zones.available" title="规则化生成，非官方公布；与东北 69 站点法定管制区分开计数">
+        <span v-if="zones.available" title="规则化生成，非官方公布；与法定管制区（OFFICIAL，另库）分开计数，不合并">
           净空 {{ zones.counts.airports }} 机场 · 覆盖 {{ ((zones.counts.coverageRatio||0)*100).toFixed(2) }}%</span>
         <span class="diag" v-if="showDiag">视口 {{ viewport.w }}×{{ viewport.h }} · 根容器 {{ viewport.root }}px</span>
         <span class="push" :class="{on:store.wsConnected}" :title="store.wsConnected?'雷达/实况/模型任一变化由服务端推送':'未连上推送，仅按需拉取'">
@@ -840,6 +921,9 @@ onUnmounted(()=>{
         </span>
         <i class="star"></i>北京
         <i class="dot"></i>城市
+        <!-- V1.0.4：城市点外面那圈红环以前在图上没有任何出处，用户直接问"这是什么"。
+             现在进图例，措辞与顶部结论条的"低能见 N 城"同一口径。 -->
+        <i class="ring"></i>低能见城市
         <i class="line"></i>航线
         <i class="line warn"></i>绕飞
         <i class="box"></i>{{ level==='province'||level==='city' ? '禁飞区' : '禁飞区（下钻可见）' }}
@@ -863,8 +947,13 @@ onUnmounted(()=>{
                       :minute="minute" :density="density" :selected-id="selectedId"
                       @select="pickFlight"/>
     </div>
+    <!-- 情报 = 两张表：先"在飞班次情报"（这一班为什么这么判），再"空域情报"（机场与净空）。
+         两段都吃同一份 payload，不再各自发一次请求。 -->
     <div class="nrn-table" v-show="view==='intel'">
-      <NationBriefing view="intel" :payload="data" :density="density"/>
+      <NationBriefing view="ledger" variant="briefing"
+                      :payload="data" :flights="flights" :minute="minute" :density="density"/>
+      <NationBriefing view="intel" :payload="data" :flights="flights"
+                      :minute="minute" :density="density"/>
     </div>
 
     <!-- ================= 处置 ================= -->
@@ -897,13 +986,10 @@ onUnmounted(()=>{
 
     <!-- ================= 右栏：分块统计 ================= -->
     <aside class="nrn-side" v-if="mode!=='corridor'&&mode!=='card'" :class="{'wx-wide':mode==='weather'}">
-      <div class="nrn-total">
-        <div><b>{{ total.corridors||0 }}</b><span>航线</span></div>
-        <div><b>{{ total.airborne||0 }}</b><span>在飞</span></div>
-        <div :class="{alarm:total.delayed>0}"><b>{{ total.delayed||0 }}</b><span>绕飞</span></div>
-        <div :class="{alarm:total.blocked>0}"><b>{{ total.blocked||0 }}</b><span>停飞</span></div>
-        <div :class="{alarm:total.hold>0}"><b>{{ total.hold||0 }}</b><span>延期</span></div>
-      </div>
+      <!-- 右栏顶部原本还有一条五项 KPI（航线/在飞/绕飞/停飞/延期），
+           与页头的指标块完全重复，而且口径更旧（把 borderBlocked 当"停飞"、
+           把天气停飞叫"延期"）。同一屏两套数、两种叫法，是"数字看着会跳"的根源之一。
+           删掉，只留页头一套。 -->
 
       <!-- 上：区块。全国只列大区，点进去才换成省；再往里换城市 —— 一层只放一层 -->
       <!-- 推演：六段链路。与态势共用同一栏，但内容完全不同 ——
@@ -953,6 +1039,18 @@ onUnmounted(()=>{
             <p><span>航线</span><b>{{ data.city?.links }} 条</b></p>
             <p><span>在飞</span><b>{{ data.city?.airborne }}</b></p>
             <p><span>相邻</span><b>{{ (data.city?.neighbours||[]).map(shortName).join('、') }}</b></p>
+            <p v-if="cityCard?.wx"><span>低能见概率</span><b :class="{warn:(cityCard.wx.p||0)>=.35}">{{ cityCard.wx.p==null?'—':(cityCard.wx.p*100).toFixed(0)+'%' }}</b></p>
+            <p v-if="cityCard?.wx"><span>实况</span><b>{{ cityCard.wx.temp==null?'—':cityCard.wx.temp+'°' }} · {{ cityCard.wx.wind==null?'—':cityCard.wx.wind+' m/s' }} · 能见 {{ visText(cityCard.wx.vis) }}</b></p>
+          </div>
+          <!-- 市级是本项目最低一级：这一屏只讲这一座城，不列本省别的机场。
+               与它相连的走廊在这里可以直接点开（落到走廊页做推演/裁决）。 -->
+          <div class="nrn-city-lines" v-if="cityCard?.lines?.length">
+            <button v-for="row in cityCard.lines" :key="row.id" :data-city-corridor="row.id"
+                    :title="`${row.kindLabel||'航线'} · ${row.lengthKm} km · 点开这条走廊`"
+                    @click="emit('open-corridor',{corridor:row.id})">
+              <b>{{ shortName(row.fromName) }} ↔ {{ shortName(row.toName) }}</b>
+              <span>{{ row.lengthKm }} km<template v-if="row.detour"> · 绕飞</template><template v-if="row.blocked"> · 停飞</template></span>
+            </button>
           </div>
         </template>
       </div>
@@ -1058,6 +1156,12 @@ onUnmounted(()=>{
             <b>取证链</b>
             <span>{{ evidence.conclusion }}</span>
             <em>{{ evidence.steps.length }} 步 · {{ evidence.generatedAt }}</em>
+            <!-- 模型状态做成一枚小标：已配置就只报"能用 + 走的哪个文件"，不占正文；
+                 未配置才展开那段可执行的说明（琥珀色，属于"要你动手"的话）。 -->
+            <i class="ev-llm" :class="{off:!evidence.llm?.configured}"
+               :title="evidence.llm?.note">
+              {{ evidence.llm?.configured ? '大模型就绪 · '+(evidence.llm?.model||'') : '大模型未配置' }}
+            </i>
           </div>
           <div class="ev-steps">
             <div class="ev-step" v-for="step in evidence.steps" :key="step.n">
@@ -1069,7 +1173,7 @@ onUnmounted(()=>{
               </p>
             </div>
           </div>
-          <p class="ev-note">{{ evidence.llm?.note }}</p>
+          <p class="ev-note" v-if="evidence.llm && !evidence.llm.configured">{{ evidence.llm.note }}</p>
           <p class="ev-note quiet">{{ evidence.discipline }}</p>
         </template>
       </div>
@@ -1132,15 +1236,17 @@ onUnmounted(()=>{
 .nrn-crumb button:hover{text-decoration:underline}
 .nrn-crumb .sep{color:#4f7288}
 .nrn-crumb .back{margin-left:8px;border:1px solid #2c4a60;border-radius:5px;padding:2px 8px;color:#a8cee6}
-.nrn-headline{margin:0;font-size:13.5px;color:#eaf6ff;letter-spacing:.2px}
+.nrn-metrics{display:flex;gap:0;margin:2px 0 1px;flex-wrap:wrap}
+.nrn-metrics .m{display:flex;flex-direction:column;gap:1px;padding:0 14px;min-width:74px;
+  border-left:1px solid rgba(70,110,140,.3)}
+.nrn-metrics .m:first-child{padding-left:0;border-left:0}
+.nrn-metrics b{font-size:19px;line-height:1.15;color:#eaf6ff;font-weight:600;
+  font-variant-numeric:tabular-nums;letter-spacing:.5px}
+.nrn-metrics span{font-size:10.5px;color:#82a6bd;white-space:nowrap}
+.nrn-metrics .m.warn b{color:#ffc857}
+.nrn-metrics .m.bad b{color:#ff8d78}
 .nrn-sub{margin:0;font-size:11.5px;color:#82a6bd}
 .nrn-sub b{color:#cfe9f8;font-variant-numeric:tabular-nums}
-
-.nrn-tabs{display:flex;gap:6px;border-bottom:1px solid rgba(70,110,140,.35);padding-bottom:6px}
-.nrn-tabs button{background:transparent;border:1px solid transparent;color:#8fb2c8;padding:5px 13px;border-radius:6px;cursor:pointer;font-size:12.5px}
-.nrn-tabs button.on{background:#17394d;border-color:#2e6b85;color:#bfe9ff}
-.nrn-tabs em{font-style:normal;opacity:.75;margin-left:4px;font-size:11px}
-.nrn-tabs em.bad{color:#ffb38a}
 
 /* 双受众切换：和 tab 条同一视觉语言，但靠右，表示"换个读法"而不是"换一页" */
 .nrn-aud{margin-left:auto;display:flex;gap:4px;align-items:center}
@@ -1151,9 +1257,15 @@ onUnmounted(()=>{
 .nrn-cnt{margin-left:3px;font-style:normal;font-size:9.5px;opacity:.62;font-variant-numeric:tabular-nums}
 .nrn-echo-note{margin-right:8px;font-size:10px;color:#ffc857}
 html[data-theme="light"] .nrn-echo-note{color:#a4610a}
-.nrn-virt{margin-left:8px;font-style:normal;font-size:10px;padding:1px 7px;border-radius:999px;
-  color:#ffd08a;background:rgba(200,140,30,.16);border:1px solid rgba(220,170,60,.55)}
-html[data-theme="light"] .nrn-virt{color:#8a5a00;background:#fdf3e0;border-color:#e0bb78}
+.nrn-virt-note{display:flex;gap:8px;align-items:baseline;margin:4px 0 0;max-width:820px;
+  padding:5px 10px;border-radius:0 6px 6px 0;border-left:3px solid #ffc857;
+  background:rgba(120,88,20,.18);font-size:11px;line-height:1.55;color:#e8d3a0}
+.nrn-virt-note b{color:#ffd98a;font-weight:600;white-space:nowrap}
+.nrn-virt-note span{color:#d9c69a}
+html[data-theme="light"] .nrn-virt-note{background:#fdf6e7 !important;border-left-color:#c99a2e !important;
+  color:#6b4a05 !important}
+html[data-theme="light"] .nrn-virt-note b{color:#7a5200 !important}
+html[data-theme="light"] .nrn-virt-note span{color:#6b5a2a !important}
 .nrn-linepanel{position:absolute;top:52px;left:14px;z-index:9;width:250px;
   display:flex;flex-direction:column;gap:6px;padding:9px 11px;border-radius:9px;
   background:rgba(9,24,36,.97);border:1px solid rgba(70,120,155,.6);
@@ -1236,6 +1348,8 @@ html[data-theme="light"] .nrn-lineall{background:#f2f7fc;border-color:#cfdcea;co
   background:rgba(8,18,28,.86);border-radius:6px;padding:3px 8px;pointer-events:none}
 .nrn-legend i{display:inline-block;width:14px;height:2px;background:var(--map-corridor);margin-right:4px;vertical-align:middle}
 .nrn-legend i.dot{width:6px;height:6px;border-radius:50%;background:#eaf6ff}
+.nrn-legend i.ring{width:8px;height:8px;border-radius:50%;background:transparent;
+  border:1.5px solid rgba(226,75,74,.92)}
 .nrn-legend i.warn{background:rgba(255,206,90,.9)}
 .nrn-legend i.bad{background:rgba(226,92,74,.75)}
 .nrn-legend i.emergency{background:#ff3b30}
@@ -1254,8 +1368,12 @@ html[data-theme="light"] .nrn-legend i.box{border-color:#c92a2a}
 /* 空域视角侧栏 */
 .nrn-zone{border:1px solid rgba(120,150,90,.35);border-radius:8px;background:rgba(18,34,22,.55);
   padding:6px 8px;display:flex;flex-direction:column;gap:2px;max-height:38%;min-height:0;overflow:auto}
-.nrn-zone h4{margin:0 0 3px;font-size:11.5px;color:#cfe6b5;display:flex;gap:6px;align-items:baseline}
-.nrn-zone h4 small{font-size:10px;color:#8a9c72;font-weight:400}
+/* 标题 + 一句副标在同一行：1366 下侧栏只有 400 宽，
+   "规则化生成 · 可申请穿越" 会被挤出面板（右边缘直接裁掉）。
+   允许换行，宁可占两行，也不要半句。 */
+.nrn-zone h4{margin:0 0 3px;font-size:11.5px;color:#cfe6b5;display:flex;gap:6px;
+  align-items:baseline;flex-wrap:wrap;line-height:1.45}
+.nrn-zone h4 small{font-size:10px;color:#8a9c72;font-weight:400;white-space:normal;min-width:0}
 .nrn-zone p{margin:1px 0;display:grid;grid-template-columns:64px 1fr;gap:6px;font-size:11px}
 .nrn-zone p>span{color:#8a9c72}
 .nrn-zone p>b{font-weight:400;color:#dbeccb;font-variant-numeric:tabular-nums}
@@ -1315,12 +1433,6 @@ html[data-theme="light"] .nrn-legend i.box{border-color:#c92a2a}
 .nrn-wx li.head{background:none;color:#6a8ca2;font-size:9.5px;padding:0 5px 2px;letter-spacing:.2px;
   position:sticky;top:0;z-index:1}
 .nrn-wx li.head b,.nrn-wx li.head em,.nrn-wx li.head span{color:#6a8ca2;font-weight:400}
-.nrn-total{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;background:rgba(12,32,46,.8);
-  border:1px solid rgba(70,110,140,.4);border-radius:8px;padding:7px 6px}
-.nrn-total div{text-align:center}
-.nrn-total b{display:block;font-size:15px;color:#eaf6ff;font-variant-numeric:tabular-nums}
-.nrn-total span{font-size:10px;color:#7d9cb3}
-.nrn-total .alarm b{color:#ffc857}
 .nrn-side h3{margin:4px 0 0;font-size:12px;color:#a9cde2;font-weight:600}
 .nrn-side h3 small{margin-left:6px;font-size:10px;color:#6f92a8;font-weight:400}
 .nrn-block{border:1px solid rgba(70,110,140,.32);border-radius:8px;overflow:hidden;background:rgba(10,26,38,.6)}
@@ -1363,6 +1475,15 @@ html[data-theme="light"] .nrn-legend i.box{border-color:#c92a2a}
 .nrn-city-detail p{margin:0;display:grid;grid-template-columns:48px 1fr;gap:6px}
 .nrn-city-detail span{color:#7d9cb3}
 .nrn-city-detail b{font-weight:500;color:#d9eefb}
+.nrn-city-detail b.warn{color:#ffb59a}
+/* 市级最低一级：右栏只讲这一座城，下面挂上"与它相连的这几条走廊"，点一条就去推演 */
+.nrn-city-lines{display:flex;flex-direction:column;gap:3px;margin-top:6px}
+.nrn-city-lines button{display:flex;justify-content:space-between;gap:8px;align-items:baseline;
+  text-align:left;padding:5px 8px;border-radius:6px;border:1px solid rgba(70,110,140,.3);
+  background:rgba(12,38,54,.5);color:#cfe6f5;font-size:11.5px;cursor:pointer}
+.nrn-city-lines button:hover{background:rgba(89,223,252,.12);border-color:rgba(89,223,252,.35)}
+.nrn-city-lines button b{font-weight:500;color:#e6f8ff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nrn-city-lines button span{font-size:10.5px;color:#7d9cb3;flex:0 0 auto}
 
 .nrn-table{display:flex;flex-direction:column;gap:8px;min-height:0}
 .nrn-table-hd h3{margin:0;font-size:13px;color:#eaf6ff}
@@ -1455,9 +1576,30 @@ html[data-theme="light"] .nrn-alert-go{color:#0b7ea6}
 .ev-step code.DERIVED{color:#ffd479;background:rgba(245,190,60,.14)}
 .ev-step code.OFFICIAL{color:#c6b4ff;background:rgba(160,140,255,.14)}
 .ev-note{margin:6px 0 0;font-size:10.5px;color:#ffcf7a;line-height:1.6}
+.ev-llm{margin-left:auto;font-style:normal;font-size:9.5px;padding:1px 6px;border-radius:999px;
+  color:#6fe0a8;border:1px solid rgba(80,200,140,.45);background:rgba(40,140,95,.14);white-space:nowrap}
+.ev-llm.off{color:#ffcf7a;border-color:rgba(220,170,60,.5);background:rgba(180,130,30,.14)}
 .ev-note.quiet{color:#6f92a8}
 .ev-err{color:#ffa08a;font-size:11px}
-.nrn-state{margin:6px 0;color:#8fb2c8;font-size:12px}
+.nrn-state{margin:6px 0;color:#8fb2c8;font-size:12px;line-height:1.6;
+  background:rgba(14,32,48,.6);border:1px solid rgba(70,110,140,.35);
+  border-left:3px solid #59dffc;border-radius:0 6px 6px 0;padding:6px 10px;max-width:760px}
+.nrn-state::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;
+  background:#59dffc;margin-right:7px;vertical-align:middle;animation:nrn-pulse 1.1s ease-in-out infinite}
+@keyframes nrn-pulse{0%,100%{opacity:.25}50%{opacity:1}}
+.nrn-state b{color:#cfe6f5;font-weight:500;font-variant-numeric:tabular-nums}
+html[data-theme="light"] .nrn-state{color:#31556f !important;background:#fff !important;
+  border-color:#dbe6f1 !important;border-left-color:#2a7fb8 !important}
+html[data-theme="light"] .nrn-state::before{background:#2a7fb8}
+html[data-theme="light"] .nrn-metrics b{color:#0f3550 !important}
+html[data-theme="light"] .nrn-metrics span{color:#5b7a92 !important}
+html[data-theme="light"] .nrn-metrics .m{border-left-color:#dbe6f1 !important}
+html[data-theme="light"] .nrn-metrics .m.warn b{color:#8a5a00 !important}
+html[data-theme="light"] .nrn-metrics .m.bad b{color:#a8321f !important}
+html[data-theme="light"] .nrn-state b{color:#14567d !important}
+html[data-theme="light"] .ev-llm{color:#0f7a52 !important;border-color:#8ecbb0 !important;background:#e6f6ee !important}
+html[data-theme="light"] .ev-llm.off{color:#7a5200 !important;border-color:#e6cf9c !important;background:#fdf6e7 !important}
+html[data-theme="light"] .ev-note{color:#7a5200 !important}
 .nrn-state.bad{color:#ffa08a}
 .nrn-state button{margin-left:8px;background:#17394d;border:1px solid #2e6b85;color:#bfe9ff;border-radius:5px;padding:2px 8px;cursor:pointer}
 
@@ -1466,13 +1608,11 @@ html[data-theme="light"] .nrn-alert-go{color:#0b7ea6}
  * 抬字号会把一屏撑破，所以必须同时压缩 padding，否则地图会被挤没。 */
 @media(max-width:1500px){
   .nrn-monitor,.nrn-legend,.nrn-sub{font-size:11px}
-  .nrn-total span,.nrn-block-hd span,.nrn-prov span,.nrn-city-list span{font-size:11px}
-  .nrn-total b{font-size:14px}
-  .nrn-block-hd b,.nrn-prov b,.nrn-city-list b{font-size:11.5px}
+  .nrn-block-hd span,.nrn-prov span,.nrn-city-list span{font-size:11px}
+    .nrn-block-hd b,.nrn-prov b,.nrn-city-list b{font-size:11.5px}
   .nrn-block-hd em,.nrn-prov em,.nrn-city-list em{font-size:11px}
   .nrn-tools{gap:5px}
   .nrn-tools button,.nrn-tools select{font-size:11px;padding:3px 7px}
-  .nrn-tabs button{font-size:11.5px;padding:4px 10px}
   .nrn-detail p,.nrn-detail p>b{font-size:11px}
   .nrn-detail header b{font-size:12.5px}
   .nrn-side h3{font-size:11.5px}
@@ -1494,9 +1634,7 @@ html[data-theme="light"] .nrn-alert-go{color:#0b7ea6}
   .nrn-tools{gap:4px}
   .nrn-tools button,.nrn-tools select{font-size:10.5px;padding:2px 6px}
   .nrn-tools input[type=range]{min-width:80px}
-  .nrn-total b{font-size:15px}
-  .nrn-total span{font-size:10px}
-}
+    }
 @media(max-width:1180px){
   .nrn-body{grid-template-columns:minmax(0,1fr) 320px}
   .nrn-detail .cols{grid-template-columns:repeat(2,minmax(0,1fr))}

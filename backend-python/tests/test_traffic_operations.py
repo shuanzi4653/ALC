@@ -11,7 +11,13 @@ def plan(monkeypatch, tmp_path):
     data = dict(status='READY', sessionId='a'*24, flights=[flight],
                 stats=dict(carRoutes=53, deliveryRoutes=108, accepted=1, closed=0))
     monkeypatch.setattr(operations.service, 'session', lambda *_: data)
-    monkeypatch.setattr(operations, 'JOURNAL', tmp_path/'journal.json')
+    journal = tmp_path/'journal.json'
+    # 显式从"空日志"开始：这条动线要求 23 次 build 全部落成新行，
+    # 一旦起点里有同 sessionId + 同 planRevision 的残留（整包运行时出现过一次），
+    # `note_build` 的去重会把第一行吞掉，断言就变成"少一条"。
+    # 写空数组比"依赖文件不存在"更确定，失败时也直接指向起点不干净。
+    journal.write_text('[]', encoding='utf-8')
+    monkeypatch.setattr(operations, 'JOURNAL', journal)
     return data
 
 

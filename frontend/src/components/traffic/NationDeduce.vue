@@ -291,8 +291,11 @@ function clock(iso) {
 /* 侧栏的通用规则是 `.nrn-side>*{flex:0 0 auto}`（每块按内容高度），
    但推演板内容比一屏高：不改成可收缩，它会把侧栏撑破、压到下面的详情卡上。 */
 /* 特异性要和父组件的 `.nrn-side>*`（带两个 scope 属性）打平还要高一点，
-   否则谁后加载谁生效 —— 实测父组件的 0 0 auto 赢，板子照样撑破侧栏。 */
-:global(.nrn-side)>.dd.dd{flex:1 1 auto;min-height:0}
+   否则谁后加载谁生效 —— 实测父组件的 0 0 auto 赢，板子照样撑破侧栏。
+   别写 `:global(.nrn-side)`：当前 Vue 编译会把 `:global()` 之后的复合选择器整段丢掉，
+   规则变成只作用于 <html>，等于没写。作用域属性只加在最后一个复合选择器（.dd）上，
+   祖先 `.nrn-side` 不需要它，所以直接写普通后代选择器即可。 */
+.nrn-side>.dd.dd{flex:1 1 auto;min-height:0}
 .dd-head{display:flex;align-items:center;gap:8px}
 .dd-head b{font-size:14px;letter-spacing:.3px;color:#eaf8ff}
 .dd-head code{font-size:10.5px;color:#6f92a8;margin-left:6px}

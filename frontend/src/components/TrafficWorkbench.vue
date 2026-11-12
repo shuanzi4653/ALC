@@ -3,8 +3,6 @@ import {computed,onBeforeUnmount,onMounted,onUnmounted,ref,watch,nextTick} from 
 import {requestJson,postAction,operatorRole,setOperatorRole} from '../api.js'
 import OperationsConsole from './OperationsConsole.vue'
 import {isCaseMode, caseQuery, caseMeta} from '../traffic/caseMode.js'
-import TrafficScene from './CityTrafficMap.vue'
-import DispatchBoard from './traffic/DispatchBoard.vue'
 import WeatherSourceSwitch from './traffic/WeatherSourceSwitch.vue'
 import NationPanel from './traffic/NationPanel.vue'
 import NationBriefing from './traffic/NationBriefing.vue'
@@ -30,6 +28,9 @@ const NATION_HINTS={
 function nationViewOf(section){
   if(section==='alerts') return 'alerts'
   if(section==='assistant') return 'ledger'
+  // 气象监测 = 情报：左侧班次/空域两张表，右侧保留逐市实况与回波/雾统计。
+  // 以前这一页是"地图 + 宽气象栏"，和首页那张图重复；地图只在态势页出现一次。
+  if(section==='weather') return 'intel'
   return 'map'
 }
 function onScopeChange(next){
@@ -48,7 +49,9 @@ function openCorridor(payload){
   corridorFocusId.value=''
   // 先清空再赋值：同一条走廊连续点两次，子组件也要能再收到一次
   nextTick(()=>{ corridorFocusId.value=corridorId })
-  activeSection.value='profile'
+  // 处置 → 走廊剖面（人工裁决）；日志 → 推演（六段链路）。
+  // 载荷里带 target:'card' 是日志入口，其余一律落剖面。
+  activeSection.value=(payload&&payload.target==='card')?'card':'profile'
 }
 
 const intelTab=ref('flight'),settings=ref(false),operations=ref([]),operationsReady=ref(false),commandBusy=ref(false),mapExpanded=ref(false)
@@ -90,7 +93,8 @@ const showEvents=ref(true),showObservations=ref(true),search=ref(''),status=ref(
 let generation=0,weatherGeneration=0,poll=null,timer=null,disposed=false
 const stateNames={AIRBORNE:'飞行中',HOLD:'等待放行',PENDING:'待执行',ARRIVED:'已到达',CLOSED:'已关闭'}
 const phaseNames={CLIMB:'爬升',CRUISE:'巡航',DESCENT:'下降',AIRBORNE:'飞行中',HOLD:'待放行',PENDING:'待执行',ARRIVED:'已到达',CLOSED:'已关闭'}
-const provinces=['辽宁省','吉林省','黑龙江省']
+// 东北三省的省份名单随顶栏下拉一起撤掉了（V1.0.6）：那套过滤只服务旧 session，
+// 而界面上的每一页现在都读全国载荷。全国 → 大区 → 省 → 市 的分级在 scope.js 里。
 const appliedOperationKey=computed(()=>operations.value.flatMap((op,i)=>op.minute<=minute.value?[i]:[]).join(','))
 const flights=computed(()=>session.value?.status==='READY'&&operationsReady.value?effectiveFlights(session.value.flights,appliedOperationKey.value?appliedOperationKey.value.split(',').map(i=>operations.value[Number(i)]):[],Infinity):[])
 const filtered=computed(()=>filterLedgerRows(flights.value,{showCar:showCar.value,showDelivery:showDelivery.value,city:city.value,search:search.value,status:status.value,minute:minute.value}))
@@ -132,7 +136,24 @@ const mapFlights=computed(()=>{
 })
 const boardFlights=computed(()=>flights.value.filter(f=>!city.value||[f.fromCity,f.toCity].includes(city.value)))
 const counts=computed(()=>{const c={AIRBORNE:0,HOLD:0,PENDING:0,ARRIVED:0,CLOSED:0};for(const f of scoped.value)c[flightState(f,minute.value)]++;return c})
-const cityName=computed(()=>network.value?.cities.find(c=>c.id===city.value)?.name||'全域')
+// 顶栏的作用域文字：全国 / 全国 / 华北 。层级名与 scope.js 的 SCOPE_LEVEL_LABEL 同源，
+// 不在这里另写一套中文（否则"大区"和"区域"会同时出现在两块界面上）。
+const scopeTrailText=computed(()=>{
+  const s=store.scope||{}
+  if(!s.level||s.level==='nation') return '全国'
+  return `全国 / ${s.label||s.id||''}`
+})
+function resetNationScope(){
+  const next={level:'nation',id:'',label:'全国'}
+  store.scope=next
+  writeScopeToUrl(next)
+  activeSection.value='home'
+}
+const scopeDrilled=computed(()=>{
+  const level=store.scope?.level
+  return !!level&&level!=='nation'
+})
+const cityName=computed(()=>network.value?.cities.find(c=>c.id===city.value)?.name||scopeTrailText.value)
 const location=computed(()=>{const pts=trajectoryOf(selected.value);return pts.length?atTime(pts,minute.value):null})
 const actualTimes=computed(()=>executionTimes(selected.value,minute.value))
 const selectedPhase=computed(()=>selected.value?flightPhase(selected.value,minute.value):'')
@@ -420,9 +441,9 @@ const mapStatusText=computed(()=>{
   return status.buildings?`地图：已载入 · ${status.buildings} 个建筑要素`:'地图：已载入'
 })
 const progressView=computed(()=>buildProgressView(session.value))
-// 全国范围的三个视图（全国台、全国情报、全国台账）都不参与东北建场
-// 全国台覆盖的视图：这些页面里不显示东北的「建场进度条」。
-// 全国网是 SIM，不参与东北建场，挂一条 0% 的进度条只会让人以为卡死了。
+// 全国台的视图：这些页面读的是全国载荷（319 市 / 492 条航线），不参与"建场"。
+// 全国网是 SIM，逐分钟解析式生成，没有"建场"这一步；挂一条 0% 的建场进度条
+// 只会让人以为卡死了，所以这些页面一律不显示进度条。
 const NATION_VIEWS=['home','national','overview','weather','profile','alerts','assistant','card']
 const nationScopeView=computed(()=>{
   if(NATION_VIEWS.includes(activeSection.value)) return true
@@ -510,12 +531,19 @@ function onPopState(){
 function applyHash(){
   const raw=String(window.location.hash||'').replace(/^#\/?/,'').replace(/\/+$/,'')
   let section=sectionFromHash(window.location.hash)
-  // 旧地址 `#/situation/national` 静默归到 home：外部测试说明里给过这个链接，
-  // 不能让同学点到"导航里不存在的一页"。
+  // 旧地址静默归到现有页面，不能让同学点到"导航里不存在的一页"：
+  // `#/situation/national` → home；`#/corridor/briefing` → weather（V1.0.5 情报并入气象监测）。
   if(section==='national') section='home'
-  const known = raw === '' || Object.values(SECTION_HASHES).includes(raw)
-  if(!known){ try{ window.location.hash = sectionHash('home') }catch(_){} }
+  if(section==='briefing') section='weather'
   if(section&&section!==activeSection.value)activeSection.value=section
+  // **地址栏必须与页面一致**，否则刷新一次就回到别的页。
+  // 以前这里只判 `raw` 在不在 SECTION_HASHES 里：`#/corridor/briefing` 不在 → 直接改写 home，
+  // 把上面刚解析出来的 weather 覆盖掉（实测打开旧链接落在运行首页）；
+  // 而 `#/situation/national` 在表里 → 不改写，于是地址写 national、页面是 home，刷新又跳一次。
+  // 现在统一按"解析后的分节"回写：地址永远等于页面，旧地址顺手升级成新地址。
+  const want=sectionHash(section||'home')
+  const wantRaw=want.replace(/^#\//,'')
+  if(raw!==wantRaw){ try{ window.location.hash=want }catch(_){} }
 }
 
 const TOUR_STEPS=[
@@ -580,13 +608,33 @@ watch([activeSection,mapExpanded],async()=>{await nextTick();if(workbench.value)
 watch(()=>weatherBucket(minute.value),loadWeather)
 watch(city,()=>{weather.value=null;loadWeather()})
 watch(()=>filtered.value.length,()=>{page.value=Math.min(page.value,Math.max(1,Math.ceil(filtered.value.length/20)))})
+// 顶栏的推演时刻：全国台自己报（它有自己的 0–1440 分钟），旧 session 页用本组件的 minute。
+const nationMinute=ref(0), nationPlaying=ref(true)
+const topMinute=computed(()=>nationScopeView.value?nationMinute.value:minute.value)
+const topPlaying=computed(()=>nationScopeView.value?nationPlaying.value:playing.value)
+function onNationTick(payload){
+  nationMinute.value=Number(payload?.minute)||0
+  nationPlaying.value=!!payload?.playing
+}
+
+// 真实北京时间：每秒刷一次。只驱动顶栏这一个数字，不参与任何推演计算。
+const wallClock=ref('')
+let wallTimer=0
+function tickWallClock(){
+  const d=new Date()
+  const p=n=>String(n).padStart(2,'0')
+  wallClock.value=`${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+}
+
 onMounted(()=>{initialize();window.addEventListener('keydown',onGlobalKey);timer=setInterval(()=>{
   if(!playing.value||!ready.value)return
   const step=Number(speed.value)*.2
   minute.value=Math.min(480,minute.value+step)
   if(minute.value===480)playing.value=false
 },200)})
+onMounted(()=>{ tickWallClock(); wallTimer=setInterval(tickWallClock,1000) })
 onUnmounted(()=>{
+  clearInterval(wallTimer)
   if(relayRetryTimer)clearTimeout(relayRetryTimer);disposed=true;++generation;++weatherGeneration;window.removeEventListener('keydown',onGlobalKey);clearTimeout(poll);clearInterval(timer);clearInterval(buildClock)})
 </script>
 <template>
@@ -596,8 +644,18 @@ onUnmounted(()=>{
   </p>
   <header class="wb-top" data-workbench-top>
     <span class="wb-brand"><b>天窗智巡</b><em>低空航路气象风险裁决</em></span>
-    <span class="wb-scope" data-scope-label>{{ cityName }}</span>
-    <span class="nav-timebase" data-time-basis :title="`全站唯一时间基准：运行分钟 ${minute} · 数据快照 ${session?.seed ?? '—'}`">时间基准 {{ clock(minute) }}</span>
+    <!-- 作用域（V1.0.6）：全国 → 大区 → 省 → 市 的唯一显示点。
+         没下钻时是静态标签；下钻之后变成一个按钮，点一下回全国 —— 否则从带 scope 的
+         链接进来，用户只能靠浏览器后退才知道"现在看的是河北省"。 -->
+    <button v-if="scopeDrilled" class="wb-scope wb-scope-jump" data-scope-jump
+            :title="`当前作用域：${scopeTrailText}（全国 → 大区 → 省 → 市）；点一下回到全国`"
+            @click="resetNationScope">{{ scopeTrailText }} · 回全国</button>
+    <span v-else class="wb-scope" data-scope-label>{{ cityName }}</span>
+    <!-- 两个时间分开写：右边那个是**真实的北京时间**，每秒走；
+         左边那个是**推演时刻**，暂停时会停住。以前只有一个"时间基准"，
+         用户暂停后看到它也停了，会以为整站卡死。 -->
+    <span class="nav-clock" data-wall-clock :title="'本机时区的当前时间，与推演无关，暂停时照常走'">北京时间 {{ wallClock }}</span>
+    <span class="nav-timebase" data-time-basis :class="{paused:!topPlaying}" :title="`推演时刻：运行第 ${Math.round(topMinute)} 分钟${topPlaying?'（播放中）':'（已暂停）'}`">推演 {{ clock(topMinute) }}<template v-if="!topPlaying"> · 已暂停</template></span>
     <span class="relay-pill" v-if="radarRelay.status!=='idle'" role="status" data-radar-relay
           :class="radarRelay.status" :title="'实测雷达' + radarRelay.detail">
       雷达 {{ radarRelay.status==='ok' ? (radarRelay.slot||'').slice(11,16) : radarRelay.status==='running' ? '代取中' : '代取失败' }}
@@ -615,11 +673,16 @@ onUnmounted(()=>{
   <div class="wb-shell">
   <nav class="operations-nav" :class="{'rail-collapsed':railCollapsed}" data-nav-groups>
     <div class="nav-groups"><button v-for="group in NAV_GROUPS" :key="group.key" :data-group="group.key" class="nav-group" :class="{active:activeGroup?.key===group.key}" @click="gotoGroup(group.key)"><em>{{ group.no }}</em>{{ group.label }}</button></div>
-    <div class="nav-subs" v-if="activeGroup" :data-group="activeGroup.key"><template v-for="group in NAV_GROUPS" :key="group.key"><button v-for="sub in visibleSubs(group)" :key="sub.key" :data-section="sub.key" v-show="group.key===activeGroup?.key" :class="{active:entryKey===sub.key,'group-active':entryKey===sub.key&&sub.merged}" @click="activeSection=sub.key">{{ sub.label }}</button></template><template v-if="entryTabList.length"><span class="nav-tab-sep" aria-hidden="true">|</span><button v-for="tab in entryTabList" :key="tab.key" class="nav-entry-tab" :data-entry-tab="tab.key" :class="{active:activeSection===tab.key}" @click="activeSection=tab.key">{{ tab.label }}</button></template></div>
+    <!-- 点亮规则只有一条：**当前页是谁就亮谁**（V1.0.4）。
+         以前用 `entryKey===sub.key` —— 那是"入口"，不是"当前页"，
+         于是「推演」和页内「口径与来源」同时亮、点完也不灭。
+         合并入口在"当前页是它的兄弟 tab"时只保留"你在这个入口里"的弱标识（entry-context）。 -->
+    <div class="nav-subs" v-if="activeGroup" :data-group="activeGroup.key"><template v-for="group in NAV_GROUPS" :key="group.key"><button v-for="sub in visibleSubs(group)" :key="sub.key" :data-section="sub.key" v-show="group.key===activeGroup?.key" :class="{active:activeSection===sub.key, 'entry-context':sub.merged&&sub.members.includes(activeSection)&&activeSection!==sub.key&&!entryTabList.some(t=>t.key===activeSection)}" @click="activeSection=sub.key">{{ sub.label }}</button></template><template v-if="entryTabList.length"><span class="nav-tab-sep" aria-hidden="true">|</span><button v-for="tab in entryTabList" :key="tab.key" class="nav-entry-tab" :data-entry-tab="tab.key" :class="{active:activeSection===tab.key}" @click="activeSection=tab.key">{{ tab.label }}</button></template></div>
     <div class="nav-fill">
-      <!-- 这个下拉只对东北那套（session/network）有效；全国台用 scope 下钻，
-         把它挂在首页会显示"东北三省 · 全域"，让人以为全国页还是东北的。 -->
-      <label class="nav-region" v-if="!nationScopeView" title="运行区域"><select aria-label="运行区域" v-model="city" @change="selectedId='';page=1"><option value="">东北三省 · 全域</option><optgroup v-for="p in provinces" :label="p" :key="p"><option v-for="c in network?.cities.filter(c=>c.province===p)||[]" :key="c.id" :value="c.id">{{c.capital?'省会 · ':''}}{{c.name}}</option></optgroup></select></label>
+      <!-- V1.0.6：这里原来挂的是东北三省的城市下拉（v-model=city），只对旧 session 有过滤
+           作用；而界面上的页面都读全国载荷，下拉一挂上去就写着"东北三省 · 全域"，等于把全国页
+           说回东北。三省下拉已撤，作用域改到顶栏那个胶囊上（见 `.wb-scope-jump`）——
+           侧栏只有 176 px，放 label + 控件会溢出到正文上（实测按钮落在 x=216）。 -->
 
       <button class="nav-toggle" data-settings-toggle :class="{on:settings}" :aria-pressed="settings" title="运行设置：情景、重新调度、信息密度、本页可做" @click="settings=!settings">设置</button>
     </div>
@@ -635,75 +698,57 @@ onUnmounted(()=>{
 
   <!-- V1.0.2：首页就是全国四级态势（全国 → 大区 → 省 → 市）。
        `national` 是旧地址，applyHash 已把它归到 home，这里一并渲染同一组件，
-       所以不存在"两套全国页"。东北那张 maplibre 运行图（HomeStage）
-       不再当首屏 —— 它会以四级通用的形式在三维里回来（T19）。 -->
+       所以不存在"两套全国页"。旧的首屏组件 `HomeStage.vue`（一张 maplibre 运行图）
+       在 9aafd7f 之后**已经没有任何地方引用**，只剩测试还在读它的源码；
+       三维能力已下线，`NationGlobe.vue` 同批删除。是否删除 HomeStage 取决于要不要
+       保留那批只针对它的用例（删了用例数会从 506 掉下来，材料里的数字要跟着改）。
+       V1.0.6 决定：**先留着组件文件，界面上不再引用**。 -->
   <section class="traffic-page national-page" v-if="activeSection==='home'||activeSection==='national'">
     <!-- 首页这一份也要接 open-corridor：处置事件在首页的「处置」页签里点开，
          没有这个监听就只会原地不动（实测点了没反应）。 -->
     <NationPanel :scope-key="nationScopeKey" :focus-corridor="corridorFocusId"
-                 @scope-change="onScopeChange" @open-corridor="openCorridor"/>
+                 @scope-change="onScopeChange" @open-corridor="openCorridor" @tick="onNationTick"/>
   </section>
-  <div class="scope-bar" v-if="activeSection==='overview'" data-scope-bar-overview>
-    <b>运行总览</b>
-    <button :class="{on:scope==='nation'}" @click="scope='nation'">全国</button>
-    <button :class="{on:scope==='ne'}" @click="scope='ne'">东北</button>
-    <span class="scope-note">{{ scope==='nation'?'全国 · 点区块逐级下钻，数字随作用域变':'东北三省 · V1.0.0 原运行图' }}</span>
-  </div>
-  <!-- 运行总览同样四级：全国走全国台，切到东北才用 V1.0.0 那张 maplibre 运行图。
-       两者共用同一个 scope 变量，避免"总览是东北、情报是全国"的错位。 -->
+  <!-- 运行总览与首页共用同一个全国台，只是首屏视图不同（总览落台账）。
+       两者读同一个 scope 变量，避免"总览在一级、情报在另一级"的错位。 -->
   <!-- 运行总览默认落「台账」视图：首页已经是地图态势，两个入口看同一张图没有意义。
        总览给的是逐班次数据，首屏看地图、要看数就点这里。 -->
   <section class="traffic-page national-page" v-if="activeSection==='overview'&&scope==='nation'">
-    <NationPanel :scope-key="nationScopeKey" initial-view="ledger" @scope-change="onScopeChange"/>
+    <NationPanel :scope-key="nationScopeKey" initial-view="ledger" @scope-change="onScopeChange" @tick="onNationTick"/>
   </section>
-  <section class="traffic-main" v-if="activeSection==='overview'&&scope==='ne'">
-    <div class="traffic-map-panel"><div class="traffic-map-heading"><div><h2>{{city?cityName:'全域运行总览'}} <small>{{city?'城区配送网络':'东北三省城市网络'}}</small></h2><span>{{clock(minute)}} · {{city?'配送起降点与航路交汇':'在导航栏选择运行区域，或直接点地图上的城市'}}</span></div><div><button v-if="city" @click="locateDelivery" :disabled="!ready">定位配送航班</button> <button @click="scene?.reset()">复位视角</button> <button @click="mapExpanded=!mapExpanded">{{mapExpanded?'退出专注':'地图专注'}}</button></div></div><div class="traffic-layer-row"><div class="traffic-layer-toggles"><label v-for="layer in layerRows" :key="layer.key" :title="layer.title"><input type="checkbox" :checked="homeLayers[layer.key]" @change="toggleLayerRow(layer.key)"><i :class="layer.rowDot"></i>{{layer.label}}</label>                    <span class="traffic-ribbon-count" v-if="overviewRibbon.length" data-overview-ribbon>
-            走廊带 {{ overviewRibbon.length }} 条
-          </span>
-          <details class="traffic-legend"><summary>图例</summary>
-            <span>走廊带：蓝＝可飞 / 橙＝需谨慎（不可飞不画） · 航迹：青＝飞行汽车 / 淡紫＝无人机 / 橙＝绕行 · 橙黄＝须绕飞 · 深橙＝禁止进入 · 淡紫面＝层状降水可穿越 · 灰：深灰＝能见度低于禁飞阈值 / 浅灰＝能见度偏低 · 冷色＝官方管制 · 事件：深橙＝停止放行 / 橙＝气象成因 / 蓝＝非气象成因</span>
-          </details></div></div><TrafficScene v-if="network" ref="scene" :network="network" :flights="mapFlights" :minute="minute" :city="city" :selected="selected" :weather="weather" :playing="playing" :show-car="showCar" :show-delivery="showDelivery" :show-weather="channel.modelVisible" :show-wind="showWind" :show-radar="channel.radarVisible" :show-fog="showFog" :show-fixed-zones="showFixedZones" :show-events="showEvents" :show-observations="showObservations" :alert-flights="scoped" :ribbon="overviewRibbon" @select-city="chooseCity" @select-flight="chooseFlight" @select-event="onSelectEvent" @map-status="onMapStatus"/></div>
-    <aside class="traffic-detail"><div class="traffic-panel-title">班次空间剖面<span class="detail-scope">{{city?cityName+' · 已按区域收窄':'东北三省 · 全域'}}</span></div><template v-if="selected"><div class="traffic-flight-title"><small>{{modeNames[selected.mode]}} · {{phaseNames[selectedPhase]}}</small><h2>{{selected.name}}</h2><code>{{selected.id}}</code></div><div class="detail-grid"><div><small>申请起飞</small><b>{{operationalTime(selected.requestedDepartureAt,selected.requestedDepartureMinute)}}</b></div><div><small>计划放行</small><b>{{operationalTime(selected.plannedReleaseAt,selected.departureMinute)}}</b></div><div><small>实际放行</small><b>{{operationalTime(actualTimes.actualReleaseAt,selected.departureMinute)}}</b></div><div><small>预计到达</small><b>{{operationalTime(selected.estimatedArrivalAt,selected.arrivalMinute)}}</b></div><div><small>延迟 / 绕行增时</small><b>{{selected.delayMinutes}} / {{selected.detourMinutes}} 分</b></div><div><small>当前高度（AGL）</small><b>{{selectedState==='AIRBORNE'?Math.round(location?.[2]||0):0}} m</b></div></div><div class="traffic-profile"><span>高度 / 飞行时间剖面</span><svg viewBox="0 0 300 110" role="img" aria-label="飞行高度剖面"><path d="M10 10V90H290" stroke="#35516b" fill="none"/><polyline :points="profile(trajectoryPoints)" fill="none" stroke="#59dffc" stroke-width="2"/><text x="12" y="105" fill="#86a6bd" font-size="9">起点 / 地面</text><text x="228" y="105" fill="#86a6bd" font-size="9">终点 / 地面</text></svg><small>最高 {{selected.maxAltitudeM??'—'}} m · {{clearanceStatusName(selected.clearanceStatus)}}</small></div><div class="traffic-reason"><h3>{{actionNames[selected.separationAction]}}</h3><p>{{reasonNames[selected.reason]}}</p><p>起降点：{{selected.fromPad}} → {{selected.toPad}}</p><p v-if="selected.conflictWith?.length">处理过 {{selected.conflictWith.length}} 个关联冲突（最多展示 8 个）。</p><details v-if="selected.conflictWith?.length"><summary>查看关联班次</summary><div v-for="id in selected.conflictWith" :key="id"><code>{{id}}</code></div></details><div class="traffic-clearance" v-if="clearanceRows.length"><h3>放行许可</h3><dl><template v-for="row in clearanceRows" :key="row.label"><dt>{{row.label}}</dt><dd>{{row.value}}</dd></template></dl><small>许可要素由本班次已写定的计划字段组装，不重新计算；标“未指派”/“未取得”的要素为计划中确无该项。</small></div><div class="traffic-static-crossing" v-if="selectedCrossings"><h3>固定管制区穿越记录</h3><p>{{selectedCrossings}}</p><small v-if="selected.staticAirspace?.prohibited">含 {{selected.staticAirspace.prohibited}} 处禁入区：该区域未获批准不得进入，本班次的记录仅用于追溯，不构成批准。</small><small v-else>按《无人驾驶航空器飞行管理暂行条例》第十九条，进入固定管制空域须经批准；机场净空按自动审批放行（2026-11-10 口径），穿越只留痕、不排队、不阻断。</small></div></div><button v-if="trajectoryPoints.length" @click="minute=selected.departureMinute;playing=false">跳到计划起飞</button><button v-if="selected.departureMinute!=null&&minute<selected.departureMinute" :disabled="commandBusy||!ready" @click="commandFlight">{{commandBusy?'操作中…':selected.manuallySuspended?'申请恢复并复核':'暂停此班次'}}</button><button @click="activeSection='assistant'">研判此班次</button></template><template v-else><div class="traffic-empty"><span>↗</span><h3>选择一个班次</h3><p>在“调度台账”选择班次，查看起降点、时间进程与经过检查的高度剖面。</p></div><div class="traffic-rules"><h3>当前运行规则</h3><p>飞行汽车：省内邻城相连；跨省仅沈阳—长春—哈尔滨。</p><p>无人机外卖：每城多节点模拟订单，业务限定城区服务范围。</p><p>对向航线分侧、分层并预约起降资源；无可用时隙则延后或关闭。</p><p>天气按有效时段评估，公开天气模式明确标注为模型估算。</p></div></template><p class="traffic-disclaimer">城市底图来自开放地图数据；交通为模拟运行。当前本地未覆盖全部航迹的 DEM 与建筑高度，净空状态会明确显示。</p></aside>
-  </section>
-  <DispatchBoard v-show="activeSection==='overview'&&scope==='ne'" :flights="boardFlights" :minute="minute" :selected-id="selectedId" :settings="deliverySettings" :plan-revision="session?.planRevision||''" :ready="ready" :preview-count="4" @select="chooseFlight" @follow="followFlight" @toggle-hold="commandFlight"/>
-  <section class="traffic-playback" v-show="activeSection==='overview'&&scope==='ne'"><button class="primary" :disabled="!ready||session?.scenario==='unknown'" @click="playing=!playing">{{playing?'Ⅱ 暂停':'▶ 推演'}}</button><strong>{{clock(minute)}}</strong><input aria-label="运行推演时间" type="range" min="0" :max="playbackMax" step="0.1" v-model.number="minute" :disabled="!ready"><span>{{playbackMaxLabel}}</span><select aria-label="推演速度" v-model.number="speed"><option :value=".25">15 倍速</option><option :value="1">60 倍速</option><option :value="5">300 倍速</option></select><span class="playback-note">{{ready?delayNote:'前 3 小时发班 · 后续观察至 8 小时（若长航线越界，窗口按最晚到达自动放宽）'}}</span></section>
-  <!-- 全国作用域下，气象/走廊/处置/取证四页都走全国台，各自落不同视图。
-       东北分支保留：切到「东北」时回到 V1.0.0 那套页面，一行没删。 -->
+  <!-- V1.0.5：一个分节只放一个视图。气象监测=情报（左表右气象统计）、
+       运行总览=台账、处置=处置，各自由左侧导航进入；页内不再有 tab 条，
+       也不再有第二个作用域变量 —— 全国 → 大区 → 省 → 市 只有 store.scope 一处。 -->
   <section class="traffic-page national-page"
-           v-if="scope==='nation'&&['weather','profile','alerts','assistant','card'].includes(activeSection)">
+           v-if="['weather','profile','alerts','assistant','card'].includes(activeSection)">
     <NationPanel :scope-key="nationScopeKey" :initial-view="nationViewOf(activeSection)"
                  :mode="activeSection==='weather'?'weather':(activeSection==='card'?'card':(activeSection==='profile'?'corridor':(activeSection==='assistant'?'evidence':'')))"
                  :hint="NATION_HINTS[activeSection]||''"
                  :focus-corridor="corridorFocusId"
-                 :hide-tabs="activeSection!=='home'" @scope-change="onScopeChange"
-                 @open-corridor="openCorridor"/>
+                 :hide-tabs="false" @scope-change="onScopeChange"
+                 @open-corridor="openCorridor" @tick="onNationTick"/>
   </section>
   <OperationsConsole v-if="!['home','overview','schedule','national'].includes(activeSection)&&!['briefing','weather','profile','alerts','assistant','card'].includes(activeSection)" :corridor-focus="corridorFocus" :corridor-pair="corridorPair" :view="activeSection" :session="session" :network="network" :flights="scoped" :weather="weather" :selected="selected" :minute="minute" :city-name="cityName" :operations="operations" :density="density" :focus="drillFocus" :weather-mode="weatherMode" :weather-mode-status="weatherModeStatus" :alert-flights="scoped" :event-focus="eventFocus" :ai-reviewed="aiReviewed" @select-flight="chooseFlight" @weather-mode-change="onWeatherModeChange" @locate-event="locateEvent" @ai-reviewed="onAiReviewed" @open-section="activeSection=$event" @seek="minute=$event" @open-corridor="openCorridor" :max-minute="playbackMax"/>
-  <!-- 全国范围：运行情报 / 调度台账接的是全国数据；切回东北就是 V1.0.0 原页 -->
-  <section class="traffic-page scope-page" v-if="scope==='nation'&&(activeSection==='briefing'||activeSection==='schedule')">
+  <!-- 调度台账：处置大类下的第二个页签。情报已经并到「气象监测」，这里只剩台账。 -->
+  <section class="traffic-page scope-page" v-if="activeSection==='schedule'">
     <div class="scope-bar" data-scope-bar>
-      <b>{{ activeSection==='briefing'?'运行情报':'调度台账' }}</b>
-      <template v-if="activeSection==='briefing'">
-        <button :class="{on:intelTab==='flight'}" data-intel-tab="flight" @click="intelTab='flight'">班次情报</button>
-        <button :class="{on:intelTab==='airspace'}" data-intel-tab="airspace" @click="intelTab='airspace'">空域情报</button>
-      </template>
-      <button :class="{on:scope==='nation'}" @click="scope='nation'">全国</button>
-      <button :class="{on:scope==='ne'}" @click="scope='ne'">东北</button>
-      <span class="scope-note">{{ scope==='nation'?'气象与雷达为公开源实况；交通为模拟（SIM），不参与运行计划':'东北三省 · V1.0.0 原页' }}</span>
+      <b>调度台账</b>
+      <span class="scope-note">气象与雷达为公开源实况；交通为模拟（SIM），不对应真实航班</span>
     </div>
+    <!-- 密度档在这里生效：值班员/指挥默认展开口径说明，演示档收起。
+        （`DENSITY_POLICY.ledger` 必须有界面消费点，否则切档位屏幕上什么都不变 ——
+        消费点就是下面这条 `<details>`；别处再挂一份会让"密度变了、屏幕没变"。） -->
+    <details class="ledger-note density-fold" :open="densityPolicy(density).ledger" data-density="ledger">
+      <summary>这一页的数怎么来的</summary>
+      <p>台账按当前分钟的快照重算：起降时刻是计划值，绕飞 / 停飞是<b>此刻</b>的裁决结果。
+        交通为模拟派生（SIM），气象与雷达来自公开源；两者不合并成"综合风险"一个数。</p>
+    </details>
     <!-- 给组件一个确定高度的槽位：它内部靠 flex:1 让表体滚动，父级不给高度就不滚 -->
     <div class="scope-body">
-      <NationBriefing :view="activeSection==='briefing'?(intelTab==='flight'?'ledger':'intel'):'ledger'"
-                      :variant="activeSection==='briefing'&&intelTab==='flight'?'briefing':'ledger'"
-                      self-fetch/>
+      <NationBriefing view="ledger" variant="ledger" self-fetch/>
     </div>
   </section>
-  <section class="traffic-table-panel" v-show="activeSection==='schedule'&&scope==='ne'"><div class="traffic-table-heading"><div><h2>{{cityName}}调度台账 <small>{{filtered.length}} 条</small><small v-if="caseMode" class="case-scope-hint" data-case-scope>班次状态来自实时推演，与回放案例的观测不对应</small></h2><p>申请、计划和实际事件分列；未来班次不会提前显示“实际放行”。</p></div><div><input aria-label="搜索城市或班次" placeholder="搜索城市 / 班次编号" v-model="search"><select aria-label="筛选运行状态" v-model="status"><option value="ALL">全部状态</option><option v-for="(name,key) in stateNames" :value="key" :key="key">{{name}}</option></select></div></div><details class="density-fold table-fold" :open="densityPolicy(density).ledger" data-density="ledger"><summary>台账表体 <span>共 {{filtered.length}} 条</span></summary><div class="traffic-table-scroll"><table><thead><tr><th>呼号 / 机型</th><th>起降点与任务</th><th>运行阶段</th><th>申请 / 计划 / 实际</th><th>高度与资源</th><th>限制与处理</th></tr></thead><tbody><tr v-for="f in rows" :key="f.id" :class="{selected:f.id===selectedId}" @click="chooseFlight(f)"><td><button class="flight-link" @click.stop="chooseFlight(f)"><span :class="f.mode==='CAR'?'cyan':'amber'">{{modeNames[f.mode]}}</span><small>{{f.id}}</small></button></td><td>{{f.name}}<small>{{f.fromPad}} → {{f.toPad}} · {{f.mode==='CAR'?(f.payload??'—')+' 位模拟乘客':(f.orderStatus||'待分配')+' · '+(f.payload??'—')+' 份订单'}}</small></td><td><span class="flight-state" :class="flightState(f,minute)">{{rowPhase(f)}}</span><small>{{stateNames[flightState(f,minute)]}}</small></td><td><small>申请 {{clock(f.requestedDepartureMinute)}}</small><small>计划 {{f.plannedReleaseAt?clock(f.departureMinute):'—'}}</small><small>实际 {{rowActual(f).actualReleaseAt?clock(f.departureMinute):'—'}}</small></td><td><small>{{f.maxAltitudeM??'—'}} m AGL</small><small>{{f.separationAction==='NONE'?'未分配':actionNames[f.separationAction]}}</small></td><td>{{reasonNames[f.reason]||f.reason}}<small>{{clearanceStatusName(f.clearanceStatus)}}</small></td></tr><tr v-if="!rows.length"><td colspan="6" class="traffic-no-results">{{busy?'正在生成并复核运行计划…':'当前筛选无班次'}}</td></tr></tbody></table></div></details><div class="traffic-pagination"><span>每页 20 条 · 同一快照、目录与算法指纹可复现</span><button @click="page--" :disabled="page<=1">上一页</button><b>{{page}} / {{Math.max(1,Math.ceil(filtered.length/20))}}</b><button @click="page++" :disabled="page*20>=filtered.length">下一页</button></div></section>
-  </div>  </div>        <div class="scope-bar floating" v-if="scope==='ne'&&(activeSection==='briefing'||activeSection==='schedule')" data-scope-bar-ne>
-    <b>{{ activeSection==='briefing'?'运行情报':'调度台账' }}</b>
-    <button :class="{on:scope==='nation'}" @click="scope='nation'">全国</button>
-    <button :class="{on:scope==='ne'}" @click="scope='ne'">东北</button>
-    <span class="scope-note">东北三省 · V1.0.0 原页</span>
+  </div>
   </div>
   <div class="nav-tour" v-if="tourStep>=0&&activeSection!=='national'" role="dialog" aria-modal="false" data-nav-tour
        :data-step="tourStep+1">
@@ -723,8 +768,8 @@ onUnmounted(()=>{
   <CommandPalette :open="paletteOpen" :groups="NAV_GROUPS" :routes="paletteRoutes" :flights="paletteFlights"
                   @close="paletteOpen=false" @run="onPaletteRun"/>
 </main>
-<!-- 建场进度条只属于东北那套（会按气象重建计划）；全国网是 SIM，不参与建场，
-     全国页上挂着一条 0% 的进度条只会让人以为卡死了。 -->
+<!-- 建场进度条只属于旧 session（按气象重建计划时才有进度）；全国网是 SIM，
+     逐分钟解析式生成，没有"建场"，全国页上挂着一条 0% 的进度条只会让人以为卡死了。 -->
 <div class="traffic-build-strip" v-if="showBuildStrip" role="status" aria-live="polite" data-build-strip>
   <div class="tbs-track" :class="{pending:buildProgress===null}" role="progressbar"
        :aria-valuenow="buildProgress===null?undefined:buildProgress"
@@ -741,10 +786,13 @@ onUnmounted(()=>{
 </template>
 <style scoped>
 .traffic-page{display:flex;flex-direction:column;padding:14px 20px 16px;min-height:0}
-/* 全国台是一屏运行台，不是一段可滚的长文：占满可视高度，内部各自滚动 */
-.traffic-page.national-page{padding:10px 16px 12px;min-height:0;height:calc(100vh - 168px)}
-/* 全国范围的民航情报 / 调度台账：和全国台同样的"一屏"高度 */
-.traffic-page.scope-page{padding:10px 16px 12px;min-height:0;height:calc(100vh - 168px)}
+/* 全国台是一屏运行台，不是一段可滚的长文：占满可视高度，内部各自滚动。
+   以前写死 `calc(100vh - 168px)` —— 168 是旧版"顶部栏 + 二级 tab"两层的估计值，
+   现在二级 tab 并进了左侧导航，实际只剩顶部栏（约 70px），于是每屏底部空出 80–100px，
+   1366×768 下地图被白压一圈。改成 flex 填满：父级 .wb-body 已是 flex 列，不需要再估高度。 */
+.traffic-page.national-page,
+.traffic-page.scope-page{padding:10px 16px 12px;min-height:0;
+  flex:1 1 auto;height:auto;min-height:min(560px,calc(100vh - 96px))}
 .scope-body{flex:1;min-height:0;display:flex;flex-direction:column}
 .scope-bar{display:flex;align-items:center;gap:8px;padding:0 2px 8px;font-size:12px;color:#82a6bd}
 .scope-bar b{font-size:13px;color:#eaf6ff;font-weight:600}
@@ -873,11 +921,7 @@ onUnmounted(()=>{
   .operations-nav>button{order:1;flex:0 0 auto}
   .operations-nav .nav-fill{margin-left:0;width:100%;order:3;padding-right:0}
   .operations-nav .nav-map-status{max-width:none;flex:1 1 auto}
-  .operations-nav .nav-region{margin-left:auto;order:2}
 }
-.nav-region{display:flex;align-items:center;gap:7px;flex:0 1 auto;min-width:0}
-.nav-region>span{font-size:12px;letter-spacing:1px;color:#7fa5bd;white-space:nowrap}
-.nav-region select{max-width:250px;min-width:0;flex:0 1 auto}
 .detail-scope{font-size:12px;font-weight:400;color:#6d899d;text-indent:0;white-space:nowrap}
 .traffic-legend{position:relative;margin-left:auto;font-size:12px;color:#7794a8}
 .traffic-legend summary{cursor:pointer;list-style:none;padding:2px 8px;border:1px solid var(--alc-line);
@@ -906,7 +950,6 @@ onUnmounted(()=>{
 .traffic-workbench>*{flex:none}
 .traffic-workbench.home-mode{padding:10px 12px 12px}
 .traffic-workbench.home-mode .traffic-header,.traffic-workbench.home-mode .traffic-summary{display:none}
-.traffic-workbench.home-mode .hstage-wrap{flex:1 1 auto;min-height:0}
 .traffic-workbench .traffic-main{flex:1 1 auto;grid-template-rows:minmax(0,1fr);min-height:620px}
 .traffic-workbench.map-expanded .traffic-main{grid-template-columns:minmax(0,1fr)!important;min-height:460px}
 .traffic-workbench.map-expanded .traffic-detail{display:none}
@@ -931,6 +974,16 @@ onUnmounted(()=>{
 @media(prefers-reduced-motion:reduce){.traffic-build-strip .tbs-fill{transition:none}
   .traffic-build-strip .tbs-fill::after{animation:none}.traffic-build-strip .tbs-fill.pending{animation:none}}
 .traffic-workbench.map-expanded .traffic-main{grid-template-columns:1fr}.traffic-workbench.map-expanded .operations-nav{margin-top:0}@media(max-width:1000px){.traffic-workbench .traffic-main{grid-template-columns:1fr;min-height:520px}.traffic-workbench .traffic-map-panel{min-height:460px}}
+
+/* 调度台账的口径说明：密度档控制默认开合，样式与其它 density-fold 一致 */
+.ledger-note{margin:0 0 8px;font-size:12px;color:#8aa2b6}
+.ledger-note summary{cursor:pointer;padding:4px 0;list-style:none}
+.ledger-note summary::-webkit-details-marker{display:none}
+.ledger-note summary::before{content:'▸ ';color:#5f7f96}
+.ledger-note[open] summary::before{content:'▾ '}
+.ledger-note p{margin:2px 0 0;line-height:1.65;color:#7d9cb0;max-width:900px}
+html[data-theme="light"] .ledger-note{color:#4a6a85 !important}
+html[data-theme="light"] .ledger-note p{color:#5b7a92 !important}
 </style>
 
 <style scoped>
@@ -942,6 +995,9 @@ onUnmounted(()=>{
 .nav-group.active{color:#ffffff;border-bottom-color:var(--alc-info)}
 .nav-group.active em{color:var(--alc-info)}
 .nav-timebase{font-size:12px;color:#93a4bc;white-space:nowrap;padding:3px 8px;border:1px solid rgba(147,164,188,.28);border-radius:999px}
+.nav-timebase.paused{color:#ffc857;border-color:rgba(220,170,60,.45)}
+.nav-clock{font-size:12px;color:#cfe6f5;white-space:nowrap;padding:3px 8px;
+  border:1px solid rgba(147,164,188,.28);border-radius:999px;font-variant-numeric:tabular-nums}
 .nav-tour{position:fixed;right:16px;bottom:56px;z-index:120;max-width:360px}
 .nav-tour-card{padding:14px 16px;border-radius:10px;background:#0e2038;border:1px solid #2f5f97;
   box-shadow:0 10px 30px rgba(0,0,0,.45);color:#dce9f7}
@@ -960,11 +1016,13 @@ onUnmounted(()=>{
 .nav-subs button{padding:5px 12px;border-radius:6px;border:1px solid transparent;background:transparent;color:#93a4bc;font-size:13px;cursor:pointer}
 .nav-subs button:hover{background:rgba(147,164,188,.10);color:#dce6f5}
 .nav-subs button.active{background:rgba(76,141,255,.16);border-color:rgba(76,141,255,.5);color:#ffffff}
-/* 多成员入口（处置/推演/运行总览）的左侧按钮只表示「你在这个分组」，不是「当前页面」。
-   真正的当前视图由页内 tab 表达。用左侧竖条 + 浅字，不再实心高亮 ——
-   否则「处置」和页内「调度台账」会同时亮，看着像前者没暗下去。 */
-.nav-subs button.active.group-active{background:transparent;border-color:transparent;
-  color:#dce6f5;box-shadow:inset 2px 0 0 rgba(76,141,255,.75);border-radius:4px 6px 6px 4px}
+/* 多成员入口（处置/推演/运行总览）的按钮在"当前页是它的兄弟 tab"时只表示
+   「你在这个分组里」，不是「当前页面」——真正的当前视图由页内 tab 表达。
+   V1.0.4：这条规则以前叫 group-active，且被后面 `.nav-subs button.active` 覆盖，
+   于是入口和 tab 一起亮、点完不灭。现在改成独立的 entry-context 类，
+   与 active 互斥，不再靠"同特异性抢顺序"。 */
+.nav-subs button.entry-context{background:transparent;border-color:transparent;
+  color:#a8bdd0;box-shadow:inset 2px 0 0 rgba(76,141,255,.55);border-radius:4px 6px 6px 4px}
 
 .nav-tab-sep{color:#2f4257;margin:0 2px;font-size:12px;user-select:none}
 .nav-entry-tab{padding:4px 10px;border-radius:5px;border:1px solid transparent;
@@ -997,7 +1055,6 @@ onUnmounted(()=>{
 .nav-subs::-webkit-scrollbar{display:none}
 .nav-subs button{padding:4px 8px!important;font-size:12px!important;border-radius:6px;white-space:nowrap}
 .nav-fill{margin-left:auto;display:flex;align-items:center;gap:6px;flex:0 1 auto;min-width:0;overflow:hidden}
-.nav-region select{max-width:150px;font-size:12px!important;padding:3px 4px!important}
 .nav-algorithm{max-width:210px;font-size:12px;color:var(--alc-text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .nav-timebase{font-size:12px;color:var(--alc-text-dim);white-space:nowrap;flex-shrink:0}
 .operations-nav .nav-toggle{padding:4px 8px!important;font-size:12px!important}
@@ -1027,6 +1084,11 @@ onUnmounted(()=>{
 .wb-brand b{font-size:16px;letter-spacing:1.2px;color:#e2f3fd;font-weight:600;white-space:nowrap}
 .wb-brand em{font-style:normal;font-size:11.5px;color:#6f92a8;letter-spacing:.4px;white-space:nowrap}
 .wb-scope{font-size:12px;color:#9fc4dd;border:1px solid #26445a;border-radius:4px;padding:2px 8px;white-space:nowrap}
+/* 下钻之后同一枚胶囊变成按钮：只多一个"· 回全国"，不做第二套样式 ——
+   用户不需要重新认一个控件，只需要知道"能点回去"。 */
+.wb-scope-jump{font:inherit;font-size:12px;color:#c6eef5;background:rgba(38,97,117,.22);
+  border-color:#2d5d72;cursor:pointer}
+.wb-scope-jump:hover{color:#eaf9fc;border-color:#3f7f97}
 .wb-spacer{flex:1 1 auto}
 .traffic-workbench .wb-rail-toggle{font-size:12px!important;padding:5px 10px!important}
 .wb-shell{flex:1 1 auto;display:flex;min-height:0;min-width:0}
@@ -1046,8 +1108,6 @@ onUnmounted(()=>{
 .traffic-workbench .operations-nav .nav-tab-sep{display:none}
 .traffic-workbench .operations-nav .nav-fill{margin:auto 0 0;display:flex;flex-direction:column;
   align-items:stretch;gap:6px;padding:9px 0 0;border-top:1px solid #1d384a;width:auto;order:0}
-.traffic-workbench .operations-nav .nav-region{margin:0}
-.traffic-workbench .operations-nav .nav-region select{width:100%;max-width:none;min-width:0}
 .traffic-workbench .operations-nav .nav-fill .nav-toggle{width:100%;justify-content:flex-start!important;
   text-align:left!important;font-size:12px!important}
 .wb-body{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;
@@ -1057,7 +1117,6 @@ onUnmounted(()=>{
   font-size:0!important;padding:10px 0!important}
 .traffic-workbench .operations-nav.rail-collapsed .nav-group em{font-size:13px}
 .traffic-workbench .operations-nav.rail-collapsed .nav-subs{display:none}
-.traffic-workbench .operations-nav.rail-collapsed .nav-region,
 .traffic-workbench .operations-nav.rail-collapsed .nav-toggle{display:none}
 .traffic-workbench.home-mode{padding:0}
 .traffic-workbench.home-mode .wb-body{padding:10px 12px 12px}
@@ -1068,7 +1127,6 @@ onUnmounted(()=>{
   .traffic-workbench .operations-nav .nav-group{justify-content:center!important;font-size:0!important}
   .traffic-workbench .operations-nav .nav-group em{font-size:13px}
   .traffic-workbench .operations-nav .nav-subs{display:none}
-  .traffic-workbench .operations-nav .nav-region,
   .traffic-workbench .operations-nav .nav-toggle{display:none}
 }
 
@@ -1118,6 +1176,13 @@ onUnmounted(()=>{
   background:rgba(89,223,252,.13)!important;border-color:rgba(89,223,252,.26)!important;color:#eaf8ff!important}
 .traffic-workbench .operations-nav .nav-subs button.active::before{
   background:#59dffc;box-shadow:0 0 7px rgba(89,223,252,.85)}
+/* 入口上下文：不点亮，只让那个圆点比常态亮一点（连左侧竖条也不给，
+   否则看起来仍像"第二盏灯"）。 */
+.traffic-workbench .operations-nav .nav-subs button.entry-context{
+  background:transparent!important;border-color:transparent!important;box-shadow:none!important;
+  color:#93aebf!important}
+.traffic-workbench .operations-nav .nav-subs button.entry-context::before{
+  background:rgba(89,223,252,.55)}
 
 .traffic-workbench .operations-nav .nav-fill{
   border-top:1px solid rgba(255,255,255,.08);padding-top:10px;gap:5px}
@@ -1130,9 +1195,6 @@ onUnmounted(()=>{
   background:rgba(89,223,252,.12)!important;border-color:rgba(89,223,252,.30)!important;color:#e6f7ff!important}
 .traffic-workbench .operations-nav .nav-fill .nav-toggle.on{
   background:rgba(89,223,252,.20)!important;border-color:rgba(89,223,252,.45)!important;color:#eaf8ff!important}
-.traffic-workbench .operations-nav .nav-region select{
-  background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.07);border-radius:7px;
-  padding:6px 8px;font-size:12px;color:#bcd3e2}
 
 .traffic-workbench .operations-nav.rail-collapsed .nav-group{
   justify-content:center!important;padding:10px 0!important;border-radius:8px!important}
@@ -1149,7 +1211,6 @@ onUnmounted(()=>{
   .traffic-workbench .operations-nav .nav-group{justify-content:center!important;font-size:0!important;padding:10px 0!important}
   .traffic-workbench .operations-nav .nav-group em{font-size:13px;min-width:0;width:100%;background:transparent}
   .traffic-workbench .operations-nav .nav-subs{display:none}
-  .traffic-workbench .operations-nav .nav-region,
   .traffic-workbench .operations-nav .nav-toggle{display:none}
   .traffic-workbench .wb-body{padding:12px 14px 16px}
 }

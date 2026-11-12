@@ -9,7 +9,8 @@
 口径纪律
 --------
 - 班次、许可、事件**全部为 SIM**（模拟交通），与 `data/traffic` 的路网同源；
-  不冒充真实航班，也不进 1.0.0 的东北运行计划。
+  不冒充真实航班，也不进任何真实运行计划。全国四级（全国 / 大区 / 省 / 市）
+  跑的是同一套对象与同一条判据链，变的只是被切片的范围。
 - 气象是**真实公开实况**（open-meteo / METAR），风险概率是由实况按本文件阈值
   算出来的**规则派生值**（`DERIVED`），不是训练模型输出 —— 界面上必须这么写。
 - 班次 id 用 `crc32` 而不是 `hash()`：后者每个进程随机加盐，重启后同一班次会换号。
@@ -19,7 +20,7 @@ from __future__ import annotations
 import zlib
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
-# 风险阈值（与东北层 1.0.0 的低能见度口径同族，但这里是规则派生，不是 ml 模型）
+# 风险阈值（与 1.0.0 的低能见度口径同族，但这里是规则派生，不是 ml 模型）
 VIS_BANDS = ((1500.0, 0.72), (3000.0, 0.45), (5000.0, 0.22))
 WIND_HIGH = 12.0
 RISK_HOLD = 0.75
@@ -408,6 +409,8 @@ def intel(cities: Iterable[Dict[str, Any]], weather: Dict[str, Dict[str, Any]],
             'icao': station.get('icao'), 'station': station.get('site'),
             'visM': vis, 'windMps': wind, 'tempC': live.get('tempC'),
             'low': bool(live.get('low')), 'status': status, 'tone': tone,
+            # 虚拟气象下能见度读数是实况、判定是虚拟的，这枚标记让前端能说明差别
+            'virtualVis': bool(live.get('virtualVis')),
             'hasWeather': bool(live),
         })
     rows.sort(key=lambda item: (item['status'] == '可放行', item['visM'] or 99999))
@@ -600,7 +603,7 @@ def model_card() -> Dict[str, Any]:
         'models': models,
         'national': {
             'applicable': False,
-            'coverage': '仅东北三站；全国 319 市无对应训练分布',
+            'coverage': 'ml-v2 只覆盖沈阳/长春/哈尔滨三站；全国 319 市改用 ml-v3（若模型文件缺失则退回规则）',
             'missing': list(MODEL_MISSING_FOR_NATIONAL),
             'featuresTotal': MODEL_FEATURES_TOTAL,
             'reason': '训练输入依赖 METAR 的露点、气压、云底与 3–6 小时历史，全国城市实况（open-meteo current）'
@@ -612,12 +615,19 @@ def model_card() -> Dict[str, Any]:
 
 
 def counterfactual(flights: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """反事实：**含回波** 与 **不含回波** 两套规则下，裁决会怎么变。
+    """反事实：两条轴，都能算、都可复现。
 
-    这不是"AI vs 规则"那种反事实（全国层没有模型，做不出来），
-    而是同一套规则里"要不要看回波"的对照 —— 能算、可复现，也能回答
-    "绕飞这 3 架，是不是雷达逼出来的"。
+    ① **含回波 / 不含回波**（`withEcho` / `withoutEcho`）：回答"绕飞这几架，是不是雷达逼出来的"。
+    ② **含模型 / 不含模型**（`modelAxis`）：回答"用 AI 和不用，差多少"。
+
+    第二条轴此前是缺的，理由是"全国层没有模型，做不出来"—— **这句早就不成立了**：
+    `_model_probs()` 一直在跑 ml-v3，每架班次都带 `pModel` 与 `probSource=MODEL`。
+    缺的只是这一段统计：把 p 这条判据摘掉，看有多少班次会从停飞变回放行。
+
+    两轴互不替代：回波轴改的是几何（绕飞），模型轴改的是放行（停飞）。
     """
+    detour_total = sum(1 for f in flights if f['decision'] == 'DETOUR')
+    hold_total = sum(1 for f in flights if f['decision'] == 'HOLD')
     changed: List[Dict[str, Any]] = []
     for flight in flights:
         if flight['decision'] != 'DETOUR':
@@ -630,12 +640,48 @@ def counterfactual(flights: List[Dict[str, Any]]) -> Dict[str, Any]:
             changed.append({'id': flight['id'], 'place': f"{flight['fromName']} → {flight['toName']}",
                             'withEcho': before, 'withoutEcho': after,
                             'riskWith': flight['riskP'], 'riskWithout': without})
+
+    # —— 模型轴 ——
+    # 停飞有四个来源：规则分 ≥0.75、模型概率 ≥0.60、航路压在强回波内无绕飞方案（blocked）、
+    # 以及判据都说不清时的兜底。摘掉模型只会影响第二类，所以先把另外三类数出来。
+    rule_hold = 0
+    model_hold: List[Dict[str, Any]] = []
+    for flight in flights:
+        if flight['decision'] != 'HOLD':
+            continue
+        drivers = flight.get('drivers') or []
+        p_model = flight.get('pModel')
+        weather_block = any('强回波' in str(d) for d in drivers)
+        if weather_block or float(flight.get('riskP') or 0.0) >= RISK_HOLD:
+            rule_hold += 1
+        elif p_model is not None and float(p_model) >= MODEL_HOLD:
+            model_hold.append(flight)
+        else:
+            rule_hold += 1          # 说不清是哪一条的，算规则一侧（宁可少报模型功劳）
     return {
-        'withEcho': {'detour': sum(1 for f in flights if f['decision'] == 'DETOUR'),
-                     'hold': sum(1 for f in flights if f['decision'] == 'HOLD')},
-        'withoutEcho': {'release': len(flights) - sum(1 for f in flights if f['decision'] == 'HOLD'),
-                        'hold': sum(1 for f in flights if f['decision'] == 'HOLD')},
+        'withEcho': {'detour': detour_total, 'hold': hold_total},
+        'withoutEcho': {'release': len(flights) - hold_total, 'hold': hold_total},
         'changed': changed,
         'changedCount': len(changed),
-        'note': '对照的是同一套规则"看不看回波"，不是 AI 与规则的对照（全国层无模型可用）。',
+        'modelAxis': {
+            # 模型可用性随帧变（限流时 probSource 退回 RULE）。不可用时这条轴没有意义，
+            # 界面据此显示"本帧无模型概率"，而不是画一个 0 差异的假对照。
+            'applicable': any(f.get('probSource') == 'MODEL' for f in flights),
+            'withModel': {'hold': hold_total, 'detour': detour_total,
+                          'release': len(flights) - hold_total - detour_total},
+            'withoutModel': {'hold': rule_hold, 'detour': detour_total,
+                             'release': len(flights) - rule_hold - detour_total},
+            'changedCount': len(model_hold),
+            'changed': [{'id': f['id'], 'place': f"{f['fromName']} → {f['toName']}",
+                         'pModel': f.get('pModel'), 'riskP': f.get('riskP'),
+                         'riskLevel': f.get('riskLevel'), 'riskLevelLabel': f.get('riskLevelLabel'),
+                         'drivers': [d for d in (f.get('drivers') or []) if '模型' in str(d)]}
+                        for f in model_hold[:20]],
+            'threshold': MODEL_HOLD,
+            'note': ('摘掉模型只改一件事：p ≥ %.0f%% 触发的停飞回到放行。'
+                     '规则分与绕飞几何两边完全相同，所以差异只可能来自模型。'
+                     % (MODEL_HOLD * 100)),
+        },
+        'note': ('两条轴分开读：回波轴问"绕飞是不是雷达逼出来的"，模型轴问"停飞有几架是模型判的"。'
+                 '两轴的"改判"不能相加 —— 同一架班次可能同时出现在两边。'),
     }

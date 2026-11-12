@@ -45,6 +45,8 @@ data_backup_*/
 config/application.yml
 backend-java/src/main/resources/application.yml
 config/qweather/*.pem
+config/secrets.env
+config/*.secret.env
 *.key
 *.secret
 

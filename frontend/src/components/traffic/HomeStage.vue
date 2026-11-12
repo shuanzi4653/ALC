@@ -1,3 +1,6 @@
+<!-- 未挂载（候选删除）：本组件在 9aafd7f 之后已无任何 import。
+     保留原因：仍有测试直接读它的源码做断言，删组件会连带删用例、
+     改变已冻结的用例数。真要清理时，组件与对应测试必须同批处理。 -->
 <script setup>
 import {computed,onBeforeUnmount,onMounted,ref} from 'vue'
 import ScrollList from './ScrollList.vue'
@@ -166,7 +169,10 @@ const sampleRatio=computed(()=>{
   if(!total||!shown)return null
   return { total, percent: Math.round((shown/total)*1000)/10 }
 })
-const cityName=computed(()=>props.city?((props.network?.cities||[]).find(c=>c.id===props.city)?.name||props.city):'东北三省 · 全域')
+// V1.0.6：本组件已不在界面上引用（首页是全国台），只为既有用例保留文件。
+// 作用域兜底文案随全国口径一起改掉 —— 一个"东北三省 · 全域"的字面量留在这里，
+// 哪天有人重新挂上它，界面就又会说回三省。
+const cityName=computed(()=>props.city?((props.network?.cities||[]).find(c=>c.id===props.city)?.name||props.city):'全国 · 全域')
 const playbackMax=computed(()=>{
   const meta=caseMeta()
   if(meta&&Number.isFinite(meta.durationMinutes))return meta.durationMinutes
@@ -207,7 +213,7 @@ function changeWorkspace(){
     <div class="hs-brief hs-brief-band">
     <h1 class="hs-title" data-stage-title>
       <b>运行态势</b>
-      <span>{{ cityName || '东北三省 · 全域' }}</span>
+      <span>{{ cityName || '全国 · 全域' }}</span>
       <em>{{ (minute||0)>=0 ? 'T+'+String(Math.floor((minute||0)/60)).padStart(2,'0')+':'+String(Math.round((minute||0)%60)).padStart(2,'0') : '' }}</em>
     </h1>
     <SituationBrief :city-name="cityName" :minute="minute"

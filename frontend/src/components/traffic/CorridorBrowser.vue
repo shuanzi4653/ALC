@@ -65,12 +65,13 @@
             <button v-for="opt in REVIEW_OPTS" :key="opt.key"
                     :class="{on:active.review && active.review.action===opt.key, [opt.tone]:true}"
                     @click="setReview(opt.key)">{{ opt.label }}</button>
-            <input v-model="reason" placeholder="理由（写进日志）" aria-label="人工裁决理由"/>
+            <input v-model="reasonText" placeholder="理由（写进日志）" aria-label="人工裁决理由"/>
             <button class="clr" v-if="active.review" @click="clearReview">撤销</button>
           </div>
           <p class="cb-rv-note" v-if="active.review">
             人工裁决已记录：{{ reviewLabel(active.review.action) }} · {{ active.review.reason || '未填理由' }}
-            —— 它覆盖算法结论，推演与日志都读这一份。
+            —— 它覆盖算法结论，推演与日志都读这一份；理由可随时改写，改完即存。
+            <em class="rv-scope">（记录在本浏览器，不写服务端台账）</em>
           </p>
         </template>
         <p v-else class="cb-empty">左侧选一条走廊。</p>
@@ -175,7 +176,12 @@ const activeId = computed(() => {
   const ids = rows.value.map(r => r.id)
   if (pickedId.value && ids.includes(pickedId.value)) return pickedId.value
   if (props.focusCorridor && ids.includes(props.focusCorridor)) return props.focusCorridor
-  const first = sorted.value[0]
+  // 推演页（card）默认落在**此刻有班次**的走廊上：没有班次就没有观测与判据可讲，
+  // 落在空走廊上整页只剩一句"先立题"（实测 09:00 的异常榜首就是这样一条）。
+  // 走廊页（corridor）仍按异常排序取第一条 —— 那一页讲的是"这条线能不能飞"。
+  const first = props.mode === 'card'
+    ? (sorted.value.find(r => r.flightId) || sorted.value[0])
+    : sorted.value[0]
   return first ? first.id : ''
 })
 const active = computed(() => rows.value.find(r => r.id === activeId.value) || null)
@@ -204,17 +210,39 @@ const altBand = computed(() => {
 })
 
 // —— 人工裁决 ——
-const reason = ref('')
+// 草案（还没裁决时先写的理由）与"已存理由"分开：
+// 以前点完按钮就把 reason 清空、而且之后改输入框也不会回写 ——
+// 于是"先点改绕飞、再补理由"的人，存下来的永远是空理由，日志里写"未填理由"。
+const draft = ref('')
+const reasonText = computed({
+  get() {
+    const cur = reviews.value[active.value?.id || '']
+    return cur ? (cur.reason || '') : draft.value
+  },
+  set(v) {
+    const id = active.value?.id || ''
+    const cur = reviews.value[id]
+    if (!cur) { draft.value = v; return }
+    // 已有裁决：改理由就地更新，保留原裁决时刻，另记 updatedAt
+    reviews.value = { ...reviews.value, [id]: { ...cur, reason: String(v ?? ''), updatedAt: Date.now() } }
+    persist()
+  },
+})
 function setReview(action) {
   const r = active.value
   if (!r) return
-  // 连"算法原判"一起存：日志要写"人工改成 X（算法原判 Y）"，两句话必须同源
+  const cur = reviews.value[r.id]
+  // 连"算法原判"一起存：日志要写"人工改成 X（算法原判 Y）"，两句话必须同源。
+  // 重复点同一个动作 = 只补/改理由，不重置裁决时刻。
+  const same = cur && cur.action === action
   reviews.value = { ...reviews.value, [r.id]: {
-    action, reason: reason.value.trim(), at: Date.now(),
-    auto: r.decisionLabel || (r.blocked ? '停飞（边界受限）' : '直飞放行'),
+    action,
+    reason: same ? (cur.reason || '') : (draft.value.trim() || (cur ? cur.reason : '') || ''),
+    at: same ? cur.at : Date.now(),
+    auto: cur?.auto || r.decisionLabel || (r.blocked ? '停飞（边界受限）' : '直飞放行'),
   } }
+  draft.value = ''
   persist()
-  reason.value = ''
 }
 function clearReview() {
   const r = active.value
@@ -222,6 +250,7 @@ function clearReview() {
   const next = { ...reviews.value }
   delete next[r.id]
   reviews.value = next
+  draft.value = ''
   persist()
 }
 function reviewLabel(action) {
@@ -260,9 +289,9 @@ function reviewLabel(action) {
 .cb-rows li.empty { cursor: default; color: #6f92a8; font-size: 10.5px; border-left-color: transparent; }
 
 .cb-main { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
-.cb-map { position: relative; flex: 1 1 auto; min-height: 240px; border-radius: 8px; overflow: hidden;
+.cb-map { position: relative; flex: 1 1 auto; min-height: 380px; border-radius: 8px; overflow: hidden;
   border: 1px solid rgba(70,110,140,.3); }
-.cb-map.short { flex: 0 0 300px; min-height: 300px; }
+.cb-map.short { flex: 0 0 360px; min-height: 360px; }
 .cb-mapnote { position: absolute; left: 8px; bottom: 6px; margin: 0; font-size: 9.5px;
   color: #7d9cb3; background: rgba(6,18,28,.7); padding: 2px 6px; border-radius: 3px; }
 
@@ -296,26 +325,51 @@ function reviewLabel(action) {
   border: 1px solid rgba(70,110,140,.45); border-radius: 5px; color: #cfe6f5; font-size: 10.5px; padding: 2px 6px; }
 .cb-review .clr { color: #7d9cb3; }
 .cb-rv-note { font-size: 9.5px; color: #8ef0ff; line-height: 1.5; }
+.cb-rv-note .rv-scope { font-style: normal; color: #7d9cb3; }
 .cb-deduce { flex: 1 1 auto; min-height: 0; display: flex; }
 .cb-empty { font-size: 11px; color: #6f92a8; }
 
 /* 浅色 */
-:global(html[data-theme="light"]) .cb-tools input,
-:global(html[data-theme="light"]) .cb-review input { background: #fff; border-color: #cfdcea; color: #12314a; }
-:global(html[data-theme="light"]) .cb-tools button,
-:global(html[data-theme="light"]) .cb-review button { border-color: #cfdcea; color: #31556f; }
-:global(html[data-theme="light"]) .cb-tools button.on { background: #e3f0fb; border-color: #9cc7e8; color: #0d4f74; }
-:global(html[data-theme="light"]) .cb-rows li { background: #fff; border-color: #dbe6f1; }
-:global(html[data-theme="light"]) .cb-rows li:hover { background: #eef6fd; }
-:global(html[data-theme="light"]) .cb-rows li.on { background: #e3f0fb; border-color: #9cc7e8; }
-:global(html[data-theme="light"]) .cb-rows b { color: #0f3550; }
-:global(html[data-theme="light"]) .cb-rows .meta,
-:global(html[data-theme="light"]) .cb-count { color: #6b8399; }
-:global(html[data-theme="light"]) .cb-info { background: #fff; border-color: #dbe6f1; }
-:global(html[data-theme="light"]) .cb-info header b { color: #0f3550; }
-:global(html[data-theme="light"]) .cb-grid b { color: #12314a; }
-:global(html[data-theme="light"]) .cb-grid small,
-:global(html[data-theme="light"]) .cb-why.quiet { color: #6b8399; }
-:global(html[data-theme="light"]) .cb-why { color: #4a6a85; }
-:global(html[data-theme="light"]) .cb-mapnote { background: rgba(255,255,255,.85); color: #5b7a92; }
+html[data-theme="light"] .cb-tools input,
+html[data-theme="light"] .cb-review input { background: #fff; border-color: #cfdcea; color: #12314a; }
+html[data-theme="light"] .cb-tools button,
+html[data-theme="light"] .cb-review button { border-color: #cfdcea; color: #31556f; }
+html[data-theme="light"] .cb-tools button.on { background: #e3f0fb; border-color: #9cc7e8; color: #0d4f74; }
+html[data-theme="light"] .cb-rows li { background: #fff; border-color: #dbe6f1; }
+html[data-theme="light"] .cb-rows li:hover { background: #eef6fd; }
+html[data-theme="light"] .cb-rows li.on { background: #e3f0fb; border-color: #9cc7e8; }
+html[data-theme="light"] .cb-rows b { color: #0f3550; }
+html[data-theme="light"] .cb-rows .meta,
+html[data-theme="light"] .cb-count { color: #6b8399; }
+html[data-theme="light"] .cb-info { background: #fff; border-color: #dbe6f1; }
+html[data-theme="light"] .cb-info header b { color: #0f3550; }
+html[data-theme="light"] .cb-grid b { color: #12314a; }
+html[data-theme="light"] .cb-grid small,
+html[data-theme="light"] .cb-why.quiet { color: #6b8399; }
+html[data-theme="light"] .cb-why { color: #4a6a85; }
+html[data-theme="light"] .cb-mapnote { background: rgba(255,255,255,.85); color: #5b7a92; }
+
+/* 列表里的状态字与徽标：深色主题用的是"暗底上的亮色"（#ffc857/#ff8d78/#6fe0a8），
+   搬到白底上对比度只有 1.3–1.5，必须换成同色系的深色版，而不是沿用。 */
+html[data-theme="light"] .cb-rows em.warn { color: #8a5a00; }
+html[data-theme="light"] .cb-rows em.bad { color: #a8321f; }
+html[data-theme="light"] .cb-rows em.ok { color: #0f7a52; }
+html[data-theme="light"] .cb-rows em.quiet { color: #5b7a92; }
+html[data-theme="light"] .cb-rows .rv { color: #0b6b7d; }
+html[data-theme="light"] .cb-rows li.empty { color: #5b7a92; }
+html[data-theme="light"] .cb-info header .arrow,
+html[data-theme="light"] .cb-info header .kind { color: #5b7a92; border-color: #cfdcea; }
+html[data-theme="light"] .cb-info header .verd { color: #31556f; border-color: #b9cfe2; }
+html[data-theme="light"] .cb-info header .verd.warn { color: #8a5a00; border-color: #e0bd74; }
+html[data-theme="light"] .cb-info header .verd.bad { color: #a8321f; border-color: #e3a596; }
+html[data-theme="light"] .cb-info header .verd.ok { color: #0f7a52; border-color: #8ecbb0; }
+html[data-theme="light"] .cb-review .lb { color: #4a6a85; }
+html[data-theme="light"] .cb-review button { color: #31556f; border-color: #cfdcea; }
+html[data-theme="light"] .cb-review button.on.ok { background: #e6f6ee; border-color: #7cc4a4; color: #0f7a52; }
+html[data-theme="light"] .cb-review button.on.warn { background: #fdf3de; border-color: #dfb96b; color: #8a5a00; }
+html[data-theme="light"] .cb-review button.on.bad { background: #fbeae6; border-color: #dd9a89; color: #a8321f; }
+html[data-theme="light"] .cb-review .clr { color: #5b7a92; }
+html[data-theme="light"] .cb-rv-note { color: #0b6b7d; }
+html[data-theme="light"] .cb-rv-note .rv-scope { color: #5b7a92; }
+html[data-theme="light"] .cb-empty { color: #5b7a92; }
 </style>

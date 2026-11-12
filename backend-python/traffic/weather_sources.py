@@ -23,7 +23,7 @@ PROVIDER = os.environ.get('ALC_TRAFFIC_WEATHER_PROVIDER', 'open-meteo').strip().
 QWEATHER_MAX_CITIES = int(os.environ.get('ALC_QWEATHER_MAX_CITIES', '36'))
 
 USER_AGENT = os.environ.get(
-    'ALC_HTTP_USER_AGENT', 'tianchuang-alc/1.0.0 (low-altitude traffic research)')
+    'ALC_HTTP_USER_AGENT', 'tianchuang-alc/1.0.6 (low-altitude traffic research)')
 MET_NO_URL = 'https://api.met.no/weatherapi/locationforecast/2.0/compact'
 MET_NO_MAX_CITIES = int(os.environ.get('ALC_MET_NO_MAX_CITIES', '36'))
 AVIATION_URL = 'https://aviationweather.gov/api/data/metar'

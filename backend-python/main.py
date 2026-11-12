@@ -29,21 +29,65 @@ log = logging.getLogger("tianchuang")
 APP_ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = APP_ROOT / "config" / "application.yml"
 
+SECRETS_PATH = APP_ROOT / "config" / "secrets.env"
+
+
+def _read_env_file(path: Path) -> dict:
+    """读 KEY=VALUE 形式的机密文件；不存在、读不动都返回空字典（不抛）。
+
+    为什么加这一层：Key 只放在环境变量里时，双击 start.bat 或由脚本拉起的进程
+    拿不到（父进程的临时 export 不会继承），表现就是"我明明配了，页面说没配"。
+    放到一个 gitignore 的文件里，跟仓库一起走、但永远不进版本库。
+    """
+    out = {}
+    try:
+        for line in path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            value = value.strip().strip('"').strip("'")
+            if value:
+                out[key.strip()] = value
+    except FileNotFoundError:
+        pass
+    except Exception as e:  # noqa: BLE001
+        log.warning("read %s failed: %s", path, e)
+    return out
+
+
 def load_deepseek_cfg():
-    """读取共享配置中的 DeepSeek 段；配置文件缺失时返回空 Key（自动降级）"""
+    """三层来源，前一层有值就覆盖后一层：环境变量 > config/secrets.env > application.yml。
+
+    以前只认「环境变量」和「yml 明文」，而仓库里的 yml 写的是 `${DEEPSEEK_API_KEY:}` 占位符，
+    见到 `${` 就当空 —— 于是"配了"和"读到了"变成两件事。返回值多带一个 key_source，
+    界面与 /health 可以据此说清楚"到底该改哪个文件"。
+    """
+    yml, ds = {}, {}
     try:
         with open(CONFIG_PATH, "r", encoding="utf-8") as f:
             yml = yaml.safe_load(f) or {}
         ds = yml.get("deepseek") or {}
-        configured_key = os.getenv("DEEPSEEK_API_KEY", str(ds.get("api-key") or "")).strip()
-        if configured_key.startswith("${"):
-            configured_key = ""
-        return {"api_key": configured_key,
-                "base_url": str(ds.get("base-url") or "https://api.deepseek.com").strip(),
-                "model": str(ds.get("model") or "deepseek-chat").strip()}
     except Exception as e:  # noqa: BLE001
-        log.warning("load config failed, deepseek disabled: %s", e)
-        return {"api_key": "", "base_url": "https://api.deepseek.com", "model": "deepseek-chat"}
+        log.warning("load config failed, deepseek 段按空处理: %s", e)
+
+    api_key, source = "", "none"
+    env_key = (os.getenv("DEEPSEEK_API_KEY") or "").strip()
+    file_key = _read_env_file(SECRETS_PATH).get("DEEPSEEK_API_KEY", "")
+    yml_key = str(ds.get("api-key") or "").strip()
+
+    if env_key:
+        api_key, source = env_key, "env"
+    elif file_key:
+        api_key, source = file_key, "file"
+    elif yml_key and not yml_key.startswith("${"):
+        api_key, source = yml_key, "yml"
+    if api_key.startswith("${"):
+        api_key, source = "", "none"
+
+    return {"api_key": api_key, "key_source": source,
+            "base_url": str(ds.get("base-url") or "https://api.deepseek.com").strip(),
+            "model": str(ds.get("model") or "deepseek-chat").strip()}
 
 DS_CFG = load_deepseek_cfg()
 
@@ -123,6 +167,7 @@ def health():
     return {"status": "ok",
             "service": "tianchuang-python",
             "deepseek_configured": bool(DS_CFG["api_key"]),
+            "deepseek_key_source": DS_CFG.get("key_source", "none"),
             "model": DS_CFG["model"] if DS_CFG["api_key"] else "(未配置)",
             "version": decision_service.VERSION, "lastEvidenceCall": agent_tools.LAST_CALL}
 
@@ -517,14 +562,20 @@ def traffic_v2_nation_evidence(flight: str = Query(..., min_length=3),
     from traffic import nation as traffic_nation
     body = traffic_nation.evidence(flight, minute)
     configured = bool(DS_CFG.get('api_key'))
+    source = DS_CFG.get('key_source', 'none')
+    where = {'env': '环境变量 DEEPSEEK_API_KEY',
+             'file': 'config/secrets.env',
+             'yml': 'config/application.yml 的 deepseek.api-key'}.get(source, '')
     body['llm'] = {
         'configured': configured,
+        'keySource': source,
         'model': DS_CFG.get('model') if configured else None,
         'status': 'READY' if configured else 'NOT_CONFIGURED',
-        'note': ('大模型已配置：本页只展示规则证据链，模型结论另见「大模型取证」入口。'
+        'note': (f'大模型已配置（来源：{where}）：本页展示规则证据链，模型结论见「大模型取证」。'
                  if configured else
-                 '大模型未配置（config 里没有 api-key）：这里给的是**规则证据链**，'
-                 '每一行都标了来源，没有一句话是模型生成的。'),
+                 '大模型未配置：环境变量 DEEPSEEK_API_KEY、config/secrets.env、'
+                 'config/application.yml 三处都没读到值。下面给的是**规则证据链**，'
+                 '每一行都标了来源，没有一句是模型生成的。'),
     }
     if body.get('status') == 'NOT_FOUND':
         raise HTTPException(404, body.get('note') or '未找到该班次')

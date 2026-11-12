@@ -1,3 +1,6 @@
+<!-- 未挂载（候选删除）：本组件在 9aafd7f 之后已无任何 import。
+     保留原因：仍有测试直接读它的源码做断言，删组件会连带删用例、
+     改变已冻结的用例数。真要清理时，组件与对应测试必须同批处理。 -->
 <script setup>
 import {computed,onMounted,ref,watch} from 'vue'
 import {requestJson} from '../../api.js'

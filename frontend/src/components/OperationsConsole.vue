@@ -1,6 +1,7 @@
 <script setup>
 import {computed,defineAsyncComponent,ref,watch,onUnmounted,onBeforeUnmount,nextTick} from 'vue'
 import {postAction,requestJson,operatorRole} from '../api.js'
+import {store} from '../store.js'
 import RegionalObservations from './RegionalObservations.vue'
 import WeatherSourceSwitch from './traffic/WeatherSourceSwitch.vue'
 import WeatherSupplements from './traffic/WeatherSupplements.vue'
@@ -247,9 +248,10 @@ const journalSource=ref('')      // 'session' | 'nation' | ''
 async function loadJournal(){
   const id=props.session?.sessionId
   journalLoading.value=true;journalError.value=''
-  // 两本账：有东北会话 id 就读那本（含人工处置记录）；
-  // 全国模式没有会话 —— 之前这里直接 return，于是日志页永远是空表。
-  // 现在改读全国派生日志：窗口内的起飞/到达/绕飞/延期/停飞 + 数据源时刻。
+  // 两本账：① 旧会话账（有 sessionId 且非空时读，含人工处置记录）；
+  // ② 全国派生账（/api/traffic/v2/nation/journal，按分钟重算）。
+  // 界面上的每一页都读全国载荷，所以 ② 是主账；① 只在确有会话时兜底。
+  // 以前没有 ② 时这里是空表 —— 空表不是"没有事件"，是"读错了账本"。
   if(id){
     try{
       const rows=await requestJson('/api/traffic/journal?sessionId='+id)
@@ -259,8 +261,8 @@ async function loadJournal(){
         journalLoading.value=false
         return
       }
-      // 会话在、但这本日志是空的（全国作用域下常见：那个会话只服务东北原页）。
-      // 以前这里就 return 了，于是日志页永远 0 行 —— 空表不是"没有事件"，是"读错了账本"。
+      // 会话在、但这本日志是空的（常见：那个会话只服务旧的三省运行图）。
+      // 以前这里就 return 了，于是日志页永远 0 行。
     }catch(e){journalError.value=e.message}
   }
   journalSource.value='nation'
@@ -311,7 +313,10 @@ const journalWindowText=computed(()=>journalWindow.value)
 function openJournalRow(row){
   const corridor=row.corridor||String(row.flightId||'').split('#')[0]
   if(!corridor) return
-  emit('open-corridor',{corridor,flightId:row.flightId||''})
+  // 日志点行 → **推演**（用户 2026-11-11 第 7 条：跳到该航线走廊的推演界面，
+  // 且推演结论必须与日志结论一致）。处置点事件才落「走廊剖面」做人工裁决 ——
+  // 两个入口目标不同，混用会出现"点日志要裁决、点事件只看图"的错位。
+  emit('open-corridor',{corridor,flightId:row.flightId||'',target:'card'})
 }
 const journalTime=row=>{
   const at=String(row.at||'')
@@ -358,6 +363,142 @@ async function exportJournal(){
 }
 
 const policy=computed(()=>densityPolicy(props.density))
+
+// —— 全国层口径（V1.0.5 起，V1.0.6 改成全国四级） ——
+// 这一页曾经只有旧三省运行网那一本总账（53 条城际 / 216 条货运 / 62 个事件），
+// 而界面上到处写的是 319 市、492 条航线 —— 读者对不上号，还会把"36 城"当成覆盖范围。
+// 现在分两层写清楚：
+//   ① 全国态势聚合层 —— 本页现算，值全部来自 `/api/traffic/v2/nation` 当前载荷；
+//   ② 裁决引擎层 —— 同一套判据在 全国 → 大区 → 省 → 市 四级上逐级切片，
+//      全国看合计、大区看 6 个区、省看 30 个省级单元、市看直接相邻的航线。
+const nationFacts=ref(null)      // ①层永远是全国那一份（它讲的就是全国聚合）
+const scopeFacts=ref(null)       // ②层的分级切片跟随当前作用域（大区/省时另取一份）
+const nationFactsError=ref('')
+let nationFetched=false,scopeBusy=false
+const scopeTrail=computed(()=>{
+  const s=store.scope||{}
+  return (!s.level||s.level==='nation')?'全国':`全国 / ${s.label||s.id||''}`
+})
+async function loadNationFacts(){
+  if(scopeBusy) return
+  scopeBusy=true
+  const s=store.scope||{}
+  try{
+    if(!nationFetched){
+      nationFacts.value=await requestJson(
+        `/api/traffic/v2/nation?level=nation&minute=${Math.round(props.minute||60)}`,{timeoutMs:90000})
+      nationFetched=true
+    }
+    // 下钻之后②层要能按省/区切片。走同一个入口的对应层级，字段逐列相同 ——
+    // 不另立接口，也不在前端把省的数字加出来。
+    if(s.level&&s.level!=='nation'&&s.id){
+      scopeFacts.value=await requestJson(
+        `/api/traffic/v2/nation?level=${encodeURIComponent(s.level)}&id=${encodeURIComponent(s.id)}`
+        + `&minute=${Math.round(props.minute||60)}`,{timeoutMs:90000})
+    }else{
+      scopeFacts.value=null
+    }
+    nationFactsError.value=''
+  }catch(e){
+    nationFactsError.value=String(e?.message||e)
+  }finally{
+    scopeBusy=false
+  }
+}
+watch(()=>[props.view,store.scope.level,store.scope.id],v=>{
+  if(v[0]==='reference') loadNationFacts()
+},{immediate:true})
+
+/** 全国层的每一行：值全部来自后端当前载荷，不在这里写死任何数字。 */
+const nationLedger=computed(()=>{
+  const d=nationFacts.value
+  if(!d) return []
+  const s=d.summary||{}, t=d.traffic||{}, r=d.radar||{}, fg=d.fog||{}, z=d.zones?.counts||{}
+  const k=d.summary?.byKind||{}
+  const bands=r.counts||{}
+  const fmt=n=>n==null?'—':n
+  return [
+    {name:'覆盖城市 / 省级单元', value:`${fmt(s.cities)} 市 / ${fmt(s.provinces)} 省`,
+     note:'`data/traffic/nation-network.json` 的 counts；台湾、西藏、香港、澳门明确排除，距境外不足 50 km 的 11 城整体退出通航'},
+    {name:'机场 / 无机场市', value:`${fmt(s.airports)} / ${fmt(s.feedCities)}`,
+     note:'aviationweather.gov 站点总表；无机场市由"专用接驳"航线接入，不是没有通航'},
+    {name:'航线总数与构成', value:`${fmt(s.corridors)} 条`,
+     note:`省内 ${fmt(k.INTRA)} + 机场接驳 ${fmt(k.AIRPORT_FEED)} + 跨省 ${fmt(k.CROSS)}；几何为模拟派生（SIM），班次与裁决在本地逐分钟推演，不对应任何真实航班`},
+    {name:'在飞 / 绕飞 / 停飞', value:`${fmt(t.airborne)} / ${fmt(t.delayed)} / ${fmt(t.hold)}`,
+     note:'在飞=此刻处在航路上的架次（**含**被判暂不放行的：屏上停住不走，但仍属本时刻的航班，所以停飞是在飞的子集）；绕飞=因回波改航；停飞=决定为 HOLD（天气或边界），与"距境外过近而整条退出通航的走廊"分开计'},
+    {name:'雷达回波片数', value:`${fmt((r.stats||{}).totalRings)} 片`,
+     note:`弱 ${fmt(bands.WEAK)} / 中 ${fmt(bands.CONVECTIVE)} / 强 ${fmt(bands.STRONG)}；累计掩膜成环，三档是嵌套关系。虚拟气象下为合成几何`},
+    {name:'雾区', value:`${fmt(fg.counts?.cities)} 城 / ${fmt((fg.counts?.BAN||0)+(fg.counts?.LOW||0))} 片`,
+     note:'由逐市能见度按半径外扩合并（DERIVED），不是雾场观测；半径是工程估值'},
+    {name:'低能见度城市', value:`${fmt(s.lowVisCities)} 市`,
+     note:'能见度 <3000 m；虚拟气象开启时这一格与雾区同源，所以会一起变'},
+    {name:'逐市实况覆盖', value:`${fmt(s.weatherCities)} / ${fmt(s.cities)} 市`,
+     note:'open-meteo 逐市实况（公开、免密钥）；缺报城市在界面上显示为"无实况"，不以默认值填补'},
+    {name:'机场净空', value:`${fmt(z.airports)} 机场 / ${fmt(z.limitZones)} 限制区`,
+     note:`规则化生成（DERIVED），覆盖 ${fmt(z.coverageSqKm)} km²、陆域 ${((z.coverageRatio||0)*100).toFixed(2)}%；与法定管制区（OFFICIAL，另库）分开计数，永不合并`},
+    {name:'距境外过近退出通航', value:`${fmt(d.border?.excludedCities?.length)} 城`,
+     note:`距境外不足 ${fmt(d.border?.excludeKm)} km 整体退出，城市与航线一并删除；界面上不留"半条"`},
+  ]
+})
+
+/** 同一套判据在 全国 → 大区 两级上的**当前帧切片**。
+ *
+ *  为什么放在口径页：②那张表说的是"怎么算"，这张表说的是"现在各算成什么样"。
+ *  只给定义不给实例，读者没法判断"四级切片"是一句口号还是真在跑；只给实例不给定义，
+ *  又会出现"数字对得上、含义对不上"。两张并排，一句话就能被验。
+ *
+ *  数字全部来自 `rollup`，前端不重算：全国总数回原始列表数（`rollup.total`），
+ *  大区各自那份是"本区涉及"，跨区航线会在两个区里各出现一次 —— 不是重复计数。
+ */
+/** 分级切片：**跟着当前作用域走**，同一张表三个层级通用。
+ *
+ *  · 全国 → 全国合计 + 六大区（各区"本区涉及"，跨区航线在两边各计一次）
+ *  · 大区 → 本区合计 + 区内各省
+ *  · 省   → 本省合计 + 各市（市层没有"停飞/低能见"这两个字段，如实显示"—"）
+ *
+ *  没有为省/市另立一张表：那是同一套判据的同一次切片，换的只是被切的容器。
+ *  数字全部来自 `rollup`，前端不重算、不补零。
+ */
+const nationRollup=computed(()=>{
+  const r=(scopeFacts.value||nationFacts.value)?.rollup
+  if(!r||!r.total) return {cols:[],rows:[]}
+  const f=v=>v==null?'—':v
+  const head=(name,note,total)=>({key:'total',name,note,cells:[
+    f(total.provinces),f(total.cities),f(total.corridors),f(total.airborne),f(total.hold),f(total.lowVisCities)]})
+  if(r.level==='province'){
+    const t=r.total||{}
+    const cities=r.cities||[]
+    const rows=[{key:'province',name:scopeFacts.value?.province?.name||store.scope?.label||'本省',
+                 note:`本级合计 · ${cities.length} 市（在飞按起飞机归属，跨市航线不重复计）`,
+                 cells:[f(t.corridors),f(t.airborne),f(t.delayed),f(t.blocked)]}]
+    for(const c of cities){
+      rows.push({key:c.name,name:c.name,
+                 note:c.hasAirport?`有机场${c.airport?' · '+c.airport:''}`:'无机场（专用接驳）',
+                 cells:[f(c.corridors),f(c.airborne),f(c.delayed),f(c.blocked)]})
+    }
+    return {cols:['层级','航线','在飞','延期','距境外受限'],rows}
+  }
+  if(r.level==='region'){
+    const t=r.total||{}
+    const rows=[{key:'region',name:r.region?.name||store.scope?.label||'本区',
+                 note:'本级合计（航线回原始列表数）',
+                 cells:[f(t.provinces),f(t.cities),f(t.corridors),f(t.airborne),f(t.hold),f(t.lowVisCities)]}]
+    for(const p of r.provinces||[]){
+      rows.push({key:p.name,name:p.name,note:`${p.cities??'—'} 市 · ${p.airports??'—'} 个机场`,
+                 cells:[1,f(p.cities),f(p.corridors),f(p.airborne),f(p.hold),f(p.lowVisCities)]})
+    }
+    return {cols:['层级','省级单元','城市','航线','在飞','停飞','低能见城市'],rows}
+  }
+  const rows=[{key:'nation',name:'全国',note:'合计（航线回原始列表数）',
+               cells:[f(r.total.provinces),f(r.total.cities),f(r.total.corridors),
+                      f(r.total.airborne),f(r.total.hold),f(r.total.lowVisCities)]}]
+  for(const row of r.regions||[]){
+    const t=row.total||{}
+    rows.push({key:row.id,name:row.name,note:`含 ${row.provinces?.length??t.provinces??0} 个省级单元`,
+               cells:[f(t.provinces),f(t.cities),f(t.corridors),f(t.airborne),f(t.hold),f(t.lowVisCities)]})
+  }
+  return {cols:['层级','省级单元','城市','航线','在飞','停飞','低能见城市'],rows}
+})
 
 const caliber=computed(()=>caliberBlocks(props.session,props.weather,props.network))
 const sourceRows=computed(()=>caliber.value.flatMap(block=>block.rows.map(row=>({...row,block:block.title}))))
@@ -838,8 +979,9 @@ async function copyReceipt(row){
   </template>
   <template v-else-if="view==='counterfactual'">
     <div class="operations-heading"><h2>反事实对照 <small>用 AI 和不用，差多少</small></h2>
-      <p>同一份运行计划、同一份气象快照，只换最后一层裁决规则 —— 差异只可能来自裁决，不来自"两次抽样恰好不同"。</p></div>
-    <CounterfactualPanel/>
+      <p>同一帧、同一份规则，只摘掉最后一层模型判据 —— 差异只可能来自模型，不来自"两次抽样恰好不同"。
+        <b>默认看全国层当前帧</b>（即时可用）；要看某一次大雾的案例重放，在页内切换。</p></div>
+    <CounterfactualPanel :minute="minute"/>
   </template>
   <template v-else-if="view==='ledger'">
     <div class="operations-heading"><h2>分歧台账 <small>AI 与规则不一致时，人怎么判的</small></h2>
@@ -956,16 +1098,37 @@ async function copyReceipt(row){
   </template>
   <template v-else-if="view==='reference'">
   <div class="operations-heading">
-    <h2>数据口径与边界 <small>{{cityName}}</small></h2>
-    <p>本系统里每一块内容都带一枚来源角标，含义只在这里定义一次。<b>「边界」一项说的是它不意味着什么</b>——前两项（谁产的、覆盖什么）在别的页面已经零散说过，唯独边界从来没有集中的、可引用的出处。</p>
+    <h2>数据口径与边界 <small>全国 · 四级口径</small></h2>
+    <p><b>两层要分开读</b>：上面一张是<b>全国态势聚合层</b>（30 个省级单元、319 市、492 条模拟航线，值随当前载荷实时变）；下面一张是<b>裁决引擎层</b>——同一套判据在<b>全国 → 大区 → 省 → 市</b>四级上逐级切片，判定真正跑在这一层。两层不是两个系统，是同一份数据的两个视角：把"319 市"读成"处处通航"、把"492 条"读成"都是载客航线"，都会读错。每一块内容都带来源角标，含义只在这里定义一次。</p>
   </div>
+  <section class="caliber-ledger nation-ledger" data-nation-ledger>
+    <div class="ledger-hd">
+      <h3>① 全国态势聚合层 <small>当前载荷实测值<template v-if="nationFacts"> · 第 {{ nationFacts.minute }} 分钟抓取</template></small></h3>
+      <p>这一层的数字<b>随载荷实时变</b>，下面每一行都指得出字段。交通为模拟（SIM）：航线几何与班次都是本地推演，不对应任何真实航班 —— 但<b>判定确实跑在这张网上</b>（见下一层的②），所以它不是"只做示意"的装饰层。</p>
+    </div>
+    <p class="operations-error" v-if="nationFactsError">全国载荷读取失败：{{nationFactsError}} —— 这一层留空，不代表全国没有数据。</p>
+    <p class="ledger-loading" v-else-if="!nationLedger.length">正在读取全国载荷…</p>
+    <div class="ledger-scroll" v-else>
+      <table>
+        <thead><tr><th>指标</th><th>当前取值</th><th>定义、来源与边界</th></tr></thead>
+        <tbody>
+          <tr v-for="row in nationLedger" :key="row.name" :data-nation-ledge="row.name">
+            <td><b>{{ row.name }}</b></td>
+            <td class="num">{{ row.value }}</td>
+            <td><small>{{ row.note }}</small></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
   <section class="caliber-ledger" data-caliber-ledger>
     <div class="ledger-hd">
-      <h3>口径总账</h3>
-      <p>每个数字都在这里能查到定义、分子分母、出处与更新节奏。<b>分母写"—"表示它不是一个比值</b>，不是"还没填"。</p>
+      <h3>② 裁决引擎层 <small>全国 / 大区 / 省 / 市 · 四级同一套判据</small></h3>
+      <p>每个数字都在这里能查到定义、分子分母、出处与更新节奏。<b>分母写"—"表示它不是一个比值</b>，不是"还没填"。本层按当前作用域切片：<b>全国</b>看合计与六个大区，<b>大区</b>看区内各省，<b>省</b>看本省各市，<b>市</b>看直接相邻的航线 —— 判据、阈值与口径四级完全一致，变的只是被切片的范围。</p>
     </div>
     <div class="ledger-scroll">
-      <table>
+      <table class="ledge-table">
         <thead><tr><th>指标</th><th>定义</th><th>分子</th><th>分母</th><th>来源</th><th>更新</th><th title="这个数字由哪一层算出来：后端 / 规则引擎 / 模型">计算方</th></tr></thead>
         <tbody>
           <tr v-for="row in CALIBER_LEDGER" :key="row.key" :data-ledge="row.key">
@@ -979,6 +1142,27 @@ async function copyReceipt(row){
           </tr>
         </tbody>
       </table>
+    </div>
+    <!-- 同一套判据的分级切片（当前帧）：口径表说"怎么算"，这张说"现在算成什么样"。
+         一张表三个层级通用：全国 → 六大区、大区 → 各区所含省、省 → 本省各市（列随层级换）。 -->
+    <div class="ledger-grid" v-if="nationRollup.rows.length" data-nation-rollup>
+      <div class="ledger-hd">
+        <h3>分级切片 <small>同一套判据 · {{ scopeTrail }}</small></h3>
+        <p>这张表<b>跟着当前作用域走</b>：全国看六大区、大区看区内各省、省看本省各市，字段与①层同源、逐列可核。
+          <b>航线数不能跨级相加</b> —— 跨省/跨区航线在两端的容器里各出现一次，那是"本区涉及"，不是重复计数；
+          合计一律回原始列表数。市层没有"停飞 / 低能见"这两个字段（市块只统计本市航线与在飞），如实显示"—"。</p>
+      </div>
+      <div class="ledger-scroll">
+        <table>
+          <thead><tr><th v-for="c in nationRollup.cols" :key="c">{{ c }}</th></tr></thead>
+          <tbody>
+            <tr v-for="row in nationRollup.rows" :key="row.key" :data-rollup="row.key">
+              <td><b>{{ row.name }}</b><small>{{ row.note }}</small></td>
+              <td class="num" v-for="(value,index) in row.cells" :key="index">{{ value }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </section>
   <div class="badge-legend">
@@ -1006,6 +1190,49 @@ async function copyReceipt(row){
       <p class="caliber-boundary"><b>边界</b>{{block.boundary}}</p>
     </section>
   </div>
+
+  <!-- ===== 评审四问（V1.0.6）=====
+       创新层级 / 与主流方案对比 / 需求从哪来 / 成效是多少 —— 这四件事方案 PDF 里都写了，
+       但评委现场点开系统时看不到。放在口径页而不是新开一页：这一页的定位就是
+       "把话说清楚"，多开一页反而要再解释一遍为什么有这一页。 -->
+  <section class="eval-grid" data-eval-block>
+    <article class="eval-card" data-eval="level">
+      <header><h3>核心创新层级</h3><span class="eval-badge">系统级 + 应用级</span></header>
+      <p><b>不是模型级。</b>能见度/阵风用的是现成的梯度提升树（100 棵、26 维特征、公开的校准方法），
+        模型结构不是我们的贡献。我们的贡献在<b>系统层</b>：把「气象判据 → 绕飞几何 → 时间窗」
+        这条链在同一个界面里贯通，并且每一步都能回到原始报文与回波几何；
+        以及<b>应用层</b>：用同一套判据同时回答"全国哪片天不能飞"和"这一班为什么这么判"。</p>
+    </article>
+    <article class="eval-card" data-eval="compare">
+      <header><h3>与主流方案的分工</h3><span class="eval-badge quiet">用途不同，不是高下</span></header>
+      <dl class="eval-rows">
+        <div><dt>单站气象保障</dt><dd>站级 METAR/TAF 深算，回答"本场能不能起降"。我们做全网可下钻的态势聚合，站级深算不是我们的目标。</dd></div>
+        <div><dt>通用航路规划</dt><dd>给定空域与气象后求最优路径。我们把判据、几何、时间窗整链留痕，结论可被逐行复核。</dd></div>
+        <div><dt>商业 UTM 平台</dt><dd>空域管理与计费。我们不发空域管制指令，只给放行建议与证据，边界写在每一块内容上。</dd></div>
+      </dl>
+    </article>
+    <article class="eval-card" data-eval="demand">
+      <header><h3>需求从哪来</h3><span class="eval-badge quiet">三条线</span></header>
+      <dl class="eval-rows">
+        <div><dt>文献线</dt><dd>低空航路、容量评估、低能见预报三组关键词，累计 259 条命中，筛出 14 篇精读。</dd></div>
+        <div><dt>体系线</dt><dd>唐山、大连、宁德已建低空气象保障 —— 说明"要不要做"不用论证，要论证的是"怎么做得可复核"。</dd></div>
+        <div><dt>自测线</dt><dd>本项目 62 个版本迭代中沉淀的 100 条问题档案，按症状索引，每条都有根因与修法。</dd></div>
+      </dl>
+    </article>
+    <article class="eval-card wide" data-eval="effect">
+      <header><h3>应用成效（稳定组 · 可复算）</h3><span class="eval-badge quiet">口径见上一张总账</span></header>
+      <dl class="eval-rows four">
+        <div><dt>进入不可飞走廊</dt><dd><b>0</b> 架次</dd></div>
+        <div><dt>回波压线改判</dt><dd><b>−100%</b>（改为绕飞或停飞）</dd></div>
+        <div><dt>绕飞架次</dt><dd><b>2848</b> 架次</dd></div>
+        <div><dt>单班追加延误</dt><dd><b>8 班 / 320 min</b>，均值 <b>0.1%</b></dd></div>
+      </dl>
+      <p class="eval-src">四个数只引这一组，不与其它口径混读：它们回答的是"这套判据跑起来之后，
+        安全与效率各付出多少"，不回答"预测准不准"（准不准看上一张的 AUC / Brier / TS）。
+        验证规模：前端单测 <b>507</b> 项、浏览器逐页验收 <b>43</b> 项、后端用例 <b>604</b> 项（当前版本全绿），
+        复现命令见仓库 README。</p>
+    </article>
+  </section>
 
   <div class="briefing-head glossary-head">
     <h3>术语表 · 专业与通俗两读</h3>
@@ -1113,7 +1340,7 @@ async function copyReceipt(row){
     </div>
   </details>
   <!-- 全国派生模式下默认展开（这页存在的意义就是看这些行）；
-       东北会话模式仍交给密度策略 —— policy.audit 是密度开关的消费点，不能丢。 -->
+       旧会话模式仍交给密度策略 —— policy.audit 是密度开关的消费点，不能丢。 -->
   <details class="density-fold journal-fold" v-if="journalRows.length"
            :open="journalSource==='nation'?true:policy.audit" data-density="audit">
   <summary>运行日志明细 <span>{{journalRows.length}} 条</span></summary>
@@ -1369,12 +1596,12 @@ html[data-theme="light"] tbody tr.jump:hover{background:#eef6fd}
 .source-badge.official{background:#1a2438;color:#9fb0dd;border-color:#37456b}
 .source-badge.manual{background:#2a1e30;color:#d9a8e4;border-color:#543d5e}
 .source-badge.absent{background:#242a30;color:#9aa6b2;border-color:#4b5560}
-.badge-legend{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-bottom:26px}
-.badge-legend article{padding:13px 15px;background:#14293a;border:1px solid #274355;border-radius:8px}
-.badge-legend p{font-size:12px;color:#8aa8ba;line-height:1.75;margin-top:9px}
+.badge-legend{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;margin-bottom:18px}
+.badge-legend article{padding:10px 12px;background:#14293a;border:1px solid #274355;border-radius:8px}
+.badge-legend p{font-size:11.5px;color:#8aa8ba;line-height:1.65;margin-top:6px}
 
-.caliber-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(390px,1fr));gap:14px;margin-bottom:30px}
-.caliber-card{padding:16px 18px;background:#14293a;border:1px solid #274355;border-radius:9px;min-width:0}
+.caliber-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px;margin-bottom:22px}
+.caliber-card{padding:13px 15px;background:#14293a;border:1px solid #274355;border-radius:9px;min-width:0}
 .caliber-card header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
 .caliber-card h3{font-size:14px;font-weight:500;color:#d5e7f1}
 .caliber-intro{font-size:12px;color:#7d9cb0;line-height:1.75;margin-bottom:13px}
@@ -1568,9 +1795,17 @@ html[data-theme="light"] tbody tr.jump:hover{background:#eef6fd}
   padding:0!important;cursor:pointer;text-align:left;text-decoration:underline;text-underline-offset:3px}
 .link:hover{color:#b8ecfb}
 
-.caliber-ledger{margin:12px 0 16px;border:1px solid var(--alc-line);border-radius:var(--alc-radius);background:var(--alc-bg-1);overflow:hidden}
-.ledger-hd{padding:12px 16px;border-bottom:1px solid var(--alc-line)}
-.ledger-hd h3{margin:0;font-size:18px;font-weight:600;color:var(--alc-text)}
+.caliber-ledger{margin:10px 0 14px;border:1px solid var(--alc-line);border-radius:var(--alc-radius);background:var(--alc-bg-1);overflow:hidden}
+/* 全国层总账：三列（指标 / 取值 / 说明），取值等宽不抖，说明列吃掉剩余宽度 */
+.nation-ledger td.num{font-variant-numeric:tabular-nums;white-space:nowrap;color:#cfe6f5;font-weight:600}
+.nation-ledger td small{font-size:11px;line-height:1.55;color:var(--alc-text-dim)}
+.nation-ledger tbody tr:hover{background:rgba(76,141,255,.06)}
+.ledger-loading{margin:0;padding:14px;font-size:12px;color:var(--alc-text-dim)}
+html[data-theme="light"] .nation-ledger td.num{color:#0f3550 !important}
+html[data-theme="light"] .nation-ledger td small{color:#4a6a85 !important}
+.ledger-hd{padding:10px 14px;border-bottom:1px solid var(--alc-line)}
+.ledger-hd h3{margin:0;font-size:15px;font-weight:600;color:var(--alc-text)}
+.ledger-hd h3 small{margin-left:8px;font-size:11.5px;font-weight:400;color:var(--alc-text-dim)}
 .ledger-hd p{margin:6px 0 0;font-size:12px;line-height:1.6;color:var(--alc-text-dim)}
 .ledger-scroll{overflow-x:auto;scrollbar-width:thin}
 .ledger-scroll::-webkit-scrollbar{height:8px}
@@ -1583,4 +1818,60 @@ html[data-theme="light"] tbody tr.jump:hover{background:#eef6fd}
 .caliber-ledger td{color:var(--alc-text)}
 .caliber-ledger td code{font-size:12px;color:var(--alc-info);word-break:break-all}
 .caliber-ledger tbody tr:last-child td{border-bottom:0}
+/* ②层是七列表：定义一列最长，不给下限就会被挤成一列竖排的字（实测在 1440 宽下
+   每行只剩 4–5 个字）。给各列定下限、整表加宽走横向滚动 —— 让表宽出去，
+   比让每个字挤进来强：挤进来是"看着有、读不了"。 */
+.caliber-ledger .ledge-table{min-width:1120px}
+.ledge-table td:nth-child(1),.ledge-table th:nth-child(1){min-width:124px}
+/* 来源一列是代码路径：默认 `white-space:nowrap` 会把整表撑到屏幕外，这里允许在词内折行
+   —— 路径断行只影响观感，不影响它"可复制、可核对"这个用途。 */
+.ledge-table td code{white-space:normal;word-break:break-word;overflow-wrap:anywhere}
+.ledge-table td:nth-child(2),.ledge-table th:nth-child(2){min-width:272px}
+.ledge-table td:nth-child(3),.ledge-table th:nth-child(3),
+.ledge-table td:nth-child(4),.ledge-table th:nth-child(4){min-width:96px}
+.ledge-table td:nth-child(5),.ledge-table th:nth-child(5){min-width:206px}
+.ledge-table td:nth-child(6),.ledge-table th:nth-child(6){min-width:104px}
+.ledge-table td:nth-child(7),.ledge-table th:nth-child(7){min-width:70px}
+/* 分级切片（V1.0.6）：挂在②同一张卡里，用一条分隔线断开"怎么算"与"现在算成什么样"。
+   七列都是数字，全部右对齐 + 等宽，否则 492 与 9 会左右跳。 */
+.ledger-grid{border-top:1px solid var(--alc-line);background:rgba(76,141,255,.03)}
+.ledger-grid .ledger-scroll table{min-width:760px}
+.ledger-grid td.num{text-align:right;font-variant-numeric:tabular-nums;color:#cfe6f5;font-weight:600}
+.ledger-grid td small{display:block;margin-top:2px;font-size:11px;color:var(--alc-text-dim)}
+.ledger-grid tbody tr:first-child{background:rgba(76,141,255,.06)}
+html[data-theme="light"] .ledger-grid td.num{color:#0f3550 !important}
+html[data-theme="light"] .ledger-grid{background:rgba(20,86,125,.04)}
+
+/* ===== 评审四问（V1.0.6）===== */
+.eval-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px;margin:6px 0 20px}
+.eval-card{padding:13px 15px;background:#14293a;border:1px solid #274355;border-radius:9px}
+.eval-card.wide{grid-column:1/-1}
+.eval-card header{display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap}
+.eval-card h3{margin:0;font-size:13.5px;color:#d5e7f1;font-weight:600}
+.eval-badge{font-size:10.5px;padding:1px 8px;border-radius:999px;color:#8ef0ff;
+  border:1px solid rgba(80,200,220,.5);background:rgba(30,120,140,.18)}
+.eval-badge.quiet{color:#9fc6dd;border-color:rgba(120,170,200,.42);background:rgba(40,80,110,.2)}
+.eval-card p{margin:0;font-size:12px;line-height:1.72;color:#9db8c9}
+.eval-card p b{color:#d7ecf8;font-weight:600}
+.eval-rows{margin:0}
+.eval-rows > div{display:flex;gap:10px;padding:4px 0;border-top:1px dashed rgba(70,110,140,.28)}
+.eval-rows > div:first-child{border-top:0}
+.eval-rows dt{flex:0 0 96px;font-size:11.5px;color:#7fb6cc}
+.eval-rows dd{margin:0;font-size:11.5px;line-height:1.65;color:#9db8c9}
+.eval-rows dd b{color:#eaf6ff;font-variant-numeric:tabular-nums}
+.eval-rows.four{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px}
+.eval-rows.four > div{border-top:0;padding:0;flex-direction:column;gap:2px}
+.eval-rows.four dt{flex:none;font-size:11px}
+.eval-rows.four dd{font-size:15px;color:#eaf6ff}
+.eval-src{margin:8px 0 0 !important;font-size:10.5px !important;color:#7d9cb3 !important;line-height:1.6}
+html[data-theme="light"] .eval-card{background:#fff !important;border-color:#dbe6f1 !important}
+html[data-theme="light"] .eval-card h3{color:#0f3550 !important}
+html[data-theme="light"] .eval-card p{color:#34516a !important}
+html[data-theme="light"] .eval-card p b{color:#12314a !important}
+html[data-theme="light"] .eval-rows dt{color:#2b5d80 !important}
+html[data-theme="light"] .eval-rows dd{color:#34516a !important}
+html[data-theme="light"] .eval-rows dd b{color:#0f3550 !important}
+html[data-theme="light"] .eval-src{color:#5b7a92 !important}
+html[data-theme="light"] .eval-badge{color:#0b6b7d !important;border-color:#8ecbb0 !important;background:#e6f6ee !important}
+html[data-theme="light"] .eval-badge.quiet{color:#31556f !important;border-color:#b9cfe2 !important;background:#eef1fa !important}
 </style>

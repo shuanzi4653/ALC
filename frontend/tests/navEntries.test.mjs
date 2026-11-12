@@ -14,17 +14,28 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   NAV_GROUPS, SECTION_NAMES, ENTRY_LABELS, HIDDEN_SECTIONS,
-  navEntryCount, entryOf, entryTabs, groupOfSection,
+  navEntryCount, entryOf, entryTabs, groupOfSection, sectionFromHash,
 } from '../src/traffic/runtime.js'
 
 const ENTRIES = NAV_GROUPS.flatMap((group) => group.subs.map((sub) => ({ ...sub, group })))
 
-test('导航入口是 8 个（W-21b 的目标），而视图仍是 15 个', () => {
-  assert.equal(navEntryCount(), 8,
+test('导航入口是 7 个（V1.0.5 合并后），而视图是 14 个', () => {
+  // V1.0.5：8 → 7、15 → 14。两处都是**合并**，不是裁功能：
+  //   · 「运行情报」并入「气象监测」（同一屏两张表，没必要两个入口）；
+  //   · 走廊组只剩「走廊剖面」（运行情报搬走后它本来就只有一项）。
+  // 保留这条断言的意义：以后每加一页，必须想清楚它挂哪个入口，
+  // 而不是顺手再加一个左侧按钮。
+  assert.equal(navEntryCount(), 7,
     `入口数变成 ${navEntryCount()}：新增页面必须挂进已有入口或明确新增一个入口，不允许回到"一页一个按钮"`)
-  // V1.0.1：14 → 15，新增「全国视图」；**入口数不变**才是重点 —— 它是挂在
-  // 「运行总览」入口下的 tab，不是第 9 个按钮。
-  assert.equal(Object.keys(SECTION_NAMES).length, 15, '视图总数不该被改（折叠的是导航，不是功能）')
+  assert.equal(Object.keys(SECTION_NAMES).length, 14, '视图总数不该被改（折叠的是导航，不是功能）')
+})
+
+test('被删掉的分节必须留旧 hash 映射，否则老链接会静默跳首页', () => {
+  // 这是 V1.0.5 删 briefing 时踩到的坑：`sectionFromHash` 查不到就回落 `home`，
+  // 表现为"别人给的链接打开是首页"，比 404 更像页面坏了。
+  const legacy = sectionFromHash('#/corridor/briefing')
+  assert.equal(legacy, 'weather', '旧地址应落到气象监测，而不是首页')
+  assert.ok(!('briefing' in SECTION_NAMES), 'briefing 已并入 weather，不该还留在分节表里')
 })
 
 test('每个视图恰好属于一个入口，且入口的锚点必须在自己的 members 里', () => {
