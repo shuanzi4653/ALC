@@ -332,7 +332,18 @@ function chooseFlight(f){
 async function loadOperations(){
   const id=session.value?.sessionId;if(!id)return
   const data=await requestJson('/api/traffic/operations?sessionId='+id)
-  if(session.value?.sessionId===id){operations.value=data;operationsReady.value=true}
+  if(session.value?.sessionId===id){
+    operations.value=data;operationsReady.value=true
+    // 就绪这一刻补一次气象帧。
+    //
+    // `generate()` 会先 `weather.value=null`、`operationsReady=false`，紧接着那次
+    // loadWeather 若撞上 ready 仍为 false 就直接返回；而**不能指望 watch(ready)**：
+    // 同一个 tick 里 ready 会 true→false→true，Vue 把中间态批处理掉，回调拿到的
+    // 前后值都是 true，于是不触发（V1.1.1 线上实测就是这么漏的：只发了 1 次请求，
+    // 之后再也没有第二次，气象帧一直停在 null）。
+    // 放在这里是因为 ready 只会在这一行之后变 true，是唯一可靠的"就绪点"。
+    if(!weather.value)loadWeather()
+  }
 }
 async function commandFlight(target){
   const flight=target&&target.id&&target.requestedDepartureMinute!=null?target:selected.value
@@ -350,13 +361,21 @@ function followFlight(flight){
 function clock(m){return relativeClock(m)}
 function rowActual(f){return executionTimes(f,minute.value)}
 function rowPhase(f){return phaseNames[flightPhase(f,minute.value)]}
+// 同参数在飞行中就不重复发：loadOperations 就绪时会补一次，generate 的 READY 分支
+// 随后还会显式调一次，两次的 (会话, 分钟, 城市) 相同，取回来的是同一份数据。
+let weatherInflight=''
 async function loadWeather(){
   if(!ready.value)return
-  const token=++weatherGeneration,key=session.value.sessionId,t=minute.value
+  const key=session.value.sessionId,t=minute.value
+  const sig=`${key}|${t}|${city.value||''}`
+  if(weatherInflight===sig)return
+  weatherInflight=sig
+  const token=++weatherGeneration
     try{const value=await requestJson(`/api/traffic/weather?seed=${session.value.seed}&scenario=${session.value.scenario}&minute=${t}${city.value?'&cityId='+encodeURIComponent(city.value):''}${caseQuery()}`);if(!disposed&&token===weatherGeneration&&key===session.value?.sessionId){weather.value=value;maybeRelayRadar(value)}}
   catch(e){
     if(token===weatherGeneration){weather.value=null;error.value='气象图层读取失败，本帧已作废（推演继续）：'+e.message}
   }
+  finally{if(weatherInflight===sig)weatherInflight=''}
 }
 const radarRelay=ref({status:'idle',slot:null,detail:''})
 let relayBusy=false,relayNextAllowedAt=0
@@ -636,6 +655,9 @@ watch(activeSection,value=>{
 watch([activeSection,mapExpanded],async()=>{await nextTick();if(workbench.value)workbench.value.scrollTop=0})
 watch(()=>weatherBucket(minute.value),loadWeather)
 watch(city,()=>{weather.value=null;loadWeather()})
+// 气象帧的补取放在 `loadOperations()` 就绪那一刻（见该函数），**不用 watch(ready)**：
+// 同一个 tick 里 ready 会 true→false→true，Vue 批处理掉中间态，watch 回调拿到的
+// 前后值都是 true，根本不触发 —— V1.1.1 线上就漏在这里。
 watch(()=>filtered.value.length,()=>{page.value=Math.min(page.value,Math.max(1,Math.ceil(filtered.value.length/20)))})
 // 顶栏的推演时刻：全国台自己报（它有自己的 0–1440 分钟），旧 session 页用本组件的 minute。
 const nationMinute=ref(0), nationPlaying=ref(true)

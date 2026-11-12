@@ -3062,7 +3062,7 @@ export function disposalNextActions(state){
 // 这里**只读取、不重算**：把当前气象帧按它自己的 `minute` 与回放时刻对齐，并明确
 // 说出两者是否同一刻。对不上时说的是"该帧不是回放时刻的帧"，而不是把当前帧
 // 当成当时的帧摆上去 —— 那正是 0.9.26 之前"计划与地图不是同一个世界"的同型错误。
-export function replayWeatherFrame(weather,minute){
+export function replayWeatherFrame(weather,minute,pending=false){
   const frame=weather&&typeof weather==='object'?weather:null
   // 0.11.25（B-4）：**ABSENT 也必须返回同一套键。**
   //
@@ -3071,6 +3071,22 @@ export function replayWeatherFrame(weather,minute){
   // `Cannot read properties of undefined (reading 'stratiform')`，
   // 整页渲染中断 ⇒ 复盘回放面板**整个不出现**，看起来像"功能没做"。
   // 缺值可以，缺键不行：调用方拿到的对象形状必须恒定。
+  // 「还在算」与「读不到」是两件事，原来挤在同一个 ABSENT 里：首次打开要 20–30 秒
+  // 把 7760 个班次排完，这段时间界面写着"读取失败或本帧已作废"，读者只会以为崩了。
+  //
+  // pending 分两级，因为线上实测存在两段空窗：
+  //   'BUILDING' —— 计划还在建（session 为 null 或 BUILDING）；
+  //   'LOADING'  —— 计划刚就绪、气象帧的请求还在飞（实测约 6 秒），这一段原来是 ABSENT。
+  // 键形状与其它分支完全一致（tiers 不能缺，0.11.25 踩过这个坑）。
+  if(!frame&&pending)return {state:'PENDING',
+    label:pending==='BUILDING'?'运行计划生成中':'正在载入气象帧',
+    minute:null,requested:Number.isFinite(Number(minute))?Number(minute):null,
+    cells:0,observations:0,provider:null,dataType:null,
+    radarAvailable:false,radarSlot:null,
+    tiers:{stratiform:null,convective:null,strong:null},
+    note:pending==='BUILDING'
+      ?'运行计划尚未建成，建成后自动载入回放时刻的气象帧，无需刷新。'
+      :'运行计划已就绪，气象帧正在载入，通常数秒内完成。'}
   if(!frame)return {state:'ABSENT',label:'未取得气象帧',
     minute:null,requested:Number.isFinite(Number(minute))?Number(minute):null,
     cells:0,observations:0,provider:null,dataType:null,

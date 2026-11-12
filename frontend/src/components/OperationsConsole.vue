@@ -158,7 +158,19 @@ const selectedMark=computed(()=>verdictMark(props.selected?.id,props.aiReviewed)
 const markOf=flight=>verdictMark(flight?.id,props.aiReviewed)
 const coverage=computed(()=>aiCoverage(props.flights,props.aiReviewed))
 const MARK_ROWS=Object.freeze(Object.values(AI_MARKS))
-const replayWeather=computed(()=>replayWeatherFrame(props.weather,replayMinute.value))
+// 计划在构建中时是"还在算"，不是"读不到"。这两句话在界面上差一个词，读者理解差一整层：
+// 前者会等，后者会以为故障。只认明确的构建态，session 为空不算（nation 模式本就没有）。
+const planBuilding=computed(()=>{
+  if(!props.session)return true          // 首次轮询还没回来：同样属于"还在算"
+  const st=props.session.status
+  return st==='BUILDING'||st==='QUEUED'||st==='PENDING'
+})
+const replayWeather=computed(()=>{
+  // 空窗分两级：计划还在建 → BUILDING；计划就绪但帧没回来 → LOADING。
+  // 两级之外才是 ABSENT（真读不到，此时会有错误条说明原因）。
+  const stage=props.weather?'':(planBuilding.value?'BUILDING':'LOADING')
+  return replayWeatherFrame(props.weather,replayMinute.value,stage)
+})
 const sigmet=computed(()=>sigmetRows(props.weather))
 const clearance=computed(()=>clearanceReport(props.selected?.atcClearance))
 const detourRows=computed(()=>(props.flights||[])
@@ -1683,6 +1695,7 @@ html[data-theme="light"] tbody tr.jump:hover{background:#eef6fd}
 .replay-weather[data-replay-weather="ALIGNED"]{border-left:3px solid #4fbf9a}
 .replay-weather[data-replay-weather="MISALIGNED"]{border-left:3px solid #d98a2b}
 .replay-weather[data-replay-weather="ABSENT"]{border-left:3px solid #6d3a46}
+.replay-weather[data-replay-weather="PENDING"]{border-left:3px solid #3f6f8a}
 .replay-weather>header{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:12px}
 .replay-weather>header b{font-size:13px;color:#d5e7f1;font-weight:500}
 .replay-weather>header span{font-size:10.5px;color:#8aa8ba}

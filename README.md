@@ -6,6 +6,14 @@
 
 **版本**：`V1.1.1`（2026-11-13）。程序文件（`VERSION` / `pom.xml` / `package.json` / `package-lock.json` 两处）写合法 semver **`1.1.1`** —— Maven 与 npm 不接受 `V` 前缀与全角括号。此前 `0.9.0` … `0.11.27` 为 Beta 线，已于 `0.11.27` 收口；版本口径与递增规则见 [`docs/NAMING.md`](docs/NAMING.md) **§7**。
 
+**V1.1.1 补正**（2026-11-13，随 1.1.1 一同发布，不单列版本号）：
+
+- **「当时气象帧」在计划生成期间写着"读取失败或本帧已作废"**。首次打开要 20–30 秒把 7760 个班次排完（实测进度 10→34→52→68→100），这段时间 `weather` 还是 null，而这一块只有 `ABSENT` 一种空态，于是"还没算完"被写成了"读不到" —— 读者只会以为崩了。
+  现在分出 `PENDING`：`session` 为 null 或 `status=BUILDING/QUEUED/PENDING` 时显示「运行计划生成中，建成后自动载入，无需刷新」，建成后自动变 `ALIGNED`（实测第 18 秒）。
+- 顺带把补取钉在就绪点上：`loadOperations()` 置 `operationsReady=true` 时若 `weather` 为空就补一次，并给 `loadWeather` 加了同参数去重。**不用 `watch(ready)`** —— 同一个 tick 里 ready 会 true→false→true，Vue 批处理掉中间态，watch 回调拿到的前后值都是 true，根本不触发（第一版就这么漏的）。
+- 数据本身没坏：`/api/traffic/weather` 在 0/30/60/120 分钟都 200 返回（36 个观测站）。
+- 前端 **497 项**全过。
+
 **V1.1.1 主要变化**（2026-11-13，收口版）：
 
 - **旧链接真正下线**。V1.1.0 把反事实对照与分歧台账并进了推演，却只删了导航、没删路由：`#/compare/counterfactual` 与 `#/compare/ledger` 仍能打开一个独立页（还是那套空转轮询），`#/model/mechanism` 因为分节被删而**静默回落到首页**。现在三条都写进 `LEGACY_SECTION_HASHES` 指向推演，路由表与 `OperationsConsole` 的两个分支一并删除，分节从 13 个减到 11 个。**教训**：删一个分节必须同时登记旧 hash，否则用户看到的是"页面坏了"而不是"搬走了"。
