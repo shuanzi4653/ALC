@@ -610,6 +610,27 @@ def traffic_v2_modelcard():
     from traffic import v2 as traffic_v2
     return traffic_v2.modelcard()
 
+@app.get('/traffic/v2/constants')
+def traffic_v2_constants():
+    """阈值与代价系数的**唯一来源**（V1.1.2）。
+
+    此前前端各存一份：走廊页的"需关注"用 0.35、台账的模型筛选用 0.35、
+    气象表的配色用 0.15/0.35/0.60，而 0.15 在后端根本没有对应常量。
+    改后端一个数，屏幕上有三处不跟随，且没人知道哪一处是准的。
+    这里一次下发，前端只在启动时取一次并缓存。
+    """
+    from traffic import nation_ops
+    return {
+        'status': 'OK',
+        'risk': {'watch': nation_ops.RISK_WATCH, 'hold': nation_ops.RISK_HOLD},
+        'model': {'watch': nation_ops.MODEL_WATCH, 'hold': nation_ops.MODEL_HOLD},
+        'windHighMps': nation_ops.WIND_HIGH,
+        'visBands': [{'thresholdM': threshold, 'risk': risk}
+                     for threshold, risk in nation_ops.VIS_BANDS],
+        'cost': dict(nation_ops.COST_W),
+        'note': '前端不得再各自保存这些数值；改动此处即全站生效。',
+    }
+
 @app.get('/traffic/v2/explain')
 def traffic_v2_explain(corridorId: str = Query(..., min_length=3, max_length=40)):
     from traffic import v2 as traffic_v2

@@ -2,6 +2,7 @@
 import {computed,onMounted,onUnmounted,ref,watch} from 'vue'
 import {requestJson} from '../../api.js'
 import {deliverCsv,csvDeliveryText} from '../../traffic/clipboard.js'
+import { TH } from '../../traffic/thresholds.js'
 // 导出的回执（一行字，取代浏览器下载条）
 const csvNote=ref('')
 let csvTimer=null
@@ -18,6 +19,10 @@ const props=defineProps({
   minute:{type:Number,default:60},
   density:{type:String,default:'full'},
   selfFetch:{type:Boolean,default:false},
+  // 独立成页时跟随全局作用域：以前写死 level=nation，下钻到沈阳市再点台账，
+  // 页面仍是全国 106 架，面包屑与数据对不上（V1.1.2）。
+  level:{type:String,default:'nation'},
+  scopeId:{type:String,default:''},
   selectedId:{type:String,default:''},
   // 'ledger'  = 调度台账：看"这一班什么时候飞、批没批"
   // 'briefing'= 班次情报：看"这一班为什么这么判"，按风险从高到低排
@@ -41,7 +46,7 @@ let lastKey=''
 const elapsed=ref(0)
 let tickTimer=null
 
-function keyOf(minute){return `nation|${Math.round(minute)}`}
+function keyOf(minute){return `${props.level}|${props.scopeId||''}|${Math.round(minute)}`}
 
 async function load(cached){
   const key=keyOf(localMinute.value)
@@ -56,7 +61,7 @@ async function load(cached){
   tickTimer=setInterval(()=>{elapsed.value+=1},1000)
   try{
     const body=await requestJson(
-      `/api/traffic/v2/nation?level=nation&minute=${Math.round(localMinute.value)}`,
+      `/api/traffic/v2/nation?level=${encodeURIComponent(props.level)}&id=${encodeURIComponent(props.scopeId||'')}&minute=${Math.round(localMinute.value)}`,
       {timeoutMs:45000,signal:controller?.signal})
     if(controller&&controller.signal.aborted) return
     local.value=body
@@ -73,6 +78,7 @@ async function load(cached){
 }
 
 onMounted(()=>{if(props.selfFetch) load()})
+watch(()=>[props.level,props.scopeId],()=>{if(!props.selfFetch)return;lastKey='';load()})
 watch(localMinute,()=>{
   if(!props.selfFetch) return
   if(debounceTimer) clearTimeout(debounceTimer)
@@ -135,7 +141,7 @@ function matchFilter(f){
   if(k==='high') return f.riskLevel==='HIGH'
   if(k==='detour') return f.decision==='DETOUR'
   if(k==='hold') return f.decision==='HOLD'
-  if(k==='model') return (f.pModel||0)>=0.35
+  if(k==='model') return (f.pModel||0)>=TH.modelWatch
   return true
 }
 const shownRows=computed(()=>{
@@ -183,7 +189,7 @@ const filterCounts=computed(()=>{
     high:list.filter(f=>f.riskLevel==='HIGH').length,
     detour:list.filter(f=>f.decision==='DETOUR').length,
     hold:list.filter(f=>f.decision==='HOLD').length,
-    model:list.filter(f=>(f.pModel||0)>=0.35).length,
+    model:list.filter(f=>(f.pModel||0)>=TH.modelWatch).length,
   }
 })
 const rows=computed(()=>{

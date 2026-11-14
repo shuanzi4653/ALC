@@ -29,6 +29,8 @@ RISK_WATCH = 0.35
 # 不是模型自带的，改了要同步改口径页。
 MODEL_WATCH = 0.35
 MODEL_HOLD = 0.60
+# 期望损失的代价系数（前端不再抄一份；口径页与推演第 5 段都读这里）
+COST_W = {'risk': 1.0, 'perHour': 0.6, 'perKm': 0.02}
 CRUISE_M = (600, 1100)
 
 DECISION_LABEL = {'RELEASE': '直飞放行', 'DETOUR': '绕飞放行', 'HOLD': '暂不放行'}

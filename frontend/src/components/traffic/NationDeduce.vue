@@ -151,7 +151,7 @@
             <thead><tr><th>项</th><th>系数</th><th>说明</th></tr></thead>
             <tbody>
               <tr><td>风险</td><td>1.0</td><td>概率 × 事故代价</td></tr>
-              <tr><td>时间</td><td>0.6 / 小时</td><td>延期按推迟 60 分钟计，不假设天气会好转</td></tr>
+              <tr><td>时间</td><td>{{ TH.costPerHour }} / 小时</td><td>延期按推迟 60 分钟计，不假设天气会好转</td></tr>
               <tr><td>里程</td><td>0.02 / km</td><td>绕飞带来的额外航程</td></tr>
               <tr><td>取消</td><td>固定项</td><td>兜底项，不参与最优比较</td></tr>
             </tbody>
@@ -199,6 +199,7 @@ import CounterfactualPanel from './CounterfactualPanel.vue'
 import DivergencePanel from './DivergencePanel.vue'
 import BarThreshold from '../charts/BarThreshold.vue'
 import Gauge from '../charts/Gauge.vue'
+import { TH } from '../../traffic/thresholds.js'
 import OptionBars from '../charts/OptionBars.vue'
 import Timeline from '../charts/Timeline.vue'
 import { activeCase } from '../../traffic/caseMode.js'

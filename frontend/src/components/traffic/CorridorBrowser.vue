@@ -84,6 +84,7 @@
 import { computed, ref, watch } from 'vue'
 import NationMap from './NationMap.vue'
 import NationDeduce from './NationDeduce.vue'
+import { TH } from '../../traffic/thresholds.js'
 
 const props = defineProps({
   mode: { type: String, default: 'corridor' },   // corridor | card
@@ -170,7 +171,7 @@ const shown = computed(() => {
     r.id.toLowerCase().includes(q) || r.fromName.includes(q) || r.toName.includes(q))
 })
 const anomalyCount = computed(() =>
-  rows.value.filter(r => r.blocked || r.detour || r.hold || r.riskP >= 0.35).length)
+  rows.value.filter(r => r.blocked || r.detour || r.hold || r.riskP >= TH.riskWatch).length)
 
 // 选中的那条：优先用户点过的，其次外部指定（从处置/日志跳进来），最后第一条异常
 const activeId = computed(() => {

@@ -75,6 +75,7 @@ test('前端不许把「没有数字」显示成 0（沿用既有纪律，防止
 const deduce = readFileSync(new URL('../src/components/traffic/NationDeduce.vue', import.meta.url), 'utf8')
 const nationPanel = readFileSync(new URL('../src/components/traffic/NationPanel.vue', import.meta.url), 'utf8')
 const corridorBrowser = readFileSync(new URL('../src/components/traffic/CorridorBrowser.vue', import.meta.url), 'utf8')
+const nationBriefing = readFileSync(new URL('../src/components/traffic/NationBriefing.vue', import.meta.url), 'utf8')
 
 test('推演板头裁决只读列表侧，不读取证数据', () => {
   assert.ok(deduce.includes('{{ flight.decisionLabel }}'),
@@ -115,3 +116,25 @@ test('模型概率缺失时判据仍出 ABSENT 行，不静默少一条', () => 
     '缺少 ABSENT 兜底行：判据会少一条，页脚就会出现「4/4 通过」')
 })
 
+// ── V1.1.2 补全：阈值单一来源 / 取证页真调用 / 台账跟随作用域 ──────────────────
+
+test('阈值只从后端下发，前端四处不再各存一个数', () => {
+  const mainPy = readFileSync(new URL('../../backend-python/main.py', import.meta.url), 'utf8')
+  assert.ok(mainPy.includes("'/traffic/v2/constants'"), '缺少阈值常量接口')
+  assert.ok(corridorBrowser.includes('TH.riskWatch'), '走廊页"需关注"仍用裸常量')
+  assert.ok(nationPanel.includes('TH.modelHold') && nationPanel.includes('TH.modelWatch'),
+    '气象表配色仍用裸常量（0.15 在后端没有对应值）')
+  assert.ok(nationBriefing.includes('TH.modelWatch'), '台账模型筛选仍用裸常量')
+  assert.ok(deduce.includes('TH.costPerHour'), '推演代价系数仍写死 0.6')
+})
+
+test('取证页真的调用一次大模型，并如实标注来源', () => {
+  assert.ok(nationPanel.includes('/api/traffic/v2/explain'), '取证页没有调用翻译器')
+  assert.ok(nationPanel.includes("reading.source === 'MODEL'"), '必须按 source 标注是模型还是模板句')
+  assert.ok(nationPanel.includes('data-evidence-reading'), '缺少解读结果区域')
+})
+
+test('台账自取跟随全局作用域，不再写死全国', () => {
+  assert.ok(nationBriefing.includes('props.level'), '台账请求没带 level')
+  assert.ok(!nationBriefing.includes('?level=nation&minute='), '台账仍写死 level=nation')
+})

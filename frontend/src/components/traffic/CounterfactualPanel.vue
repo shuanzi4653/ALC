@@ -21,6 +21,11 @@ const caseNote=computed(()=>{
   if(!effectiveCase.value)return 'live'
   return ''
 })
+// 时基：这一段的数字属于哪一帧。案例重放与全国单帧是两套口径，不标出来就会被读者当成同一件事。
+const minuteLabel=computed(()=>{
+  const m=Math.round(props.minute||60)
+  return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0')
+})
 const caseLabel=computed(()=>{
   const meta=caseMeta()||{}
   return effectiveCase.value===(activeCase()||'')&&meta.label?meta.label:'2025-01-05 沈阳大雾'
@@ -139,6 +144,12 @@ function pctText(v){return typeof v==='number'?`${v>0?'+':''}${v}%`:'—'}
 
 <template>
 <section class="cf">
+  <!-- V1.1.2：同一段里可能有两种口径 —— 全国单帧（跟着时间轴）与案例重放（2025-01-05 沈阳大雾）。
+       不写出来，读者会拿"7760 班那次"去比"当前帧 106 架"。 -->
+  <p class="cf-basis" data-cf-basis>
+    <template v-if="effectiveCase">案例重放 · {{ caseLabel }}（初赛会话口径，与首页全国帧不是同一套数据）</template>
+    <template v-else>全国单帧 · 含模型 / 不含模型按 T+{{ minuteLabel }} 重算，与首页同一帧</template>
+  </p>
   <p class="cf-state" v-if="loading&&!d">正在读取反事实对照…</p>
   <p class="cf-state bad" v-else-if="error">对照不可用 · {{ error }}</p>
   <p class="cf-state" v-else-if="d&&!ready&&building">
@@ -293,6 +304,8 @@ function pctText(v){return typeof v==='number'?`${v>0?'+':''}${v}%`:'—'}
 .cf-switch:hover{background:rgba(255,255,255,.18)}
 .cf-scope{color:#9fc4dd}
 
+.cf-basis{margin:0 0 6px;font-size:9.5px;color:#7d9cb3;letter-spacing:.2px}
+html[data-theme="light"] .cf-basis{color:#5b7a92}
 .cf{padding:16px 0;color:var(--alc-text);font-size:13px}
 .cf-state{padding:16px;background:var(--alc-bg-1);border:1px solid var(--alc-line);border-radius:var(--alc-radius)}
 .cf-state.bad{border-left:3px solid var(--alc-danger)}

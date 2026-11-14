@@ -1562,7 +1562,9 @@ def _evidence_locked(flight_id: str, minute: int = 60, virtual: bool = False) ->
     #  风险损失 = 该方案下的飞行风险概率 × 1.0
     #  时间成本 = 延误分钟 ÷ 60 × 0.6
     #  能耗成本 = 航程增量 km × 0.02
-    W_RISK, W_HOUR, W_KM = 1.0, 0.6, 0.02
+    W_RISK = nation_ops.COST_W['risk']
+    W_HOUR = nation_ops.COST_W['perHour']
+    W_KM = nation_ops.COST_W['perKm']
     speed = float(flight.get('speedKmh') or 200.0)
     detour_km = float(flight.get('detourKm') or 0.0)
     # 压线时"直飞"不是可选项：穿强回波是**硬约束**，不参与代价比较。

@@ -5,6 +5,7 @@ import {store} from '../../store.js'
 import NationDeduce from './NationDeduce.vue'
 import CorridorBrowser from './CorridorBrowser.vue'
 import NationMap from './NationMap.vue'
+import { TH } from '../../traffic/thresholds.js'
 import NationBriefing from './NationBriefing.vue'
 import {parseScope,scopeKey} from '../../traffic/scope.js'
 
@@ -228,7 +229,23 @@ async function loadEvidence(){
   }catch(e){evidenceErr.value=e.message||String(e);evidence.value=null}
   finally{evidenceBusy.value=false}
 }
-function clearEvidence(){evidence.value=null;evidenceErr.value=''}
+// —— 一句解读：这是界面上**真正调用大模型**的地方 ——
+// `/v2/explain` 的守卫在后端：生成文本里的数字必须落在该走廊字段构成的集合内，
+// 越界回灌重写一次，两次不过就退回模板句，并把 source 标成 TEMPLATE。
+// 这里只负责把 source 如实显示出来 —— 不把模板句说成"模型结论"。
+const reading=ref(null), readingBusy=ref(false), readingErr=ref('')
+async function explainReading(){
+  const corridor=(selectedFlight.value&&selectedFlight.value.corridor)
+    || String(evidence.value?.flight?.id||'').split('#')[0]
+  if(!corridor){readingErr.value='当前班次没有对应走廊，无法生成解读';return}
+  readingBusy.value=true;readingErr.value=''
+  try{
+    reading.value=await requestJson('/api/traffic/v2/explain?corridorId='+encodeURIComponent(corridor),
+      {timeoutMs:25000})
+  }catch(e){readingErr.value=e.message||String(e);reading.value=null}
+  finally{readingBusy.value=false}
+}
+function clearEvidence(){evidence.value=null;evidenceErr.value='';reading.value=null;readingErr.value=''}
 
 // 定位/复位只对平面图这一套。
 const globeRef=ref(null)   // 已下线三维，保留 ref 只为兼容模板里的旧引用
@@ -686,7 +703,7 @@ const wxSourceDetail=computed(()=>{
   const errs=(weatherMeta.value.errors||[]).filter(Boolean)
   return [...parts, ...errs].join('；')||'未记录数据来源'
 })
-function pBand(p){return p==null?'':(p>=0.6?'bad':(p>=0.35?'warn':(p>=0.15?'watch':'')))}
+function pBand(p){return p==null?'':(p>=TH.modelHold?'bad':(p>=TH.modelWatch?'warn':''))}
 // 气象表要"一眼看出哪列是异常"，所以温度/风速/能见度各自上色。
 // 阈值集中在这里，别散到模板里 —— 否则改一次要翻三个地方。
 // 推演/走廊已改成「左侧列表 + 右侧详情」，两级下拉（选城市→选班次）随之作废。
@@ -1219,6 +1236,26 @@ onUnmounted(()=>{
             </div>
           </div>
           <p class="ev-note" v-if="evidence.llm && !evidence.llm.configured">{{ evidence.llm.note }}</p>
+
+          <!-- V1.1.2：此前这一页只有一枚"大模型已配置"的徽标，报告与 PPT 说的
+               "证据检索 + 结论成句"在界面上找不到 —— 等于说了一件没有发生的事。
+               现在把走廊级翻译器接在这里：一句不超过 80 字，数字受后端守卫，
+               越界退回模板句，界面按 source 如实标注。 -->
+          <div class="ev-read" data-evidence-reading>
+            <button type="button" class="ev-read-btn" :disabled="readingBusy" @click="explainReading">
+              {{ readingBusy ? '正在生成…' : '用大模型生成一句解读' }}
+            </button>
+            <p v-if="readingErr" class="ev-err">{{ readingErr }}</p>
+            <template v-else-if="reading">
+              <p class="ev-read-text">{{ reading.text }}</p>
+              <p class="ev-read-meta">
+                来源：{{ reading.source === 'MODEL' ? '大模型（数字守卫通过）' : '模板句（未参与或未通过守卫）' }}
+                <template v-if="(reading.guard?.violations || []).length"> · 被拦下的数字：{{ reading.guard.violations.join('、') }}</template>
+                · 范围：单条走廊，与班次判定共用同一套阈值
+              </p>
+            </template>
+          </div>
+
           <p class="ev-note quiet">{{ evidence.discipline }}</p>
         </template>
       </div>
@@ -1630,6 +1667,16 @@ html[data-theme="light"] .nrn-alert-go{color:#0b7ea6}
 .ev-step code.DERIVED{color:#ffd479;background:rgba(245,190,60,.14)}
 .ev-step code.OFFICIAL{color:#c6b4ff;background:rgba(160,140,255,.14)}
 .ev-note{margin:6px 0 0;font-size:10.5px;color:#ffcf7a;line-height:1.6}
+.ev-read{margin:8px 0 2px;padding:8px 10px;border-left:2px solid var(--alc-line);background:rgba(30,70,100,.14)}
+.ev-read-btn{font-size:10.5px;padding:3px 9px;border-radius:4px;border:1px solid rgba(120,170,200,.45);
+  background:transparent;color:#bcd8ea;cursor:pointer}
+.ev-read-btn:disabled{opacity:.5;cursor:default}
+.ev-read-text{margin:7px 0 3px;font-size:11.5px;line-height:1.65;color:#dfeefb}
+.ev-read-meta{margin:0;font-size:9.5px;color:#7d9cb3}
+html[data-theme="light"] .ev-read{background:#f2f7fb}
+html[data-theme="light"] .ev-read-btn{color:#1d4a6b;border-color:#a9c6da}
+html[data-theme="light"] .ev-read-text{color:#12303f}
+html[data-theme="light"] .ev-read-meta{color:#5b7a92}
 .ev-llm{margin-left:auto;font-style:normal;font-size:9.5px;padding:1px 6px;border-radius:999px;
   color:#6fe0a8;border:1px solid rgba(80,200,140,.45);background:rgba(40,140,95,.14);white-space:nowrap}
 .ev-llm.off{color:#ffcf7a;border-color:rgba(220,170,60,.5);background:rgba(180,130,30,.14)}

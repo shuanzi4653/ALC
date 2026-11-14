@@ -8,6 +8,7 @@ import NationPanel from './traffic/NationPanel.vue'
 import NationBriefing from './traffic/NationBriefing.vue'
 import CommandPalette from './traffic/CommandPalette.vue'
 import {relayRadarTiles} from '../traffic/radarRelay.js'
+import {loadThresholds} from '../traffic/thresholds.js'
 import {theme,toggleTheme} from '../theme.js'
 import {store} from '../store.js'
 import {readScopeFromUrl,writeScopeToUrl,scopeKey} from '../traffic/scope.js'
@@ -719,7 +720,11 @@ function tickWallClock(){
   wallClock.value=`${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
 }
 
-onMounted(()=>{initialize();window.addEventListener('keydown',onGlobalKey);timer=setInterval(()=>{
+onMounted(()=>{
+  // 阈值只在启动时取一次：走廊页"需关注"、台账"模型"筛选、气象表配色、推演代价系数
+  // 都读这一份，不再各存一个数（V1.1.2）。
+  loadThresholds()
+  initialize();window.addEventListener('keydown',onGlobalKey);timer=setInterval(()=>{
   if(!playing.value||!ready.value)return
   const step=Number(speed.value)*.2
   minute.value=Math.min(480,minute.value+step)
@@ -831,7 +836,7 @@ onUnmounted(()=>{
   <section class="traffic-page scope-page" v-if="activeSection==='schedule'">
     <div class="scope-bar" data-scope-bar>
       <b>调度台账</b>
-      <span class="scope-note">气象与雷达为公开源实况；交通为模拟（SIM），不对应真实航班</span>
+      <span class="scope-note">{{ scope.label }} · 气象与雷达为公开源实况；交通为模拟（SIM），不对应真实航班</span>
     </div>
     <!-- 密度档在这里生效：值班员/指挥默认展开口径说明，演示档收起。
         （`DENSITY_POLICY.ledger` 必须有界面消费点，否则切档位屏幕上什么都不变 ——
@@ -842,7 +847,7 @@ onUnmounted(()=>{
     </details>
     <!-- 给组件一个确定高度的槽位：它内部靠 flex:1 让表体滚动，父级不给高度就不滚 -->
     <div class="scope-body">
-      <NationBriefing view="ledger" variant="ledger" self-fetch/>
+      <NationBriefing view="ledger" variant="ledger" self-fetch :level="scope.level" :scope-id="scope.id"/>
     </div>
   </section>
   </div>
