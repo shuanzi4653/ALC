@@ -24,12 +24,19 @@
         </div>
         <span class="dd-verd" :class="tone">
           <template v-if="review">人工 · {{ reviewText }}</template>
-          <template v-else>{{ data?.flight?.decisionLabel || flight.decisionLabel }}</template>
+          <template v-else>{{ flight.decisionLabel }}</template>
         </span>
       </header>
       <p class="dd-sub">
         {{ short(flight.fromName) }} → {{ short(flight.toName) }}
-        <span v-if="data">· 风险 {{ num(data.flight.riskP, 2) }}（{{ data.flight.riskLevelLabel }}）</span>
+        <span>· 规则风险 {{ num(flight.riskP, 2) }}（{{ flight.riskBandLabel || flight.riskLevelLabel }}）</span>
+        <span v-if="flight.pModel != null">· 模型低能见 {{ Math.round(flight.pModel * 100) }}%</span>
+        <span class="dd-basis" data-deduce-basis>· 证据取 {{ snapshotLabel }} 快照<template v-if="virtual">（虚拟气象）</template></span>
+      </p>
+      <!-- V1.1.2：板头裁决一律读列表侧（含模型门槛与绕飞封禁），取证只提供证据细节。
+           两侧判定不同时必须说出来，不能让读者自己发现"上面写直飞、左边写停飞"。 -->
+      <p v-if="driftNote" class="dd-state bad" data-deduce-drift>
+        {{ driftNote }}<button type="button" @click="load">按当前帧重算</button>
       </p>
 
       <p v-if="busy" class="dd-state">正在按这一架重算链路…</p>
@@ -80,7 +87,7 @@
         <!-- ② 判据 -->
         <DeduceSection name="criteria" no="2" title="判据" tag="RULE"
                        :summary="sumCriteria" :force="forceSeq" :force-dir="forceDir"
-                       :tone="passCount === (data.criteria || []).length ? 'ok' : 'bad'">
+                       :tone="criteriaTone">
           <BarThreshold :rows="criteriaRows" title="各判据的实测值与阈值" unit="条长＝实测值距阈值的接近程度，触及虚线即达阈值"
                         aria="各判据实测值与阈值对照" />
           <table class="dd-tbl" data-tbl="criteria">
@@ -100,9 +107,9 @@
         <!-- ③ 概率与裁决 -->
         <DeduceSection name="verdict" no="3" title="概率与裁决" tag="DERIVED"
                        :summary="sumVerdict" :force="forceSeq" :force-dir="forceDir" :tone="tone">
-          <Gauge :p="data.flight.riskP || 0" title="不可飞概率落在哪一档" unit="阈值由后端单一常量给出"
+          <Gauge :p="flight.riskP || 0" title="不可飞概率落在哪一档" unit="阈值由后端单一常量给出"
                  aria="不可飞概率与三档区间" />
-          <p class="dd-verd-line">裁决：<b :class="tone">{{ data.flight.decisionLabel }}</b></p>
+          <p class="dd-verd-line">裁决：<b :class="tone">{{ flight.decisionLabel }}</b></p>
           <ul class="dd-drivers" v-if="(drivers || []).length">
             <li v-for="(text, i) in drivers" :key="'d' + i">{{ text }}</li>
           </ul>
@@ -171,7 +178,7 @@
         <DeduceSection name="compare" no="7" title="网络层对照" tag="A/B"
                        :summary="sumCompare" :default-open="caseMode"
                        :force="forceSeq" :force-dir="forceDir">
-          <CounterfactualPanel :minute="minute" />
+          <CounterfactualPanel :minute="minute" :virtual="virtual" />
         </DeduceSection>
 
         <!-- ⑧ 分歧台账：人与算法不一致的逐条记录 -->
@@ -202,6 +209,8 @@ const props = defineProps({
   corridor: { type: Object, default: null },
   minute: { type: Number, default: 0 },
   paused: { type: Boolean, default: true },
+  // V1.1.2：与列表同参。虚拟气象下取证若不跟着走，两侧裁决必然分叉。
+  virtual: { type: Boolean, default: false },
   // 人工裁决（走廊页记录的那一条）。有它就以它为准：
   // 日志写什么、推演结论就写什么 —— 两处读同一份，不许各说各话。
   review: { type: Object, default: null },
@@ -232,7 +241,7 @@ async function load() {
   err.value = ''
   try {
     const res = await fetch(
-      `/api/traffic/v2/nation/evidence?flight=${encodeURIComponent(f.id)}&minute=${Math.round(props.minute)}`,
+      `/api/traffic/v2/nation/evidence?flight=${encodeURIComponent(f.id)}&minute=${Math.round(props.minute)}${props.virtual?'&virtual=1':''}`,
       { headers: { Accept: 'application/json' } },
     )
     if (!res.ok) throw new Error('HTTP ' + res.status)
@@ -278,7 +287,13 @@ const finalConclusion = computed(() => {
   if (!r) return auto
   return `人工裁决：${reviewText.value}${r.reason ? '（' + r.reason + '）' : ''}；算法原判 ${auto}`
 })
-const passCount = computed(() => (data.value?.criteria || []).filter(c => c.pass).length)
+// V1.1.2：ABSENT 的行（例如"本帧未取到模型概率"）要出现在表里，但不参与"通过 n/m"的计数 ——
+// 否则"4/4 通过"会与"暂不放行"并排出现，读者只能得出"系统自相矛盾"这一种结论。
+const criteriaAll = computed(() => data.value?.criteria || [])
+const criteriaScored = computed(() => criteriaAll.value.filter(c => (c.source || '') !== 'ABSENT'))
+const criteriaAbsent = computed(() => criteriaAll.value.length - criteriaScored.value.length)
+const passCount = computed(() => criteriaScored.value.filter(c => c.pass).length)
+const criteriaTone = computed(() => (passCount.value === criteriaScored.value.length ? 'ok' : 'bad'))
 const bothExposureZero = computed(() => {
   const o = data.value?.observed
   return !!o && !o.exposureDirect && !o.exposureDetour
@@ -392,10 +407,28 @@ const sumObserve = computed(() => {
   const b = o.toVis || '无实况'
   return `${short(o.fromName)} ${a} · ${short(o.toName)} ${b}${o.radarOk ? '' : ' · 回波不可用'}`
 })
-const sumCriteria = computed(() => `${passCount.value}/${(data.value?.criteria || []).length} 通过`)
+const sumCriteria = computed(() => `${passCount.value}/${criteriaScored.value.length} 通过` +
+  (criteriaAbsent.value ? ` · ${criteriaAbsent.value} 条未取到` : ''))
+// 裁决一律取列表侧（含模型门槛、绕飞封禁），与板头、左侧列表同源。
 const sumVerdict = computed(() => {
-  const f = data.value?.flight
-  return f ? `${f.decisionLabel} · 概率 ${num(f.riskP, 2)}（${f.riskLevelLabel}）` : ''
+  const f = props.flight
+  return f ? `${f.decisionLabel} · 风险 ${num(f.riskP, 2)}（${f.riskLevelLabel}）` : ''
+})
+
+// 证据快照是哪一分钟：播放中板子不按秒重算，必须把它标出来，否则读者会拿"T+58 的结论"
+// 去比"当前 T+60 的列表"。取后端回传的 minute，而不是本地时钟。
+const snapshotLabel = computed(() => {
+  const m = Number.isFinite(data.value?.minute) ? data.value.minute : props.minute
+  const h = String(Math.floor(m / 60)).padStart(2, '0')
+  const mm = String(Math.round(m % 60)).padStart(2, '0')
+  return `T+${h}:${mm}`
+})
+// 两侧判定不一致时说出来：这是"快照 vs 当前帧"，不是"系统算错了"，但也不是可以不说的事。
+const driftNote = computed(() => {
+  const d = data.value?.flight
+  if (!d || !props.flight) return ''
+  if (String(d.decision || '') === String(props.flight.decision || '')) return ''
+  return `证据快照判「${d.decisionLabel}」，当前帧判「${props.flight.decisionLabel}」——以当前帧为准。`
 })
 const exposureGain = computed(() => {
   const o = data.value?.observed
@@ -479,6 +512,8 @@ function clock(iso) {
 .dd-verd.warn{color:#ffc857;border-color:rgba(220,170,60,.5);background:rgba(180,130,30,.12)}
 .dd-verd.bad{color:#ff8d78;border-color:rgba(230,90,70,.55);background:rgba(190,60,45,.14)}
 .dd-sub{font-size:11px;color:#8fb2c8;margin-top:-3px}
+/* 快照时基：与裁决同样显眼，但不抢裁决的位置 —— 它是限定语，不是结论 */
+.dd-basis{color:#7d9cb3;font-size:10px;margin-left:2px}
 .dd-empty b{display:block;font-size:12.5px;color:#dfeefb;margin-bottom:4px}
 .dd-empty p{font-size:11px;line-height:1.65;color:#8fb2c8}
 .dd-empty p.quiet{color:#6f92a8;margin-top:4px}
@@ -589,6 +624,7 @@ html[data-theme="light"] .dd-seg h4{color:#12314a}
 html[data-theme="light"] .dd-seg h4 i{background:rgba(11,126,166,.12);color:#0b7ea6}
 html[data-theme="light"] .dd-seg h4 em{color:#7d97ad}
 html[data-theme="light"] .dd-sub{color:#5b7a92}
+html[data-theme="light"] .dd-basis{color:#6a8497}
 html[data-theme="light"] .dd-vis .nm,html[data-theme="light"] .dd-crit .lb,
 html[data-theme="light"] .dd-line,html[data-theme="light"] .dd-opt .lb{color:#5b7a92}
 html[data-theme="light"] .dd-vis b,html[data-theme="light"] .dd-line b,

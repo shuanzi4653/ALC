@@ -128,7 +128,10 @@ public class PythonClient {
     }
 
     public org.springframework.http.ResponseEntity<?> decisionRequest(String path, Map<String, Object> body) throws Exception {
-        HttpRequest.Builder requestBuilder = builder(path).timeout(Duration.ofSeconds(30));
+        // V1.1.2：30 s 短于冷启动重建全国载荷的耗时（实测 30.2 s 断在一次 568 KB 的 GET 上，
+        // 报 java.net.http.HttpTimeoutException，前端 90 s 超时被网关抢先）。抬到 75 s，
+        // 留 15 s 给前端超时收尾。
+        HttpRequest.Builder requestBuilder = builder(path).timeout(Duration.ofSeconds(75));
         if (body == null) requestBuilder.GET();
         else requestBuilder.POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body)));
         HttpResponse<String> response = http.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());

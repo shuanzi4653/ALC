@@ -66,3 +66,52 @@ test('前端不许把「没有数字」显示成 0（沿用既有纪律，防止
   assert.equal(typeof riskLabel, 'function')
   assert.equal(riskLabel(0.31), '留观', '概率 31% 的语义档是「留观」——这是概率口径，不是判定口径')
 })
+
+// ── V1.1.2：同一个裁决只能有一个来源 ────────────────────────────────────────
+//
+// 1.1.1 的实测症状：推演页板头「无论绕飞还是停飞都写直飞放行」，判据段「4/4 通过」
+// 与左侧「暂不放行」并排。根因是取证链路少传三个输入（模型概率、绕飞封禁、虚拟气象），
+// 而板头又读取证接口的裁决 —— 两套路径各算一次，谁也不知道对方算出了什么。
+const deduce = readFileSync(new URL('../src/components/traffic/NationDeduce.vue', import.meta.url), 'utf8')
+const nationPanel = readFileSync(new URL('../src/components/traffic/NationPanel.vue', import.meta.url), 'utf8')
+const corridorBrowser = readFileSync(new URL('../src/components/traffic/CorridorBrowser.vue', import.meta.url), 'utf8')
+
+test('推演板头裁决只读列表侧，不读取证数据', () => {
+  assert.ok(deduce.includes('{{ flight.decisionLabel }}'),
+    '板头应读 props.flight.decisionLabel（含模型门槛与绕飞封禁）')
+  assert.ok(!deduce.includes('data?.flight?.decisionLabel'),
+    '不得再用 data.flight.decisionLabel 兜底 —— 那是取证链路的裁决')
+  assert.ok(deduce.includes('裁决：<b :class="tone">{{ flight.decisionLabel }}</b>'),
+    '第 3 段的裁决行同样要跟列表同源')
+})
+
+test('取证请求必须带 virtual，否则虚拟气象下两侧必然分叉', () => {
+  assert.ok(deduce.includes("props.virtual?'&virtual=1'"), '推演板取证缺 virtual')
+  assert.ok(nationPanel.includes("virtualWx.value?'&virtual=1'"), '取证页缺 virtual')
+})
+
+test('走廊页缺字段时不兜底成「直飞放行」', () => {
+  assert.ok(!corridorBrowser.includes("'直飞放行'"),
+    "兜底值不得是「直飞放行」：缺字段会被读成“可以直接飞”")
+  assert.ok(corridorBrowser.includes("'未判定'"), '缺字段应显式写「未判定」')
+})
+
+test('后端取证链路与 /nation/flights 同参：模型概率 + 绕飞封禁 + 虚拟', () => {
+  const py = readFileSync(new URL('../../backend-python/traffic/nation.py', import.meta.url), 'utf8')
+  const start = py.indexOf('def _evidence_locked')
+  const body = py.slice(start, py.indexOf('def evidence(', start))
+  assert.ok(start > 0 && body.length > 0, '找不到 _evidence_locked')
+  assert.ok(body.includes('_model_probs()'), '取证未传模型概率（MODEL_HOLD 门槛失效）')
+  assert.ok(body.includes('blocked_ids=blocked_ids'), '取证未传绕飞封禁（无小绕的走廊会被判成可飞）')
+  assert.ok(body.includes('_virtual_'), '取证不认虚拟气象')
+})
+
+test('模型概率缺失时判据仍出 ABSENT 行，不静默少一条', () => {
+  const py = readFileSync(new URL('../../backend-python/traffic/nation.py', import.meta.url), 'utf8')
+  const start = py.indexOf("if flight.get('pModel') is not None:")
+  assert.ok(start > 0, '找不到模型判据分支')
+  const tail = py.slice(start, start + 1800)
+  assert.ok(tail.includes("'source': 'ABSENT'"),
+    '缺少 ABSENT 兜底行：判据会少一条，页脚就会出现「4/4 通过」')
+})
+

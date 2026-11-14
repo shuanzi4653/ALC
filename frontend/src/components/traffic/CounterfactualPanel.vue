@@ -4,7 +4,7 @@ import {requestJson} from '../../api.js'
 import {activeCase,caseMeta} from '../../traffic/caseMode.js'
 import {pct} from '../../traffic/runtime.js'
 
-const props=defineProps({minute:{type:Number,default:60}})
+const props=defineProps({minute:{type:Number,default:60},virtual:{type:Boolean,default:false}})
 const data=ref(null),error=ref(''),loading=ref(false),policy=ref('balanced')
 
 const DEFAULT_CF_CASE='fog-20250105'
@@ -76,7 +76,7 @@ async function loadNational(){
   loading.value=true
   try{
     const payload=await requestJson(
-      `/api/traffic/v2/nation?level=nation&minute=${Math.round(props.minute||60)}`,{timeoutMs:60000})
+      `/api/traffic/v2/nation?level=nation&minute=${Math.round(props.minute||60)}${props.virtual?'&virtual=1':''}`,{timeoutMs:60000})
     if(disposed)return
     data.value=buildNational(payload)
     error.value=''

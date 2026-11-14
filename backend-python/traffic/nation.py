@@ -1363,8 +1363,12 @@ def _totals(blocks: List[Dict[str, Any]], flights: List[Dict[str, Any]],
     }
 
 
-def _evidence_locked(flight_id: str, minute: int = 60) -> Dict[str, Any]:
+def _evidence_locked(flight_id: str, minute: int = 60, virtual: bool = False) -> Dict[str, Any]:
     """全国班次的取证链：**每一行都带来源**，没有来源的行不许写。
+
+    V1.1.2：与 ``/nation/flights`` 用**同一套输入**（模型概率、绕飞封禁、虚拟气象）。
+    1.1.1 这里只传了四个参数，于是同一班次出现"列表判停飞、取证判直飞"两套裁决 ——
+    界面上的"无论绕飞还是停飞都写直飞放行"就是这么来的。
 
     设计上刻意不依赖"班次属于哪个层级"：班次 id 里已经带走廊号（`NC-0310#-1`），
     直接按走廊重算这一班，O(1)，不必为了一次点击重建整棵树。
@@ -1383,18 +1387,29 @@ def _evidence_locked(flight_id: str, minute: int = 60) -> Dict[str, Any]:
         return {'status': 'NOT_FOUND', 'flightId': raw,
                 'note': f'没有这条航线：{corridor_id}'}
     minute = max(0, min(1440, int(minute or 0)))
-    radar = _radar()
-    table = _detour_table(radar.get('ts') or 'none') if radar.get('available') else {}
+    if virtual:
+        radar = _virtual_radar(_virtual_bucket(minute))
+        table, blocked_ids = _virtual_detour_table(_virtual_bucket(minute))
+    else:
+        radar = _radar()
+        table = _detour_table(radar.get('ts') or 'none') if radar.get('available') else {}
+        blocked_ids = set()
     weather_body = _city_weather_payload()
     weather = weather_body.get('cities') or {}
     weather_ts = weather_body.get('fetchedAt')
+    if virtual:
+        # 虚拟气象的唯一开关点是能见度。取证必须与判定同源，否则会出现
+        # "观测段写实况 4.2 km、裁决段按虚拟雾判停飞"这种同页矛盾。
+        weather = _virtual_vis_override(_city_rows(), weather, _virtual_bucket(minute))
     scoped = _slice_corridors({destination['fromProvince'], destination['toProvince']})
     corridor = next((item for item in scoped if item['id'] == corridor_id), None)
     if corridor is None:
         return {'status': 'NOT_FOUND', 'flightId': raw, 'note': '航线不在当前路网里'}
     if table.get(corridor_id):
         corridor['detour'] = table[corridor_id]
-    flights = nation_ops.flight_objects([corridor], minute, table, weather)
+    blocked = corridor_id in (blocked_ids or set())
+    flights = nation_ops.flight_objects([corridor], minute, table, weather, _model_probs(),
+                                        blocked_ids=blocked_ids)
     flight = next((item for item in flights if item['id'] == raw), None)
     if flight is None:
         return {'status': 'NOT_AIRBORNE', 'flightId': raw, 'minute': minute,
@@ -1491,7 +1506,16 @@ def _evidence_locked(flight_id: str, minute: int = 60) -> Dict[str, Any]:
             'ratio': round(min(1.0, wind_val / nation_ops.WIND_HIGH), 3),
             'pass': wind_val < nation_ops.WIND_HIGH, 'source': 'PUBLIC',
         })
-    if radar_ok:
+    if radar_ok and blocked:
+        # 被封禁的走廊：航路确实压在强回波里，只是找不到能脱离的小绕方案。
+        # 这里写"无压线"会把停飞原因抹掉 —— 页面上就只剩"全都通过却停飞"。
+        criteria.append({
+            'key': 'echo', 'label': '航路穿强回波',
+            'display': '压在强回波内', 'actual': None, 'threshold': 0.0, 'unit': 'km',
+            'higherBetter': False, 'ratio': 1.0, 'pass': False, 'source': 'DERIVED',
+            'note': '航路压在强回波内，且周围没有可脱离的小绕方案',
+        })
+    elif radar_ok:
         hit = float(detour.get('hitKm') or 0.0)
         criteria.append({
             'key': 'echo', 'label': '航路穿强回波',
@@ -1507,7 +1531,7 @@ def _evidence_locked(flight_id: str, minute: int = 60) -> Dict[str, Any]:
                          'note': '本帧没取到回波，这一条不参与裁决'})
     criteria.append({
         'key': 'risk', 'label': '运行风险概率',
-        'display': f"{flight['riskP']:.2f}（{flight['riskLevelLabel']}）",
+        'display': f"{flight['riskP']:.2f}（规则{flight.get('riskBandLabel') or flight['riskLevelLabel']}）",
         'actual': round(flight['riskP'], 3), 'threshold': nation_ops.RISK_HOLD,
         'unit': '', 'higherBetter': False,
         'ratio': round(min(1.0, flight['riskP'] / nation_ops.RISK_HOLD), 3),
@@ -1520,6 +1544,17 @@ def _evidence_locked(flight_id: str, minute: int = 60) -> Dict[str, Any]:
             'threshold': nation_ops.MODEL_HOLD, 'unit': '', 'higherBetter': False,
             'ratio': round(min(1.0, flight['pModel'] / nation_ops.MODEL_HOLD), 3),
             'pass': flight['pModel'] < nation_ops.MODEL_HOLD, 'source': 'DERIVED',
+        })
+    else:
+        # 与回波缺失同样的处理：**这一条要出现**，只是标 ABSENT。
+        # 1.1.1 这里是"没有就不写"，于是判据只剩四条、页脚写"4/4 通过"，
+        # 而停飞恰恰可能来自模型门槛 —— 屏幕上看不到任何一条不通过项。
+        criteria.append({
+            'key': 'pmodel', 'label': '模型低能见概率（ml-v3）',
+            'display': '未取到', 'actual': None, 'threshold': nation_ops.MODEL_HOLD,
+            'unit': '', 'higherBetter': False, 'ratio': 0.0,
+            'pass': True, 'source': 'ABSENT',
+            'note': '本帧未取到模型概率，这一条不参与裁决（也不计入"通过"数）',
         })
 
     # —— 期望损失：直飞 / 绕飞 / 延期三个方案的代价对比 ——
@@ -1575,7 +1610,7 @@ def _evidence_locked(flight_id: str, minute: int = 60) -> Dict[str, Any]:
     else:
         conclusion += '；端点实况与航路回波均未触发改航条件'
     return {
-        'status': 'OK', 'flightId': raw, 'minute': minute,
+        'status': 'OK', 'flightId': raw, 'minute': minute, 'virtual': bool(virtual),
         'generatedAt': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
         'flight': {key: flight[key] for key in
                    ('id', 'callsign', 'fromName', 'toName', 'departAt', 'arriveAt',
@@ -1802,6 +1837,6 @@ def pulse() -> Dict[str, Any]:
         return _pulse_locked()
 
 
-def evidence(flight_id: str, minute: int = 60) -> Dict[str, Any]:
+def evidence(flight_id: str, minute: int = 60, virtual: bool = False) -> Dict[str, Any]:
     with _NATION_LOCK:
-        return _evidence_locked(flight_id, minute)
+        return _evidence_locked(flight_id, minute, virtual)

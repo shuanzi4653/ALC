@@ -554,13 +554,17 @@ def traffic_v2_nation_journal(minute: int = Query(60, ge=0, le=1440),
 
 @app.get('/traffic/v2/nation/evidence')
 def traffic_v2_nation_evidence(flight: str = Query(..., min_length=3),
-                               minute: int = Query(60, ge=0, le=1440)):
+                               minute: int = Query(60, ge=0, le=1440),
+                               virtual: int = Query(0, ge=0, le=1)):
     """全国班次的取证链。
 
     大模型只在配置了 key 时才可能参与；**没配置就明说**，不给"像模型结论"的规则话术。
+
+    V1.1.2：接受 `virtual`，与 `/nation/flights` 同参。此前进证不认虚拟气象，
+    界面开"虚拟增强"后同一班次会出现两套裁决（列表判停飞、取证判直飞）。
     """
     from traffic import nation as traffic_nation
-    body = traffic_nation.evidence(flight, minute)
+    body = traffic_nation.evidence(flight, minute, bool(virtual))
     configured = bool(DS_CFG.get('api_key'))
     source = DS_CFG.get('key_source', 'none')
     where = {'env': '环境变量 DEEPSEEK_API_KEY',

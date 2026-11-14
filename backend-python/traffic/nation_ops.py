@@ -113,6 +113,9 @@ def _risk(row: Dict[str, Any], weather: Dict[str, Dict[str, Any]],
 
     level = 'HIGH' if (risk >= RISK_HOLD or (p_model or 0) >= MODEL_HOLD) else (
         'MEDIUM' if (risk >= RISK_WATCH or (p_model or 0) >= MODEL_WATCH) else 'LOW')
+    # 规则分自己的档。综合档（level）含模型门槛，单独拿它去标注"风险 0.05"会写成
+    # "0.05（高）" —— 数字与档位互相否定。判据行与板头副标用这个，别用 level。
+    rule_band = 'HIGH' if risk >= RISK_HOLD else ('MEDIUM' if risk >= RISK_WATCH else 'LOW')
     if detour:
         decision = 'DETOUR'
     elif risk >= RISK_HOLD or (p_model or 0) >= MODEL_HOLD:
@@ -120,6 +123,7 @@ def _risk(row: Dict[str, Any], weather: Dict[str, Dict[str, Any]],
     else:
         decision = 'RELEASE'
     return {'riskP': risk, 'riskLevel': level, 'riskLevelLabel': LEVEL_LABEL[level],
+            'riskBand': rule_band, 'riskBandLabel': LEVEL_LABEL[rule_band],
             'decision': decision, 'decisionLabel': DECISION_LABEL[decision],
             'drivers': drivers, 'visM': vis, 'windMps': wind,
             'pModel': p_model, 'probSource': source}
@@ -262,7 +266,9 @@ def flight_objects(corridors: Iterable[Dict[str, Any]], minute: int,
             'status': 'DELAYED' if detour else 'ON_TIME',
             'delayMin': late, 'detourKm': detour['shiftKm'] if detour else 0.0,
             'riskP': risk['riskP'], 'riskLevel': risk['riskLevel'],
-            'riskLevelLabel': risk['riskLevelLabel'], 'probSource': risk['probSource'],
+            'riskLevelLabel': risk['riskLevelLabel'],
+            'riskBand': risk.get('riskBand'), 'riskBandLabel': risk.get('riskBandLabel'),
+            'probSource': risk['probSource'],
             'pModel': risk['pModel'],
             'decision': risk['decision'], 'decisionLabel': risk['decisionLabel'],
             'drivers': risk['drivers'],

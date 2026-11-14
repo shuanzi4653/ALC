@@ -203,7 +203,9 @@ const verdictText = computed(() => {
   if (!r) return '—'
   if (r.review) return '人工 · ' + reviewLabel(r.review.action)
   if (r.blocked) return '停飞（边界受限）'
-  return r.decisionLabel || (r.hold ? '延期' : '直飞放行')
+  // V1.1.2：缺字段时**不许默认成最松的结论**。原来兜底写"直飞放行"，
+  // 于是字段一缺就显示成"可以直接飞"，而且没人看得出这是兜底。
+  return r.decisionLabel || (r.hold ? '延期' : '未判定')
 })
 const altBand = computed(() => {
   const f = activeFlight.value
@@ -240,7 +242,9 @@ function setReview(action) {
     action,
     reason: same ? (cur.reason || '') : (draft.value.trim() || (cur ? cur.reason : '') || ''),
     at: same ? cur.at : Date.now(),
-    auto: cur?.auto || r.decisionLabel || (r.blocked ? '停飞（边界受限）' : '直飞放行'),
+    // 这一条会作为"算法原判"写进本地裁决记录与日志：兜底值绝不能是"直飞放行"，
+    // 否则留痕里会出现一条从未发生过的放行结论。
+    auto: cur?.auto || r.decisionLabel || (r.blocked ? '停飞（边界受限）' : '未判定'),
   } }
   draft.value = ''
   persist()

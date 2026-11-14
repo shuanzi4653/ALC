@@ -223,7 +223,7 @@ async function loadEvidence(){
   evidenceErr.value=''
   try{
     evidence.value=await requestJson(
-      `/api/traffic/v2/nation/evidence?flight=${encodeURIComponent(flight.id)}&minute=${Math.round(minute.value)}`,
+      `/api/traffic/v2/nation/evidence?flight=${encodeURIComponent(flight.id)}&minute=${Math.round(minute.value)}${virtualWx.value?'&virtual=1':''}`,
       {timeoutMs:25000})
   }catch(e){evidenceErr.value=e.message||String(e);evidence.value=null}
   finally{evidenceBusy.value=false}
@@ -1039,7 +1039,7 @@ onUnmounted(()=>{
       <!-- 上：区块。全国只列大区，点进去才换成省；再往里换城市 —— 一层只放一层 -->
       <!-- 推演：六段链路。与态势共用同一栏，但内容完全不同 ——
            之前两页长得一样，是因为推演根本没有自己的面板，直接复用了右栏。 -->
-      <NationDeduce v-if="mode==='card'" :flight="selectedFlight" :minute="minute" :paused="!playing"/>
+      <NationDeduce v-if="mode==='card'" :flight="selectedFlight" :minute="minute" :paused="!playing" :virtual="virtualWx"/>
 
       <div class="nrn-blocks" v-if="mode!=='card'">
         <template v-if="rollup.level==='nation'">
@@ -1205,7 +1205,7 @@ onUnmounted(()=>{
                  未配置才展开那段可执行的说明（琥珀色，属于"要你动手"的话）。 -->
             <i class="ev-llm" :class="{off:!evidence.llm?.configured}"
                :title="evidence.llm?.note">
-              {{ evidence.llm?.configured ? '大模型就绪 · '+(evidence.llm?.model||'') : '大模型未配置' }}
+              {{ evidence.llm?.configured ? '大模型已配置 · '+(evidence.llm?.model||'')+'（本页未调用）' : '大模型未配置' }}
             </i>
           </div>
           <div class="ev-steps">
