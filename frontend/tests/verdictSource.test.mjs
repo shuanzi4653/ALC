@@ -129,7 +129,7 @@ test('阈值只从后端下发，前端四处不再各存一个数', () => {
 })
 
 test('取证页真的调用一次大模型，并如实标注来源', () => {
-  assert.ok(nationPanel.includes('/api/traffic/v2/explain'), '取证页没有调用翻译器')
+  assert.ok(nationPanel.includes('/api/traffic/v2/nation/explain'), '取证页没有调用班次级解读接口')
   assert.ok(nationPanel.includes("reading.source === 'MODEL'"), '必须按 source 标注是模型还是模板句')
   assert.ok(nationPanel.includes('data-evidence-reading'), '缺少解读结果区域')
 })
