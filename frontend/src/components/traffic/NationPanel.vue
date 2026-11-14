@@ -235,12 +235,13 @@ async function loadEvidence(){
 // 这里只负责把 source 如实显示出来 —— 不把模板句说成"模型结论"。
 const reading=ref(null), readingBusy=ref(false), readingErr=ref('')
 async function explainReading(){
-  const corridor=(selectedFlight.value&&selectedFlight.value.corridor)
-    || String(evidence.value?.flight?.id||'').split('#')[0]
-  if(!corridor){readingErr.value='当前班次没有对应走廊，无法生成解读';return}
+  const f=selectedFlight.value
+  if(!f){readingErr.value='先选一个班次';return}
   readingBusy.value=true;readingErr.value=''
   try{
-    reading.value=await requestJson('/api/traffic/v2/explain?corridorId='+encodeURIComponent(corridor),
+    // 走班次级接口：走廊级 /v2/explain 只认初赛走廊编号，全国 NC-xxxx 会一律 NOT_FOUND。
+    reading.value=await requestJson(
+      `/api/traffic/v2/nation/explain?flight=${encodeURIComponent(f.id)}&minute=${Math.round(minute.value)}${virtualWx.value?'&virtual=1':''}`,
       {timeoutMs:25000})
   }catch(e){readingErr.value=e.message||String(e);reading.value=null}
   finally{readingBusy.value=false}
@@ -1251,7 +1252,7 @@ onUnmounted(()=>{
               <p class="ev-read-meta">
                 来源：{{ reading.source === 'MODEL' ? '大模型（数字守卫通过）' : '模板句（未参与或未通过守卫）' }}
                 <template v-if="(reading.guard?.violations || []).length"> · 被拦下的数字：{{ reading.guard.violations.join('、') }}</template>
-                · 范围：单条走廊，与班次判定共用同一套阈值
+                · 范围：本班次，数字受守卫，裁决不受影响
               </p>
             </template>
           </div>

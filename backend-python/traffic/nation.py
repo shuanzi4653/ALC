@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 import threading
 from datetime import datetime, timezone
 from functools import lru_cache
@@ -1606,11 +1607,20 @@ def _evidence_locked(flight_id: str, minute: int = 60, virtual: bool = False) ->
                      'options': options, 'best': best,
                      'formula': '代价 = 风险概率×1.0 + 延误分钟÷60×0.6 + 航程增量km×0.02'}
 
-    conclusion = f"{flight['decisionLabel']}：风险 {flight['riskP']:.2f}"
-    if detour:
-        conclusion += f"；原航路穿回波 {detour.get('hitKm')} km，已外偏 {detour.get('shiftKm')} km"
+    # 结论句要跟裁决同源：1.1.1 这里对"封禁停飞"的班次写"未触发改航条件"，
+    # 于是取证链顶部出现"停飞：风险 0.72；……未触发改航条件"——一句话里两个相反结论。
+    reasons = []
+    if blocked:
+        reasons.append('航路压在强回波内，且周围没有可脱离的小绕方案')
+    elif detour:
+        reasons.append(f"原航路穿回波 {detour.get('hitKm')} km，已外偏 {detour.get('shiftKm')} km")
     else:
-        conclusion += '；端点实况与航路回波均未触发改航条件'
+        reasons.append('端点实况与航路回波均未触发改航条件')
+    _p_model = flight.get('pModel')
+    if flight['decision'] == 'HOLD' and not blocked and _p_model is not None \
+            and _p_model >= nation_ops.MODEL_HOLD:
+        reasons.append(f"模型低能见概率 {_p_model:.0%} 达到停飞门槛")
+    conclusion = f"{flight['decisionLabel']}：风险 {flight['riskP']:.2f}；" + '；'.join(reasons)
     return {
         'status': 'OK', 'flightId': raw, 'minute': minute, 'virtual': bool(virtual),
         'generatedAt': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
@@ -1837,6 +1847,98 @@ def pulse() -> Dict[str, Any]:
     """心跳同样要串行：它内部要算雷达环数（shapely），和主请求并发就会崩进程。"""
     with _NATION_LOCK:
         return _pulse_locked()
+
+
+_NARRATE_NUM = re.compile(r'\d+(?:\.\d+)?')
+
+
+def _narrate_numbers(text: str) -> set:
+    out = set()
+    for token in _NARRATE_NUM.findall(text or ''):
+        try:
+            out.add('%g' % float(token.rstrip('.')))
+        except ValueError:
+            continue
+    return out
+
+
+def narrate(flight_id: str, minute: int = 60, virtual: bool = False,
+            cfg: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """班次级"一句解读"：大模型在界面上**唯一**真正产出自然语言的地方（V1.1.2）。
+
+    为什么不用 `/v2/explain`：那个翻译器绑在走廊剖面上，只认初赛那批走廊编号，
+    对全国 `NC-xxxx` 一律 `NOT_FOUND` —— 取证页挂上去只会显示"走廊剖面不可用"。
+
+    守卫与 `/v2/explain` 同一套：只能用证据里已有的数字；出现集合外数字回灌重写一次；
+    两次不过就退回 `conclusion`（它本身就是一句带数字的结论，不是"生成失败"）。
+    """
+    body = evidence(flight_id, minute, virtual)
+    if body.get('status') != 'OK':
+        return {'status': body.get('status'), 'flightId': flight_id,
+                'note': body.get('note') or '该班次此刻无法解读'}
+    f = body['flight']
+    facts = {
+        '班次': f['callsign'],
+        '航线': '%s → %s' % (f['fromName'], f['toName']),
+        '裁决': f['decisionLabel'],
+        '规则风险概率': f['riskP'],
+        '规则档': f.get('riskBandLabel'),
+        '模型低能见概率': f.get('pModel'),
+        '判据': [{'项': c.get('label'), '实测': c.get('display'),
+                  '阈值': c.get('threshold'), '通过': bool(c.get('pass')),
+                  '来源': c.get('source')} for c in body.get('criteria') or []],
+        '结论': body.get('conclusion'),
+    }
+    template = body.get('conclusion') or ''
+    allowed = _narrate_numbers(json.dumps(facts, ensure_ascii=False))
+    for token in list(allowed):
+        try:
+            value = float(token)
+        except ValueError:
+            continue
+        if 0.0 <= value <= 1.0:            # 0.63 与 63% 都算"同一个数"
+            allowed.add('%g' % round(value * 100))
+    result = {'status': 'OK', 'flightId': flight_id, 'minute': body.get('minute'),
+              'virtual': bool(virtual), 'text': template, 'template': template,
+              'source': 'TEMPLATE', 'guard': {'violations': [], 'retried': False},
+              'evidence': facts}
+
+    api_key = (cfg or {}).get('api_key')
+    if not api_key:
+        result['note'] = '未配置大模型：本句由证据链的结论句直接给出（不是模型生成）'
+        return result
+
+    system = ('你是低空运行的值班员。把给定的结构化证据翻译成一句中文说明：'
+              '只能使用输入里出现过的数字，禁止推算、禁止四舍五入到新数值、禁止补充输入里没有的数字；'
+              '不得改变裁决结论；不超过 80 字；不要分点；不要自称 AI。')
+    messages = [{'role': 'system', 'content': system},
+                {'role': 'user', 'content': json.dumps(facts, ensure_ascii=False)}]
+    try:
+        import httpx
+        for attempt in range(2):
+            with httpx.Client(timeout=httpx.Timeout(15, connect=5), trust_env=False) as client:
+                response = client.post((cfg.get('base_url') or '').rstrip('/') + '/chat/completions',
+                                       headers={'Authorization': 'Bearer ' + api_key},
+                                       json={'model': cfg.get('model', 'deepseek-chat'),
+                                             'temperature': 0, 'max_tokens': 220,
+                                             'messages': messages})
+                response.raise_for_status()
+                text = (response.json()['choices'][0]['message']['content'] or '').strip()
+            extra = sorted(_narrate_numbers(text) - allowed)
+            if not extra:
+                result.update({'text': text, 'source': 'MODEL',
+                               'guard': {'violations': [], 'retried': attempt > 0}})
+                return result
+            result['guard'] = {'violations': extra, 'retried': attempt > 0}
+            messages.append({'role': 'assistant', 'content': text})
+            messages.append({'role': 'user',
+                             'content': '上一句出现了输入里没有的数字（%s）。只能用给定数字，重写一句。'
+                                        % '、'.join(extra)})
+        result['note'] = '两次生成都引入集合外数字（%s），已退回结论句' % '、'.join(result['guard']['violations'])
+        return result
+    except Exception as exc:  # noqa: BLE001 - 模型不可用不能把页面打崩
+        result['note'] = '大模型不可用（%s），已退回结论句' % type(exc).__name__
+        return result
 
 
 def evidence(flight_id: str, minute: int = 60, virtual: bool = False) -> Dict[str, Any]:

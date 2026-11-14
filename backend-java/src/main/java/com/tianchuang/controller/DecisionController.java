@@ -118,6 +118,16 @@ public class DecisionController {
         return python.rawBytes("/terrain/" + z + "/" + x + "/" + y + ".png");
     }
 
+    /**
+     * 班次级一句解读。同样是两段路径，`{resource}` 单段白名单接不住。
+     */
+    @GetMapping("/traffic/v2/nation/explain")
+    public ResponseEntity<?> nationExplain(@RequestParam Map<String, String> params) throws Exception {
+        String query = params.entrySet().stream().map(e -> encode(e.getKey()) + "=" + encode(e.getValue()))
+                .collect(Collectors.joining("&"));
+        return python.decisionRequest("/traffic/v2/nation/explain" + (query.isEmpty() ? "" : "?" + query), null);
+    }
+
     @GetMapping("/traffic/v2/nation/evidence")
     public ResponseEntity<?> nationEvidence(@RequestParam Map<String, String> params) throws Exception {
         String query = params.entrySet().stream().map(e -> encode(e.getKey()) + "=" + encode(e.getValue()))

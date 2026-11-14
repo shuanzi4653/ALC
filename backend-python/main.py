@@ -585,6 +585,18 @@ def traffic_v2_nation_evidence(flight: str = Query(..., min_length=3),
         raise HTTPException(404, body.get('note') or '未找到该班次')
     return body
 
+@app.get('/traffic/v2/nation/explain')
+def traffic_v2_nation_explain(flight: str = Query(..., min_length=3),
+                              minute: int = Query(60, ge=0, le=1440),
+                              virtual: int = Query(0, ge=0, le=1)):
+    """班次级一句解读（V1.1.2）。
+
+    与 `/traffic/v2/explain` 的区别：后者绑在走廊剖面上，只认初赛那批走廊编号；
+    全国 `NC-xxxx` 走它会一律 NOT_FOUND。这里按班次取证链生成，数字守卫同源。
+    """
+    from traffic import nation as traffic_nation
+    return traffic_nation.narrate(flight, minute, bool(virtual), DS_CFG)
+
 @app.get('/traffic/v2/national')
 def traffic_v2_national():
     """全国层聚合（七 大区 + 省级三态）。只读缓存，不做全网推理。"""
