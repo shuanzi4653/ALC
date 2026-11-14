@@ -93,7 +93,7 @@ public class DecisionController {
     @GetMapping("/observations")
     public ResponseEntity<?> observations() throws Exception { return python.decisionRequest("/observations", null); }
 
-    @GetMapping("/traffic/v2/{resource:overview|national|nation|corridors|modelcard|counterfactual|divergences|explain}")
+    @GetMapping("/traffic/v2/{resource:overview|national|nation|corridors|modelcard|counterfactual|divergences|explain|constants}")
     public ResponseEntity<?> trafficV2(@PathVariable String resource,
                                        @RequestParam Map<String, String> params) throws Exception {
         String query = params.entrySet().stream().map(e -> encode(e.getKey()) + "=" + encode(e.getValue()))
